@@ -87,7 +87,6 @@ async function startTask(taskId) {
   if (!task) return;
 
   // tell main process the task is starting
-  // main may do things like start a timer or log the event
   try {
     await window.nucleus.startTask(task);
   } catch (error) {
@@ -129,7 +128,6 @@ function closeTab(tabId) {
 
   // if the closed tab was active, navigate to the next best tab
   if (state.activeTabId === tabId) {
-    // try the tab after it, then the one before it, then fall back to the center tab
     const nextTab = visibleTabs[index] || visibleTabs[index - 1];
     state.activeTabId = nextTab && nextTab.id !== tabId
       ? nextTab.id
@@ -145,7 +143,6 @@ function closeTab(tabId) {
 // syncs the active class on the three primary top tabs (Projects, Tasks, Workspace)
 function renderPrimaryTabs() {
   document.querySelectorAll("#primary-tabs button").forEach(button => {
-    // add "active" class if this button's section matches the current active section
     button.classList.toggle("active", button.dataset.section === state.activeSection);
   });
 }
@@ -154,7 +151,6 @@ function renderPrimaryTabs() {
 function renderWorkspaceTabs() {
   const workspaceTabs = document.getElementById("workspace-tabs");
 
-  // build one button per workspace, marking the active one
   workspaceTabs.innerHTML = workspaces.map(workspace => `
     <button type="button" class="${workspace.id === state.activeWorkspaceId ? "active" : ""}" data-workspace="${workspace.id}">
       <span>${workspace.name}</span>
@@ -162,7 +158,6 @@ function renderWorkspaceTabs() {
     </button>
   `).join("");
 
-  // attach click listeners after rebuilding — needed because innerHTML destroys old listeners
   workspaceTabs.querySelectorAll("button").forEach(button => {
     button.addEventListener("click", () => setActiveWorkspace(button.dataset.workspace));
   });
@@ -176,7 +171,6 @@ function renderWorkspacePageTabs() {
   // hide the tab strip entirely when not in a workspace
   pageTabs.classList.toggle("is-hidden", state.top !== "workspace");
 
-  // build one button per visible tab, with a close button for non-center tabs
   pageTabs.innerHTML = state.activeSection === "workspace" ? visibleTabs.map(tab => `
     <button type="button" class="workspace-page-tab ${tab.id === state.activeTabId ? "active" : ""}" data-tab-id="${tab.id}">
       <span>${tab.label}</span>
@@ -184,17 +178,14 @@ function renderWorkspacePageTabs() {
     </button>
   `).join("") : "";
 
-  // attach click listeners after rebuilding
   pageTabs.querySelectorAll(".workspace-page-tab").forEach(tabButton => {
     tabButton.addEventListener("click", event => {
-      // check if the click was on the close button
       const closeTarget = event.target.closest("[data-close-tab]");
       if (closeTarget) {
         closeTab(closeTarget.dataset.closeTab);
         return;
       }
 
-      // otherwise switch to the clicked tab
       state.activeTabId = tabButton.dataset.tabId;
       render();
     });
@@ -219,7 +210,7 @@ function renderTaskCard(task) {
   `;
 }
 
-// builds the HTML for the Projects dashboard (all course and personal project cards)
+// builds the HTML for the Projects dashboard
 function renderProjectsDashboard() {
   return `
     <header>
@@ -247,7 +238,7 @@ function renderProjectsDashboard() {
   `;
 }
 
-// builds the HTML for the Tasks page (all tasks across all workspaces)
+// builds the HTML for the Tasks page
 function renderSuggestedTasks() {
   return `
     <header>
@@ -262,9 +253,8 @@ function renderSuggestedTasks() {
   `;
 }
 
-// builds the HTML for a workspace's Project Center (the default landing tab)
+// builds the HTML for a workspace's Project Center
 function renderProjectCenter(workspace) {
-
   return `
     <header>
       <h1>${workspace.name} Project Center</h1>
@@ -285,8 +275,6 @@ function renderProjectCenter(workspace) {
 
 // builds the HTML for an open task workspace tab
 function renderTaskWorkspace(tab) {
-  // find the task this tab belongs to
-  // if it no longer exists, fall back to showing the project center
   const task = tasks.find(item => item.id === tab.taskId);
   if (!task) return renderProjectCenter(getWorkspace(state.activeWorkspaceId));
 
@@ -308,7 +296,6 @@ function renderTaskWorkspace(tab) {
 
 // decides what to show in the main content area and renders it
 function renderView() {
-  // resolve the active tab object if we're in workspace mode
   const activeTab = state.activeSection === "workspace"
     ? state.tabs.find(tab => tab.id === state.activeTabId) || {
         id: ensureWorkspaceCenter(state.activeWorkspaceId),
@@ -319,7 +306,6 @@ function renderView() {
 
   const view = document.getElementById("view");
 
-  // pick which view to render based on current state
   if (state.activeSection === "projects") {
     view.innerHTML = renderProjectsDashboard();
   } else if (state.activeSection === "tasks") {
@@ -330,61 +316,60 @@ function renderView() {
     view.innerHTML = renderProjectCenter(getWorkspace(state.activeWorkspaceId));
   }
 
-  // re-attach event listeners after innerHTML replacement
-
-  // start task buttons on task cards
   view.querySelectorAll("[data-start-task]").forEach(button => {
     button.addEventListener("click", () => startTask(button.dataset.startTask));
   });
 
-  // navigation buttons that switch top sections
   view.querySelectorAll("[data-open-section]").forEach(button => {
     button.addEventListener("click", () => setActiveSection(button.dataset.openSection));
   });
-
 }
 
 // master render function — rebuilds all four regions of the UI
 function render() {
-  renderPrimaryTabs();       // top nav tabs
-  renderWorkspaceTabs();     // workspace sidebar tabs
-  renderWorkspacePageTabs(); // page tabs within a workspace
-  renderView();              // main content area
+  renderPrimaryTabs();
+  renderWorkspaceTabs();
+  renderWorkspacePageTabs();
+  renderView();
 }
+
+
+// ─── AI Agent ─────────────────────────────────────────────────────────────────
 
 function startagent() {
   const input = document.getElementById("ai-input");
   const messages = document.getElementById("ai-messages");
   let currentResponse = null;
-  let responded = false
 
-  window.nucleus.on('prompt:response-chunk', (response) => {
-    console.log("chunk received:", response);
-    if (responded == false) {
-      messages.appendChild(currentResponse)
-      responded = true;}
-    currentResponse.innerText += response;
+  // listen for streaming chunks from Claude
+  window.nucleus.on('prompt:response-chunk', (chunk) => {
+    // create response div on first chunk
+    if (!currentResponse) {
+      currentResponse = document.createElement("div");
+      currentResponse.classList.add("ai-message", "response");
+      messages.appendChild(currentResponse);
+    }
+    currentResponse.innerText += chunk;
     messages.scrollTop = messages.scrollHeight;
   });
 
   input.addEventListener("keypress", event => {
-    if (event.key === "Enter") {
-      if (input.value.trim() === "") return;
-      responded = false;
-      const message = document.createElement("div");
-      
-      const responsemessage = document.createElement("div");
-      currentResponse = responsemessage;
-      currentResponse.classList.add("ai-message", "response");
+    if (event.key !== "Enter") return;
+    if (input.value.trim() === "") return;
 
-      message.classList.add("ai-message")
-      message.innerText = input.value
-      window.nucleus.sendprompt(input.value);
-      messages.appendChild(message)
-      input.value = "";
-        messages.scrollTop = messages.scrollHeight;
-    }
-  })
+    // reset response div for new message
+    currentResponse = null;
+
+    // add user message to chat
+    const message = document.createElement("div");
+    message.classList.add("ai-message");
+    message.innerText = input.value;
+    messages.appendChild(message);
+
+    window.nucleus.sendprompt(input.value);
+    input.value = "";
+    messages.scrollTop = messages.scrollHeight;
+  });
 }
 
 
@@ -402,10 +387,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   workspaces = data.workspaces || [];
   projectGroups = data.projectGroups || [];
 
+  // start the AI agent
   startagent();
 
   // listen for main process pushing updated data down
-  // re-render whenever tasks or workspaces change (e.g. Claude adds a task)
   window.nucleus.on('tasks:update', updatedTasks => {
     tasks = updatedTasks;
     render();

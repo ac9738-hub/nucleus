@@ -583,30 +583,33 @@ h3 {
   gap: 12px;
 }
 
+/* user messages — right aligned */
 .ai-message {
-  background: var(--surface-2);
-  border: 1px solid var(--border);
+  background: var(--accent);
+  border: 1px solid transparent;
   border-radius: 12px;
   padding: 12px 14px;
-  color: var(--text);
+  color: #fff;
   font-size: 14px;
   line-height: 1.5;
   max-width: 80%;
   align-self: flex-end;
-  background: var(--accent);
-  color: #fff;
-  border-color: transparent;
 }
 
+/* Claude responses — left aligned */
 .ai-message.response {
-  align-self: flex-start;  /* Claude on left */
+  align-self: flex-start;
   background: var(--surface-2);
   color: var(--text);
   border-color: var(--border);
 }
 
 .ai-message.system {
-  color: var(--text-dim);
+  align-self: center;
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-mute);
+  font-size: 12px;
 }
 
 .ai-input-section {
