@@ -11,7 +11,7 @@ if not claude_api_key:
         "Missing Claude API key. Set CLAUDE_API_KEY or ANTHROPIC_API_KEY in .env or environment."
     )
 
-client = Anthropic(api_key=claude_api_key)
+client = Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
 
 system_prompt = (
     "You are a helpful assistant for a student organization app called Nucleus. "
