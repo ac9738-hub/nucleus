@@ -1,0 +1,626 @@
+/* =========================
+   NUCLEUS CANVAS THEME
+   ========================= */
+
+/* =========================
+   GLOBAL: TOKENS
+   ========================= */
+
+:root {
+  --bg: #0f1117;
+  --surface: #171a21;
+  --surface-2: #1d212b;
+  --border: #262b36;
+
+  --text: #e7e9ee;
+  --text-dim: #9aa1b1;
+  --text-mute: #6b7280;
+
+  --accent: #7f77dd;
+  --accent-hover: #938cff;
+
+  --danger: #ef4444;
+  --success: #22c55e;
+
+  --radius: 8px;
+
+  --ic-brand-primary: #7f77dd !important;
+  --ic-brand-global-nav-bgd: #0f1117 !important;
+}
+
+/* =========================
+   GLOBAL: PAGE SHELL
+   ========================= */
+
+html,
+body,
+#application,
+#main,
+#content,
+#content-wrapper,
+.ic-app,
+.ic-Layout-wrapper,
+.ic-Layout-contentWrapper,
+.ic-Layout-columns,
+.ic-Layout-contentMain,
+div[role="main"] {
+  background: var(--bg) !important;
+  color: var(--text) !important;
+}
+
+#application,
+#main,
+#content,
+.ic-Layout-contentMain {
+  left: 0 !important;
+  margin-left: 0 !important;
+  max-width: none !important;
+  width: 100% !important;
+}
+
+.ic-Layout-columns,
+.ic-Layout-contentWrapper {
+  margin-left: 0 !important;
+  padding-left: 0 !important;
+}
+
+.ic-Layout-contentMain,
+#content,
+#wiki_page_show,
+#assignment_show,
+#context_modules,
+.user_content,
+.show-content {
+  max-width: none !important;
+  width: 100% !important;
+}
+
+/* =========================
+   GLOBAL: CANVAS NAVIGATION
+   ========================= */
+
+#global_nav,
+#left-side,
+#section-tabs,
+.ic-app-header,
+.ic-app-header__main-navigation,
+.ic-app-header__menu-list,
+.ic-app-header__menu-list-item,
+.ic-app-header__logomark,
+.ic-app-header__logomark-container,
+.ic-app-course-menu,
+.ic-app-course-menu__content,
+.ic-app-course-menu__menu {
+  display: none !important;
+}
+
+.ic-app,
+.ic-Layout-wrapper,
+.ic-Layout-contentWrapper,
+.ic-Layout-columns {
+  margin-left: 0 !important;
+  padding-left: 0 !important;
+}
+
+/* =========================
+   GLOBAL: TOP BARS
+   ========================= */
+
+.ic-app-nav-toggle-and-crumbs,
+.header-bar,
+.breadcrumbs,
+#breadcrumbs,
+.ic-app-crumbs,
+.navigation-tray-container {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+
+/* =========================
+   GLOBAL: TYPOGRAPHY
+   ========================= */
+
+body,
+div,
+span,
+p,
+td,
+th,
+li,
+label,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  color: var(--text) !important;
+}
+
+.title,
+.page-title,
+.assignment-title {
+  color: var(--text) !important;
+}
+
+.description,
+.details,
+.points_possible,
+.display_name,
+.metadata,
+.date,
+.publish-icon,
+.course-title,
+.module-item-title {
+  color: var(--text-dim) !important;
+}
+
+/* =========================
+   GLOBAL: LINKS
+   ========================= */
+
+a {
+  color: var(--accent) !important;
+}
+
+a:hover {
+  color: var(--accent-hover) !important;
+}
+
+/* =========================
+   GLOBAL: FORMS AND BUTTONS
+   ========================= */
+
+button,
+.Button,
+.btn,
+input[type="submit"] {
+  background: var(--surface-2) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius) !important;
+  color: var(--text) !important;
+  transition: all 0.15s ease;
+}
+
+button:hover,
+.Button:hover,
+.btn:hover,
+input[type="submit"]:hover {
+  background: #252a36 !important;
+  border-color: #3a4250 !important;
+}
+
+.btn-primary,
+.Button--primary {
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+  color: white !important;
+}
+
+.btn-primary:hover,
+.Button--primary:hover {
+  background: var(--accent-hover) !important;
+}
+
+input,
+textarea,
+select {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius) !important;
+  color: var(--text) !important;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-mute) !important;
+}
+
+/* =========================
+   GLOBAL: SHARED SURFACES
+   ========================= */
+
+div,
+section,
+article,
+main,
+aside,
+header,
+footer {
+  border-color: var(--border) !important;
+}
+
+.content-box,
+.box,
+.ic-DashboardCard,
+.ig-list,
+ul.ig-list,
+.item-group-container,
+.form-actions,
+.summary,
+.events_list,
+.todo-list,
+.stream_header,
+.discussion-entry {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+  border-radius: var(--radius) !important;
+  color: var(--text) !important;
+}
+
+table,
+.ic-Table,
+thead,
+tbody,
+tr,
+td,
+th {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+
+tr:hover {
+  background: var(--surface-2) !important;
+}
+
+/* =========================
+   GLOBAL: INLINE CANVAS OVERRIDES
+   ========================= */
+
+[style*="background: white"],
+[style*="background-color: white"],
+[style*="background:#fff"],
+[style*="background: #fff"] {
+  background: var(--surface) !important;
+}
+
+[style*="background"],
+[style*="background-color"] {
+  background-color: transparent !important;
+}
+
+button,
+.Button,
+.btn,
+input[type="submit"] {
+  background-color: var(--surface-2) !important;
+}
+
+input,
+textarea,
+select {
+  background-color: var(--surface) !important;
+}
+
+/* =========================
+   GLOBAL: SCROLLBARS AND MOTION
+   ========================= */
+
+* {
+  scrollbar-color: #343a48 transparent;
+  scrollbar-width: thin;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+*::-webkit-scrollbar {
+  height: 10px;
+  width: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #343a48;
+  background-clip: padding-box;
+  border: 2px solid transparent;
+  border-radius: 999px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #4a5162;
+  background-clip: padding-box;
+}
+
+/* =========================
+   PAGE SPECIFIC: ASSIGNMENT PAGES
+   ========================= */
+
+.assignment-show,
+.assignment-content,
+#assignment_show {
+  background: var(--bg) !important;
+}
+
+.assignment,
+.assignment-group,
+.assignment-title {
+  background: transparent !important;
+  border-color: var(--border) !important;
+}
+
+.assignment-details,
+.student-assignment-overview,
+.submission-details-header__heading {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+  border-radius: var(--radius) !important;
+  color: var(--text) !important;
+}
+
+.student-assignment-overview,
+.assignment-details,
+.details,
+.summary,
+.ic-Layout-contentMain > div,
+.ic-Layout-contentMain > span,
+.ic-Layout-contentMain > section,
+.ic-Layout-contentMain > article {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.assignment-details table,
+.assignment-details tbody,
+.assignment-details tr,
+.assignment-details td,
+.assignment-details th,
+.student-assignment-overview table,
+.student-assignment-overview td,
+.student-assignment-overview th {
+  background: #12161d !important;
+  border-color: var(--border) !important;
+}
+
+/* =========================
+   PAGE SPECIFIC: ASSIGNMENT DETAILS
+   ========================= */
+
+.submission-details-header,
+.submission_details {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius) !important;
+  box-shadow: none !important;
+  margin: 0 0 18px !important;
+  padding: 18px !important;
+}
+
+.submission-details-header__heading-and-grades,
+.submission-details-header .ic-Action-header {
+  align-items: flex-start !important;
+  border-color: var(--border) !important;
+  display: flex !important;
+  gap: 18px !important;
+  justify-content: space-between !important;
+}
+
+.submission-details-header__heading,
+.submission_header {
+  color: var(--text) !important;
+  font-weight: 700 !important;
+  margin: 0 !important;
+}
+
+.submission-details-header__grade-summary,
+.grade-values {
+  background: var(--surface-2) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius) !important;
+  color: var(--text) !important;
+}
+
+.submission-details-header__grade-summary {
+  padding: 10px 12px !important;
+}
+
+.grade-values,
+.grade-values tbody,
+.grade-values tr,
+.grade-values th,
+.grade-values td {
+  background: transparent !important;
+  border: 0 !important;
+}
+
+.grade-values th,
+.grade-values td {
+  padding: 4px 8px !important;
+}
+
+.grade-values th {
+  color: var(--text-dim) !important;
+  font-weight: 600 !important;
+}
+
+.grade-values .entered_grade,
+.grade-values .grade,
+.grade-values .bold {
+  color: var(--text) !important;
+  font-weight: 700 !important;
+}
+
+.submission-details-header__info,
+.submission-details-header__time {
+  color: var(--text-dim) !important;
+}
+
+.submission-details-container {
+  align-items: stretch !important;
+  background: transparent !important;
+  display: grid !important;
+  gap: 16px !important;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px) !important;
+  margin-top: 0 !important;
+}
+
+.submission-details-frame,
+.submission-details-comments {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius) !important;
+  box-shadow: none !important;
+  overflow: hidden !important;
+}
+
+.submission-details-frame {
+  background: var(--surface) !important;
+  min-width: 0 !important;
+  max-height: calc(100vh - 270px) !important;
+}
+
+#preview_frame {
+  background: var(--surface) !important;
+  border: 0 !important;
+  color: var(--text) !important;
+  color-scheme: dark !important;
+  display: block !important;
+  height: calc(100vh - 270px) !important;
+  min-height: 420px !important;
+  width: 100% !important;
+}
+
+#preview_frame html,
+#preview_frame body,
+#preview_frame h1,
+#preview_frame h2,
+#preview_frame p,
+#preview_frame div {
+  background: var(--surface) !important;
+  color: var(--text) !important;
+}
+
+body:not(:has(#application)) {
+  background: var(--surface) !important;
+  color: var(--text) !important;
+}
+
+body:not(:has(#application)) * {
+  color: var(--text) !important;
+}
+
+.submission-details-comments,
+.submission-details-comments > div,
+.comments {
+  background: var(--surface) !important;
+  color: var(--text) !important;
+}
+
+.comments {
+  max-height: none !important;
+}
+
+.comment_list,
+#add_comment_form {
+  background: transparent !important;
+  border-color: var(--border) !important;
+}
+
+.add_a_comment strong {
+  color: var(--text) !important;
+}
+
+.grading_comment,
+.ic-Input.grading_comment {
+  background: var(--surface-2) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius) !important;
+  color: var(--text) !important;
+  min-height: 110px !important;
+  width: 100% !important;
+}
+
+.comment,
+.comment span,
+.author_name,
+.posted_at {
+  color: var(--text-dim) !important;
+}
+
+.media_comment_link,
+.attach_comment_file_link {
+  color: var(--accent) !important;
+}
+
+.save_comment_button {
+  margin-top: 10px !important;
+}
+
+@media (max-width: 1100px) {
+  .submission-details-container {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* =========================
+   PAGE SPECIFIC: MODULE PAGES
+   ========================= */
+
+.context_module,
+.context_module_item,
+.module,
+.module-item,
+.module-item-row,
+.module-sequence-footer {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+}
+
+.context_module_item:hover,
+.module-item-row:hover {
+  background: var(--surface-2) !important;
+}
+
+/* =========================
+   PAGE SPECIFIC: RIGHT SIDEBAR
+   ========================= */
+
+#right-side,
+.right-side-wrapper,
+.sidebar-content,
+#submission_details,
+.summary,
+.details {
+  background: #12161d !important;
+  border-color: var(--border) !important;
+}
+
+#right-side,
+.right-side-wrapper,
+.sidebar-content {
+  border-left: 1px solid var(--border) !important;
+}
+
+/* =========================
+   PAGE SPECIFIC: TABLE-LIKE CANVAS LISTS
+   ========================= */
+
+.ic-Table,
+table,
+tbody,
+tr,
+td,
+th,
+.context_module,
+.module,
+.module-item,
+.item-group-container,
+.ig-list,
+ul.ig-list {
+  background: transparent !important;
+}
+
+/* =========================
+   PAGE SPECIFIC: ACCESSIBILITY WIDGET
+   ========================= */
+
+#accessibility-widget,
+#ally-accessible-iframe {
+  opacity: 0.3;
+}

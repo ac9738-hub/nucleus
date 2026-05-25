@@ -8,17 +8,6 @@
   <link rel="stylesheet" href="styles.css">
 
   <style>
-    .app-body {
-      display: flex;
-      height: calc(100vh - 70px);
-    }
-
-    .content {
-      flex: 1;
-      padding: 20px;
-      overflow-y: auto;
-    }
-
     /* RIGHT AI PANEL */
     .ai-panel {
       width: 340px;
@@ -98,6 +87,8 @@
       <nav class="primary-tabs" id="primary-tabs">
         <button type="button" class="active" data-section="projects">Projects</button>
         <button type="button" data-section="tasks">Tasks</button>
+        <button type="button" data-section="calendar">Calendar</button>
+        <span class="primary-tabs-separator" aria-hidden="true"></span>
       </nav>
     </header>
 
@@ -107,11 +98,27 @@
       <aside class="sidebar">
         <div class="sidebar-label">Workspaces</div>
         <nav class="workspace-tabs" id="workspace-tabs"></nav>
+        <button type="button" class="new-workspace-button" id="new-workspace-button">
+          <span>+</span>
+          <span>New workspace</span>
+        </button>
+        <form class="new-workspace-form is-hidden" id="new-workspace-form">
+          <input type="text" id="new-workspace-input" placeholder="Workspace name">
+          <div class="new-workspace-actions">
+            <button type="submit">Add</button>
+            <button type="button" id="cancel-new-workspace">Cancel</button>
+          </div>
+        </form>
       </aside>
 
       <!-- MAIN CONTENT -->
       <main class="content">
-        <div class="workspace-page-tabs" id="workspace-page-tabs"></div>
+        <div class="workspace-page-tabs" id="workspace-page-tabs">
+          <!-- tabs get rendered here by renderer.js -->
+        </div>
+        <div class="browser-toolbar is-hidden" id="browser-toolbar"></div>
+        <div class="canvas-toolbar is-hidden" id="canvas-toolbar"></div>
+        <div class="tab-wipe" id="tab-wipe" aria-hidden="true"></div>
         <div id="view"></div>
       </main>
 
@@ -119,12 +126,12 @@
       <aside class="ai-panel">
 
         <div class="ai-panel-header">
-          Claude Assistant
+           LUMI Assistant
         </div>
 
         <div class="ai-messages" id="ai-messages">
           <div class="ai-message">
-            Ask Claude to add tasks, create workspaces, or organize your schedule.
+            Ask LUMI to add tasks, create workspaces, or organize your schedule.
           </div>
         </div>
 
@@ -132,7 +139,7 @@
           <input
             type="text"
             id="ai-input"
-            placeholder="Ask Claude anything..."
+            placeholder="Ask LUMI anything..."
           >
 
           <button onclick="sendMessage()">
@@ -145,6 +152,7 @@
     </div>
   </div>
 
+  <script src="course.js"></script>
   <script src="renderer.js"></script>
 </body>
 

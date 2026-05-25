@@ -1,0 +1,48 @@
+:root {
+  --bg: #0f1117;
+  --surface: #171a21;
+  --surface-2: #1d212b;
+  --border: #262b36;
+  --text: #e7e9ee;
+  --text-dim: #9aa1b1;
+}
+
+html,
+body {
+  background: var(--surface) !important;
+  color: var(--text) !important;
+  color-scheme: dark !important;
+}
+
+body,
+body * {
+  color: var(--text) !important;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+div,
+span {
+  color: var(--text) !important;
+}
+
+[style*="background"],
+[style*="background-color"] {
+  background-color: transparent !important;
+}
+
+button,
+.Button,
+.btn,
+input,
+textarea,
+select {
+  background: var(--surface-2) !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}

@@ -1,52 +1,306 @@
 from anthropic import Anthropic
+from ollama import chat
+from openai import OpenAI
+from ollama import ChatResponse
 from dotenv import load_dotenv
 import json
 import sys
 import os
 
-load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
-claude_api_key = os.environ.get("CLAUDE_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")
-if not claude_api_key:
-    raise RuntimeError(
-        "Missing Claude API key. Set CLAUDE_API_KEY or ANTHROPIC_API_KEY in .env or environment."
-    )
 
-client = Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+load_dotenv()
+claude_client = Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+deepseek_client = OpenAI(api_key = os.environ.get("DEEP_SEEK_API_KEY"), base_url="https://api.deepseek.com")
 
 system_prompt = (
     "You are a helpful assistant for a student organization app called Nucleus. "
-    "You have full control over in-app actions and a context retrieval system. "
-    "Your task is to assist the user with their questions and requests. "
-    "Do not mention your capabilities unprompted. Do not use markdown formatting."
+    "You have full control over in-app actions. if you call a tool summarize what you did. If not just answer whatever is asked with no extra commentary. Always call a tool if it can help accomplish the user's goal. If you have already addressed a user message in a previous response, do not address it again in future responses. Only address new user messages that have not yet been addressed"
+    "Do not use markdown formatting."
 )
+context_only_system_prompt = (
+    "You are a helpful assistant for a student organization app called Nucleus. "
+    "Your task will most likely need in-app context. You have 2 options. call get_context, or respond"
+)
+local_system_prompt = """
+You are a routing classifier for the Nucleus student app.
 
-tools = []
+Classify the user's message into EXACTLY ONE category.
 
-def runagent(prompt):
-    with client.messages.stream(
+A = TOOL_ACTION
+Use TOOL_ACTION when the app must change something.
+Examples:
+- create a task
+- edit a task
+- delete a reminder
+- add a course
+- mark work complete
+- schedule something
+
+B= APP_DATA_REQUEST
+Use APP_DATA_REQUEST when the user is asking for information stored in the app.
+Examples:
+- what assignments are due tomorrow
+- show my tasks
+- what classes do I have today
+- how am I doing in calculus
+- what deadlines are upcoming
+
+C = GENERAL_CHAT
+Use GENERAL_CHAT for:
+- general knowledge questions
+- casual conversation
+- brainstorming
+- explanations
+- tutoring
+- anything unrelated to stored app data or app actions
+
+IMPORTANT RULES:
+- If the app database must be READ -> B
+- If the app database must be MODIFIED -> A
+- Otherwise -> C
+
+Reply with ONLY one Letter:
+A
+B
+or
+C
+"""
+chat_history = []
+
+tools = [
+    {
+        "name": "add_task",
+        "description": (
+            "Add a new task to the user's task list. "
+            "Priority weight should be between 1 and 10."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "task_name": {
+                    "type": "string",
+                    "description": "The name of the task."
+                },
+                "project_name": {
+                    "type": "string",
+                    "description": "The id of the project this task belongs to. Leave blank if unknown."
+                },
+                "priority_weight": {
+                    "type": "number",
+                    "description": "Priority between 1 (lowest) and 10 (highest)."
+                },
+                "prerequisites": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "List of task ids that must be completed first."
+                }
+            },
+            "required": ["task_name", "priority_weight"]
+        }
+    },
+    {
+        "name": "open_browser_window",
+        "description": (
+            "Open a browser tab inside a Nucleus workspace. "
+            "Use this when the user asks to open a website, Canvas page, document link, or search in a workspace."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "url": {
+                    "type": "string",
+                    "description": "The URL or search text to open."
+                },
+                "workspaceid": {
+                    "type": "string",
+                    "description": "The id of the workspace where the browser tab should open."
+                }
+            },
+            "required": ["url", "workspaceid"]
+        }
+    },
+    {
+        "name": "get_all_workspaces",
+        "description": "Return all current Nucleus workspaces, including their ids and names.",
+        "input_schema": {
+            "type": "object",
+            "properties": {}
+        }
+    },
+    {
+        "name": "get_workspace_ids_by_name",
+        "description": (
+            "Find workspace ids by a workspace name or partial name. "
+            "Use this before tools that require workspaceid when the user gives a human-readable workspace name."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "workspace_name": {
+                    "type": "string",
+                    "description": "The full or partial workspace name to search for."
+                }
+            },
+            "required": ["workspace_name"]
+        }
+    }
+]
+
+classifyA = set(["add", "delete", "move", "open"])
+classifyB = set(["my", "content", "lecture", "explain"])
+classifyC = set([])
+weights = {"add": 1, "delete": 1, "move": 1, "open": 1, "my": 0.5, "content": 0.5, "lecture": 0.8, "explain": 0.7}
+def run_classifier(prompt):
+    runclaude(prompt = chat_history)
+    return
+
+    splitprompt = prompt[0]["content"].split()
+    setprompt = set(splitprompt)
+    weightA, weightB, weightC = 0, 0, 0
+    for word in (setprompt & classifyA):
+        weightA += weights[word]
+    for word in (setprompt & classifyB):
+        weightB += weights[word]
+    for word in (setprompt & classifyC):
+        weightC += weights[word]
+
+    if weightA >= weightB and weightA >= weightC:
+        if weightA > 0.5:
+            runclaude(prompt = chat_history)
+            return
+    elif weightB >= weightC:
+        if weightB > 0.8:
+            run_deepseek(prompt = prompt)
+            return
+    else:
+        if weightC > 0.5:
+            rerepo: ChatResponse = chat(model = 'gemma3', messages = [{"role": "system", "content": "respond concisely and directly"}] + prompt)
+            # NEED TO ADD context memory for this response
+            print(json.dumps(rerepo["message"]["content"]), file= sys.stderr)
+            return
+            
+    localprompt = [{"role": "user", "content":"Classify: " + prompt[0]["content"] + "\nAnswer: "}]
+    print(f"py: running classifier: {prompt[0]["content"]}", file=sys.stderr)
+    response: ChatResponse = chat(model = 'llama3.2:1b', messages = [{"role": "system", "content": local_system_prompt}] + localprompt, options={"temperature": 0, "num_predict": 1})
+    retext = response['message']['content']
+    print(f'classifier classified as: {retext}', file = sys.stderr)
+    if retext == "A":
+        runclaude(prompt=prompt)
+    elif retext == "B":
+        run_deepseek(prompt = prompt)
+    elif retext == "c":
+        rerepo: ChatResponse = chat(model = 'gemma3', messages = [{"role": "system", "content": "respond concisely and directly"}] + prompt)
+        # NEED TO ADD context memory for this response
+        print(json.dumps(rerepo["message"]["content"]), file= sys.stderr)
+        return
+
+
+
+def run_deepseek(prompt):
+    print(f"py: running deepseek: {prompt}", file=sys.stderr)
+    response = deepseek_client.chat.completions.create(
+        model="deepseek-v4-pro",
+        messages=[{"role": "system", "content": context_only_system_prompt}] + prompt,
+        stream=True
+    )
+    tool_call = {"name": None, "arguments": ""}
+    called_function = False
+
+    for event in response:
+        if event.type == "delta":
+            delta = event.delta
+            if "content" in delta:
+                print(delta["content"], flush=True)
+            if "function_call" in delta:
+                called_function = True
+                fc = delta["function_call"]
+                if "name" in fc:
+                    tool_call["name"] = fc["name"]
+                if "arguments" in fc:
+                    tool_call["arguments"] += fc["arguments"]
+
+    if called_function:
+        try:
+            tool_call["arguments"] = json.loads(tool_call["arguments"])
+        except json.JSONDecodeError:
+            pass
+        print(json.dumps(tool_call, ensure_ascii=False), flush=True)
+
+
+def runclaude(prompt):
+    print(f"py: running claude: {prompt}", file=sys.stderr)
+    tool_calls = {}
+    full_text = ""
+
+    response = claude_client.messages.create(
         model="claude-sonnet-4-6",
         max_tokens=1000,
         system=system_prompt,
-        messages=[{"role": "user", "content": prompt}]
-    ) as stream:
-        for text in stream.text_stream:
-            print(text, end="", flush=True)
+        messages=prompt,
+        tools=tools,
+        stream=True
+    )
 
-    # newline after response so next JSON line is on its own line
-    print("", flush=True)
+    for event in response:
+        if event.type == "content_block_start":
+            if event.content_block.type == "tool_use":
+                tool_calls[event.index] = {
+                    "id": event.content_block.id,
+                    "name": event.content_block.name,
+                    "input": ""
+                }
+            # remove the else block entirely
+
+        elif event.type == "content_block_delta":
+            if event.delta.type == "text_delta":
+                full_text += event.delta.text  # accumulate, don't append to history yet
+                print(json.dumps(event.delta.text), flush=True)
+            elif event.delta.type == "input_json_delta":
+                if event.index in tool_calls:
+                    tool_calls[event.index]["input"] += event.delta.partial_json
+
+        elif event.type == "message_stop":
+            # build ONE assistant message containing everything
+            assistant_content = []
+
+            if full_text:
+                assistant_content.append({
+                    "type": "text",
+                    "text": full_text
+                })
+
+            total_tools_called = []
+            for tool in tool_calls.values():
+                tool["input"] = json.loads(tool["input"]) if tool["input"] else {}
+                assistant_content.append({
+                    "type": "tool_use",
+                    "id": tool["id"],
+                    "name": tool["name"],
+                    "input": tool["input"]
+                })
+                total_tools_called.append({
+                    "type": "tool",
+                    "name": tool["name"],
+                    "input": tool["input"],
+                    "id": tool["id"]
+                })
+
+            # ONE assistant message with all content
+            if assistant_content:
+                chat_history.append({
+                    "role": "assistant",
+                    "content": assistant_content
+                })
+
+            if total_tools_called:
+                print(json.dumps(total_tools_called), flush=True)
 
 for line in sys.stdin:
-    line = line.strip()
-    if not line:
-        continue
-    try:
-        payload = json.loads(line)
-    except json.JSONDecodeError as exc:
-        print(f"Invalid JSON payload: {exc}", file=sys.stderr)
-        continue
-
-    prompt = payload.get("message") or payload.get("prompt")
-    if prompt:
-        runagent(prompt=prompt)
-    else:
-        print("No 'message' or 'prompt' field found in payload.", file=sys.stderr)
+    print(line, file=sys.stderr )
+    line = json.loads(line)  
+    if line[0] == "tool_response":
+        chat_history.append({"role": "user", "content": [{"type": "tool_result","tool_use_id": line[1], "content": line[2]}]})
+        runclaude(prompt = chat_history)
+    elif line[0] == "message":
+        chat_history.append({"role": "user","content": line[1] })
+        run_classifier(prompt = [{"role": "user", "content": line[1]}])
