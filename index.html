@@ -10,7 +10,10 @@
   <style>
     /* RIGHT AI PANEL */
     .ai-panel {
-      width: 340px;
+      width: var(--right-panel-width);
+      min-width: var(--right-panel-width);
+      max-width: var(--right-panel-width);
+      flex: 0 0 var(--right-panel-width);
       background: #161616;
       border-left: 1px solid #2c2c2c;
       display: flex;
@@ -85,7 +88,7 @@
       </div>
 
       <nav class="primary-tabs" id="primary-tabs">
-        <button type="button" class="active" data-section="projects">Projects</button>
+        <button type="button" class="active" data-section="projects">Apps</button>
         <button type="button" data-section="tasks">Tasks</button>
         <button type="button" data-section="calendar">Calendar</button>
         <span class="primary-tabs-separator" aria-hidden="true"></span>
@@ -114,10 +117,11 @@
       <!-- MAIN CONTENT -->
       <main class="content">
         <div class="workspace-page-tabs" id="workspace-page-tabs">
-          <!-- tabs get rendered here by renderer.js -->
+          <!-- tabs get rendered here by renderer/app.js -->
         </div>
         <div class="browser-toolbar is-hidden" id="browser-toolbar"></div>
         <div class="canvas-toolbar is-hidden" id="canvas-toolbar"></div>
+        <div class="canvas-blank-slate" id="canvas-blank-slate" aria-hidden="true"></div>
         <div class="tab-wipe" id="tab-wipe" aria-hidden="true"></div>
         <div id="view"></div>
       </main>
@@ -152,8 +156,12 @@
     </div>
   </div>
 
-  <script src="course.js"></script>
-  <script src="renderer.js"></script>
+  <script src="app/canvas/course.js"></script>
+  <script src="app/canvas/dashboard.js"></script>
+  <script src="taskoptimizer.js"></script>
+  <script src="renderer/workspace-page-tabs.js"></script>
+  <script src="renderer/render.js"></script>
+  <script src="renderer/app.js"></script>
 </body>
 
 </html>

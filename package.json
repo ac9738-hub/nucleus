@@ -13,5 +13,9 @@
   "type": "commonjs",
   "devDependencies": {
     "electron": "^42.1.0"
+  },
+  "dependencies": {
+    "@datastructures-js/priority-queue": "^6.3.5",
+    "axios": "^1.16.1"
   }
 }

@@ -1,0 +1,66 @@
+:root {
+  --slate-bg: #181a1f;
+  --slate-shadow: rgba(0, 0, 0, 0.24);
+  --slate-duration: 630ms;
+  --slate-ease: ease-in-out;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  background: transparent;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  width: 100%;
+}
+
+.slate {
+  background:
+    linear-gradient(90deg, transparent 0, var(--slate-shadow) 18px, transparent 48px),
+    var(--slate-bg);
+  height: 100%;
+  opacity: 0;
+  transform: translateX(100%);
+  width: 100%;
+}
+
+.slate.show {
+  animation: slate-wipe-from-right var(--slate-duration) var(--slate-ease) forwards;
+}
+
+.slate.hide {
+  animation: slate-wipe-to-right var(--slate-duration) var(--slate-ease) forwards;
+}
+
+@keyframes slate-wipe-from-right {
+  0% {
+    opacity: 1;
+    transform: translateX(100%);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slate-wipe-to-right {
+  0% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  99% {
+    opacity: 1;
+    transform: translateX(100%);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+}

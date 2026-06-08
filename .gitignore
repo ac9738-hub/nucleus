@@ -3,3 +3,16 @@ node_modules/
 .venv/
 __pycache__/
 *.pyc
+
+# Local/generated Canvas and browser data
+assignmenthtml.json
+canvas_data.json
+canvas_graph.json
+canvas_embedding_cache.json
+*.tmp
+save.json
+canvasfiles/
+engine-search-cache/
+frame-html/
+app/canvas/canvas_homepages/
+*.pdf

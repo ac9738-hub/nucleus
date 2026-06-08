@@ -6,11 +6,25 @@ from dotenv import load_dotenv
 import json
 import sys
 import os
+import fitz
 
 
 load_dotenv()
 claude_client = Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
 deepseek_client = OpenAI(api_key = os.environ.get("DEEP_SEEK_API_KEY"), base_url="https://api.deepseek.com")
+
+hardcoded_syllabus = ""
+
+
+doc = fitz.open("NEU201 syllabus.pdf")
+
+pages = []
+for page in doc:
+    pages.append(page.get_text())
+
+hardcoded_syllabus = "\n".join(pages)
+
+doc.close()
 
 system_prompt = (
     "You are a helpful assistant for a student organization app called Nucleus. "
@@ -102,7 +116,8 @@ tools = [
         "name": "open_browser_window",
         "description": (
             "Open a browser tab inside a Nucleus workspace. "
-            "Use this when the user asks to open a website, Canvas page, document link, or search in a workspace."
+            "Use this when the user asks to open a non-Canvas website, document link, or search in a workspace. "
+            "Do not use this for Canvas URLs; use open_canvas_tab for Canvas."
         ),
         "input_schema": {
             "type": "object",
@@ -117,6 +132,31 @@ tools = [
                 }
             },
             "required": ["url", "workspaceid"]
+        }
+    },
+    {
+        "name": "open_canvas_tab",
+        "description": (
+            "Open Canvas inside a dedicated Nucleus Canvas tab using the app's saved Canvas authentication. "
+            "Use this for Canvas pages, Canvas files, Canvas assignments, Canvas preview URLs, or retrieved Canvas context URLs."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "url": {
+                    "type": "string",
+                    "description": "The Canvas URL to open. Leave blank to open the Canvas app dashboard."
+                },
+                "workspaceid": {
+                    "type": "string",
+                    "description": "The id of the workspace where the Canvas tab should open."
+                },
+                "courseId": {
+                    "type": "string",
+                    "description": "Optional Canvas course id, if known."
+                }
+            },
+            "required": ["workspaceid"]
         }
     },
     {
@@ -142,6 +182,168 @@ tools = [
                 }
             },
             "required": ["workspace_name"]
+        }
+    },
+    {
+        "name": "create_workspace",
+        "description": "Create a Nucleus workspace. Returns only the created workspace id, name, and description.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "workspaceid": {
+                    "type": "string",
+                    "description": "Stable workspace id, lowercase with hyphens."
+                },
+                "name": {
+                    "type": "string",
+                    "description": "Human-readable workspace name."
+                },
+                "description": {
+                    "type": "string",
+                    "description": "Short workspace description."
+                }
+            },
+            "required": ["workspaceid", "name"]
+        }
+    },
+    {
+        "name": "delete_workspace",
+        "description": "Delete a Nucleus workspace by id.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "workspaceid": {
+                    "type": "string",
+                    "description": "Workspace id to delete."
+                }
+            },
+            "required": ["workspaceid"]
+        }
+    },
+    {
+        "name": "list_open_tabs",
+        "description": "List open Nucleus tabs compactly, optionally for one workspace. Returns tab id, type, label, workspace id, URL, course id, and active flag.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "workspaceid": {
+                    "type": "string",
+                    "description": "Optional workspace id to filter tabs."
+                }
+            }
+        }
+    },
+    {
+        "name": "focus_tab",
+        "description": "Focus an existing Nucleus tab by tab id.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "tabid": {
+                    "type": "string",
+                    "description": "Tab id to focus."
+                }
+            },
+            "required": ["tabid"]
+        }
+    },
+    {
+        "name": "close_tab",
+        "description": "Close an existing Nucleus tab by tab id. Center workspace tabs cannot be closed.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "tabid": {
+                    "type": "string",
+                    "description": "Tab id to close."
+                }
+            },
+            "required": ["tabid"]
+        }
+    },
+    {
+        "name": "navigate_tab",
+        "description": "Navigate an existing browser or Canvas tab to a URL or search query.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "tabid": {
+                    "type": "string",
+                    "description": "Tab id to navigate."
+                },
+                "url": {
+                    "type": "string",
+                    "description": "URL or search text."
+                }
+            },
+            "required": ["tabid", "url"]
+        }
+    },
+    {
+        "name": "list_canvas_courses",
+        "description": "List saved Canvas courses compactly. Returns course id, name, course code, and short description only.",
+        "input_schema": {
+            "type": "object",
+            "properties": {}
+        }
+    },
+    {
+        "name": "list_canvas_assignments",
+        "description": "List saved Canvas assignments compactly, optionally filtered by course id. Returns id, name, course id, due date, URL, and short description only.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "courseid": {
+                    "type": "string",
+                    "description": "Optional Canvas course id."
+                },
+                "limit": {
+                    "type": "number",
+                    "description": "Maximum number of compact items to return. Defaults to 80 and caps at 200."
+                }
+            }
+        }
+    },
+    {
+        "name": "list_canvas_files",
+        "description": "List saved Canvas files compactly, optionally filtered by course id. Returns id, name, course id, URL, and short description only.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "courseid": {
+                    "type": "string",
+                    "description": "Optional Canvas course id."
+                },
+                "limit": {
+                    "type": "number",
+                    "description": "Maximum number of compact items to return. Defaults to 80 and caps at 200."
+                }
+            }
+        }
+    },
+    {
+        "name": "list_canvas_modules",
+        "description": "List saved Canvas modules compactly, optionally filtered by course id. Returns id, name, course id, position, and short description only.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "courseid": {
+                    "type": "string",
+                    "description": "Optional Canvas course id."
+                },
+                "limit": {
+                    "type": "number",
+                    "description": "Maximum number of compact items to return. Defaults to 80 and caps at 200."
+                }
+            }
+        }
+    },
+    {
+        "name": "refresh_canvas_data",
+        "description": "Fetch Canvas data using saved Canvas authentication and save it to local Canvas data files. Returns compact counts only.",
+        "input_schema": {
+            "type": "object",
+            "properties": {}
         }
     }
 ]
@@ -200,7 +402,7 @@ def run_deepseek(prompt):
     print(f"py: running deepseek: {prompt}", file=sys.stderr)
     response = deepseek_client.chat.completions.create(
         model="deepseek-v4-pro",
-        messages=[{"role": "system", "content": context_only_system_prompt}] + prompt,
+        messages=[{"role": "system", "content": context_only_system_prompt + prompt}],
         stream=True
     )
     tool_call = {"name": None, "arguments": ""}
@@ -231,11 +433,10 @@ def runclaude(prompt):
     print(f"py: running claude: {prompt}", file=sys.stderr)
     tool_calls = {}
     full_text = ""
-
     response = claude_client.messages.create(
         model="claude-sonnet-4-6",
         max_tokens=1000,
-        system=system_prompt,
+        system=system_prompt + "\nThis is the syllabus for NEU 201:" + hardcoded_syllabus,
         messages=prompt,
         tools=tools,
         stream=True

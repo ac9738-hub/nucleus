@@ -1,0 +1,733 @@
+import numpy as np
+import json
+import heapq
+import re
+import os
+import sys
+from difflib import SequenceMatcher
+from html import unescape
+from pathlib import Path
+from dotenv import load_dotenv
+from parser import (
+    assignmentNode,
+    conceptNode,
+    course_scoped_embedding_name,
+    detailNode,
+    eventNode,
+    exampleNode,
+    fileNode,
+    learningBlock,
+    problemNode,
+    syllabusNode,
+)
+from openai import OpenAI
+
+load_dotenv()
+openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+BASE_DIR = Path(__file__).resolve().parent
+CANVAS_GRAPH_PATH = BASE_DIR / "canvas_graph.json"
+
+QUERY_PREFIXES = [
+    "what is",
+    "what are",
+    "who is",
+    "who are",
+    "explain",
+    "define",
+    "find",
+    "search for",
+    "tell me about",
+    "give me",
+    "summarize",
+    "describe",
+    "how does",
+    "how do",
+    "why does",
+    "why do",
+    "show me",
+    "where is",
+    "when is",
+]
+
+INTENT_CONTEXT = {
+    "deadline": "deadline due date schedule syllabus assignment event",
+    "exam": "exam quiz final midterm review concepts dependencies covered material",
+    "assignment": "assignment homework problem set pset due description submission",
+    "practice": "practice problem example solution concept worked exercise",
+    "concept": "definition explanation concept detail example lecture notes",
+    "syllabus": "syllabus course policy grading schedule class information",
+    "general": "course concept assignment event file syllabus lecture material",
+}
+
+INTENT_KEYWORDS = {
+    "deadline": ["due", "deadline", "when", "date", "schedule"],
+    "exam": ["exam", "midterm", "final", "quiz", "test", "review"],
+    "assignment": ["assignment", "homework", "problem set", "pset", "submit", "submission"],
+    "practice": ["example", "practice", "problem", "exercise", "solution"],
+    "concept": ["define", "definition", "what is", "what are", "explain", "concept"],
+    "syllabus": ["syllabus", "policy", "grading", "grade", "participation", "office hours"],
+}
+
+FUZZY_STOPWORDS = {
+    "a",
+    "about",
+    "an",
+    "and",
+    "are",
+    "as",
+    "at",
+    "be",
+    "by",
+    "can",
+    "could",
+    "course",
+    "define",
+    "describe",
+    "do",
+    "does",
+    "find",
+    "for",
+    "from",
+    "give",
+    "how",
+    "in",
+    "is",
+    "it",
+    "me",
+    "of",
+    "on",
+    "or",
+    "please",
+    "search",
+    "should",
+    "show",
+    "summarize",
+    "tell",
+    "the",
+    "to",
+    "what",
+    "when",
+    "where",
+    "who",
+    "why",
+    "would",
+    "with",
+}
+
+RETRIEVAL_SCORE_MARGIN = 0.5
+BROWSER_RETRIEVAL_CANDIDATES = 12
+
+PREFIX_PATTERN = re.compile(
+    r"^(?:" + "|".join(re.escape(prefix) for prefix in QUERY_PREFIXES) + r")\s+",
+    re.IGNORECASE
+)
+
+
+def sanitize_query(query, max_chars=4000):
+    query = str(query or "")
+    query = re.sub(r"<[^>]+>", " ", query)
+    query = unescape(query)
+    query = re.sub(r"\s+", " ", query).strip()
+    return query[:max_chars]
+
+
+def normalize_academic_query(query):
+    query = sanitize_query(query)
+    query = PREFIX_PATTERN.sub("", query, count=1).strip()
+    return query
+
+
+def classify_query_intent(query):
+    lowered = sanitize_query(query).lower()
+    for intent, keywords in INTENT_KEYWORDS.items():
+        if any(keyword in lowered for keyword in keywords):
+            return intent
+    return "general"
+
+
+def prepare_query_for_embedding(query):
+    normalized = normalize_academic_query(query)
+    if not normalized:
+        raise ValueError("Query is empty")
+
+    intent = classify_query_intent(query)
+    context = INTENT_CONTEXT.get(intent, INTENT_CONTEXT["general"])
+    return {
+        "original": sanitize_query(query),
+        "normalized": normalized,
+        "intent": intent,
+        "embedding_text": f"{normalized}. {context}",
+    }
+
+
+def split_fuzzy_keywords(text):
+    text = sanitize_query(text, max_chars=1000).lower()
+    text = re.sub(r"[\s#.]+", " ", text)
+    text = re.sub(r"[^a-z0-9 ]+", " ", text)
+    return [
+        term
+        for term in text.split()
+        if len(term) > 2 and term not in FUZZY_STOPWORDS
+    ]
+
+
+def fuzzy_query_terms(query):
+    return split_fuzzy_keywords(normalize_academic_query(query))
+
+
+def keyword_set_similarity(query_terms, name_terms):
+    query_set = set(query_terms)
+    name_set = set(name_terms)
+    if not query_set or not name_set:
+        return 0.0
+
+    exact_overlap = query_set & name_set
+    exact_coverage = len(exact_overlap) / len(query_set)
+    exact_jaccard = len(exact_overlap) / len(query_set | name_set)
+
+    fuzzy_matches = 0
+    for query_term in query_set:
+        if max(best_partial_ratio(query_term, name_term) for name_term in name_set) >= 0.82:
+            fuzzy_matches += 1
+    fuzzy_coverage = fuzzy_matches / len(query_set)
+
+    return max(exact_coverage, fuzzy_coverage, exact_jaccard)
+
+
+def best_partial_ratio(needle, haystack):
+    if not needle or not haystack:
+        return 0.0
+    if needle in haystack:
+        return 1.0
+
+    needle_len = len(needle)
+    haystack_len = len(haystack)
+    if needle_len >= haystack_len:
+        return SequenceMatcher(None, needle, haystack).ratio()
+
+    best = 0.0
+    for start in range(0, haystack_len - needle_len + 1):
+        window = haystack[start:start + needle_len]
+        best = max(best, SequenceMatcher(None, needle, window).ratio())
+    return best
+
+
+def fuzzy_name_similarity(query_terms, node_name):
+    name_terms = split_fuzzy_keywords(node_name)
+    if not query_terms or not name_terms:
+        return 0.0
+
+    token_scores = [
+        max(best_partial_ratio(term, name_term) for name_term in name_terms)
+        for term in query_terms
+    ]
+    keyword_score = sum(token_scores) / len(token_scores) if token_scores else 0.0
+    coverage = sum(1 for score in token_scores if score >= 0.82) / len(query_terms)
+    set_score = keyword_set_similarity(query_terms, name_terms)
+
+    return (0.5 * set_score) + (0.35 * keyword_score) + (0.15 * coverage)
+
+
+def fuzzy_match_name(node, courseid=None):
+    name = getattr(node, "name", "")
+    scoped_courseid = courseid or getattr(node, "courseid", "")
+    return course_scoped_embedding_name(scoped_courseid, name)
+
+
+def combine_retrieval_scores(embedding_similarity, fuzzy_similarity):
+    return embedding_similarity + fuzzy_similarity
+
+
+def vectorize_embedding(value):
+    if isinstance(value, list):
+        return np.array(value, dtype=np.float32)
+    return value
+
+
+def vectorize_embedded(embedded):
+    if not isinstance(embedded, dict):
+        return {}
+    return {
+        key: vectorize_embedding(value)
+        for key, value in embedded.items()
+    }
+
+
+def reconstruct_detail(data):
+    node = detailNode(
+        data.get("name", "No name"),
+        data.get("description", "")
+    )
+    node.courseid = data.get("courseid", "")
+    node.embedded = vectorize_embedded(data.get("embedded", {}))
+    return node
+
+
+def reconstruct_example(data):
+    node = exampleNode(
+        data.get("name", "No name"),
+        data.get("description", "")
+    )
+    node.embedded = vectorize_embedded(data.get("embedded", {}))
+    return node
+
+
+def reconstruct_concept(data):
+    node = conceptNode(
+        data.get("courseid", "No courseid"),
+        data.get("name", "No name"),
+        data.get("conceptid"),
+        data.get("description", "")
+    )
+    node.embedded = vectorize_embedded(data.get("embedded", {}))
+    node.details = [
+        reconstruct_detail(detail)
+        for detail in data.get("details", []) or []
+    ]
+    node.examples = [
+        reconstruct_example(example)
+        for example in data.get("examples", []) or []
+    ]
+    node.problems = data.get("problems", []) or []
+    return node
+
+
+def reconstruct_problem(data):
+    node = problemNode(
+        data.get("name", "No name"),
+        data.get("problemid"),
+        data.get("incomingConceptNodeIds", []) or [],
+        data.get("outgoingConceptNodeIds", []) or [],
+        data.get("steps", []) or [],
+        data.get("answer", "None"),
+        data.get("assignmentNodeIds", []) or []
+    )
+    node.embedded = vectorize_embedded(data.get("embedded", {}))
+    return node
+
+
+def reconstruct_assignment(data):
+    node = assignmentNode(
+        data.get("name", "No name"),
+        data.get("unlockdate", ""),
+        data.get("duedate", ""),
+        data.get("gradepercentage", ""),
+        data.get("description", ""),
+        data.get("problems", []) or [],
+        data.get("downloadurl", ""),
+        data.get("canvaspreviewurl", "")
+    )
+    node.assignmentid = data.get("assignmentid", node.assignmentid)
+    node.embedded = vectorize_embedded(data.get("embedded", {}))
+    return node
+
+
+def reconstruct_syllabus(data):
+    node = syllabusNode(
+        data.get("courseid", "No courseid"),
+        data.get("classtimes", ""),
+        [],
+        data.get("other", ""),
+        data.get("filechildren", []) or [],
+        data.get("downloadurl", ""),
+        data.get("canvaspreviewurl", ""),
+        data.get("participationgrade")
+    )
+    node.assignments = [
+        reconstruct_assignment(assignment)
+        for assignment in data.get("assignments", []) or []
+    ]
+    for assignment in node.assignments:
+        assignment.courseid = node.courseid
+    node.embedded = vectorize_embedded(data.get("embedded", {}))
+    return node
+
+
+def reconstruct_file(data):
+    node = fileNode(
+        data.get("fileid", ""),
+        data.get("courseid", "No courseid"),
+        data.get("name", ""),
+        data.get("downloadurl", ""),
+        data.get("canvaspreviewurl", "")
+    )
+    node.concepts = data.get("concepts", []) or []
+    node.details = data.get("details", []) or []
+    node.examples = data.get("examples", []) or []
+    node.problems = data.get("problems", []) or []
+    node.embedded = vectorize_embedded(data.get("embedded", {}))
+    return node
+
+
+def reconstruct_event(data):
+    node = eventNode(
+        data.get("name", "No name"),
+        data.get("startdate", ""),
+        data.get("enddate", ""),
+        data.get("gradepercentage", ""),
+        data.get("description", ""),
+        data.get("type", ""),
+        data.get("dependencies", []) or []
+    )
+    node.eventid = data.get("eventid", node.eventid)
+    node.courseid = data.get("courseid", "")
+    node.embedded = vectorize_embedded(data.get("embedded", {}))
+    return node
+
+
+def reconstruct_nodes(path=CANVAS_GRAPH_PATH):
+    with open(path, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+
+    concepts = [reconstruct_concept(item) for item in data.get("concepts", []) or []]
+    problems = [reconstruct_problem(item) for item in data.get("problems", []) or []]
+    events = [reconstruct_event(item) for item in data.get("events", []) or []]
+    syllabi = {
+        courseid: reconstruct_syllabus(syllabus)
+        for courseid, syllabus in (data.get("syllabi", {}) or {}).items()
+    }
+    files = {
+        courseid: {
+            fileid: reconstruct_file(file_data)
+            for fileid, file_data in (course_files or {}).items()
+        }
+        for courseid, course_files in (data.get("files", {}) or {}).items()
+    }
+
+    return {
+        "concepts": concepts,
+        "problems": problems,
+        "events": events,
+        "syllabi": syllabi,
+        "files": files,
+        "logged_details": data.get("logged_details", {}),
+        "logged_examples": data.get("logged_examples", {}),
+        "logged_problems": data.get("logged_problems", {}),
+        "logged_assignments": data.get("logged_assignments", {}),
+        "logged_events": data.get("logged_events", {}),
+    }
+
+allnodes = reconstruct_nodes()
+
+def node_identity(nodetype, node):
+    return (
+        nodetype,
+        str(
+            getattr(node, "conceptid", None) or
+            getattr(node, "problemid", None) or
+            getattr(node, "assignmentid", None) or
+            getattr(node, "eventid", None) or
+            getattr(node, "fileid", None) or
+            getattr(node, "courseid", None) or
+            getattr(node, "name", "")
+        )
+    )
+
+
+def iter_assignments():
+    for syllabus in allnodes["syllabi"].values():
+        for assignment in syllabus.assignments:
+            yield assignment
+
+
+def find_problem(problemid):
+    problemid = str(problemid or "")
+    for problem in allnodes["problems"]:
+        if str(getattr(problem, "problemid", "")) == problemid:
+            return problem
+    return None
+
+
+def find_assignment(assignmentid):
+    assignmentid = str(assignmentid or "")
+    for assignment in iter_assignments():
+        if str(getattr(assignment, "assignmentid", "")) == assignmentid:
+            return assignment
+    return None
+
+
+def find_concept(conceptid):
+    conceptid = str(conceptid or "")
+    for concept in allnodes["concepts"]:
+        if str(getattr(concept, "conceptid", "")) == conceptid:
+            return concept
+    return None
+
+
+def node_neighbors(nodetype, node):
+    neighbors = []
+    if nodetype in {"detail", "example"}:
+        child_kind = "details" if nodetype == "detail" else "examples"
+        ref_kind = "detail" if nodetype == "detail" else "example"
+        for concept in allnodes["concepts"]:
+            children = getattr(concept, child_kind, []) or []
+            if any(child is node for child in children):
+                neighbors.append(("concept", concept))
+                child_ref = f"{ref_kind}:{getattr(concept, 'conceptid', '')}:{getattr(node, 'name', '')}"
+                for coursefiles in allnodes["files"].values():
+                    for filenode in coursefiles.values():
+                        file_refs = getattr(filenode, child_kind, []) or []
+                        if child_ref in file_refs or getattr(node, "name", "") in file_refs:
+                            neighbors.append(("file", filenode))
+                break
+        return neighbors
+
+    if nodetype == "concept":
+        for detail in getattr(node, "details", []) or []:
+            neighbors.append(("detail", detail))
+        for example in getattr(node, "examples", []) or []:
+            neighbors.append(("example", example))
+        for problemid in getattr(node, "problems", []) or []:
+            problem = find_problem(problemid)
+            if problem:
+                neighbors.append(("problem", problem))
+        conceptid = getattr(node, "conceptid", "")
+        for coursefiles in allnodes["files"].values():
+            for filenode in coursefiles.values():
+                if conceptid and conceptid in (getattr(filenode, "concepts", []) or []):
+                    neighbors.append(("file", filenode))
+        for assignment in iter_assignments():
+            assignment_problems = getattr(assignment, "problems", []) or []
+            if any(problemid in assignment_problems for problemid in getattr(node, "problems", []) or []):
+                neighbors.append(("assignment", assignment))
+        return neighbors
+
+    if nodetype == "problem":
+        for conceptid in (getattr(node, "incomingConceptNodeIds", []) or []) + (getattr(node, "outgoingConceptNodeIds", []) or []):
+            concept = find_concept(conceptid)
+            if concept:
+                neighbors.append(("concept", concept))
+        for assignmentid in getattr(node, "assignmentNodeIds", []) or []:
+            assignment = find_assignment(assignmentid)
+            if assignment:
+                neighbors.append(("assignment", assignment))
+        problemid = getattr(node, "problemid", "")
+        for coursefiles in allnodes["files"].values():
+            for filenode in coursefiles.values():
+                if problemid and problemid in (getattr(filenode, "problems", []) or []):
+                    neighbors.append(("file", filenode))
+        for assignment in iter_assignments():
+            if problemid and problemid in (getattr(assignment, "problems", []) or []):
+                neighbors.append(("assignment", assignment))
+        return neighbors
+
+    if nodetype == "assignment":
+        for problemid in getattr(node, "problems", []) or []:
+            problem = find_problem(problemid)
+            if problem:
+                neighbors.append(("problem", problem))
+        return neighbors
+
+    if nodetype == "file":
+        for conceptid in getattr(node, "concepts", []) or []:
+            concept = find_concept(conceptid)
+            if concept:
+                neighbors.append(("concept", concept))
+        for problemid in getattr(node, "problems", []) or []:
+            problem = find_problem(problemid)
+            if problem:
+                neighbors.append(("problem", problem))
+        return neighbors
+
+    return neighbors
+
+
+def add_result(results, seen, nodetype, node, similarity, source=None):
+    key = node_identity(nodetype, node)
+    existing_index = seen.get(key)
+    item = {
+        'type': nodetype,
+        'node': node,
+        'similarity': float(similarity),
+        'source': source
+    }
+    if existing_index is None:
+        seen[key] = len(results)
+        results.append(item)
+        return
+    if similarity > results[existing_index].get('similarity', 0):
+        results[existing_index] = item
+
+
+def source_context(nodetype, node):
+    return {
+        "type": nodetype,
+        "id": node_identity(nodetype, node)[1],
+        "name": getattr(node, "name", ""),
+        "description": getattr(node, "description", "")
+    }
+
+
+def expand_startpoints(startpoints, mode):
+    if mode == "raw":
+        return startpoints
+
+    results = []
+    seen = {}
+    for startpoint in startpoints:
+        nodetype = startpoint["type"]
+        node = startpoint["node"]
+        similarity = startpoint.get("similarity", 0.0)
+        if mode == "browser":
+            if nodetype in {"file", "assignment"}:
+                add_result(results, seen, nodetype, node, similarity)
+            for neighbor_type, neighbor in node_neighbors(nodetype, node):
+                if neighbor_type in {"file", "assignment"}:
+                    add_result(
+                        results,
+                        seen,
+                        neighbor_type,
+                        neighbor,
+                        similarity,
+                        source=source_context(nodetype, node)
+                    )
+            continue
+
+        add_result(results, seen, nodetype, node, similarity)
+        for neighbor_type, neighbor in node_neighbors(nodetype, node):
+            add_result(
+                results,
+                seen,
+                neighbor_type,
+                neighbor,
+                similarity,
+                source=source_context(nodetype, node)
+            )
+
+    return sorted(results, key=lambda item: item.get("similarity", 0), reverse=True)
+
+
+def retreive(query, k = 3, mode = "agent"):
+
+    startpoints = []
+    heap = []
+    heap_counter = 0
+    
+    newquery = prepare_query_for_embedding(query)
+    qv = openai_client.embeddings.create(
+        input=newquery["embedding_text"],
+        model="text-embedding-3-small"
+    )
+    embeddedq = np.array(qv.data[0].embedding, dtype=np.float32)
+    query_terms = fuzzy_query_terms(query)
+
+    def push_node(overall_similarity, nodetype, node):
+        nonlocal heap_counter
+        if overall_similarity > 0:
+            heapq.heappush(heap, (-float(overall_similarity), heap_counter, nodetype, node))
+            heap_counter += 1
+
+    def rank_node(nodetype, node, courseid=None):
+        if not getattr(node, "embedded", None):
+            return
+        if "name" in node.embedded:
+            name_similarity = np.dot(embeddedq, node.embedded.get("name", []))
+        else:
+            name_similarity = 0.0
+        if "description" in node.embedded:
+            description_similarity = np.dot(embeddedq, node.embedded.get("description", []))
+        else:
+            description_similarity = 0.0
+        embedding_similarity = max(name_similarity, description_similarity)
+        fuzzy_similarity = fuzzy_name_similarity(query_terms, fuzzy_match_name(node, courseid))
+        overall_similarity = combine_retrieval_scores(embedding_similarity, fuzzy_similarity)
+        push_node(overall_similarity, nodetype, node)
+
+    for conceptnode in allnodes["concepts"]:
+        courseid = getattr(conceptnode, "courseid", "")
+        rank_node("concept", conceptnode, courseid)
+        for detailnode in conceptnode.details:
+            rank_node("detail", detailnode, courseid)
+        for examplenode in conceptnode.examples:
+            rank_node("example", examplenode, courseid)
+
+    for problemnode in allnodes["problems"]:
+        rank_node("problem", problemnode)
+
+    for eventnode in allnodes["events"]:
+        rank_node("event", eventnode)
+
+    for syllabusnode in allnodes["syllabi"].values():
+        courseid = getattr(syllabusnode, "courseid", "")
+        rank_node("syllabus", syllabusnode, courseid)
+        for assignmentnode in syllabusnode.assignments:
+            rank_node("assignment", assignmentnode, courseid)
+
+    for coursefiles in allnodes["files"].values():
+        for filenode in coursefiles.values():
+            rank_node("file", filenode, getattr(filenode, "courseid", ""))
+
+    candidate_count = BROWSER_RETRIEVAL_CANDIDATES if mode == "browser" else k
+    best_score = -heap[0][0] if heap else 0.0
+    cutoff_score = best_score - RETRIEVAL_SCORE_MARGIN
+    for i in range(min(candidate_count, len(heap))):
+        similarity, _, nodetype, node = heapq.heappop(heap)
+        score = -similarity
+        print(f"Type: {nodetype}, Name: {getattr(node, 'name', 'N/A')}, Similarity: {score:.4f}", file=sys.stderr)
+        if score >= cutoff_score:
+            startpoints.append({'type': nodetype, 'node': node, 'similarity': score})
+    return expand_startpoints(startpoints, mode)
+
+def serialize_startpoint(startpoint):
+    node = startpoint["node"]
+    downloadurl = getattr(node, "downloadurl", "") or ""
+    canvaspreviewurl = getattr(node, "canvaspreviewurl", "") or ""
+    return {
+        "type": startpoint["type"],
+        "name": getattr(node, "name", ""),
+        "description": getattr(node, "description", ""),
+        "courseid": getattr(node, "courseid", ""),
+        "downloadurl": downloadurl,
+        "canvaspreviewurl": canvaspreviewurl,
+        "url": canvaspreviewurl or downloadurl,
+        "duedate": getattr(node, "duedate", ""),
+        "unlockdate": getattr(node, "unlockdate", ""),
+        "gradepercentage": getattr(node, "gradepercentage", ""),
+        "similarity": startpoint.get("similarity", None),
+        "source": startpoint.get("source", None),
+        "id": (
+            getattr(node, "conceptid", None) or
+            getattr(node, "problemid", None) or
+            getattr(node, "assignmentid", None) or
+            getattr(node, "eventid", None) or
+            getattr(node, "fileid", None) or
+            getattr(node, "courseid", "")
+        )
+    }
+
+def print_retrieval_results(results):
+    for result in results:
+        nodetype = result['type']
+        node = result['node']
+        print(f"Type: {nodetype}, Name: {getattr(node, 'name', 'N/A')}, description: {getattr(node, 'description', 'N/A')[:100]}...")
+
+
+def run_service():
+    for rawline in sys.stdin:
+        rawline = rawline.strip()
+        if not rawline:
+            continue
+        try:
+            payload = json.loads(rawline)
+            query = payload[1] if isinstance(payload, list) and len(payload) > 1 else payload.get("query", "")
+            if isinstance(payload, list):
+                mode = payload[2].get("mode", "agent") if len(payload) > 2 and isinstance(payload[2], dict) else "agent"
+            else:
+                mode = payload.get("mode", "agent")
+            print(f"vector retrieval received query: {query}", file=sys.stderr, flush=True)
+            startpoints = retreive(query, mode=mode)
+            print(json.dumps({
+                "query": query,
+                "startpoints": [serialize_startpoint(startpoint) for startpoint in startpoints]
+            }, ensure_ascii=False), flush=True)
+        except Exception as error:
+            print(json.dumps({
+                "error": str(error),
+                "raw": rawline
+            }, ensure_ascii=False), flush=True)
+
+
+if __name__ == "__main__":
+    run_service()
+    
