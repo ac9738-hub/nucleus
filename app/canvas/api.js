@@ -1,3 +1,8 @@
+// Canvas data API and task builder.
+// Functionality: fetches Canvas data with saved auth, writes local snapshots,
+// spawns parser.py, and converts parsed graph nodes into task cards.
+// Dependencies: main.js provides auth state/update callbacks; parser.py consumes
+// streamed Canvas records; data-store.js receives generated tasks.
 const fs = require('fs')
 const { spawn } = require('child_process')
 const path = require('path')
@@ -736,6 +741,30 @@ function createCanvasApi({ canvasDataPath, getAuthState, sendCanvasDataUpdate, r
     return buckets
   }
 
+  async function fetchCanvasCourseSyllabi(courses, errors) {
+    const { canvasBaseUrl } = getAuthState()
+    const requests = courses.map(tcourse => {
+      const url = canvasBaseUrl + '/api/v1/courses/' + tcourse.id + '?include[]=syllabus_body'
+      return fetchCanvasJsonOrNull(url, `course ${tcourse.id} syllabus`, errors)
+    })
+    const responses = await Promise.all(requests)
+    const buckets = {}
+    for (let i = 0; i < responses.length; i++) {
+      const course = responses[i]
+      const syllabusBody = course && stripHtmlToText(course.syllabus_body || '')
+      if (syllabusBody) {
+        buckets[courses[i].id] = {
+          id: courses[i].id,
+          name: courses[i].name || course.name || '',
+          html_url: course.html_url || courses[i].html_url || '',
+          syllabus_body: course.syllabus_body || '',
+          syllabus_text: syllabusBody
+        }
+      }
+    }
+    return buckets
+  }
+
   function saveCanvasHomepages(courses, frontPages) {
     const homepagesRoot = path.join(__dirname, 'canvas_homepages')
     fs.mkdirSync(homepagesRoot, { recursive: true })
@@ -856,7 +885,29 @@ ${html}
     let filecount = 0
     const data1 = JSON.parse(fs.readFileSync(canvasDataPath, 'utf8'))
     data1.front_pages = await fetchCanvasFrontPages(course, canvasErrors)
+    data1.syllabi = await fetchCanvasCourseSyllabi(course, canvasErrors)
     saveCanvasHomepages(course, data1.front_pages)
+    const parsingSyllabi = []
+    Object.entries(data1.syllabi).forEach(([courseid, syllabus]) => {
+      if (!syllabus || !syllabus.syllabus_text) return
+      parsingSyllabi.push({
+        id: `course-syllabus-${courseid}`,
+        url: syllabus.html_url || `${canvasBaseUrl}/courses/${courseid}/assignments/syllabus`,
+        previewurl: syllabus.html_url || `${canvasBaseUrl}/courses/${courseid}/assignments/syllabus`,
+        courseid,
+        name: `${syllabus.name || 'Course'} syllabus`,
+        content: JSON.stringify({
+          documenttype: 'syllabus',
+          coursename: syllabus.name || '',
+          html_url: syllabus.html_url || '',
+          syllabus: syllabus.syllabus_text
+        }, null, 2)
+      })
+    })
+    if (parsingSyllabi.length) {
+      const parserdata = {"type": "syllabus", "content": parsingSyllabi}
+      proc.stdin.write(JSON.stringify(parserdata) + '\n', 'utf8')
+    }
     data1.assignments = await fetchCanvasCourseBuckets(course, 'assignments', canvasErrors)
     for (const [courseid, assignments] of Object.entries(data1.assignments)) {
       if (!Array.isArray(assignments)) continue

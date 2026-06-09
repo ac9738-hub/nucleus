@@ -1,3 +1,7 @@
+// Canvas vector retrieval tester.
+// Functionality: loads canvas_graph.json, embeds the global query variable, and
+// prints the top Canvas node matches with similarity scores.
+// Dependencies: local .env OPENAI_API_KEY and parser.py-generated graph vectors.
 const fs = require('fs')
 const path = require('path')
 const https = require('https')
@@ -11,11 +15,7 @@ const BASE_DIR = __dirname
 const GRAPH_PATH = path.join(BASE_DIR, 'canvas_graph.json')
 const ENV_PATH = path.join(BASE_DIR, '.env')
 
-const query = String(
-  global.query ||
-  process.env.CANVAS_QUERY ||
-  process.argv.slice(2).join(' ')
-).trim()
+const query = "mat 201 syllabus"
 
 const QUERY_PREFIXES = [
   'what is',

@@ -1,3 +1,11 @@
+"""Canvas graph parser service.
+
+Functionality: consumes Canvas assignment/file records from app/canvas/api.js,
+extracts concepts/events/tasks/files, persists canvas_graph.json atomically, and
+produces embeddings used by vector_retreival.py.
+Dependencies: OpenAI/DeepSeek/Ollama clients, PyMuPDF for PDFs, and newline JSON
+messages sent by the Node Canvas API process.
+"""
 from openai import AsyncOpenAI
 from openai import OpenAI
 from ollama import AsyncClient
@@ -7,6 +15,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 from html import unescape
 from html.parser import HTMLParser
+from urllib.parse import urljoin, urlparse, urldefrag
 import asyncio
 import os
 import json
@@ -54,17 +63,20 @@ logged_problems = {}
 logged_assignments = {}
 logged_events = {}
 looking_for_files = {}
+external_crawl_state = {}
 completed_model_calls = {
     'local_assignment_summaries': [],
     'deepseek_file_passes': []
 }
 parsed_items = {
     'assignment': [],
-    'file': []
+    'file': [],
+    'external': []
 }
 parsed_item_keys = {
     'assignment': set(),
-    'file': set()
+    'file': set(),
+    'external': set()
 }
 eventNodes = {}
 assignment_description_summary_cache = {}
@@ -75,6 +87,13 @@ json_write_lock = threading.RLock()
 ASSIGNMENT_DESCRIPTION_SUMMARY_LENGTH = int(os.getenv("ASSIGNMENT_DESCRIPTION_SUMMARY_LENGTH", "220"))
 OLLAMA_SUMMARY_MODEL = os.getenv("OLLAMA_SUMMARY_MODEL", "llama3.2:3b")
 OPENAI_EMBEDDING_BATCH_SIZE = int(os.getenv("OPENAI_EMBEDDING_BATCH_SIZE", "50"))
+EXTERNAL_CRAWL_MAX_DEPTH = int(os.getenv("EXTERNAL_CRAWL_MAX_DEPTH", "3"))
+EXTERNAL_CRAWL_MAX_PAGES = int(os.getenv("EXTERNAL_CRAWL_MAX_PAGES", "40"))
+EXTERNAL_CRAWL_TIMEOUT_SECONDS = float(os.getenv("EXTERNAL_CRAWL_TIMEOUT_SECONDS", "15"))
+SYLLABUS_NAME_PATTERN = re.compile(
+    r"\b(syllabus|course\s+outline|course\s+information|class\s+information|course\s+schedule)\b",
+    re.IGNORECASE
+)
 
 
 class HtmlTextExtractor(HTMLParser):
@@ -129,6 +148,20 @@ class HtmlTextExtractor(HTMLParser):
             if cleaned:
                 lines.append(cleaned)
         return '\n'.join(lines)
+
+
+class HtmlLinkExtractor(HTMLParser):
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.links = []
+
+    def handle_starttag(self, tag, attrs):
+        tag = tag.lower()
+        attr_map = {name.lower(): value for name, value in attrs if value}
+        if tag in {'a', 'area'} and attr_map.get('href'):
+            self.links.append(attr_map['href'])
+        elif tag in {'iframe', 'embed'} and attr_map.get('src'):
+            self.links.append(attr_map['src'])
 
 
 def html_to_text(value):
@@ -322,6 +355,7 @@ class conceptNode():
         self.details = []
         self.examples = []
         self.problems = []
+        self.sourcePages = []
 
     def to_dict(self):
         return {
@@ -332,7 +366,8 @@ class conceptNode():
             'embedded': self.embedded,
             'details': [f.to_dict() for f in self.details],
             'examples': [f.to_dict() for f in self.examples],
-            'problems': self.problems
+            'problems': self.problems,
+            'sourcePages': self.sourcePages
         }
 
 
@@ -342,9 +377,10 @@ class detailNode():
         self.description = description
         self.content_vector = calcvector(description)
         self.embedded = {}
+        self.sourcePages = []
 
     def to_dict(self):
-        return {'name': self.name, 'description': self.description, 'embedded': self.embedded}
+        return {'name': self.name, 'description': self.description, 'embedded': self.embedded, 'sourcePages': self.sourcePages}
 
 
 class exampleNode():
@@ -353,9 +389,10 @@ class exampleNode():
         self.description = description
         self.content_vector = calcvector(description)
         self.embedded = {}
+        self.sourcePages = []
 
     def to_dict(self):
-        return {'name': self.name, 'description': self.description, 'embedded': self.embedded}
+        return {'name': self.name, 'description': self.description, 'embedded': self.embedded, 'sourcePages': self.sourcePages}
 
 
 class problemNode():
@@ -368,6 +405,7 @@ class problemNode():
         self.answer = answer
         self.assignmentNodeIds = assignmentNodeIds or []
         self.embedded = {}
+        self.sourcePages = []
 
     def to_dict(self):
         return {
@@ -378,7 +416,8 @@ class problemNode():
             'steps': self.steps,
             'answer': self.answer,
             'embedded': self.embedded,
-            'assignmentNodeIds': self.assignmentNodeIds
+            'assignmentNodeIds': self.assignmentNodeIds,
+            'sourcePages': self.sourcePages
         }
 
 
@@ -395,6 +434,7 @@ class fileNode():
         self.problems = []
         self.embedded = {}
         self.searchtext = ''
+        self.pages = []
 
     def to_dict(self):
         return {
@@ -408,7 +448,8 @@ class fileNode():
             'details': self.details,
             'examples': self.examples,
             'problems': self.problems,
-            'searchtext': self.searchtext
+            'searchtext': self.searchtext,
+            'pages': self.pages
         }
 
 
@@ -1292,12 +1333,42 @@ DEEPSEEK_TOOLS = [
                 "additionalProperties": False
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "log_external_resource",
+            "description": "Call this when an assignment, file, or syllabus mentions an outside course resource that is not a Canvas file/node, such as a public course website, textbook, publisher platform, code repository, dataset, class tool, article, video playlist, or third-party link associated with the course.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "courseid": {
+                        "type": "string",
+                        "description": "The unique identifier of the course."
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "The display name of the external resource."
+                    },
+                    "type": {
+                        "type": "string",
+                        "description": "The type/category of the external resource (e.g. 'website', 'textbook', 'tool', 'article')."
+                    },
+                    "url": {
+                        "type": "string",
+                        "description": "The URL of the external resource if provided.",
+                        "default": ""
+                    }
+                },
+                "required": ["courseid", "name", "type"]
+            }
+        }
     }
 ]
 
 
 files = {}
-
+externalResources = {}
 
 def serialize_tool_calls(tool_calls):
     return [
@@ -1323,9 +1394,173 @@ def get_syllabus_for_prompt(courseid):
         return {}
     return syllabus.to_dict()
 
+def normalize_external_resource_key(name, resource_type, url=''):
+    key_parts = [
+        normalize_resource_text(url),
+        normalize_resource_text(name),
+        normalize_resource_text(resource_type)
+    ]
+    return '|'.join(key_parts)
+
+
+def log_external_resource(courseid, name, resource_type, url=''):
+    name = str(name or '').strip()
+    resource_type = str(resource_type or '').strip()
+    url = str(url or '').strip()
+    if not name and not url:
+        return {'added': False, 'reason': 'missing name and url'}
+
+    resource = {
+        'courseid': str(courseid),
+        'name': name or url,
+        'type': resource_type or 'resource',
+        'url': url
+    }
+    key = normalize_external_resource_key(resource['name'], resource['type'], resource['url'])
+    externalResources.setdefault(courseid, [])
+    for existing in externalResources[courseid]:
+        existing_key = normalize_external_resource_key(
+            existing.get('name', ''),
+            existing.get('type', ''),
+            existing.get('url', '')
+        )
+        if existing_key == key:
+            existing.update({field: value for field, value in resource.items() if value})
+            return {'added': False, 'resource': existing}
+
+    externalResources[courseid].append(resource)
+    return {'added': True, 'resource': resource}
+
 
 def make_fileid(filemeta):
     return str(filemeta.get('fileid', ''))
+
+
+def normalize_file_pages(pages, fileid=''):
+    normalized = []
+    if not isinstance(pages, list):
+        return normalized
+    for index, page in enumerate(pages):
+        if not isinstance(page, dict):
+            continue
+        page_number = int(page.get('pageNumber') or page.get('page') or index + 1)
+        pageid = str(page.get('pageid') or f"{fileid}:page:{page_number}")
+        normalized.append({
+            'pageid': pageid,
+            'pageNumber': page_number,
+            'yScroll': float(page.get('yScroll', page.get('y_scroll', 0)) or 0),
+            'yScrollRatio': float(page.get('yScrollRatio', page.get('y_scroll_ratio', 0)) or 0),
+            'height': float(page.get('height', 0) or 0),
+            'width': float(page.get('width', 0) or 0),
+            'text': compact_file_search_text(page.get('text', '')),
+            'nodes': page.get('nodes', []) if isinstance(page.get('nodes', []), list) else []
+        })
+    return normalized
+
+
+def merge_file_pages(existing_pages, incoming_pages):
+    existing_by_id = {
+        str(page.get('pageid') or ''): page
+        for page in existing_pages or []
+        if isinstance(page, dict)
+    }
+    merged = []
+    for page in incoming_pages or []:
+        pageid = str(page.get('pageid') or '')
+        previous = existing_by_id.get(pageid, {})
+        nodes = []
+        for node_ref in previous.get('nodes', []) or []:
+            append_unique(nodes, node_ref)
+        for node_ref in page.get('nodes', []) or []:
+            append_unique(nodes, node_ref)
+        merged_page = {**page, 'nodes': nodes}
+        merged.append(merged_page)
+    return merged
+
+
+def build_pdf_pages(filepath, fileid):
+    pages = []
+    doc = fitz.open(filepath)
+    try:
+        page_sizes = []
+        page_texts = []
+        for index in range(len(doc)):
+            page = doc[index]
+            rect = page.rect
+            page_texts.append(page.get_text())
+            page_sizes.append((float(rect.width), float(rect.height)))
+
+        total_height = sum(height for _width, height in page_sizes) or 1.0
+        y_offset = 0.0
+        for index, text in enumerate(page_texts):
+            width, height = page_sizes[index]
+            page_number = index + 1
+            pages.append({
+                'pageid': f"{fileid}:page:{page_number}",
+                'pageNumber': page_number,
+                'yScroll': y_offset,
+                'yScrollRatio': y_offset / total_height,
+                'height': height,
+                'width': width,
+                'text': text,
+                'nodes': []
+            })
+            y_offset += height
+    finally:
+        doc.close()
+    return normalize_file_pages(pages, fileid)
+
+
+def pages_to_prompt_text(pages):
+    if not pages:
+        return ''
+    chunks = []
+    for page in pages:
+        chunks.append(
+            "\n".join([
+                f"[[PAGE {page.get('pageNumber')} | pageid={page.get('pageid')} | yScroll={page.get('yScroll')} | yScrollRatio={page.get('yScrollRatio')}]]",
+                page.get('text', '')
+            ])
+        )
+    return "\n\n".join(chunks)
+
+
+def make_page_source(file_node, page):
+    return {
+        'fileid': file_node.fileid,
+        'filename': file_node.name,
+        'pageid': page.get('pageid', ''),
+        'pageNumber': page.get('pageNumber', 0),
+        'yScroll': page.get('yScroll', 0),
+        'yScrollRatio': page.get('yScrollRatio', 0)
+    }
+
+
+def get_current_page(file_node, filemeta):
+    if not file_node or not file_node.pages:
+        return None
+    current_page = filemeta.get('currentPage') if isinstance(filemeta, dict) else None
+    current_pageid = ''
+    if isinstance(current_page, dict):
+        current_pageid = str(current_page.get('pageid') or '')
+    if not current_pageid:
+        current_pageid = str((filemeta or {}).get('pageid') or '')
+    if not current_pageid and len(file_node.pages) == 1:
+        return file_node.pages[0]
+    for page in file_node.pages:
+        if str(page.get('pageid') or '') == current_pageid:
+            return page
+    return None
+
+
+def attach_node_to_current_page(file_node, filemeta, nodetype, node, nodeid):
+    page = get_current_page(file_node, filemeta or {})
+    if not page:
+        return
+    node_ref = {'type': nodetype, 'id': nodeid, 'name': getattr(node, 'name', '')}
+    append_unique(page.setdefault('nodes', []), node_ref)
+    if hasattr(node, 'sourcePages'):
+        append_unique(node.sourcePages, make_page_source(file_node, page))
 
 
 def get_or_create_file_node(courseid, filemeta):
@@ -1349,26 +1584,37 @@ def get_or_create_file_node(courseid, filemeta):
     searchtext = compact_file_search_text(filemeta.get('searchtext', ''))
     if searchtext:
         fileNodes[courseid][fileid].searchtext = searchtext
+    pages = normalize_file_pages(filemeta.get('pages', []), fileid)
+    if pages:
+        fileNodes[courseid][fileid].pages = merge_file_pages(fileNodes[courseid][fileid].pages, pages)
     return fileNodes[courseid][fileid]
 
 
-async def run_deepseek(prompt, fileid, courseid, downloadurl='', canvaspreviewurl='', filename=''):
+async def run_deepseek(prompt, fileid, courseid, downloadurl='', canvaspreviewurl='', filename='', final_pass=False, pages=None, current_page=None):
     firstcall = True
+
     prompt = clean_surrogates(prompt)
     filemeta = {
         'fileid': str(fileid),
         'courseid': courseid,
         'name': filename,
         'downloadurl': downloadurl,
-        'canvaspreviewurl': canvaspreviewurl
+        'canvaspreviewurl': canvaspreviewurl,
+        'pages': pages or [],
+        'currentPage': current_page or {}
     }
     filemeta = clean_surrogates(filemeta)
     systemprompt = (
         f"You are a class secretary. You will be given JSON objects, text, and pictures. Your job is to identify object type and due date. First identify if the object is either 1: assignment file 2: learning/content file or 3: the course syllabus. "
-        "If the item is a class syllabus, call add_syllabus and create syllabus assignment objects from any assignment list. Also call add_exam_node for exams, tests, quizzes, midterms, and finals; these must be stored as event type test. Use add_event_node for lectures, office hours, review sessions, presentations, labs, deadline windows, or other dated course events. Test dependencies should list concept node IDs or concept names covered by the test. If the object is an assignment file, call add_assignment_node to create or update the real assignment tracker and call log_problem for any assignment-level problems. If an assignment instructs the student to use another file, reading, prompt, rubric, worksheet, slide deck, notebook, article, PDF, or document, put known file IDs in filechildren; if the file ID is not known, put the referenced resource names in lookingfor. If the item is a learning/content file, first call add_file_node, then extract concepts, details, examples, and problems. First call add_concept_node for concepts, then log_detail, log_example, log_problem, and log_event for items that may need concept IDs or later confirmation. On the second pass, use add_detail_node, add_example_node, and add_problem_node to attach examples/problems/details to concepts, and use update_assignment_node and update_event_node to update assignment or event objects as needed. Problems should have incoming pointers from multiple concepts and outgoing pointers to concepts. The current file URLs are attached automatically to whichever syllabus, file, or assignment object is created. \n" \
-        "You will only be able to see this file text on the first call, log everything needed for subsequent tool calls inside your response"
+        "If the item is a class syllabus, call add_syllabus and create syllabus assignment objects from any assignment list. Also call add_exam_node for exams, tests, quizzes, midterms, and finals; these must be stored as event type test. Use add_event_node for lectures, office hours, review sessions, presentations, labs, deadline windows, or other dated course events. Test dependencies should list concept node IDs or concept names covered by the test. If the object is an assignment file, call add_assignment_node to create or update the real assignment tracker and call log_problem for any assignment-level problems. If an assignment instructs the student to use another file, reading, prompt, rubric, worksheet, slide deck, notebook, article, PDF, or document, put known file IDs in filechildren; if the file ID is not known, put the referenced resource names in lookingfor. Also call log_external_resource for every outside course resource that is not a Canvas file/node, including public class websites, textbook titles or textbook sites, publisher homework systems, code repositories, datasets, external APIs, library reserves/articles, online judges, discussion tools, video playlists, and third-party platforms. Log it even when there is no URL; use a short resource type such as website, textbook, tool, repository, dataset, article, video, or publisher. If the item is a learning/content file, first call add_file_node, then extract concepts, details, examples, and problems. First call add_concept_node for concepts, then log_detail, log_example, log_problem, and log_event for items that may need concept IDs or later confirmation. On the second pass, use add_detail_node, add_example_node, and add_problem_node to attach examples/problems/details to concepts, and use update_assignment_node and update_event_node to update assignment or event objects as needed. Problems should have incoming pointers from multiple concepts and outgoing pointers to concepts. The current file URLs are attached automatically to whichever syllabus, file, or assignment object is created. \n"
+        "You will only be able to see this file text on the first call, log everything needed for subsequent tool calls inside your response. "
+        "Each page is delimited by [[PAGE N | pageid=... | yScroll=... | yScrollRatio=...]] headers. When creating nodes, reference the pageid from the header of the page where the content appears. "
         f"Here are your current classified assignments and files ordered by date: {current_assignment_files_groups}\nHere is the current file metadata: {json.dumps(filemeta, ensure_ascii=False)}\nHere is the class syllabus if it has been found: {allsyllabi.get(courseid, 'Not found')}\n your course id is {courseid}. Last thing: do not use markdown formatting, utf-8 only"
+        "\n Do not give any text response that is not a tool call"
     )
+    if final_pass:
+        firstcall = False
+        systemprompt = (" This is the final syllabus pass. Your job is to make sure the grade percentage of assignments are correctly assigned. check every assignment carefully even if it already has a grade percentage. \n here is the current assignment files: " + str(current_assignment_files_groups))
 
     messages = [
         {"role": "system", "content": systemprompt},
@@ -1407,6 +1653,8 @@ async def run_deepseek(prompt, fileid, courseid, downloadurl='', canvaspreviewur
                 + json.dumps(get_syllabus_for_prompt(courseid), ensure_ascii=False)
                 + "\nlooking for file requests:"
                 + json.dumps(looking_for_files.get(courseid, []), ensure_ascii=False)
+                + "\nlogged external resources:"
+                + json.dumps(externalResources.get(courseid, []), ensure_ascii=False)
                 + "\ncurrent file node:"
                 + json.dumps(current_file_node.to_dict() if current_file_node else {}, ensure_ascii=False)
             )
@@ -1453,6 +1701,7 @@ async def run_deepseek(prompt, fileid, courseid, downloadurl='', canvaspreviewur
                 "arguments": arguments,
                 "result": result
             }, ensure_ascii=False), flush=True)
+
         completed_model_calls['deepseek_file_passes'].append({
             'courseid': courseid,
             'fileid': str(fileid),
@@ -1461,9 +1710,6 @@ async def run_deepseek(prompt, fileid, courseid, downloadurl='', canvaspreviewur
             'tool_count': len(message.tool_calls or []),
             'completed_at': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
         })
-        write_state()
-
-        write_state()
 
         if not message.tool_calls:
             break
@@ -1734,7 +1980,7 @@ def cleanup_looking_for_target(value):
 def extract_looking_for_targets(text):
     text = html_to_text(text or '')
     targets = []
-    for match in re.finditer(r'["“”]([^"“”]{4,120})["“”]', text):
+    for match in re.finditer(r'["""]([^"""]{4,120})["""]', text):
         target = cleanup_looking_for_target(match.group(1))
         if target:
             targets.append(target)
@@ -1933,6 +2179,7 @@ def add_exam_node(courseid, name, startdate='', enddate='', gradepercentage='', 
         dependencies or []
     )
 
+
 def add_syllabus(courseid, classtimes, assignments, other, filechildren=None, filemeta=None, participationgrade=None):
     filemeta = filemeta or {}
     current_file = get_or_create_file_node(courseid, filemeta)
@@ -1981,6 +2228,7 @@ def add_concept_node(courseid, conceptname, description):
     conceptNodes[courseid].append(conceptNode(courseid, conceptname, nodeid, description))
     return nodeid
 
+
 def embed_text_for_field(label, text):
     start = time.perf_counter()
     print(f"parser debug embedding: request start field={label}", flush=True)
@@ -2023,15 +2271,18 @@ def embed_concept_node(name, description):
     embedded_description = embed_text_for_field("concept.description", description)
     return {'name': np.array(embedded_name), 'description': np.array(embedded_description)}
 
+
 def embed_example_node(name, description):
     embedded_name = embed_text_for_field("example.name", name)
     embedded_description = embed_text_for_field("example.description", description)
     return {'name': embedded_name, 'description': embedded_description}
 
+
 def embed_problem_node(name, description):
     embedded_name = embed_text_for_field("problem.name", name)
     embedded_description = embed_text_for_field("problem.description", description)
     return {'name': embedded_name, 'description': embedded_description}
+
 
 def embed_detail_node(name, description):
     embedded_name = embed_text_for_field("detail.name", name)
@@ -2406,6 +2657,7 @@ def log_detail(courseid, conceptname, detailname, description, filemeta=None):
         'sourceFileId': make_fileid(filemeta or {})
     })
 
+
 def log_example(courseid, conceptname, examplename, description, filemeta=None):
     if courseid not in logged_examples:
         logged_examples[courseid] = []
@@ -2415,6 +2667,7 @@ def log_example(courseid, conceptname, examplename, description, filemeta=None):
         "description": description,
         'sourceFileId': make_fileid(filemeta or {})
     })
+
 
 def log_problem(courseid, problemname, incomingConceptNames, outgoingConceptNames, steps, answer, filemeta=None):
     if courseid not in logged_problems:
@@ -2427,6 +2680,7 @@ def log_problem(courseid, problemname, incomingConceptNames, outgoingConceptName
         'answer': answer,
         'sourceFileId': make_fileid(filemeta or {})
     })
+
 
 def log_assignment(courseid, assignmentname, unlockdate='', duedate='', gradepercentage='', description='', problemnames=None, filemeta=None, filechildren=None, lookingfor=None):
     print(
@@ -2635,7 +2889,6 @@ def attach_logged_nodes_to_file(courseid, filemeta):
             if problem.name == item.get('problemname', ''):
                 append_unique(current_file.problems, problem.problemid)
 
-    # Also attach anything created during this file pass but not explicitly logged.
     for concept in conceptNodes.get(courseid, []) or []:
         if concept.conceptid in current_file.concepts:
             for detail in concept.details:
@@ -2644,6 +2897,28 @@ def attach_logged_nodes_to_file(courseid, filemeta):
                 append_unique(current_file.examples, make_child_node_ref('example', concept.conceptid, example.name))
             for problemid in concept.problems:
                 append_unique(current_file.problems, problemid)
+
+
+def find_detail_by_ref(courseid, ref):
+    parts = str(ref or '').split(':', 2)
+    if len(parts) == 3 and parts[0] == 'detail':
+        concept = find_concept_by_name_or_id(courseid, parts[1])
+        if concept:
+            for detail in concept.details:
+                if detail.name == parts[2]:
+                    return detail
+    return None
+
+
+def find_example_by_ref(courseid, ref):
+    parts = str(ref or '').split(':', 2)
+    if len(parts) == 3 and parts[0] == 'example':
+        concept = find_concept_by_name_or_id(courseid, parts[1])
+        if concept:
+            for example in concept.examples:
+                if example.name == parts[2]:
+                    return example
+    return None
 
 
 def normalize_file_node_links(courseid, file_node):
@@ -2735,6 +3010,9 @@ def run_tool_call(name, courseid, arguments, filemeta=None):
         )
         if current_file:
             append_unique(current_file.concepts, nodeid)
+            concept = find_concept_by_name_or_id(courseid, nodeid)
+            if concept:
+                attach_node_to_current_page(current_file, filemeta, 'concept', concept, nodeid)
         return {"added": True, "courseid": courseid, "conceptNodeId": nodeid}
     if name == "add_syllabus":
         syllabus = add_syllabus(
@@ -2755,12 +3033,18 @@ def run_tool_call(name, courseid, arguments, filemeta=None):
         result = add_example_node(courseid, arguments.get('conceptNodeId', ''), arguments.get('examplename', ''), arguments.get('description', ""))
         if current_file and isinstance(result, dict):
             append_unique(current_file.examples, result.get('exampleid'))
+            example = find_example_by_ref(courseid, result.get('exampleid'))
+            if example:
+                attach_node_to_current_page(current_file, filemeta, 'example', example, result.get('exampleid'))
         return result
 
     if name == "add_detail_node":
         result = add_detail_node(courseid, arguments.get('conceptNodeId', ''), arguments.get('detailname', ''), arguments.get('description', ''))
         if current_file and isinstance(result, dict):
             append_unique(current_file.details, result.get('detailid'))
+            detail = find_detail_by_ref(courseid, result.get('detailid'))
+            if detail:
+                attach_node_to_current_page(current_file, filemeta, 'detail', detail, result.get('detailid'))
         return result
 
     if name == 'add_problem_node':
@@ -2777,8 +3061,11 @@ def run_tool_call(name, courseid, arguments, filemeta=None):
         )
         if current_file:
             append_unique(current_file.problems, result.get('problemid'))
+            problem = find_problem_by_id(courseid, result.get('problemid'))
+            if problem:
+                attach_node_to_current_page(current_file, filemeta, 'problem', problem, result.get('problemid'))
         return result
-    
+
     if name == 'log_detail':
         log_detail(courseid, arguments.get('conceptname', ''), arguments.get('detailname', ''), arguments.get('description', ''), filemeta)
         return f"detail with name {arguments.get('detailname', '')} logged successfully"
@@ -2798,6 +3085,15 @@ def run_tool_call(name, courseid, arguments, filemeta=None):
             filemeta
         )
         return f"problem with name {arguments.get('problemname', '')} logged successfully"
+
+    if name == 'log_external_resource':
+        result = log_external_resource(
+            courseid,
+            arguments.get('name', ''),
+            arguments.get('type', ''),
+            arguments.get('url', '')
+        )
+        return result
 
     if name == 'add_assignment_node':
         print(
@@ -2974,18 +3270,341 @@ def downloadtopath(path, url):
     return target_path
 
 
+def extract_pdf_text(filepath):
+    return pages_to_prompt_text(build_pdf_pages(filepath, Path(filepath).name))
+
+
 def processfile(fileid, url):
     filepath = folder / str(fileid)
     downloadtopath(filepath, url)
-    totaldoc = []
-    doc = fitz.open(filepath)
+    pages = build_pdf_pages(filepath, str(fileid))
+    return {
+        'text': pages_to_prompt_text(pages),
+        'pages': pages
+    }
 
-    for i in range(len(doc)):
-        page = doc[i]
-        text = page.get_text()
-        totaldoc.append(text)
 
-    return "".join(totaldoc)
+def safe_path_part(value, fallback='outside-source'):
+    cleaned = re.sub(r'[^a-zA-Z0-9._-]+', '-', str(value or '').strip()).strip('-._')
+    return cleaned[:80] or fallback
+
+
+def external_hash(*parts):
+    joined = '|'.join(str(part or '') for part in parts)
+    return hashlib.sha1(joined.encode('utf-8', errors='ignore')).hexdigest()[:16]
+
+
+def is_public_http_url(url):
+    parsed = urlparse(str(url or '').strip())
+    return parsed.scheme in {'http', 'https'} and bool(parsed.netloc)
+
+
+def normalize_crawl_url(url, base_url=''):
+    if not url:
+        return ''
+    raw = str(url).strip()
+    if raw.lower().startswith(('mailto:', 'tel:', 'javascript:', 'data:')):
+        return ''
+    joined = urljoin(base_url, raw) if base_url else raw
+    joined, _fragment = urldefrag(joined)
+    parsed = urlparse(joined)
+    if parsed.scheme not in {'http', 'https'} or not parsed.netloc:
+        return ''
+    path = parsed.path or '/'
+    return parsed._replace(path=path).geturl()
+
+
+def same_crawl_host(root_url, candidate_url):
+    root = urlparse(root_url)
+    candidate = urlparse(candidate_url)
+    return root.netloc.lower() == candidate.netloc.lower()
+
+
+def is_probably_pdf_url(url):
+    return urlparse(url).path.lower().endswith('.pdf')
+
+
+def extract_page_links(html, base_url):
+    parser = HtmlLinkExtractor()
+    try:
+        parser.feed(html or '')
+        parser.close()
+    except Exception:
+        return []
+    links = []
+    for href in parser.links:
+        normalized = normalize_crawl_url(href, base_url)
+        if normalized and normalized not in links:
+            links.append(normalized)
+    return links
+
+
+def extract_html_title(html):
+    match = re.search(r'<title[^>]*>(.*?)</title>', html or '', re.IGNORECASE | re.DOTALL)
+    if not match:
+        return ''
+    return re.sub(r'\s+', ' ', unescape(match.group(1))).strip()
+
+
+def page_to_markdown(url, depth, html, links):
+    title = extract_html_title(html) or url
+    text = html_to_text(html)
+    link_lines = [
+        f"- {link}"
+        for link in links[:40]
+        if link
+    ]
+    return "\n".join([
+        f"## {title}",
+        "",
+        f"- Source URL: {url}",
+        f"- Crawl depth: {depth}",
+        "",
+        text,
+        "",
+        "### Links",
+        "\n".join(link_lines) if link_lines else "No crawlable links found.",
+        ""
+    ]).strip()
+
+
+def external_resource_state_key(courseid, resource):
+    return external_hash(courseid, resource.get('url', ''), resource.get('name', ''), resource.get('type', ''))
+
+
+def download_external_pdf(courseid, url, resource_name=''):
+    pdf_dir = OUTSIDE_SOURCES_FOLDER / safe_path_part(courseid, 'course') / 'pdfs'
+    pdf_dir.mkdir(parents=True, exist_ok=True)
+    filename = safe_path_part(resource_name or Path(urlparse(url).path).name or 'external-pdf', 'external-pdf')
+    if not filename.lower().endswith('.pdf'):
+        filename = f"{filename}.pdf"
+    filepath = pdf_dir / f"{external_hash(courseid, url)}-{filename}"
+    if filepath.exists():
+        return filepath
+
+    response = requests.get(
+        url,
+        stream=True,
+        timeout=EXTERNAL_CRAWL_TIMEOUT_SECONDS,
+        headers={'User-Agent': 'NucleusCourseCrawler/1.0'},
+        allow_redirects=True
+    )
+    if response.status_code in {401, 403}:
+        raise PermissionError(f"outside source locked or forbidden: {url}")
+    response.raise_for_status()
+    with filepath.open('wb') as file:
+        for chunk in response.iter_content(chunk_size=8192):
+            if chunk:
+                file.write(chunk)
+    return filepath
+
+
+def crawl_external_website(courseid, resource, max_depth=EXTERNAL_CRAWL_MAX_DEPTH):
+    root_url = normalize_crawl_url(resource.get('url', ''))
+    if not is_public_http_url(root_url):
+        return {'ok': False, 'reason': 'missing public http url', 'pdfs': []}
+
+    state_key = external_resource_state_key(courseid, resource)
+    state = external_crawl_state.setdefault(str(courseid), {}).setdefault(state_key, {
+        'resource': resource,
+        'visited_urls': [],
+        'downloaded_pdfs': [],
+        'errors': []
+    })
+    visited = set(state.get('visited_urls', []) or [])
+    pdf_urls = set(item.get('url', '') for item in state.get('downloaded_pdfs', []) or [])
+    queue = [(root_url, 0)]
+    markdown_sections = []
+    pdfs = []
+
+    while queue and len(visited) < EXTERNAL_CRAWL_MAX_PAGES:
+        url, depth = queue.pop(0)
+        url = normalize_crawl_url(url)
+        if not url or url in visited or depth > max_depth or not same_crawl_host(root_url, url):
+            continue
+
+        visited.add(url)
+        try:
+            if is_probably_pdf_url(url):
+                pdf_path = download_external_pdf(courseid, url, resource.get('name', ''))
+                item = {'url': url, 'path': str(pdf_path), 'name': Path(pdf_path).name}
+                if url not in pdf_urls:
+                    pdfs.append(item)
+                    state.setdefault('downloaded_pdfs', []).append(item)
+                    pdf_urls.add(url)
+                continue
+
+            response = requests.get(
+                url,
+                timeout=EXTERNAL_CRAWL_TIMEOUT_SECONDS,
+                headers={'User-Agent': 'NucleusCourseCrawler/1.0'},
+                allow_redirects=True
+            )
+            final_url = normalize_crawl_url(response.url or url)
+            if final_url and final_url != url:
+                visited.add(final_url)
+            if response.status_code in {401, 403}:
+                state.setdefault('errors', []).append({'url': url, 'error': f'locked status {response.status_code}'})
+                continue
+            response.raise_for_status()
+
+            content_type = response.headers.get('content-type', '').lower()
+            if 'application/pdf' in content_type:
+                pdf_path = download_external_pdf(courseid, final_url or url, resource.get('name', ''))
+                item = {'url': final_url or url, 'path': str(pdf_path), 'name': Path(pdf_path).name}
+                if item['url'] not in pdf_urls:
+                    pdfs.append(item)
+                    state.setdefault('downloaded_pdfs', []).append(item)
+                    pdf_urls.add(item['url'])
+                continue
+
+            if 'text/html' not in content_type and '<html' not in response.text[:500].lower():
+                continue
+
+            links = [
+                link for link in extract_page_links(response.text, final_url or url)
+                if same_crawl_host(root_url, link)
+            ]
+            markdown_sections.append(page_to_markdown(final_url or url, depth, response.text, links))
+            if depth < max_depth:
+                for link in links:
+                    if link not in visited:
+                        queue.append((link, depth + 1))
+        except Exception as error:
+            state.setdefault('errors', []).append({'url': url, 'error': str(error)})
+
+    state['visited_urls'] = sorted(visited)
+    markdown_path = ''
+    if markdown_sections:
+        course_dir = OUTSIDE_SOURCES_FOLDER / safe_path_part(courseid, 'course')
+        course_dir.mkdir(parents=True, exist_ok=True)
+        markdown_path_obj = course_dir / f"{safe_path_part(resource.get('name') or urlparse(root_url).netloc)}-{state_key}.md"
+        markdown_header = "\n".join([
+            f"# {resource.get('name') or root_url}",
+            f"- Root URL: {root_url}",
+            f"- Course ID: {courseid}",
+            f"- Max link depth: {max_depth}",
+            f"- Crawled at: {datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}",
+            ""
+        ])
+        markdown_path_obj.write_text(
+            markdown_header + "\n\n---\n\n" + "\n\n---\n\n".join(markdown_sections),
+            encoding='utf-8'
+        )
+        markdown_path = str(markdown_path_obj)
+        state['markdown_file'] = markdown_path
+
+    state['parsed_at'] = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+    return {
+        'ok': bool(markdown_path or pdfs or state.get('downloaded_pdfs')),
+        'state_key': state_key,
+        'markdown_path': markdown_path,
+        'pdfs': pdfs or state.get('downloaded_pdfs', []),
+        'visited_urls': state['visited_urls'],
+        'errors': state.get('errors', [])
+    }
+
+
+async def parse_external_file_text(courseid, fileid, name, url, text, markdown_path='', pages=None):
+    if not text or is_item_parsed('external', courseid, fileid):
+        return
+    pages = normalize_file_pages(pages or [], fileid)
+    filemeta = {
+        'fileid': str(fileid),
+        'courseid': courseid,
+        'name': name,
+        'downloadurl': url,
+        'canvaspreviewurl': url,
+        'searchtext': text,
+        'pages': pages
+    }
+    current_file = get_or_create_file_node(courseid, filemeta)
+
+    # ── CHANGED: send all pages in one call instead of one call per page ──
+    if pages:
+        full_prompt = pages_to_prompt_text(pages)
+        await run_deepseek(full_prompt, fileid, courseid, url, url, name, pages=pages)
+    else:
+        await run_deepseek(text, fileid, courseid, url, url, name, pages=pages)
+
+    attach_logged_nodes_to_file(courseid, filemeta)
+
+    if current_file:
+        resolve_file_against_looking_requests(courseid, current_file)
+    mark_item_parsed('external', courseid, fileid, name)
+    write_state()
+
+
+async def parse_external_resources_after_canvas():
+    for courseid, resources in list(externalResources.items()):
+        for resource in list(resources or []):
+            url = normalize_crawl_url(resource.get('url', ''))
+            if not url:
+                continue
+            state_key = external_resource_state_key(courseid, resource)
+            website_fileid = f"external-site-{state_key}"
+            if is_item_parsed('external', courseid, website_fileid):
+                saved_state = external_crawl_state.get(str(courseid), {}).get(state_key, {})
+                crawl_result = {
+                    'ok': bool(saved_state),
+                    'state_key': state_key,
+                    'markdown_path': saved_state.get('markdown_file', ''),
+                    'pdfs': saved_state.get('downloaded_pdfs', []),
+                    'visited_urls': saved_state.get('visited_urls', []),
+                    'errors': saved_state.get('errors', [])
+                }
+            else:
+                print(f"parser debug external: crawling course={courseid} url={url}", flush=True)
+                crawl_result = crawl_external_website(courseid, resource)
+            if not crawl_result.get('ok'):
+                print(
+                    f"parser debug external: skipped course={courseid} url={url} reason={crawl_result.get('reason', 'no public content')}",
+                    flush=True
+                )
+                write_state()
+                continue
+
+            markdown_path = crawl_result.get('markdown_path', '')
+            if markdown_path:
+                markdown_text = Path(markdown_path).read_text(encoding='utf-8')
+                await parse_external_file_text(
+                    courseid,
+                    website_fileid,
+                    f"Outside source: {resource.get('name') or urlparse(url).netloc}",
+                    url,
+                    markdown_text,
+                    markdown_path
+                )
+            elif not is_item_parsed('external', courseid, website_fileid):
+                mark_item_parsed('external', courseid, website_fileid, resource.get('name') or url)
+
+            for pdf in crawl_result.get('pdfs', []) or []:
+                pdf_url = pdf.get('url', '')
+                pdf_path = pdf.get('path', '')
+                if not pdf_path:
+                    continue
+                pdf_fileid = f"external-pdf-{external_hash(courseid, pdf_url, pdf_path)}"
+                if is_item_parsed('external', courseid, pdf_fileid):
+                    continue
+                try:
+                    pdf_pages = build_pdf_pages(pdf_path, pdf_fileid)
+                    pdf_text = pages_to_prompt_text(pdf_pages)
+                except Exception as error:
+                    external_crawl_state.setdefault(str(courseid), {}).setdefault(state_key, {}).setdefault('errors', []).append({
+                        'url': pdf_url,
+                        'error': f'pdf parse failed: {error}'
+                    })
+                    continue
+                await parse_external_file_text(
+                    courseid,
+                    pdf_fileid,
+                    f"Outside PDF: {pdf.get('name') or Path(pdf_path).name}",
+                    pdf_url,
+                    pdf_text,
+                    pdf_path,
+                    pages=pdf_pages
+                )
+            write_state()
 
 
 def parse_assignment_payload(file):
@@ -3079,12 +3698,31 @@ def process_canvas_assignment(fileid, courseid, file):
     return assignmentid
 
 
+def is_likely_syllabus_item(item):
+    if not isinstance(item, dict):
+        return False
+    if str(item.get('documenttype', '')).lower() == 'syllabus':
+        return True
+    searchable = " ".join(
+        str(item.get(key, '') or '')
+        for key in ('name', 'display_name', 'filename', 'url', 'previewurl', 'content')
+    )
+    return bool(SYLLABUS_NAME_PATTERN.search(searchable))
+
+
+def order_canvas_parse_items(items, batch_type):
+    if batch_type not in {'file', 'syllabus'} or not isinstance(items, list):
+        return items
+    return sorted(items, key=lambda item: 0 if is_likely_syllabus_item(item) else 1)
+
+
 async def parseclass(course):
     items = course.get('content', course) if isinstance(course, dict) else course
     batch_type = course.get('type', 'unknown') if isinstance(course, dict) else 'raw-list'
     if not isinstance(items, list):
         print(f"parser debug assignment: skipped non-list batch type={batch_type}", flush=True)
         return
+    items = order_canvas_parse_items(items, batch_type)
     print(f"parser debug assignment: parseclass batch type={batch_type} count={len(items)}", flush=True)
     for file in items:
         if not isinstance(file, dict):
@@ -3122,36 +3760,53 @@ async def parseclass(course):
                     flush=True
                 )
                 continue
-            totaldoc = processfile(fileid, url)
+            processed = processfile(fileid, url)
+            totaldoc = processed.get('text', '')
+            file['pages'] = processed.get('pages', [])
         totaldoc = clean_surrogates(totaldoc)
-        await run_deepseek(
-            totaldoc,
-            fileid,
-            courseid,
-            file.get('url', ''),
-            file.get('previewurl', ''),
-            file.get('name', '')
-        )
-        attach_logged_nodes_to_file(courseid, {
+        pages = normalize_file_pages(file.get('pages', []), str(fileid))
+        filemeta = {
             'fileid': str(fileid),
             'courseid': courseid,
             'name': file.get('name', ''),
             'downloadurl': file.get('url', ''),
             'canvaspreviewurl': file.get('previewurl', ''),
-            'searchtext': totaldoc
-        })
-        current_file = get_or_create_file_node(courseid, {
-            'fileid': str(fileid),
-            'courseid': courseid,
-            'name': file.get('name', ''),
-            'downloadurl': file.get('url', ''),
-            'canvaspreviewurl': file.get('previewurl', ''),
-            'searchtext': totaldoc
-        })
+            'searchtext': totaldoc,
+            'pages': pages
+        }
+        current_file = get_or_create_file_node(courseid, filemeta)
+
+        # ── CHANGED: send all pages in one call instead of one call per page ──
+        if pages:
+            full_prompt = pages_to_prompt_text(pages)
+            await run_deepseek(
+                full_prompt,
+                fileid,
+                courseid,
+                file.get('url', ''),
+                file.get('previewurl', ''),
+                file.get('name', ''),
+                pages=pages
+                # no current_page — deepseek reads pageid from [[PAGE N | pageid=...]] headers
+            )
+        else:
+            await run_deepseek(
+                totaldoc,
+                fileid,
+                courseid,
+                file.get('url', ''),
+                file.get('previewurl', ''),
+                file.get('name', ''),
+                pages=pages
+            )
+
+        attach_logged_nodes_to_file(courseid, filemeta)
+
         if current_file:
             resolve_file_against_looking_requests(courseid, current_file)
         mark_item_parsed('file', courseid, fileid, file.get('name', ''))
-        write_state()
+        write_state()  # once per file, not per page
+
     if batch_type == 'assignment':
         write_state()
 
@@ -3159,6 +3814,8 @@ async def parseclass(course):
 DIRNAME = Path(__file__).resolve().parent
 folder = DIRNAME / "canvasfiles"
 folder.mkdir(parents=True, exist_ok=True)
+OUTSIDE_SOURCES_FOLDER = DIRNAME / "outside_sources"
+OUTSIDE_SOURCES_FOLDER.mkdir(parents=True, exist_ok=True)
 CANVAS_DATA_PATH = DIRNAME / 'canvas_data.json'
 CANVAS_GRAPH_PATH = DIRNAME / 'canvas_graph.json'
 EMBEDDING_CACHE_PATH = DIRNAME / 'canvas_embedding_cache.json'
@@ -3167,12 +3824,14 @@ EMBEDDING_CACHE_PATH = DIRNAME / 'canvas_embedding_cache.json'
 def reconstruct_detail_node(data):
     node = detailNode(data.get('name', 'No name'), data.get('description', ''))
     node.embedded = data.get('embedded', {}) or {}
+    node.sourcePages = data.get('sourcePages', []) or []
     return node
 
 
 def reconstruct_example_node(data):
     node = exampleNode(data.get('name', 'No name'), data.get('description', ''))
     node.embedded = data.get('embedded', {}) or {}
+    node.sourcePages = data.get('sourcePages', []) or []
     return node
 
 
@@ -3187,6 +3846,7 @@ def reconstruct_concept_node(data):
     node.details = [reconstruct_detail_node(detail) for detail in data.get('details', []) or []]
     node.examples = [reconstruct_example_node(example) for example in data.get('examples', []) or []]
     node.problems = data.get('problems', []) or []
+    node.sourcePages = data.get('sourcePages', []) or []
     return node
 
 
@@ -3201,6 +3861,7 @@ def reconstruct_problem_node(data):
         data.get('assignmentNodeIds', []) or []
     )
     node.embedded = data.get('embedded', {}) or {}
+    node.sourcePages = data.get('sourcePages', []) or []
     return node
 
 
@@ -3252,6 +3913,7 @@ def reconstruct_file_node(data):
     node.problems = data.get('problems', []) or []
     node.embedded = data.get('embedded', {}) or {}
     node.searchtext = data.get('searchtext', '') or ''
+    node.pages = normalize_file_pages(data.get('pages', []) or [], node.fileid)
     return node
 
 
@@ -3273,7 +3935,7 @@ def reconstruct_event_node(data):
 
 
 def load_state_from_disk():
-    global logged_details, logged_examples, logged_problems, logged_assignments, logged_events, looking_for_files
+    global logged_details, logged_examples, logged_problems, logged_assignments, logged_events, looking_for_files, externalResources, external_crawl_state
     global completed_model_calls, parsed_items, parsed_item_keys
     if not CANVAS_GRAPH_PATH.exists():
         return
@@ -3322,6 +3984,8 @@ def load_state_from_disk():
     logged_assignments = state.get('logged_assignments', {}) or {}
     logged_events = state.get('logged_events', {}) or {}
     looking_for_files = state.get('looking_for_files', {}) or {}
+    externalResources = state.get('external_resources', {}) or {}
+    external_crawl_state = state.get('external_crawl_state', {}) or {}
     for courseid, syllabus in syllabusNodes.items():
         for assignment in syllabus.assignments:
             resolve_assignment_looking_for(courseid, assignment)
@@ -3329,6 +3993,7 @@ def load_state_from_disk():
     parsed_items = state.get('parsed_items', parsed_items) or parsed_items
     parsed_items.setdefault('assignment', [])
     parsed_items.setdefault('file', [])
+    parsed_items.setdefault('external', [])
     for item in completed_model_calls.get('deepseek_file_passes', []) or []:
         courseid = item.get('courseid')
         fileid = item.get('fileid')
@@ -3348,6 +4013,7 @@ def load_state_from_disk():
     }
     parsed_item_keys.setdefault('assignment', set())
     parsed_item_keys.setdefault('file', set())
+    parsed_item_keys.setdefault('external', set())
 
     print(
         f"parser debug resume: loaded {sum(len(nodes) for nodes in conceptNodes.values())} concepts, "
@@ -3414,6 +4080,8 @@ def write_state(embed=False):
         'logged_assignments': logged_assignments,
         'logged_events': logged_events,
         'looking_for_files': looking_for_files,
+        'external_resources': externalResources,
+        'external_crawl_state': external_crawl_state,
         'completed_model_calls': completed_model_calls,
         'parsed_items': parsed_items
     }
@@ -3431,7 +4099,8 @@ async def main():
     load_embedding_cache_from_disk()
     load_state_from_disk()
     queue_pending_assignment_summaries()
-    assignment_tasks = []
+    syllabus_parse_batches = []
+    assignment_parse_batches = []
     deferred_parse_batches = []
 
     while True:
@@ -3452,12 +4121,19 @@ async def main():
 
         line = json.loads(rawline)
         batch_type = line.get('type', 'unknown') if isinstance(line, dict) else 'raw-list'
-        if batch_type == 'assignment':
-            assignment_tasks.append(asyncio.create_task(parseclass(line)))
+        if batch_type == 'syllabus':
+            syllabus_parse_batches.append(line)
+        elif batch_type == 'assignment':
+            assignment_parse_batches.append(line)
         else:
             deferred_parse_batches.append(line)
         write_state()
 
+    for line in syllabus_parse_batches:
+        await parseclass(line)
+        write_state()
+
+    assignment_tasks = [asyncio.create_task(parseclass(line)) for line in assignment_parse_batches]
     if assignment_tasks:
         await asyncio.gather(*assignment_tasks)
         write_state()
@@ -3465,6 +4141,9 @@ async def main():
     parse_tasks = [asyncio.create_task(parseclass(line)) for line in deferred_parse_batches]
     if parse_tasks:
         await asyncio.gather(*parse_tasks)
+
+    await parse_external_resources_after_canvas()
+    write_state()
 
     update_embedded_fields()
     write_state()
@@ -3480,7 +4159,45 @@ async def main():
 
     write_state()
     print("parser local summaries completed__________________________________________________", flush=True)
-    
+
+    # ── SYLLABUS GRADE PERCENTAGE FINAL PASS ──
+    syllabus_tasks = []
+    for courseid, syllabus in syllabusNodes.items():
+        # find the syllabus file node to get the original PDF content
+        syllabus_file = None
+        for fileid in syllabus.filechildren or []:
+            file_node = fileNodes.get(courseid, {}).get(str(fileid))
+            if file_node and file_node.pages:
+                syllabus_file = file_node
+                break
+
+        if not syllabus_file:
+            print(f"parser debug syllabus pass: no file found for course={courseid}", flush=True)
+            continue
+
+        full_prompt = pages_to_prompt_text(syllabus_file.pages)
+        if not full_prompt:
+            continue
+
+        print(f"parser debug syllabus pass: grade check course={courseid} file={syllabus_file.fileid}", flush=True)
+        syllabus_tasks.append(
+            run_deepseek(
+                full_prompt,
+                syllabus_file.fileid,
+                courseid,
+                syllabus_file.downloadurl,
+                syllabus_file.canvaspreviewurl,
+                syllabus_file.name,
+                pages=syllabus_file.pages,
+                final_pass=True,
+            )
+        )
+    print("parser syllabus final pass completed__________________________________________________", flush=True)
+
+    if syllabus_tasks:
+        await asyncio.gather(*syllabus_tasks)
+        write_state()
+
 
 if __name__ == "__main__":
     asyncio.run(main())

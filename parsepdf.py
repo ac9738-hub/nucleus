@@ -1,3 +1,8 @@
+"""Small PDF extraction helper.
+
+Functionality: extracts text from local PDFs for parser experiments.
+Dependencies: PyMuPDF (fitz) and local filesystem paths.
+"""
 import os
 import fitz
 import json

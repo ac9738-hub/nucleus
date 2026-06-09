@@ -1,11 +1,14 @@
+// Agent process adapter.
+// Functionality: spawns sidekick.py, parses newline-delimited JSON responses,
+// and routes text/tool calls back to main.js.
+// Dependencies: child_process.spawn and main.js callbacks for UI text/tool IO.
 const { spawn } = require('child_process')
 
-function createAgentProcess({ scriptPath, onText, onToolCall }) {
+function createAgentProcess({ scriptPath, onText, onToolCall, onDone = () => {} }) {
   const proc = spawn('python', [scriptPath])
   let stdoutBuffer = ''
 
   proc.stdout.on('data', chunk => {
-    console.log("main: recieved response: " + chunk.toString())
     stdoutBuffer += chunk.toString()
     const lines = stdoutBuffer.split('\n')
     stdoutBuffer = lines.pop()
@@ -21,20 +24,21 @@ function createAgentProcess({ scriptPath, onText, onToolCall }) {
         return
       }
 
-      console.log('main: received data from agent', data)
-
       if (typeof data === 'string') {
         onText(data)
         return
       }
 
+      if (data && typeof data === 'object' && data.type === 'done') {
+        onDone()
+        return
+      }
+
       if (Array.isArray(data)) {
-        console.log("first call")
         data.forEach(item => {
           if (typeof item === 'string') {
             onText(item)
           } else if (typeof item === 'object' && item !== null) {
-            console.log('main: running tool function with data', item)
             Promise.resolve(onToolCall(item))
               .then(toolResponse => {
                 proc.stdin.write(JSON.stringify(toolResponse) + "\n")
@@ -60,7 +64,6 @@ function createAgentProcess({ scriptPath, onText, onToolCall }) {
 
   return {
     send(payload) {
-      console.log("main: sending prompt to agent", payload)
       proc.stdin.write(JSON.stringify(payload) + '\n')
     }
   }

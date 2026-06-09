@@ -1,4 +1,9 @@
 <!doctype html>
+<!--
+  Nucleus engine shell.
+  Functionality: file-backed browser/search tab container loaded by main.js.
+  Dependencies: engine.js renders search result HTML targeting this page.
+-->
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -19,12 +24,40 @@
     }
 
     body {
-      background: var(--bg);
+      background:
+        radial-gradient(circle at 18% 8%, rgba(117, 103, 216, 0.16), transparent 30%),
+        radial-gradient(circle at 78% 12%, rgba(90, 169, 200, 0.1), transparent 32%),
+        radial-gradient(circle at 52% 106%, rgba(199, 154, 84, 0.08), transparent 34%),
+        linear-gradient(180deg, #101219 0%, #0d0f15 100%);
+      background-attachment: fixed;
+      background-position: 0% 0%, 100% 0%, 50% 100%, 50% 50%;
+      background-size: 140% 140%, 150% 150%, 135% 135%, 100% 100%;
       color: var(--text);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       margin: 0;
       min-height: 100vh;
       padding: 0 34px 34px;
+      animation: engineAmbientDrift 100s ease-in-out infinite alternate;
+    }
+
+    @keyframes engineAmbientDrift {
+      0% {
+        background-position: 0% 0%, 100% 0%, 50% 100%, 50% 50%;
+      }
+
+      50% {
+        background-position: 7% 5%, 93% 7%, 48% 94%, 50% 50%;
+      }
+
+      100% {
+        background-position: 13% 9%, 86% 12%, 54% 88%, 50% 50%;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      body {
+        animation: none;
+      }
     }
 
     main {
@@ -89,11 +122,10 @@
 
     .app-link {
       align-items: center;
-      border-radius: 7px;
       color: var(--text);
       display: flex;
       flex-direction: column;
-      min-height: 126px;
+      min-height: 108px;
       padding: 0 6px;
       text-align: center;
       text-decoration: none;
@@ -107,12 +139,9 @@
     }
 
     .app-icon {
-      background: var(--surface);
-      border-radius: 8px;
-      box-shadow: 0 12px 28px rgba(0,0,0,0.24);
       display: block;
       height: 96px;
-      margin-bottom: 8px;
+      margin-bottom: 2px;
       overflow: hidden;
       width: 96px;
     }
@@ -149,6 +178,12 @@
           <img src="app/canvas/assets/canvas_icon.png" alt="">
         </span>
         <span class="app-name">Canvas</span>
+      </a>
+      <a class="app-link" href="nucleus://app/synapse" aria-label="Open Synapse">
+        <span class="app-icon" aria-hidden="true">
+          <img src="app/synapse/assets/synapse_icon.png" alt="">
+        </span>
+        <span class="app-name">Synapse</span>
       </a>
     </section>
   </main>

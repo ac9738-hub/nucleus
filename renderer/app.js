@@ -1,434 +1,882 @@
-// ─── Data (owned by main process, renderer keeps local copies) ───────────────
-let tasks;         // array of task objects
-let workspaces;    // array of workspace objects
-let projectGroups; // array of project group objects
-let canvasData;    // parsed canvas_data.json snapshot
-let nucleusCanvasCSS;
+// ─── Render Functions ─────────────────────────────────────────────────────────
 
-// ─── UI State (owned by renderer) ────────────────────────────────────────────
-let state = {
-  activeSection: "projects",     // which top section is active: "projects" | "tasks" | "calendar"
-  activeWorkspaceId: "nucleus",  // which workspace tab is selected
-  activeTabId: null,             // which page tab is active within the workspace
-  activeCourseId: null,
-  activeTabByWorkspace: {},
-  tabs: [
-    { id: "center:nucleus", type: "center", workspaceId: "nucleus", label: "Project Center" }
-  ],
-  top: 'section'                 // whether the user is in a top section or a workspace: "section" | "workspace"
-}
-//------DEV FUNCTIONS
+// Renderer view templates.
+// Functionality: renders sidebars, task cards, toolbars, project center, Canvas
+// native app surfaces, and event listeners for generated DOM.
+// Dependencies: renderer/app.js state/data globals and renderer/workspace-page-tabs.js
+// navigation helpers are loaded before/after this file by index.html.
 
-// TEST FUNCTION, write current pages HTML to assignmenthtml.json for inspection
-async function writeActiveBrowserTabHtml() {
-  const result = await window.nucleus.writeActiveTabHtml();
-  if (!result || !result.ok) {
-    console.error("Unable to write active tab HTML:", result && result.error);
-    return;
-  }
-  console.log(`Wrote active tab HTML to assignmenthtml.json (${result.characters} characters).`);
+let appIconClickState = {
+  target: null,
+  timeout: null
+};
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
-// ─── Data Helpers ─────────────────────────────────────────────────────────────
-
-async function writeActiveBrowserTabFramesHtml() {
-  const result = await window.nucleus.writeActiveTabFramesHtml();
-  if (!result || !result.ok) {
-    console.error("Unable to write active tab frame HTML:", result && result.error);
-    return;
-  }
-  console.log(`Wrote ${result.frames} frame HTML snapshots to ${result.directory}.`);
-}
-
-function getWorkspace(workspaceId) {
-  return workspaces.find(workspace => workspace.id === workspaceId) || workspaces[0];
-}
-
-function getWorkspaceTasks(workspaceId) {
-  return tasks.filter(task => task.workspaceId === workspaceId);
-}
-
-function getGreeting() {
-  const h = new Date().getHours();
-  return h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
-}
-
-function getProjectGroups() {
-  return Array.isArray(projectGroups) ? projectGroups : [];
-}
-
-function getBrowserWorkspaceId() {
-  if (workspaces.some(workspace => workspace.id === state.activeWorkspaceId)) {
-    return state.activeWorkspaceId;
-  }
-  return workspaces[0] ? workspaces[0].id : "nucleus";
-}
-
-
-// ─── Navigation ───────────────────────────────────────────────────────────────
-
-function setActiveSection(section) {
-  rememberActiveWorkspaceTab();
-  state.activeSection = section;
-  state.activeTabId = null;
-  state.activeCourseId = null;
-  state.top = 'section';
-  syncActiveTab();
-  render();
-}
-
-function setActiveWorkspace(workspaceId) {
-  rememberActiveWorkspaceTab();
-  state.top = 'workspace';
-  state.activeCourseId = null;
-  state.activeWorkspaceId = workspaceId;
-  state.activeTabId = getRememberedWorkspaceTabId(workspaceId);
-  syncTabs();
-  syncActiveTab();
-  render();
-}
-
-function addworkspace(workspaceid, name) {
-  return window.nucleus.newWorkspace({
-    id: workspaceid,
-    name,
-    description: `Workspace for ${name}.`
-  });
-}
-
-function slugifyWorkspaceName(name) {
-  const base = name
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "") || "workspace";
-  let candidate = base;
-  let suffix = 2;
-
-  while (workspaces.some(workspace => workspace.id === candidate)) {
-    candidate = `${base}-${suffix}`;
-    suffix += 1;
-  }
-
-  return candidate;
-}
-
-async function manuallyAddWorkspace() {
-  const form = document.getElementById("new-workspace-form");
-  const input = document.getElementById("new-workspace-input");
-  const name = input.value;
-  if (!name || !name.trim()) return;
-
-  const trimmedName = name.trim();
-  const workspaceId = slugifyWorkspaceName(trimmedName);
-  const result = await addworkspace(workspaceId, trimmedName);
-
-  if (result === 1 || result === 2 || (result && result.ok === false)) {
-    console.error("Unable to create workspace:", result);
-    input.select();
+function activateAppIcon(card, openApp) {
+  if (appIconClickState.target === card) {
+    clearTimeout(appIconClickState.timeout);
+    appIconClickState.target = null;
+    appIconClickState.timeout = null;
+    card.classList.remove("is-clicked");
+    card.classList.add("is-launching");
+    setTimeout(openApp, 180);
     return;
   }
 
-  input.value = "";
-  form.classList.add("is-hidden");
-  state.top = "workspace";
-  state.activeWorkspaceId = workspaceId;
-  state.activeTabId = ensureWorkspaceCenter(workspaceId);
-  state.activeTabByWorkspace[workspaceId] = state.activeTabId;
-  syncTabs();
-  syncActiveTab();
-  render();
-}
-
-function showNewWorkspaceForm() {
-  const form = document.getElementById("new-workspace-form");
-  const input = document.getElementById("new-workspace-input");
-  form.classList.remove("is-hidden");
-  input.focus();
-}
-
-function hideNewWorkspaceForm() {
-  const form = document.getElementById("new-workspace-form");
-  const input = document.getElementById("new-workspace-input");
-  input.value = "";
-  form.classList.add("is-hidden");
-}
-
-async function deleteWorkspace(workspaceId) {
-  const result = await window.nucleus.deleteWorkspace(workspaceId);
-  if (!result || !result.ok) {
-    console.error("Unable to delete workspace:", result && result.error);
-    return;
+  if (appIconClickState.target) {
+    appIconClickState.target.classList.remove("is-clicked");
+    clearTimeout(appIconClickState.timeout);
   }
 
-  state.tabs = state.tabs.filter(tab => tab.workspaceId !== workspaceId);
-  delete state.activeTabByWorkspace[workspaceId];
-
-  if (state.activeWorkspaceId === workspaceId) {
-    const fallback = workspaces.find(workspace => workspace.id !== workspaceId);
-    if (fallback) {
-      state.top = "workspace";
-      state.activeWorkspaceId = fallback.id;
-      state.activeTabId = getRememberedWorkspaceTabId(fallback.id);
-    } else {
-      state.top = "section";
-      state.activeTabId = null;
+  appIconClickState.target = card;
+  card.classList.add("is-clicked");
+  appIconClickState.timeout = setTimeout(() => {
+    card.classList.remove("is-clicked");
+    if (appIconClickState.target === card) {
+      appIconClickState.target = null;
+      appIconClickState.timeout = null;
     }
-  }
-
-  await syncTabs();
-  syncActiveTab();
+  }, 750);
 }
 
-// ─── Task Actions ─────────────────────────────────────────────────────────────
-let renderafterupdate = false;
-let pendingworkspaceID = null;
-let pendingtabID = null;
-
-async function ensureTaskWorkspace(task) {
-  if (!task.workspaceId) {
-    task.workspaceId = task.id + "wkspce";
-  }
-
-  const workspaceId = task.workspaceId;
-  if (!workspaces.some(workspace => workspace.id === workspaceId)) {
-    let workspaceName = task.title || "Task";
-    let result = await addworkspace(workspaceId, workspaceName);
-    if (result === 2) {
-      workspaceName = `${workspaceName} (${String(task.id || workspaceId).slice(0, 8)})`;
-      result = await addworkspace(workspaceId, workspaceName);
-    }
-
-    const created = result && result.ok !== false && result !== 2;
-    if (!created && result !== 1) {
-      console.error("Unable to create task workspace:", result && result.error ? result.error : result);
-      return null;
-    }
-
-    if (!workspaces.some(workspace => workspace.id === workspaceId)) {
-      workspaces.push({
-        id: workspaceId,
-        name: workspaceName,
-        description: `Workspace for ${workspaceName}.`
-      });
-    }
-  }
-
-  const centerTabId = ensureWorkspaceCenter(workspaceId);
-  state.top = "workspace";
-  state.activeWorkspaceId = workspaceId;
-  state.activeTabId = centerTabId;
-  state.activeTabByWorkspace[workspaceId] = centerTabId;
-  return workspaceId;
-}
-
-async function startTask(taskId) {
-  const task = tasks.find(item => item.id === taskId);
-  if (!task) return;
-
-  const taskUrls = Array.isArray(task.urls) ? task.urls.filter(Boolean) : [];
-  if (taskUrls.length) {
-    const workspaceId = await ensureTaskWorkspace(task);
-    if (!workspaceId) return;
-    for (let index = 0; index < taskUrls.length; index += 1) {
-      await openUrlInWorkspaceTab(taskUrls[index], workspaceId, index === 0);
-    }
-    await syncTabs();
-    await syncActiveTab();
-    render();
-    return;
-  }
-
-  const workspaceId = await ensureTaskWorkspace(task);
-  if (!workspaceId) return;
-
-  if (task.source === "canvas" && task.courseId) {
-    await openCanvasAppTab(workspaceId, task.courseId);
-    return;
-  }
-
-  renderafterupdate = true;
-  pendingworkspaceID = workspaceId;
-  pendingtabID = ensureWorkspaceCenter(workspaceId);
-
-  try {
-    await window.nucleus.startTask(task);
-  } catch (error) {
-    console.error("Unable to start task:", error);
-  }
-}
-
-// ─── AI Agent ─────────────────────────────────────────────────────────────────
-
-function startagent() {
-  const input = document.getElementById("ai-input");
-  const messages = document.getElementById("ai-messages");
-  let currentResponse = null;
-
-  window.nucleus.on('prompt:response-chunk', (chunk) => {
-    if (!currentResponse) {
-      currentResponse = document.createElement("div");
-      currentResponse.classList.add("ai-message", "response");
-      messages.appendChild(currentResponse);
-    }
-    currentResponse.innerText += chunk;
-    messages.scrollTop = messages.scrollHeight;
-  });
-
-  function submitPrompt() {
-    if (input.value.trim() === "") return;
-
-    currentResponse = null;
-
-    const message = document.createElement("div");
-    message.classList.add("ai-message");
-    message.innerText = input.value;
-    messages.appendChild(message);
-
-    window.nucleus.sendprompt(input.value);
-    input.value = "";
-    messages.scrollTop = messages.scrollHeight;
-  }
-
-  window.sendMessage = submitPrompt;
-
-  input.addEventListener("keypress", event => {
-    if (event.key !== "Enter") return;
-    submitPrompt();
-  });
-}
-
-
-// ─── Startup ──────────────────────────────────────────────────────────────────
-
-document.addEventListener("DOMContentLoaded", async () => {
+// render the top level vertical tabs aka the section panel by toggleing active on or off
+function renderPrimaryTabs() {
   document.querySelectorAll("#primary-tabs button").forEach(button => {
-    button.addEventListener("click", () => setActiveSection(button.dataset.section));
+    button.classList.toggle("active", state.top !== "workspace" && button.dataset.section === state.activeSection);
   });
-  document.getElementById("new-workspace-button").addEventListener("click", showNewWorkspaceForm);
-  document.getElementById("cancel-new-workspace").addEventListener("click", hideNewWorkspaceForm);
-  document.getElementById("new-workspace-form").addEventListener("submit", event => {
+}
+
+// render the tabs in the left panel for workspaces ** no container
+function renderWorkspaceTabs() {
+  const workspaceTabs = document.getElementById("workspace-tabs");
+
+  // build html
+  workspaceTabs.innerHTML = workspaces.map(workspace => `
+    <button type="button" class="${state.top === 'workspace' && workspace.id === state.activeWorkspaceId ? "active" : ""}" data-workspace="${escapeHtml(workspace.id)}">
+      <span class="workspace-tab-main">
+        <span>${escapeHtml(workspace.name)}</span>
+        <small>${getWorkspaceTasks(workspace.id).length} tasks</small>
+      </span>
+      <span class="workspace-delete" data-delete-workspace="${escapeHtml(workspace.id)}" title="Delete workspace">x</span>
+    </button>
+  `).join("");
+
+  // add click listeners
+  workspaceTabs.querySelectorAll("button").forEach(button => {
+    button.addEventListener("click", event => {
+      const deleteTarget = event.target.closest("[data-delete-workspace]");
+      if (deleteTarget) {
+        event.stopPropagation();
+        deleteWorkspace(deleteTarget.dataset.deleteWorkspace);
+        return;
+      }
+      setActiveWorkspace(button.dataset.workspace);
+    });
+  });
+}
+
+// render the workspacepagetabs under the primary tabs ** no container
+function renderWorkspacePageTabs() {
+  const pageTabs = document.getElementById("workspace-page-tabs");
+  const visibleTabs = getVisibleTabs();
+
+  pageTabs.classList.toggle("is-hidden", state.top !== "workspace");
+
+  // build html only if workspace on top
+  pageTabs.innerHTML = state.top === "workspace" ? visibleTabs.map(tab => `
+    <button type="button" class="workspace-page-tab ${sameTabId(tab.id, state.activeTabId) ? "active" : ""}" data-tab-id="${escapeHtml(tab.id)}">
+      <span>${escapeHtml(tab.label)}</span>
+      ${tab.type !== "center" ? `<span class="close-tab" data-close-tab="${escapeHtml(tab.id)}">x</span>` : ""}
+    </button>
+  `).join("") : "";
+
+  // new tab button (+)
+  if (state.top === "workspace") {
+    const addBtn = document.createElement("button");
+    addBtn.type = "button";
+    addBtn.id = "add-tab-btn";
+    addBtn.className = "add-tab-btn";
+    addBtn.title = "New tab";
+    addBtn.textContent = "+";
+    addBtn.addEventListener('click', () => {
+      newbrowsertab(null, state.activeWorkspaceId, true);
+    })
+    pageTabs.appendChild(addBtn);
+  }
+
+  // add tab click listeners
+  pageTabs.querySelectorAll(".workspace-page-tab").forEach(tabButton => {
+    tabButton.addEventListener("click", async event => {
+      const closeTarget = event.target.closest("[data-close-tab]");
+      if (closeTarget) {
+        closeTab(closeTarget.dataset.closeTab);
+        return;
+      }
+      rememberActiveCanvasYIndex();
+      state.activeTabId = tabButton.dataset.tabId;
+      state.activeTabByWorkspace[state.activeWorkspaceId] = state.activeTabId;
+      await syncActiveTab();
+      render();
+    });
+  });
+}
+
+// renders the toolbar for browsertabs
+function renderBrowserToolbar() {
+  const toolbar = document.getElementById("browser-toolbar");
+  const activeTab = getActiveBrowserTab();
+
+  toolbar.classList.toggle("is-hidden", !activeTab);
+  toolbar.innerHTML = "";
+
+  if (!activeTab) return;
+
+  const backButton = document.createElement("button");
+  backButton.type = "button";
+  backButton.className = "browser-back-button";
+  backButton.title = "Back";
+  backButton.textContent = "Undo";
+  backButton.addEventListener("click", goBackActiveBrowserTab);
+
+  const saveHtmlButton = document.createElement("button");
+  saveHtmlButton.type = "button";
+  saveHtmlButton.className = "browser-save-html-button";
+  saveHtmlButton.title = "Save page HTML";
+  saveHtmlButton.textContent = "Save HTML";
+  saveHtmlButton.addEventListener("click", writeActiveBrowserTabHtml);
+
+  const saveFramesButton = document.createElement("button");
+  saveFramesButton.type = "button";
+  saveFramesButton.className = "browser-save-html-button";
+  saveFramesButton.title = "Save page and iframe HTML";
+  saveFramesButton.textContent = "Save Frames";
+  saveFramesButton.addEventListener("click", writeActiveBrowserTabFramesHtml);
+
+  const form = document.createElement("form");
+  form.className = "browser-url-form";
+
+  const input = document.createElement("input");
+  input.type = "text";
+  input.className = "browser-url-input";
+  input.placeholder = "Search or enter URL";
+  input.value = activeTab.url || "";
+
+  form.addEventListener("submit", event => {
     event.preventDefault();
-    manuallyAddWorkspace();
-  });
-  document.querySelector(".content").addEventListener("scroll", rememberActiveCanvasYIndex);
-
-  const data = await window.nucleus.getData();
-  tasks = data.tasks || [];
-  workspaces = data.workspaces || [];
-  projectGroups = data.projectGroups || [];
-  canvasData = data.canvasData || {};
-  ensureWorkspaceCenters();
-  syncTabs();
-
-  startagent();
-
-  window.nucleus.on('tasks:update', updatedTasks => {
-    tasks = updatedTasks;
-    render();
+    navigateActiveBrowserTab(input.value);
   });
 
-  window.nucleus.on('workspaces:update', updatedWorkspaces => {
-    workspaces = updatedWorkspaces;
-    state.tabs = state.tabs.filter(tab => workspaces.some(workspace => workspace.id === tab.workspaceId));
-    Object.keys(state.activeTabByWorkspace).forEach(workspaceId => {
-      const rememberedTabId = state.activeTabByWorkspace[workspaceId];
-      const stillValid = workspaces.some(workspace => workspace.id === workspaceId)
-        && state.tabs.some(tab => tab.workspaceId === workspaceId && sameTabId(tab.id, rememberedTabId));
-      if (!stillValid) {
-        delete state.activeTabByWorkspace[workspaceId];
+  form.appendChild(input);
+  toolbar.appendChild(backButton);
+  toolbar.appendChild(saveHtmlButton);
+  toolbar.appendChild(saveFramesButton);
+  toolbar.appendChild(form);
+}
+
+// render the tab toolbar for canvas
+function renderCanvasToolbar() {
+  const toolbar = document.getElementById("canvas-toolbar");
+  const activeTab = getActiveCanvasTab();
+
+  toolbar.classList.toggle("is-hidden", !activeTab);
+  toolbar.innerHTML = "";
+
+  if (!activeTab) return;
+
+  const backButton = document.createElement("button");
+  backButton.type = "button";
+  backButton.className = "canvas-back-button";
+  backButton.title = "Back";
+  backButton.setAttribute("aria-label", "Back");
+  backButton.textContent = "<";
+  backButton.addEventListener("click", goBackActiveCanvasTab);
+
+  const saveHtmlButton = document.createElement("button");
+  saveHtmlButton.type = "button";
+  saveHtmlButton.className = "canvas-save-html-button";
+  saveHtmlButton.title = "Save page HTML";
+  saveHtmlButton.textContent = "Save HTML";
+  saveHtmlButton.addEventListener("click", writeActiveBrowserTabHtml);
+
+  const saveFramesButton = document.createElement("button");
+  saveFramesButton.type = "button";
+  saveFramesButton.className = "canvas-save-html-button";
+  saveFramesButton.title = "Save page and iframe HTML";
+  saveFramesButton.textContent = "Save Frames";
+  saveFramesButton.addEventListener("click", writeActiveBrowserTabFramesHtml);
+
+  toolbar.appendChild(backButton);
+  toolbar.appendChild(saveHtmlButton);
+  toolbar.appendChild(saveFramesButton);
+}
+
+// update taskcard html in the DOM
+function truncateTaskText(value, maxLength = 220) {
+  const text = String(value || "").replace(/\s+/g, " ").trim();
+  if (text.length <= maxLength) return text;
+  return `${text.slice(0, maxLength - 1).trim()}...`;
+}
+
+const CANVAS_COURSE_BORDER_COLORS = [
+  "#ff4d4d",
+  "#35c46a",
+  "#4d8dff",
+  "#f2c94c",
+  "#ffffff",
+  "#a66cff"
+];
+
+function isCanvasTask(task) {
+  return task && (
+    task.source === "canvas" ||
+    task.type === "canvas-assignment" ||
+    String(task.id || "").startsWith("canvas-assignment-") ||
+    String(task.course || "").startsWith("Canvas ")
+  );
+}
+
+function getCanvasCourseKey(task) {
+  return String(task.courseId || task.course || "Canvas");
+}
+
+function getCanvasCourseDisplayName(task) {
+  if (!isCanvasTask(task)) {
+    return task.course || "";
+  }
+
+  const courseId = String(task.courseId || "").trim()
+    || String(task.course || "").replace(/^Canvas\s+/i, "").trim();
+  const courses = canvasData && Array.isArray(canvasData.courses)
+    ? canvasData.courses
+    : [];
+  const course = courses.find(item => String(item.id) === courseId);
+
+  if (course) {
+    return course.name || course.course_code || task.course || `Canvas ${courseId}`;
+  }
+
+  return task.course || (courseId ? `Canvas ${courseId}` : "Canvas");
+}
+
+function getCanvasCourseBorderColor(task) {
+  if (!isCanvasTask(task)) return "";
+
+  const courseKeys = [];
+  tasks.forEach(item => {
+    if (!isCanvasTask(item)) return;
+    const key = getCanvasCourseKey(item);
+    if (!courseKeys.includes(key)) {
+      courseKeys.push(key);
+    }
+  });
+
+  const courseIndex = courseKeys.indexOf(getCanvasCourseKey(task));
+  return CANVAS_COURSE_BORDER_COLORS[courseIndex % CANVAS_COURSE_BORDER_COLORS.length];
+}
+
+function renderTaskCard(task) {
+  const urls = Array.isArray(task.urls) ? task.urls : [];
+  const details = truncateTaskText(task.details || "No description provided.");
+  const borderColor = getCanvasCourseBorderColor(task);
+  const cardStyle = borderColor ? ` style="--task-course-border:${borderColor}"` : "";
+  const courseName = getCanvasCourseDisplayName(task);
+  const encodedUrls = encodeURIComponent(JSON.stringify(urls));
+  return `
+    <article class="task-card" data-id="${escapeHtml(task.id)}" data-task-urls="${escapeHtml(encodedUrls)}"${cardStyle}>
+      <div class="task-header">
+        <span class="task-course" style="background:${escapeHtml(task.color)}">${escapeHtml(courseName)}</span>
+        <span class="task-due">Due ${escapeHtml(task.due)}</span>
+      </div>
+      <h2>${escapeHtml(task.title)}</h2>
+      <p title="${escapeHtml(details)}">${escapeHtml(details)}</p>
+      <div class="task-footer">
+        <span>${escapeHtml(task.estimate)}</span>
+        <button type="button" class="start-task-button" data-start-task="${escapeHtml(task.id)}">Start task</button>
+      </div>
+    </article>
+  `;
+}
+
+function getTasksForCards() {
+  if (window.TaskOptimizer && typeof window.TaskOptimizer.orderTasks === "function") {
+    return window.TaskOptimizer.orderTasks(tasks).map(score => score.task || score);
+  }
+
+  return tasks;
+}
+
+function dueTimestamp(value) {
+  const timestamp = Date.parse(value || "");
+  return Number.isFinite(timestamp) ? timestamp : Number.POSITIVE_INFINITY;
+}
+
+function formatHubDue(value) {
+  const timestamp = dueTimestamp(value);
+  if (!Number.isFinite(timestamp)) return value || "No due date";
+  return new Date(timestamp).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function isSameCalendarDay(left, right) {
+  return left.getFullYear() === right.getFullYear()
+    && left.getMonth() === right.getMonth()
+    && left.getDate() === right.getDate();
+}
+
+function getTodaysDashboardItems(sourceTasks) {
+  const today = new Date();
+  return sourceTasks
+    .filter(task => {
+      const timestamp = dueTimestamp(task.due);
+      return Number.isFinite(timestamp) && isSameCalendarDay(new Date(timestamp), today);
+    })
+    .slice()
+    .sort((left, right) => dueTimestamp(left.due) - dueTimestamp(right.due))
+    .slice(0, 5);
+}
+
+function getContinueWorkingTasks(orderedTasks, unfinishedTabs) {
+  const byId = new Map(tasks.map(task => [String(task.id), task]));
+  const seen = new Set();
+  const openTaskItems = unfinishedTabs
+    .map(tab => byId.get(String(tab.taskId || tab.id || "")))
+    .filter(Boolean)
+    .filter(task => {
+      const key = String(task.id);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+  if (openTaskItems.length) {
+    return openTaskItems.slice(0, 4);
+  }
+
+  return orderedTasks
+    .filter(task => !String(task.status || "").match(/done|complete|finished/i))
+    .slice(0, 4);
+}
+
+function renderHubEmpty(message) {
+  return `<div class="home-empty">${escapeHtml(message)}</div>`;
+}
+
+function renderHomeTaskItem(task, index) {
+  const courseName = getCanvasCourseDisplayName(task) || task.course || "Task";
+  const details = truncateTaskText(task.details || "", 96);
+  return `
+    <article class="home-list-item home-task-item">
+      <div class="home-rank">${index + 1}</div>
+      <div class="home-item-main">
+        <h3>${escapeHtml(task.title || "Untitled task")}</h3>
+        <p>${escapeHtml(details || courseName)}</p>
+      </div>
+      <div class="home-item-side">
+        <span>${escapeHtml(formatHubDue(task.due))}</span>
+        <button type="button" class="home-action-button" data-start-task="${escapeHtml(task.id)}">Start</button>
+      </div>
+    </article>
+  `;
+}
+
+function tabKindLabel(tab) {
+  if (!tab) return "Tab";
+  if (tab.type === "canvastab") return tab.canvasMode === "browser" ? "Canvas page" : "Canvas";
+  if (tab.type === "synapsetab") return "Synapse";
+  if (tab.type === "browsertab") return "Browser";
+  if (tab.type === "task") return "Task";
+  return "Workspace";
+}
+
+function renderHomeTabItem(tab) {
+  return `
+    <button type="button" class="home-list-item home-tab-item" data-home-tab="${escapeHtml(tab.id)}">
+      <div class="home-item-main">
+        <h3>${escapeHtml(tab.label || tabKindLabel(tab))}</h3>
+        <p>${escapeHtml(tab.url || tabKindLabel(tab))}</p>
+      </div>
+      <span class="home-pill">${escapeHtml(tabKindLabel(tab))}</span>
+    </button>
+  `;
+}
+
+function renderHomeWorkspaceItem(workspace) {
+  const workspaceTasks = getWorkspaceTasks(workspace.id);
+  const openTabs = state.tabs.filter(tab => tab.workspaceId === workspace.id && tab.type !== "center");
+  return `
+    <button type="button" class="home-list-item home-workspace-item" data-home-workspace="${escapeHtml(workspace.id)}">
+      <div class="home-item-main">
+        <h3>${escapeHtml(workspace.name || workspace.id)}</h3>
+        <p>${escapeHtml(workspace.description || `${workspaceTasks.length} tasks`)}</p>
+      </div>
+      <span class="home-pill">${openTabs.length} tabs</span>
+    </button>
+  `;
+}
+
+function renderHomeCalendarItem(task, index) {
+  const courseName = getCanvasCourseDisplayName(task) || task.course || "Calendar";
+  return `
+    <article class="home-list-item home-calendar-item">
+      <div class="home-calendar-dot">${index + 1}</div>
+      <div class="home-item-main">
+        <h3>${escapeHtml(task.title || "Untitled event")}</h3>
+        <p>${escapeHtml(courseName)}</p>
+      </div>
+      <span class="home-pill">${escapeHtml(formatHubDue(task.due))}</span>
+    </article>
+  `;
+}
+
+function getDashboardUpdates(priorityTasks, continueTasks, todaysItems, unfinishedTabs) {
+  const updates = [];
+  if (todaysItems.length) {
+    updates.push({
+      tone: "blue",
+      title: `${todaysItems.length} item${todaysItems.length === 1 ? "" : "s"} on today's calendar`,
+      detail: todaysItems[0].title || "Open calendar"
+    });
+  }
+  if (priorityTasks.length) {
+    updates.push({
+      tone: "purple",
+      title: "Top priority queue refreshed",
+      detail: priorityTasks[0].title || "Review priority tasks"
+    });
+  }
+  if (continueTasks.length) {
+    updates.push({
+      tone: "teal",
+      title: "Continue working list ready",
+      detail: continueTasks[0].title || "Pick up where you left off"
+    });
+  }
+  if (unfinishedTabs.length) {
+    updates.push({
+      tone: "amber",
+      title: `${unfinishedTabs.length} unfinished tab${unfinishedTabs.length === 1 ? "" : "s"}`,
+      detail: unfinishedTabs[0].label || unfinishedTabs[0].url || "Workspace tabs"
+    });
+  }
+
+  return updates.slice(0, 5);
+}
+
+function renderHomeUpdateItem(update) {
+  return `
+    <article class="home-list-item home-update-item">
+      <span class="home-update-dot home-update-${escapeHtml(update.tone)}"></span>
+      <div class="home-item-main">
+        <h3>${escapeHtml(update.title)}</h3>
+        <p>${escapeHtml(update.detail)}</p>
+      </div>
+    </article>
+  `;
+}
+
+function renderHomeDashboard() {
+  const orderedTasks = getTasksForCards();
+  const priorityTasks = orderedTasks.slice(0, 5);
+  const unfinishedTabs = state.tabs
+    .filter(tab => tab.type !== "center")
+    .slice(-6)
+    .reverse();
+  const continueTasks = getContinueWorkingTasks(orderedTasks, unfinishedTabs);
+  const todaysItems = getTodaysDashboardItems(tasks);
+  const activeWorkspace = getWorkspace(getBrowserWorkspaceId());
+  const recentWorkspaces = workspaces
+    .filter(workspace => !activeWorkspace || workspace.id !== activeWorkspace.id)
+    .slice(-5)
+    .reverse();
+  const dashboardUpdates = getDashboardUpdates(priorityTasks, continueTasks, todaysItems, unfinishedTabs);
+  const totalTasks = tasks.length;
+  const highPriorityCount = priorityTasks.length;
+  const openTabCount = unfinishedTabs.length;
+  const todaysCount = todaysItems.length;
+  const focusScore = totalTasks ? Math.max(30, Math.min(98, 100 - Math.max(0, totalTasks - highPriorityCount) * 4)) : 100;
+
+  return `
+    <header class="home-header">
+      <div>
+        <h1>${getGreeting()}</h1>
+        <p>Your work hub for tasks, tabs, events, and active spaces.</p>
+      </div>
+      <div class="home-header-actions">
+        <button type="button" class="home-primary-action" data-open-section="tasks">New focus</button>
+        <button type="button" class="home-secondary-action" data-open-section="calendar">Calendar</button>
+      </div>
+    </header>
+
+    <section class="home-stats" aria-label="Dashboard summary">
+      <article class="home-stat-card">
+        <span class="home-stat-orb home-stat-purple"></span>
+        <div><strong>${totalTasks}</strong><span>Tasks today</span></div>
+      </article>
+      <article class="home-stat-card">
+        <span class="home-stat-orb home-stat-blue"></span>
+        <div><strong>${openTabCount}</strong><span>Unfinished tabs</span></div>
+      </article>
+      <article class="home-stat-card">
+        <span class="home-stat-orb home-stat-amber"></span>
+        <div><strong>${todaysCount}</strong><span>Today calendar</span></div>
+      </article>
+      <article class="home-stat-card">
+        <span class="home-stat-orb home-stat-teal"></span>
+        <div><strong>${focusScore}%</strong><span>Focus score</span></div>
+      </article>
+    </section>
+
+    <section class="home-dashboard">
+      <article class="home-panel home-panel-large home-priority-panel">
+        <div class="home-panel-heading">
+          <h2>Top priority new tasks</h2>
+          <span>${priorityTasks.length}</span>
+        </div>
+        <div class="home-list">
+          ${priorityTasks.length ? priorityTasks.map(renderHomeTaskItem).join("") : renderHubEmpty("No priority tasks yet.")}
+        </div>
+      </article>
+
+      <article class="home-panel home-continue-panel">
+        <div class="home-panel-heading">
+          <h2>Continue working</h2>
+          <span>${continueTasks.length}</span>
+        </div>
+        <div class="home-list">
+          ${continueTasks.length ? continueTasks.map(renderHomeTaskItem).join("") : renderHubEmpty("Nothing in progress yet.")}
+        </div>
+      </article>
+
+      <article class="home-panel home-calendar-panel">
+        <div class="home-panel-heading">
+          <h2>Today's calendar</h2>
+          <span>${todaysItems.length}</span>
+        </div>
+        <div class="home-list">
+          ${todaysItems.length ? todaysItems.map(renderHomeCalendarItem).join("") : renderHubEmpty("No events or tasks due today.")}
+        </div>
+      </article>
+
+      <article class="home-panel home-recent-panel">
+        <div class="home-panel-heading">
+          <h2>Recent workspaces</h2>
+          <span>${recentWorkspaces.length}</span>
+        </div>
+        <div class="home-list">
+          ${recentWorkspaces.length ? recentWorkspaces.map(renderHomeWorkspaceItem).join("") : renderHubEmpty("No other workspaces yet.")}
+        </div>
+      </article>
+
+      <article class="home-panel home-updates-panel">
+        <div class="home-panel-heading">
+          <h2>Notifications/updates</h2>
+          <span>${dashboardUpdates.length}</span>
+        </div>
+        <div class="home-list">
+          ${dashboardUpdates.length ? dashboardUpdates.map(renderHomeUpdateItem).join("") : renderHubEmpty("No updates right now.")}
+        </div>
+      </article>
+    </section>
+  `;
+}
+
+// render tasks container
+function renderSuggestedTasks() {
+  return `
+    <header>
+      <h1>Tasks</h1>
+      <p>All suggested tasks across classes, projects, and workspaces.</p>
+    </header>
+    <section>
+      <div class="task-grid">
+        ${getTasksForCards().map(renderTaskCard).join("")}
+      </div>
+    </section>
+  `;
+}
+
+// calender tab
+function renderCalendarPlaceholder() {
+  return `
+    <header>
+      <h1>Calendar</h1>
+      <p>Calendar view placeholder.</p>
+    </header>
+    <section class="workspace-panel">
+      <div>
+        <h2>Calendar</h2>
+        <p>This tab is ready for the calendar UI.</p>
+      </div>
+    </section>
+  `;
+}
+
+//  return the html of the projectcenter tab
+function renderProjectCenter(workspace) {
+  return `
+    <header>
+      <h1>${escapeHtml(workspace.name)} Project Center</h1>
+      <p>${escapeHtml(workspace.description)}</p>
+    </header>
+
+    <section class="workspace-panel">
+      <div>
+        <h2>Project Center</h2>
+        <p>Workspace tabs appear above this page. Use the Tasks top tab to start suggested work items.</p>
+      </div>
+      <div class="workspace-actions">
+        <button type="button" class="start-task-button" data-open-section="tasks">View tasks</button>
+      </div>
+    </section>
+  `;
+}
+
+// ???
+function renderTaskWorkspace(tab) {
+  const task = tasks.find(item => item.id === tab.taskId);
+  if (!task) return renderProjectCenter(getWorkspace(state.activeWorkspaceId));
+  const courseName = getCanvasCourseDisplayName(task);
+
+  return `
+    <header>
+      <h1>${escapeHtml(task.title)}</h1>
+      <p>${escapeHtml(courseName)} / Due ${escapeHtml(task.due)} / ${escapeHtml(task.estimate)}</p>
+    </header>
+
+    <section class="workspace-panel">
+      <div>
+        <h2>Workspace</h2>
+        <p>${escapeHtml(task.details)}</p>
+      </div>
+      <button type="button" class="start-task-button">Begin work</button>
+    </section>
+  `;
+}
+
+// renders the inner view (everything that's not the paneels)
+function renderView() {
+  const activeTab = state.top === "workspace"
+    ? state.tabs.find(tab => sameTabId(tab.id, state.activeTabId)) || {
+        id: ensureWorkspaceCenter(state.activeWorkspaceId),
+        type: "center",
+        workspaceId: state.activeWorkspaceId
+      }
+    : null;
+
+  const view = document.getElementById("view");
+
+  // injects html to view object based on what pagetype is active
+  if (state.top !== "workspace") {
+    if (state.activeSection === "home") {
+      view.innerHTML = renderHomeDashboard();
+    } else if (state.activeSection === "tasks") {
+      view.innerHTML = renderSuggestedTasks();
+    } else {
+      view.innerHTML = renderCalendarPlaceholder();
+    }
+  } else if (activeTab.type === "task") {
+    view.innerHTML = renderTaskWorkspace(activeTab);
+  } else if (activeTab.type === "canvastab" && activeTab.canvasMode !== "browser") {
+    view.innerHTML = window.nucleusCanvasApp
+      ? window.nucleusCanvasApp.renderCanvasApp(activeTab, canvasData)
+      : `<section class="workspace-panel"><div><h2>Canvas</h2><p>The Canvas app script did not load.</p></div></section>`;
+  } else if (activeTab.type === "synapsetab") {
+    view.innerHTML = window.nucleusSynapseApp
+      ? window.nucleusSynapseApp.renderSynapseApp(activeTab, synapseState)
+      : `<section class="workspace-panel"><div><h2>Synapse</h2><p>The Synapse app script did not load.</p></div></section>`;
+  } else if (isWebContentTab(activeTab)) {
+    view.innerHTML = "";
+  } else {
+    view.innerHTML = renderProjectCenter(getWorkspace(state.activeWorkspaceId));
+  }
+
+  restoreActiveCanvasYIndex();
+
+  // attach click listeners to buttons
+  view.querySelectorAll("[data-start-task]").forEach(button => {
+    button.addEventListener("click", () => startTask(button.dataset.startTask));
+  });
+
+  view.querySelectorAll("[data-open-section]").forEach(button => {
+    button.addEventListener("click", () => setActiveSection(button.dataset.openSection));
+  });
+
+  view.querySelectorAll("[data-home-workspace]").forEach(button => {
+    button.addEventListener("click", () => setActiveWorkspace(button.dataset.homeWorkspace));
+  });
+
+  view.querySelectorAll("[data-home-tab]").forEach(button => {
+    button.addEventListener("click", async () => {
+      const tab = state.tabs.find(item => sameTabId(item.id, button.dataset.homeTab));
+      if (!tab) return;
+      rememberActiveCanvasYIndex();
+      state.top = "workspace";
+      state.activeWorkspaceId = tab.workspaceId;
+      state.activeTabId = tab.id;
+      state.activeTabByWorkspace[tab.workspaceId] = tab.id;
+      await syncActiveTab();
+      render();
+    });
+  });
+
+  view.querySelectorAll("[data-back-to-home], [data-back-to-projects]").forEach(button => {
+    button.addEventListener("click", () => {
+      state.activeCourseId = null;
+      state.activeSection = "home";
+      state.top = "section";
+      render();
+    });
+  });
+
+  view.querySelectorAll("[data-back-to-canvas-app]").forEach(button => {
+    button.addEventListener("click", () => {
+      const activeTab = getActiveTab();
+      if (activeTab && activeTab.type === "canvastab" && activeTab.canvasMode !== "browser") {
+        rememberActiveCanvasYIndex();
+        if (Array.isArray(activeTab.nativeHistory)) {
+          activeTab.nativeHistory.pop();
+        }
+        activeTab.canvasNativePage = "dashboard";
+        activeTab.courseId = null;
+        activeTab.courseSection = "homepage";
+        activeTab.yindex = 0;
+        syncTabs();
+        render();
       }
     });
-    ensureWorkspaceCenters();
-    syncTabs();
-    if (renderafterupdate) {
-      state.top = 'workspace';
-      state.activeWorkspaceId = pendingworkspaceID;
-      state.activeTabId = pendingtabID;
-      state.activeTabByWorkspace[pendingworkspaceID] = pendingtabID;
-      renderafterupdate = false;
-      pendingworkspaceID = null;
-      pendingtabID = null;
-      syncActiveTab();
-    }
-    render();
   });
 
-  window.nucleus.on('canvas:update', data => {
-    if (!data) return;
-    tasks = data.tasks || tasks || [];
-    workspaces = data.workspaces || workspaces || [];
-    projectGroups = data.projectGroups || projectGroups || [];
-    canvasData = data.canvasData || {};
-    ensureWorkspaceCenters();
-    syncTabs();
-    render();
+  view.querySelectorAll("[data-course-section]").forEach(button => {
+    button.addEventListener("click", () => {
+      const activeTab = getActiveTab();
+      if (!activeTab || activeTab.type !== "canvastab" || activeTab.canvasMode === "browser") return;
+      const section = button.dataset.courseSection;
+      if (!["homepage", "assignments", "modules", "files"].includes(section)) return;
+      rememberActiveCanvasYIndex();
+      activeTab.courseSection = section;
+      activeTab.yindex = 0;
+      syncTabs();
+      render();
+    });
   });
 
-  nucleusCanvasCSS = await window.nucleus.getinjection()
-
-
-  window.nucleus.on('tabs:url_update', payload => {
-    const tab = state.tabs.find(item => sameTabId(item.id, payload.id));
-    if (!tab) return;
-    tab.url = payload.url;
-    if (sameTabId(tab.id, state.activeTabId)) {
-      renderBrowserToolbar();
-    }
-  });
-
-  window.nucleus.on('tabs:open_browser_window', payload => {
-    if (!payload || !workspaces.some(workspace => workspace.id === payload.workspaceId)) {
-      console.error("Unable to open browser tab: workspace not found", payload);
-      return;
-    }
-    openUrlInWorkspaceTab(payload.url, payload.workspaceId, true);
-  });
-  window.nucleus.on('tabs:open_canvas_window', payload => {
-    if (!payload || !workspaces.some(workspace => workspace.id === payload.workspaceId)) {
-      console.error("Unable to open Canvas tab: workspace not found", payload);
-      return;
-    }
-    if (!payload.url) {
-      openCanvasAppTab(payload.workspaceId, payload.courseId || null);
-      return;
-    }
-    newCanvasTab(payload.url, payload.workspaceId, true, getCanvasInjectionConfig());
-  });
-  window.nucleus.on('tabs:tool_focus_tab', payload => {
-    const tab = payload && state.tabs.find(item => sameTabId(item.id, payload.tabId));
-    if (!tab) return;
-    rememberActiveCanvasYIndex();
-    state.top = "workspace";
-    state.activeWorkspaceId = tab.workspaceId;
-    state.activeTabId = tab.id;
-    state.activeTabByWorkspace[tab.workspaceId] = tab.id;
-    syncActiveTab();
-    render();
-  });
-  window.nucleus.on('tabs:tool_close_tab', payload => {
-    if (!payload || !payload.tabId) return;
-    closeTab(payload.tabId);
-  });
-  window.nucleus.on('engine:open-app-in-tab', payload => {
-    if (!payload || payload.app !== "canvas" || !payload.tabId) return;
-    openCanvasAppInExistingTab(payload.tabId);
-  });
-  window.nucleus.on("canvas:navigation", () => {
-    handlecanvaspagechange();
-  });
-  window.nucleus.on("canvas:blank", () => {
-    showCanvasBlankSlate();
-  });
-  window.nucleus.on("canvas:view-ready", payload => {
-    if (payload && payload.id) {
-      const tab = state.tabs.find(item => sameTabId(item.id, payload.id));
-      if (tab) {
-        tab.loading = false;
+  view.querySelectorAll("[data-open-canvas-app]").forEach(card => {
+    const openCanvas = () => openCanvasAppTab(getBrowserWorkspaceId());
+    card.addEventListener("click", () => activateAppIcon(card, openCanvas));
+    card.addEventListener("keydown", event => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        activateAppIcon(card, openCanvas);
       }
-    }
-    hideCanvasBlankSlate();
+    });
   });
 
-  render();
-});
+  view.querySelectorAll("[data-canvas-course-id]").forEach(card => {
+    const openCourse = () => {
+      if (state.top === "workspace") {
+        const activeTab = getActiveTab();
+        if (activeTab && activeTab.type === "canvastab" && activeTab.canvasMode !== "browser") {
+          pushCanvasNativeHistory(activeTab);
+          activeTab.canvasNativePage = "course";
+          activeTab.courseId = card.dataset.canvasCourseId;
+          activeTab.courseSection = "homepage";
+          activeTab.yindex = 0;
+          syncTabs();
+          render();
+          return;
+        }
+      }
+      openCanvasAppTab(getBrowserWorkspaceId(), card.dataset.canvasCourseId);
+    };
+    card.addEventListener("click", openCourse);
+    card.addEventListener("keydown", event => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        openCourse();
+      }
+    });
+  });
+  // --- Synapse handlers ---
+  view.querySelectorAll("[data-open-synapse-app]").forEach(card => {
+    const openSynapse = () => openSynapseAppTab(getBrowserWorkspaceId());
+    card.addEventListener("click", () => activateAppIcon(card, openSynapse));
+    card.addEventListener("keydown", event => {
+      if (event.key === "Enter" || event.key === " ") { event.preventDefault(); activateAppIcon(card, openSynapse); }
+    });
+  });
+
+  view.querySelectorAll("[data-synapse-toggle-sidebar]").forEach(button => {
+    button.addEventListener("click", () => {
+      const activeTab = getActiveTab();
+      if (activeTab && activeTab.type === "synapsetab") {
+        activeTab.synapseSidebarCollapsed = !activeTab.synapseSidebarCollapsed;
+        syncTabs();
+        render();
+      }
+    });
+  });
+
+  view.querySelectorAll("[data-synapse-new-conversation]").forEach(card => {
+    const open = () => {
+      const activeTab = getActiveTab();
+      const convo = createSynapseConversation();
+      if (activeTab && activeTab.type === "synapsetab") {
+        activeTab.conversationId = convo.id;
+        syncTabs();
+        render();
+      } else {
+        openSynapseAppTab(getBrowserWorkspaceId(), convo.id);
+      }
+    };
+    card.addEventListener("click", open);
+    card.addEventListener("keydown", event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); open(); } });
+  });
+
+  view.querySelectorAll(".synapse-conversation-card[data-synapse-conversation-id]").forEach(card => {
+    const open = () => {
+      const id = card.dataset.synapseConversationId;
+      const activeTab = getActiveTab();
+      if (activeTab && activeTab.type === "synapsetab") {
+        activeTab.conversationId = id;
+        syncTabs();
+        render();
+      } else {
+        openSynapseAppTab(getBrowserWorkspaceId(), id);
+      }
+    };
+    card.addEventListener("click", open);
+    card.addEventListener("keydown", event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); open(); } });
+  });
+
+  // linke handlers for canvas. IMPORTANT
+  view.querySelectorAll(".course-page a[href]").forEach(link => {
+    link.addEventListener("click", event => {
+      const href = link.getAttribute("href");
+      if (!href || href === "#" || href.startsWith("#")) return;
+
+      event.preventDefault();
+      openCourseLinkInCanvasTab(link);
+    });
+  });
+
+  // Mount/teardown the Synapse streaming chat controller for this view.
+  mountSynapseControllerIfNeeded(view, activeTab);
+}
+
+// renders whole page
+function render() {
+  renderWorkspaceSidebarCollapseState();
+  renderPrimaryTabs();
+  renderWorkspaceTabs();
+  renderWorkspacePageTabs();
+  renderBrowserToolbar();
+  renderCanvasToolbar();
+  renderView();
+}

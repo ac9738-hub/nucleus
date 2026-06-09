@@ -1,3 +1,8 @@
+// Local search result renderer.
+// Functionality: calls Brave Search, mixes web/image/news/video results with
+// Canvas vector retrieval results, and renders the file-backed engine page HTML.
+// Dependencies: main.js calls searchweb/renderwebsearchresult; webassets/ holds
+// result logos; app/canvas/assets provides Canvas branding.
 const fs = require('fs')
 const path = require('path')
 const { pathToFileURL } = require('url')
@@ -234,7 +239,11 @@ function formatInternalType(value) {
 
 function formatInternalMeta(item) {
   const parts = [formatInternalType(item && item.type)]
-  if (item && item.courseid) parts.push(`Course ${item.courseid}`)
+  if (item && (item.coursename || item.courseName)) {
+    parts.push(item.coursename || item.courseName)
+  } else if (item && item.courseid) {
+    parts.push(`Course ${item.courseid}`)
+  }
   if (item && item.duedate) parts.push(`Due ${item.duedate}`)
   return parts.filter(Boolean).join(" · ")
 }
@@ -320,7 +329,7 @@ function renderFeaturePanel(title, feature) {
 function renderInternalResultsPanel(results) {
   if (!Array.isArray(results) || results.length === 0) return ""
 
-  const canvasLogo = localAssetUrl('app', 'canvas', 'assets', 'canvas_icon.png') || localAssetUrl('canvas_icon.png')
+  const canvasLogo = localAssetUrl('app', 'canvas', 'assets', 'canvas_icon.png')
   const internalLogo = assetUrl('internal_results_logo.png')
   const items = results.slice(0, 6).map(item => {
     const title = item.name || item.id || "Canvas result"
@@ -351,6 +360,26 @@ function renderInternalResultsPanel(results) {
         <h2>Internal results</h2>
       </div>
       ${items}
+    </section>
+  `
+}
+
+function renderInternalPendingPanel() {
+  const internalLogo = assetUrl('internal_results_logo.png')
+
+  return `
+    <section class="side-module internal-pending-panel">
+      <div class="module-heading">
+        ${internalLogo ? `<img src="${escapeHtml(internalLogo)}" alt="">` : ""}
+        <h2>Internal results</h2>
+      </div>
+      <div class="internal-loader-row" aria-live="polite">
+        <span class="internal-loader" aria-hidden="true"></span>
+        <span>
+          <span class="internal-loader-title">Searching internal graph</span>
+          <span class="internal-loader-meta">Matching Canvas nodes and concepts</span>
+        </span>
+      </div>
     </section>
   `
 }
@@ -394,14 +423,18 @@ function renderwebsearchresult(result, query = "", mode = "all") {
   const errorMessage = result && result.error ? String(result.error) : ""
   const verticalErrors = Array.isArray(result && result.verticalErrors) ? result.verticalErrors : []
   const internalError = result && result.internalError ? String(result.internalError) : ""
+  const internalPending = Boolean(result && result.internalPending)
+  const restoreScrollY = Number.isFinite(result && result.restoreScrollY) ? Math.max(0, Math.round(result.restoreScrollY)) : 0
   const images = pickResults(result && result.images, ["images", "results"]).slice(0, 8)
   const news = pickResults(result && result.news, ["news", "results"]).slice(0, 4)
   const videos = pickResults(result && result.videos, ["videos", "results"]).slice(0, 4)
   const alteredQuery = result && result.query && result.query.altered ? result.query.altered : ""
   const totalCount = results.length + internalResults.length + images.length + news.length + videos.length
-  const webLogo = assetUrl('websearch_logo.png')
+  const webLogo = assetUrl('nucleus_engine_mark.svg')
   const featurePanel = internalResults.length
     ? renderInternalResultsPanel(internalResults)
+    : internalPending
+      ? renderInternalPendingPanel()
     : renderFeaturePanel(
         "Internal results",
         findFeatureObject(result && result.richData, result && result.infobox, result && result.knowledge_graph)
@@ -588,13 +621,33 @@ function renderwebsearchresult(result, query = "", mode = "all") {
 
     body {
       background:
-        radial-gradient(circle at 50% -18%, rgba(140, 131, 255, 0.13), transparent 32%),
+        radial-gradient(circle at 18% 8%, rgba(117, 103, 216, 0.16), transparent 30%),
+        radial-gradient(circle at 78% 12%, rgba(90, 169, 200, 0.1), transparent 32%),
+        radial-gradient(circle at 52% 106%, rgba(199, 154, 84, 0.08), transparent 34%),
         linear-gradient(180deg, #101219 0%, #0d0f15 100%);
+      background-attachment: fixed;
+      background-position: 0% 0%, 100% 0%, 50% 100%, 50% 50%;
+      background-size: 140% 140%, 150% 150%, 135% 135%, 100% 100%;
       color: var(--text);
       font-family: Arial, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       margin: 0;
       min-height: 100vh;
       text-align: left;
+      animation: engineAmbientDrift 100s ease-in-out infinite alternate;
+    }
+
+    @keyframes engineAmbientDrift {
+      0% {
+        background-position: 0% 0%, 100% 0%, 50% 100%, 50% 50%;
+      }
+
+      50% {
+        background-position: 7% 5%, 93% 7%, 48% 94%, 50% 50%;
+      }
+
+      100% {
+        background-position: 13% 9%, 86% 12%, 54% 88%, 50% 50%;
+      }
     }
 
     main {
@@ -654,24 +707,40 @@ function renderwebsearchresult(result, query = "", mode = "all") {
     .search-again {
       display: flex;
       gap: 10px;
-      margin-left: auto;
-      margin-right: auto;
-      max-width: 884px;
+      min-width: 0;
+      width: min(820px, 100%);
     }
 
-    .search-mark {
+    .search-bar-row {
+      align-items: center;
+      display: flex;
+      gap: 12px;
+      max-width: 960px;
+      width: min(960px, 100%);
+    }
+
+    .search-home-mark {
       align-items: center;
       border: 1px solid rgba(140, 131, 255, 0.22);
       border-radius: 50%;
       display: inline-flex;
       flex: 0 0 auto;
-      height: 44px;
+      height: 42px;
       justify-content: center;
       overflow: hidden;
-      width: 44px;
+      transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+      width: 42px;
     }
 
-    .search-mark img {
+    .search-home-mark:hover,
+    .search-home-mark:focus-visible {
+      border-color: rgba(167, 139, 250, 0.58);
+      box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.16);
+      outline: none;
+      transform: translateY(-1px);
+    }
+
+    .search-home-mark img {
       height: 100%;
       object-fit: cover;
       width: 100%;
@@ -1054,6 +1123,124 @@ function renderwebsearchresult(result, query = "", mode = "all") {
       margin: 0;
     }
 
+    .internal-pending-panel {
+      overflow: hidden;
+      position: relative;
+    }
+
+    .internal-pending-panel::after {
+      background: linear-gradient(90deg, transparent, rgba(125, 211, 252, 0.18), transparent);
+      content: "";
+      height: 1px;
+      left: -40%;
+      position: absolute;
+      right: -40%;
+      top: 0;
+      transform: translateX(-35%);
+      animation: internalSweep 1.8s ease-in-out infinite;
+    }
+
+    .internal-loader-row {
+      align-items: center;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      justify-content: center;
+      margin-top: 14px;
+      min-height: 96px;
+      text-align: center;
+    }
+
+    .internal-loader {
+      aspect-ratio: 1;
+      border: 2px solid rgba(148, 163, 184, 0.18);
+      border-radius: 999px;
+      box-shadow: 0 0 20px rgba(168, 85, 247, 0.16);
+      display: block;
+      position: relative;
+      width: 24px;
+    }
+
+    .internal-loader::before {
+      border: 2px solid transparent;
+      border-right-color: #a855f7;
+      border-top-color: #c084fc;
+      border-radius: inherit;
+      content: "";
+      inset: -2px;
+      position: absolute;
+      animation: internalSpin 0.9s linear infinite;
+    }
+
+    .internal-loader::after {
+      background: #c084fc;
+      border-radius: 999px;
+      box-shadow: 0 0 12px rgba(192, 132, 252, 0.75);
+      content: "";
+      height: 5px;
+      left: 50%;
+      position: absolute;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 5px;
+      animation: internalPulse 1.2s ease-in-out infinite;
+    }
+
+    .internal-loader-title,
+    .internal-loader-meta {
+      display: block;
+      line-height: 1.35;
+    }
+
+    .internal-loader-title {
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .internal-loader-meta {
+      color: var(--text-mute);
+      font-size: 12px;
+      margin-top: 2px;
+    }
+
+    @keyframes internalSpin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    @keyframes internalPulse {
+      0%,
+      100% {
+        opacity: 0.5;
+        transform: translate(-50%, -50%) scale(0.72);
+      }
+      50% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+      }
+    }
+
+    @keyframes internalSweep {
+      0% {
+        transform: translateX(-35%);
+      }
+      55%,
+      100% {
+        transform: translateX(35%);
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      body,
+      .internal-pending-panel::after,
+      .internal-loader::before,
+      .internal-loader::after {
+        animation: none;
+      }
+    }
+
     .module-heading {
       align-items: center;
       display: flex;
@@ -1271,12 +1458,21 @@ function renderwebsearchresult(result, query = "", mode = "all") {
       .search-again {
         align-items: stretch;
         display: grid;
-        grid-template-columns: 44px minmax(0, 1fr);
+        grid-template-columns: minmax(0, 1fr);
       }
 
       .search-again button {
-        grid-column: 1 / -1;
         height: 40px;
+      }
+
+      .search-bar-row {
+        align-items: start;
+        gap: 9px;
+      }
+
+      .search-home-mark {
+        height: 40px;
+        width: 40px;
       }
 
       .image-row {
@@ -1289,11 +1485,13 @@ function renderwebsearchresult(result, query = "", mode = "all") {
   <main>
     <section class="search-header">
       ${alteredQuery ? `<div class="spellcheck">Showing results for <a href="nucleus://search?q=${encodeURIComponent(alteredQuery)}">${escapeHtml(alteredQuery)}</a></div>` : ""}
-      <form class="search-again" id="search-form">
-        ${webLogo ? `<span class="search-mark"><img src="${escapeHtml(webLogo)}" alt=""></span>` : ""}
-        <input id="search-input" type="text" value="${escapeHtml(query)}" autocomplete="off">
-        <button type="submit">Search</button>
-      </form>
+      <div class="search-bar-row">
+        ${webLogo ? `<a class="search-home-mark" href="nucleus://engine" aria-label="Return to Nucleus Engine"><img src="${escapeHtml(webLogo)}" alt=""></a>` : ""}
+        <form class="search-again" id="search-form">
+          <input id="search-input" type="text" value="${escapeHtml(query)}" autocomplete="off">
+          <button type="submit">Search</button>
+        </form>
+      </div>
       <nav class="search-tabs" aria-label="Search categories">
         <a class="${tabClass("all")}" href="${escapeHtml(makeSearchUrl("all"))}">All</a>
         <a class="${tabClass("images")}" href="${escapeHtml(makeSearchUrl("images"))}">Images</a>
@@ -1323,6 +1521,10 @@ function renderwebsearchresult(result, query = "", mode = "all") {
         window.location.href = "nucleus://search?q=" + encodeURIComponent(query) + "&type=${escapeHtml(activeMode)}";
       }
     });
+    const restoreScrollY = ${JSON.stringify(restoreScrollY)};
+    if (restoreScrollY > 0) {
+      requestAnimationFrame(() => window.scrollTo(0, restoreScrollY));
+    }
   </script>
 </body>
 </html>`

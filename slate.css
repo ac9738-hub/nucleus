@@ -1,3 +1,8 @@
+/*
+  Canvas slate animation styles.
+  Functionality: visual cover used while Canvas WebContentsView navigation settles.
+  Dependencies: slate.html markup and main.js slate WebContentsView lifecycle.
+*/
 :root {
   --slate-bg: #181a1f;
   --slate-shadow: rgba(0, 0, 0, 0.24);

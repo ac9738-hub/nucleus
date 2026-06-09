@@ -1,3 +1,9 @@
+"""Sidekick agent process.
+
+Functionality: streams user prompts to the LLM, emits text/tool calls as
+newline-delimited JSON for agent-process.js, and exposes workspace/Canvas tools.
+Dependencies: Anthropic/OpenAI/Ollama clients and main.js tool responses.
+"""
 from anthropic import Anthropic
 from ollama import chat
 from openai import OpenAI
@@ -7,6 +13,7 @@ import json
 import sys
 import os
 import fitz
+import base64
 
 
 load_dotenv()
@@ -14,6 +21,7 @@ claude_client = Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
 deepseek_client = OpenAI(api_key = os.environ.get("DEEP_SEEK_API_KEY"), base_url="https://api.deepseek.com")
 
 hardcoded_syllabus = ""
+MAX_ATTACHMENT_TEXT_CHARS = 60000
 
 
 doc = fitz.open("NEU201 syllabus.pdf")
@@ -495,6 +503,95 @@ def runclaude(prompt):
 
             if total_tools_called:
                 print(json.dumps(total_tools_called), flush=True)
+            else:
+                print(json.dumps({"type": "done"}), flush=True)
+
+
+def attachment_to_content_blocks(attachment):
+    if not isinstance(attachment, dict):
+        return []
+
+    name = str(attachment.get("name") or "Attachment")
+    media_type = str(attachment.get("type") or "application/octet-stream")
+    kind = str(attachment.get("kind") or "metadata")
+    note = str(attachment.get("note") or "")
+    size = attachment.get("size", "")
+    blocks = []
+
+    if kind == "image" and attachment.get("data"):
+        blocks.append({
+            "type": "image",
+            "source": {
+                "type": "base64",
+                "media_type": media_type,
+                "data": attachment.get("data")
+            }
+        })
+        blocks.append({
+            "type": "text",
+            "text": f"Attached screenshot/image: {name}"
+        })
+        return blocks
+
+    if kind == "document" and attachment.get("data") and media_type == "application/pdf":
+        try:
+            pdf_bytes = base64.b64decode(attachment.get("data"))
+            doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+            pages = [page.get_text() for page in doc]
+            doc.close()
+            blocks.append({
+                "type": "text",
+                "text": (
+                    f"Attached PDF: {name}\n"
+                    f"Extracted text:\n{('\\n'.join(pages))[:MAX_ATTACHMENT_TEXT_CHARS]}"
+                )
+            })
+        except Exception as error:
+            blocks.append({
+                "type": "text",
+                "text": f"Attached PDF: {name}. Could not extract text: {error}"
+            })
+        return blocks
+
+    if kind == "text":
+        text = str(attachment.get("text") or "")
+        blocks.append({
+            "type": "text",
+            "text": (
+                f"Attached text file: {name}\n"
+                f"Media type: {media_type}\n"
+                f"Content:\n{text[:MAX_ATTACHMENT_TEXT_CHARS]}"
+            )
+        })
+        return blocks
+
+    blocks.append({
+        "type": "text",
+        "text": f"Attached file metadata: {name} ({media_type}, {size} bytes). {note}".strip()
+    })
+    return blocks
+
+
+def message_payload_to_text_and_content(payload):
+    if isinstance(payload, str):
+        return payload, payload
+
+    if not isinstance(payload, dict):
+        text = str(payload or "")
+        return text, text
+
+    text = str(payload.get("text") or "")
+    attachments = payload.get("attachments") if isinstance(payload.get("attachments"), list) else []
+    content = []
+    if text:
+        content.append({"type": "text", "text": text})
+    for attachment in attachments:
+        content.extend(attachment_to_content_blocks(attachment))
+
+    if not content:
+        content.append({"type": "text", "text": "User sent empty attachments."})
+    return text, content
+
 
 for line in sys.stdin:
     print(line, file=sys.stderr )
@@ -503,5 +600,6 @@ for line in sys.stdin:
         chat_history.append({"role": "user", "content": [{"type": "tool_result","tool_use_id": line[1], "content": line[2]}]})
         runclaude(prompt = chat_history)
     elif line[0] == "message":
-        chat_history.append({"role": "user","content": line[1] })
-        run_classifier(prompt = [{"role": "user", "content": line[1]}])
+        message_text, message_content = message_payload_to_text_and_content(line[1])
+        chat_history.append({"role": "user","content": message_content })
+        run_classifier(prompt = [{"role": "user", "content": message_text}])

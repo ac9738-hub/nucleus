@@ -1,3 +1,7 @@
+// Shared tab/navigation helpers.
+// Functionality: normalizes browser input, identifies Electron web-content tabs,
+// detects download-like Canvas URLs, and names saved frame snapshots.
+// Dependencies: imported by main.js; renderer has its own browser-global helpers.
 function sameTabId(left, right) {
   return String(left) === String(right)
 }

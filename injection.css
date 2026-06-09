@@ -1,3 +1,9 @@
+/*
+  Canvas main-frame injection stylesheet.
+  Functionality: restyles Canvas pages hosted in canvastab WebContentsViews.
+  Dependencies: app/canvas/preload.js injects this file; main.js configures the
+  Canvas tab preload.
+*/
 /* =========================
    NUCLEUS CANVAS THEME
    ========================= */

@@ -1,4 +1,9 @@
-const {BrowserWindow, WebContentsView} = require('electron')
+// Canvas interactive auth capture.
+// Functionality: opens an Electron auth WebContentsView and captures Canvas
+// cookies/CSRF/base URL from authenticated API requests.
+// Dependencies: main.js owns the view lifecycle callbacks and persists auth via
+// app/canvas/api.js after setup.
+const { WebContentsView } = require('electron')
 
 module.exports = { open_canvas_auth_window, get_auth_token, get_auth_csrf, get_base_url }
 
@@ -44,10 +49,11 @@ async function isInstitutionalCanvasPage(view) {
     }
 }
 
-// need to add error handling for unsuccessful retrieval of api calls
-function open_canvas_auth_window (window, onath, getauthview, setup = false) {
+// Opens the one interactive auth surface. main.js supplies callbacks so this
+// module never owns app state beyond the captured token fields below.
+function open_canvas_auth_window (window, onauth, getauthview, setup = false) {
     const [contentWidth, contentHeight] = window.getContentSize()
-    view = new WebContentsView()
+    const view = new WebContentsView()
     view.webContents.setWindowOpenHandler(({ url }) => {
         view.webContents.loadURL(url);
         return { action: 'deny' };
@@ -63,10 +69,9 @@ function open_canvas_auth_window (window, onath, getauthview, setup = false) {
                 if (called || !isCanvasPage) return
                 called = true
 
-            turl = requestOrigin
-            token = getHeader(details.requestHeaders, 'Cookie')
-            tcsrf = getHeader(details.requestHeaders, 'x-csrf-token')
-             console.log('window closed')
+            const turl = requestOrigin
+            const token = getHeader(details.requestHeaders, 'Cookie')
+            const tcsrf = getHeader(details.requestHeaders, 'x-csrf-token')
              window.contentView.removeChildView(view)
              getauthview(null)
             if (tcsrf) {
@@ -78,12 +83,9 @@ function open_canvas_auth_window (window, onath, getauthview, setup = false) {
             }
             if (token) {
                 authtoken = token
-                console.log(csrf)
                 if (base_url){
-                    onath()
-                    console.log('got to setup')
+                    onauth()
                     if(setup) {
-                        console.log('setup ran')
                         Promise.resolve(setup()).catch(error => {
                             console.error("Canvas setup failed:", error)
                         })
@@ -96,7 +98,6 @@ function open_canvas_auth_window (window, onath, getauthview, setup = false) {
         }
     })
     view.webContents.loadURL("https://www.instructure.com/canvas/login")
-    console.log('opened window')
     view.setBounds({
         x: 220,
         y: 0,

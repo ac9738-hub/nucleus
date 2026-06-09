@@ -1,3 +1,8 @@
+// Native Canvas course renderer.
+// Functionality: renders course homepage/assignments/modules/files into the
+// renderer DOM and normalizes Canvas API URLs into browser-safe links.
+// Dependencies: app/canvas/dashboard.js calls the exported template helpers;
+// renderer/render.js attaches navigation handlers to generated course links.
 function escapeHtml(value) {
   return String(value ?? "")
     .replace(/&/g, "&amp;")

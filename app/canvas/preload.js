@@ -1,3 +1,7 @@
+// Canvas tab preload.
+// Functionality: injects Canvas-specific CSS into main frames and selected
+// iframe previews so WebContentsView Canvas tabs match the app shell.
+// Dependencies: main.js configures this preload for canvastab WebContentsViews.
 const fs = require('fs')
 const path = require('path')
 const { webFrame } = require('electron')

@@ -1,3 +1,8 @@
+// Renderer workspace/tab controller.
+// Functionality: mutates browser/task/Canvas tab state, syncs tab state to the
+// Electron main process, and handles Canvas native/browser mode transitions.
+// Dependencies: renderer/app.js owns state/workspaces, renderer/render.js draws
+// the UI, and preload.js window.nucleus forwards tab IPC.
 // ----------------WORKSPACEPAGETABS
 //----navigation
 

@@ -1,3 +1,7 @@
+// In-memory application data store.
+// Functionality: owns renderer-visible workspaces/tasks and merges Canvas project
+// groups into snapshots sent over IPC.
+// Dependencies: main.js supplies renderer emitters and Canvas data/project readers.
 function createDataStore({ sendToRenderer, getCanvasProjectGroups, readCanvasData }) {
   const workspaces = [
     { id: "nucleus",          name: "Nucleus",          description: "Your main planning workspace." },
@@ -32,15 +36,11 @@ function createDataStore({ sendToRenderer, getCanvasProjectGroups, readCanvasDat
 
   const tasks = []
 
-  function getProjectGroupsSnapshot() {
-    return [...projectGroups, ...getCanvasProjectGroups()]
-  }
-
   function getRendererDataSnapshot() {
     return {
       tasks,
       workspaces,
-      projectGroups: getProjectGroupsSnapshot(),
+      projectGroups: [...projectGroups, ...getCanvasProjectGroups()],
       canvasData: readCanvasData()
     }
   }
@@ -138,7 +138,6 @@ function createDataStore({ sendToRenderer, getCanvasProjectGroups, readCanvasDat
       ? String(id)
       : title.toLowerCase().replace(/\s+/g, '-') + '-' + Math.floor(Math.random() * 1000)
     urls = Array.isArray(urls) ? urls.filter(Boolean) : []
-    const toolmessage = "created new task with " + taskId + "," + workspaceId + "," + course + "," + title + "," + details + "," + due + "," + estimate + "," + color + "," + priority_weight + "\n"
     const existing = tasks.find(task => task.id === taskId)
     const taskData = {
       id: taskId,
@@ -160,7 +159,7 @@ function createDataStore({ sendToRenderer, getCanvasProjectGroups, readCanvasDat
     }
     sortTasksSequentially()
     sendToRenderer('tasks:update', tasks)
-    return toolmessage
+    return "created new task with " + taskId + "," + workspaceId + "," + course + "," + title + "," + details + "," + due + "," + estimate + "," + color + "," + priority_weight + "\n"
   }
 
   function deleteTask(id) {

@@ -1,3 +1,7 @@
+// Task ranking helper.
+// Functionality: scores tasks from due date, grade weight, effort, dependencies,
+// and task type; renderer/render.js uses it to order task cards.
+// Dependencies: browser global window.TaskOptimizer or CommonJS module export.
 const Config = {
   K_BASE: 0.25,
   K_SCALE: 0.80,

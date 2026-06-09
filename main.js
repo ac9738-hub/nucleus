@@ -2,16 +2,21 @@
 // IMPORTS
 // ─────────────────────────────────────────────────────────────────────────────
 
-const { app, BrowserWindow, ipcMain, WebContentsView, session, webFrameMain, View } = require('electron');
+// Main Electron process.
+// Functionality: owns BrowserWindow/WebContentsView lifecycle, IPC handlers,
+// Canvas authentication, Canvas/browser tab navigation, agent tools, and search.
+// Dependencies: renderer/preload.js IPC contract, app/canvas/api.js data sync,
+// app/canvas/auth.js auth capture view, engine.js search renderer, sidekick.py
+// and vector_retreival.py child processes.
+const { app, BrowserWindow, ipcMain, WebContentsView, session, webFrameMain } = require('electron');
 const path = require('path');
 const fs = require('fs')
 const { spawn } = require('child_process')
-const { runStartTaskPlaceholder } = require('./task-scripts');
 const {open_canvas_auth_window, get_auth_token, get_auth_csrf, get_base_url} = require('./app/canvas/auth')
 const { createAgentProcess } = require('./agent-process')
 const { createDataStore } = require('./data-store')
 const { renderwebsearchresult, searchweb } = require('./engine')
-const { getAuthBounds, getBrowserBounds } = require('./view-layout')
+const { getAuthBounds, getBrowserBounds, setRightPanelWidth, setWorkspaceSidebarCollapsed } = require('./view-layout')
 const {
   getFrameSnapshotName,
   isLikelyDownloadUrl,
@@ -21,6 +26,8 @@ const {
   sameTabId
 } = require('./tab-utils')
 const { createCanvasApi } = require('./app/canvas/api')
+const { createSynapseClient } = require('./app/synapse/client')
+const {creategmailauthview, get_token, getmail, getmailmeta} = require('./app/mail/api')
 
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -265,6 +272,7 @@ class BrowserPool {
 
 const browserpool = new BrowserPool()
 const envPath = path.join(__dirname, '.env')
+const synapseClient = createSynapseClient({ getApiKey: () => getEnvValue('ANTHROPIC_API_KEY') })
 const iframeInjectionFilesById = {
   preview_frame: 'preview_frame.css',
   tool_content: 'injection.css'
@@ -292,6 +300,12 @@ const agent = createAgentProcess({
   onText: text => {
     BrowserWindow.getAllWindows()[0].webContents.send('prompt:response-chunk', text)
   },
+  onDone: () => {
+    const window = BrowserWindow.getAllWindows()[0]
+    if (window && !window.webContents.isDestroyed()) {
+      window.webContents.send('prompt:response-done')
+    }
+  },
   onToolCall: data => runfunction(data)
 })
 
@@ -316,7 +330,9 @@ const vectorRetrieval = (() => {
         item.downloadurl && item.downloadurl !== item.url ? `Download URL: ${item.downloadurl}` : ''
       ].filter(Boolean)
       const metadataLines = [
-        item.courseid ? `Course ID: ${item.courseid}` : '',
+        item.coursename || item.courseName
+          ? `Course: ${item.coursename || item.courseName}${item.courseid ? ` (${item.courseid})` : ''}`
+          : item.courseid ? `Course ID: ${item.courseid}` : '',
         item.duedate ? `Due date: ${item.duedate}` : '',
         item.unlockdate ? `Unlock date: ${item.unlockdate}` : '',
         item.gradepercentage !== '' && item.gradepercentage !== null && item.gradepercentage !== undefined
@@ -362,7 +378,6 @@ const vectorRetrieval = (() => {
             if (pending) pending.resolve([])
             return
           }
-          console.log('vector retrieval startpoints:', result.startpoints)
           const pending = pendingQueries.shift()
           if (pending) pending.resolve(result.startpoints || [])
         } catch (error) {
@@ -416,11 +431,9 @@ const vectorRetrieval = (() => {
     },
     sendQuery(query, options = {}) {
       if (!query) {
-        console.log('vector retrieval skipped empty query')
         return Promise.resolve([])
       }
       if (!proc || proc.killed || proc.stdin.destroyed) {
-        console.log('vector retrieval process unavailable; restarting before query')
         start()
       }
       if (!proc || proc.killed || proc.stdin.destroyed) {
@@ -428,7 +441,6 @@ const vectorRetrieval = (() => {
         return Promise.resolve([])
       }
       const line = JSON.stringify(['query', query, options]) + '\n'
-      console.log('vector retrieval sending query:', query, options)
       return new Promise(resolve => {
         let pendingItem = null
         const timeout = setTimeout(() => {
@@ -458,7 +470,6 @@ const vectorRetrieval = (() => {
             pendingItem.reject(error)
             console.error('vector retrieval stdin write failed:', error)
           } else {
-            console.log('vector retrieval query written')
           }
         })
       })
@@ -478,9 +489,22 @@ const vectorRetrieval = (() => {
  */
 async function senduserprompt(payload) {
   if (Array.isArray(payload) && payload[0] === 'message') {
-    const startpoints = await vectorRetrieval.sendQuery(payload[1], { mode: 'agent' })
+    const messagePayload = payload[1]
+    const messageText = typeof messagePayload === 'object' && messagePayload !== null
+      ? String(messagePayload.text || '')
+      : String(messagePayload || '')
+    const startpoints = messageText
+      ? await vectorRetrieval.sendQuery(messageText, { mode: 'agent' })
+      : []
     const retrievalContext = vectorRetrieval.contextFor(startpoints)
-    agent.send(['message', `${payload[1]}${retrievalContext}`])
+    if (typeof messagePayload === 'object' && messagePayload !== null) {
+      agent.send(['message', {
+        ...messagePayload,
+        text: `${messageText}${retrievalContext}`
+      }])
+    } else {
+      agent.send(['message', `${messageText}${retrievalContext}`])
+    }
     return
   }
   agent.send(payload)
@@ -497,6 +521,10 @@ let activetab = 'None'
 let slate = null
 let canvasSetupPromise = null
 let mainwindow = null
+let currentCanvasPageContext = null
+let canvasVisibleContextPollTimer = null
+let lastCanvasVisibleContextKey = ''
+let canvasVisibleContextPollInFlight = false
 
 let canvasApi
 const dataStore = createDataStore({
@@ -571,6 +599,16 @@ function readInjectionCssFile(filename) {
 
 function getEngineUrl() {
   return new URL('file://' + path.join(__dirname, 'engine.html').replace(/\\/g, '/')).href
+}
+
+function isEngineHomeUrl(value) {
+  if (!value) return false
+  try {
+    const url = new URL(value)
+    return url.protocol === 'nucleus:' && url.hostname === 'engine'
+  } catch (_error) {
+    return false
+  }
 }
 
 function getEngineAppRoute(value) {
@@ -652,52 +690,83 @@ function openEngineCanvasRoute(tab, canvasRoute) {
   return true
 }
 
-function getEngineSearchPageUrl(tab, html) {
+function getEngineSearchPageUrl(tab, html, cacheKey = '') {
   const outputDir = path.join(__dirname, 'engine-search-cache')
   const safeId = String(tab && tab.id ? tab.id : 'search').replace(/[^a-zA-Z0-9_-]/g, '_')
   const filepath = path.join(outputDir, `${safeId}.html`)
 
   fs.mkdirSync(outputDir, { recursive: true })
   fs.writeFileSync(filepath, html, 'utf-8')
-  return new URL('file://' + filepath.replace(/\\/g, '/')).href
+  const url = new URL('file://' + filepath.replace(/\\/g, '/'))
+  if (cacheKey) url.searchParams.set('v', String(cacheKey))
+  return url.href
+}
+
+async function getEngineSearchScrollY(tab) {
+  if (!tab || !tab.view || tab.view.webContents.isDestroyed()) return 0
+  try {
+    const scrollY = await tab.view.webContents.executeJavaScript(
+      'Math.max(window.scrollY || 0, document.documentElement ? document.documentElement.scrollTop || 0 : 0, document.body ? document.body.scrollTop || 0 : 0)',
+      true
+    )
+    return Number.isFinite(scrollY) ? Math.max(0, Math.round(scrollY)) : 0
+  } catch {
+    return 0
+  }
+}
+
+async function renderEngineSearchPage(tab, result, query, searchType, options = {}) {
+  if (!tab || !tab.view || tab.view.webContents.isDestroyed()) return false
+  const html = renderwebsearchresult({
+    ...result,
+    restoreScrollY: Number.isFinite(options.restoreScrollY) ? options.restoreScrollY : 0
+  }, query, searchType)
+  const url = getEngineSearchPageUrl(tab, html, options.cacheKey || Date.now())
+  await tab.view.webContents.loadURL(url)
+  return true
 }
 
 async function openEngineSearchInTab(tab, query, type = 'all') {
   if (!tab || !tab.view || !query) return false
   const searchType = ['all', 'images', 'news', 'videos'].includes(type) ? type : 'all'
+  const searchToken = `${query}:${searchType}:${Date.now()}`
+  tab.engineSearchToken = searchToken
+  const internalPromise = vectorRetrieval.sendQuery(query, { mode: 'browser' })
+
+  const finishInternalRender = async (baseResult, internalResults, internalError = '') => {
+    if (!tab || tab.engineSearchToken !== searchToken || !tab.view || tab.view.webContents.isDestroyed()) return
+    const scrollY = await getEngineSearchScrollY(tab)
+    if (tab.engineSearchToken !== searchToken || !tab.view || tab.view.webContents.isDestroyed()) return
+    await renderEngineSearchPage(tab, {
+      ...baseResult,
+      internalPending: false,
+      internalResults: Array.isArray(internalResults) ? internalResults : [],
+      internalError
+    }, query, searchType, { restoreScrollY: scrollY })
+  }
+
   try {
-    const [webResult, internalResult] = await Promise.allSettled([
-      searchweb(query),
-      vectorRetrieval.sendQuery(query, { mode: 'browser' })
-    ])
-    const result = webResult.status === 'fulfilled'
-      ? webResult.value
-      : {
-          error: webResult.reason && webResult.reason.message ? webResult.reason.message : String(webResult.reason),
-          web: { results: [] }
-        }
-    result.internalResults = internalResult.status === 'fulfilled' ? internalResult.value : []
-    if (internalResult.status === 'rejected') {
-      result.internalError = internalResult.reason && internalResult.reason.message
-        ? internalResult.reason.message
-        : String(internalResult.reason)
-    }
-    const html = renderwebsearchresult(result, query, searchType)
-    const url = getEngineSearchPageUrl(tab, html)
+    const result = await searchweb(query)
     tab.url = `nucleus://search?q=${encodeURIComponent(query)}&type=${encodeURIComponent(searchType)}`
-    await tab.view.webContents.loadURL(url)
+    await renderEngineSearchPage(tab, { ...result, internalPending: true }, query, searchType)
     mainwindow.webContents.send('tabs:url_update', { id: tab.id, url: tab.url })
+    internalPromise
+      .then(internalResults => finishInternalRender(result, internalResults))
+      .catch(error => finishInternalRender(result, [], error && error.message ? error.message : String(error)))
     return true
   } catch (error) {
-    const internalResults = await vectorRetrieval.sendQuery(query, { mode: 'browser' }).catch(() => [])
-    const html = renderwebsearchresult({
+    const result = {
       error: error && error.message ? error.message : String(error),
       web: { results: [] },
-      internalResults
-    }, query, searchType)
-    const url = getEngineSearchPageUrl(tab, html)
+      internalPending: true
+    }
     console.error("Unable to load Nucleus search:", error)
-    await tab.view.webContents.loadURL(url)
+    tab.url = `nucleus://search?q=${encodeURIComponent(query)}&type=${encodeURIComponent(searchType)}`
+    await renderEngineSearchPage(tab, result, query, searchType)
+    mainwindow.webContents.send('tabs:url_update', { id: tab.id, url: tab.url })
+    internalPromise
+      .then(internalResults => finishInternalRender(result, internalResults))
+      .catch(internalError => finishInternalRender(result, [], internalError && internalError.message ? internalError.message : String(internalError)))
     return false
   }
 }
@@ -708,6 +777,18 @@ function parseEnvValue(value) {
     return text.slice(1, -1).replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\\\/g, '\\')
   }
   return text
+}
+
+function getEnvValue(name) {
+  if (process.env[name]) return process.env[name]
+  if (!fs.existsSync(envPath)) return ''
+  const pattern = new RegExp(`^\\s*${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*=\\s*(.*)\\s*$`)
+  const lines = fs.readFileSync(envPath, 'utf8').split(/\r?\n/)
+  for (const line of lines) {
+    const match = line.match(pattern)
+    if (match) return parseEnvValue(match[1])
+  }
+  return ''
 }
 
 function loadCanvasAuthFromEnv() {
@@ -935,6 +1016,351 @@ function compactText(value, maxLength = 180) {
     .slice(0, maxLength)
 }
 
+function readCanvasGraphSnapshot() {
+  const graphPath = path.join(__dirname, 'canvas_graph.json')
+  if (!fs.existsSync(graphPath)) return null
+
+  try {
+    return JSON.parse(fs.readFileSync(graphPath, 'utf8'))
+  } catch (error) {
+    console.error("Unable to read canvas graph for visible context:", error)
+    return null
+  }
+}
+
+function getCanvasCourseIdFromUrl(value) {
+  try {
+    const match = new URL(value).pathname.match(/\/courses\/([^/]+)/)
+    return match ? decodeURIComponent(match[1]) : ''
+  } catch (_error) {
+    return ''
+  }
+}
+
+function getCanvasFileIdFromUrl(value) {
+  try {
+    const url = new URL(value)
+    const pathMatch = url.pathname.match(/\/files\/([^/?#]+)/)
+    if (pathMatch) return decodeURIComponent(pathMatch[1])
+
+    const preview = url.searchParams.get('preview')
+    if (preview && preview !== '1' && preview !== 'true') {
+      return preview
+    }
+  } catch (_error) {
+  }
+  return ''
+}
+
+function normalizeUrlForContext(value) {
+  try {
+    const url = new URL(value)
+    url.hash = ''
+    return url.href.replace(/\/$/, '')
+  } catch (_error) {
+    return String(value || '').replace(/#.*$/, '').replace(/\/$/, '')
+  }
+}
+
+function findCanvasFileForVisibleUrl(graph, rawUrl) {
+  if (!graph || !graph.files || !rawUrl) return null
+  const fileId = getCanvasFileIdFromUrl(rawUrl)
+  const courseId = getCanvasCourseIdFromUrl(rawUrl)
+
+  if (fileId && courseId && graph.files[courseId] && graph.files[courseId][fileId]) {
+    return { courseId, fileId, file: graph.files[courseId][fileId] }
+  }
+
+  for (const [candidateCourseId, courseFiles] of Object.entries(graph.files || {})) {
+    if (!courseFiles || typeof courseFiles !== 'object') continue
+    if (fileId && courseFiles[fileId]) {
+      return { courseId: candidateCourseId, fileId, file: courseFiles[fileId] }
+    }
+
+    for (const [candidateFileId, file] of Object.entries(courseFiles)) {
+      if (!file) continue
+      if (fileId && String(file.fileid || '') === String(fileId)) {
+        return { courseId: candidateCourseId, fileId: candidateFileId, file }
+      }
+    }
+  }
+
+  const normalizedCurrent = normalizeUrlForContext(rawUrl)
+  for (const [candidateCourseId, courseFiles] of Object.entries(graph.files || {})) {
+    for (const [candidateFileId, file] of Object.entries(courseFiles || {})) {
+      const urls = [file.canvaspreviewurl, file.downloadurl].filter(Boolean).map(normalizeUrlForContext)
+      if (urls.some(url => url && (url === normalizedCurrent || normalizedCurrent.startsWith(url) || url.startsWith(normalizedCurrent)))) {
+        return { courseId: candidateCourseId, fileId: candidateFileId, file }
+      }
+    }
+  }
+
+  return null
+}
+
+function getNodeId(node) {
+  return String(node && (node.conceptid || node.problemid || node.id || node.name) || '')
+}
+
+function summarizeGraphNode(type, node, fallback = {}) {
+  if (!node) return null
+  return {
+    type,
+    id: getNodeId(node) || getNodeId(fallback),
+    name: String(node.name || fallback.name || ''),
+    description: compactText(node.description || node.answer || fallback.description || '', 260),
+    courseid: String(node.courseid || fallback.courseid || '')
+  }
+}
+
+function collectNodeSourcePageIds(node) {
+  return new Set((node && Array.isArray(node.sourcePages) ? node.sourcePages : [])
+    .map(page => String(page && page.pageid || ''))
+    .filter(Boolean))
+}
+
+function buildVisibleGraphIndexes(graph) {
+  const concepts = new Map()
+  const details = new Map()
+  const examples = new Map()
+  const problems = new Map()
+
+  ;(graph.concepts || []).forEach(concept => {
+    const conceptKey = getNodeId(concept)
+    if (conceptKey) concepts.set(conceptKey, concept)
+    if (concept.name) concepts.set(String(concept.name), concept)
+
+    ;(concept.details || []).forEach(detail => {
+      const id = getNodeId(detail) || `detail:${conceptKey}:${detail.name || ''}`
+      const item = { ...detail, courseid: concept.courseid, parentConceptId: conceptKey, parentConceptName: concept.name }
+      details.set(id, item)
+      if (detail.name) details.set(String(detail.name), item)
+    })
+
+    ;(concept.examples || []).forEach(example => {
+      const id = getNodeId(example) || `example:${conceptKey}:${example.name || ''}`
+      const item = { ...example, courseid: concept.courseid, parentConceptId: conceptKey, parentConceptName: concept.name }
+      examples.set(id, item)
+      if (example.name) examples.set(String(example.name), item)
+    })
+  })
+
+  ;(graph.problems || []).forEach(problem => {
+    const problemKey = getNodeId(problem)
+    if (problemKey) problems.set(problemKey, problem)
+    if (problem.name) problems.set(String(problem.name), problem)
+  })
+
+  return { concepts, details, examples, problems }
+}
+
+function addVisibleNode(target, type, node, fallback = {}) {
+  const summary = summarizeGraphNode(type, node, fallback)
+  if (!summary || !summary.name) return
+  const key = `${type}:${summary.id || summary.name}`
+  if (target.keys.has(key)) return
+  target.keys.add(key)
+  target[type === 'problem' ? 'problems' : `${type}s`].push(summary)
+}
+
+function resolvePageNode(indexes, ref) {
+  if (!ref || !ref.type) return null
+  const id = String(ref.id || ref.name || '')
+  if (ref.type === 'concept') return { type: 'concept', node: indexes.concepts.get(id) || indexes.concepts.get(String(ref.name || '')) }
+  if (ref.type === 'detail') return { type: 'detail', node: indexes.details.get(id) || indexes.details.get(String(ref.name || '')) }
+  if (ref.type === 'example') return { type: 'example', node: indexes.examples.get(id) || indexes.examples.get(String(ref.name || '')) }
+  if (ref.type === 'problem') return { type: 'problem', node: indexes.problems.get(id) || indexes.problems.get(String(ref.name || '')) }
+  return null
+}
+
+function getVisiblePagesForScroll(file, scrollY, viewportHeight, scrollHeight = 0) {
+  const pages = Array.isArray(file && file.pages) ? file.pages : []
+  if (!pages.length) return []
+  const start = Math.max(0, Number(scrollY) || 0)
+  const end = start + Math.max(1, Number(viewportHeight) || 1)
+  const sorted = [...pages].sort((a, b) => (Number(a.yScroll) || 0) - (Number(b.yScroll) || 0))
+  const browserScrollHeight = Number(scrollHeight) || 0
+  const canUseRatios = browserScrollHeight > 0 && sorted.some(page => Number(page.yScrollRatio) > 0)
+  const visible = sorted.filter((page, index) => {
+    const nextPage = sorted[index + 1]
+    const pageStart = canUseRatios
+      ? Math.max(0, (Number(page.yScrollRatio) || 0) * browserScrollHeight)
+      : Number(page.yScroll) || 0
+    const inferredHeight = nextPage
+      ? Math.max(1, (canUseRatios ? (Number(nextPage.yScrollRatio) || 0) * browserScrollHeight : Number(nextPage.yScroll) || 0) - pageStart)
+      : Number(page.height) || Math.max(1, browserScrollHeight - pageStart)
+    const pageEnd = pageStart + Math.max(1, Number(page.height) && !canUseRatios ? Number(page.height) : inferredHeight)
+    return pageEnd >= start && pageStart <= end
+  })
+
+  if (visible.length) return visible
+  let closest = sorted[0]
+  sorted.forEach(page => {
+    const pageStart = canUseRatios
+      ? Math.max(0, (Number(page.yScrollRatio) || 0) * browserScrollHeight)
+      : Number(page.yScroll) || 0
+    if (pageStart <= start) closest = page
+  })
+  return closest ? [closest] : []
+}
+
+function buildCanvasPageContext(graph, fileMatch, url, scrollState) {
+  const file = fileMatch.file
+  const visiblePages = getVisiblePagesForScroll(file, scrollState.scrollY, scrollState.viewportHeight, scrollState.scrollHeight)
+  const visiblePageIds = new Set(visiblePages.map(page => String(page.pageid || '')).filter(Boolean))
+  const indexes = buildVisibleGraphIndexes(graph)
+  const result = {
+    url,
+    courseid: String(file.courseid || fileMatch.courseId || ''),
+    fileid: String(file.fileid || fileMatch.fileId || ''),
+    filename: String(file.name || ''),
+    scrollY: Math.round(Number(scrollState.scrollY) || 0),
+    scrollHeight: Math.round(Number(scrollState.scrollHeight) || 0),
+    viewportHeight: Math.round(Number(scrollState.viewportHeight) || 0),
+    pages: visiblePages.map(page => ({
+      pageid: String(page.pageid || ''),
+      pageNumber: page.pageNumber || null,
+      yScroll: Number(page.yScroll) || 0,
+      yScrollRatio: Number(page.yScrollRatio) || 0
+    })),
+    concepts: [],
+    details: [],
+    examples: [],
+    problems: []
+  }
+  const target = { ...result, keys: new Set() }
+
+  visiblePages.forEach(page => {
+    ;(page.nodes || []).forEach(ref => {
+      const resolved = resolvePageNode(indexes, ref)
+      if (!resolved) return
+      addVisibleNode(target, resolved.type, resolved.node, ref)
+    })
+  })
+
+  ;(graph.concepts || []).forEach(concept => {
+    if ([...collectNodeSourcePageIds(concept)].some(pageid => visiblePageIds.has(pageid))) {
+      addVisibleNode(target, 'concept', concept)
+    }
+    ;(concept.details || []).forEach(detail => {
+      if ([...collectNodeSourcePageIds(detail)].some(pageid => visiblePageIds.has(pageid))) {
+        addVisibleNode(target, 'detail', { ...detail, courseid: concept.courseid, parentConceptId: concept.conceptid, parentConceptName: concept.name })
+      }
+    })
+    ;(concept.examples || []).forEach(example => {
+      if ([...collectNodeSourcePageIds(example)].some(pageid => visiblePageIds.has(pageid))) {
+        addVisibleNode(target, 'example', { ...example, courseid: concept.courseid, parentConceptId: concept.conceptid, parentConceptName: concept.name })
+      }
+    })
+  })
+
+  ;(graph.problems || []).forEach(problem => {
+    if ([...collectNodeSourcePageIds(problem)].some(pageid => visiblePageIds.has(pageid))) {
+      addVisibleNode(target, 'problem', problem)
+    }
+  })
+
+  delete target.keys
+  return target
+}
+
+function setCurrentCanvasPageContext(context) {
+  currentCanvasPageContext = context || null
+  BrowserWindow.getAllWindows().forEach(window => {
+    if (!window.isDestroyed()) {
+      window.webContents.send('canvas:visible_context', currentCanvasPageContext)
+    }
+  })
+}
+
+async function readCanvasVisibleScrollState(tab) {
+  if (!tab || !tab.view || tab.view.webContents.isDestroyed()) return null
+  return tab.view.webContents.executeJavaScript(`
+    (() => {
+      const candidates = [];
+      const addCandidate = (label, element, scrollTop, scrollHeight, clientHeight) => {
+        const top = Number(scrollTop) || 0;
+        const total = Number(scrollHeight) || 0;
+        const height = Number(clientHeight) || 0;
+        if (total > height + 4) candidates.push({ label, scrollY: top, scrollHeight: total, viewportHeight: height });
+      };
+      const doc = document.documentElement;
+      const body = document.body;
+      addCandidate("window", null, window.scrollY || (doc && doc.scrollTop) || (body && body.scrollTop) || 0, doc && doc.scrollHeight, window.innerHeight || (doc && doc.clientHeight) || 0);
+      [doc, body, ...Array.from(document.querySelectorAll("*"))].forEach((element, index) => {
+        if (!element) return;
+        addCandidate("element:" + index, element, element.scrollTop, element.scrollHeight, element.clientHeight);
+      });
+      let selected = candidates[0] || { label: "window", scrollY: 0, scrollHeight: document.documentElement.scrollHeight || 0, viewportHeight: window.innerHeight || 0 };
+      candidates.forEach(candidate => {
+        if (candidate.scrollY > selected.scrollY || (candidate.scrollY === selected.scrollY && candidate.scrollHeight > selected.scrollHeight)) {
+          selected = candidate;
+        }
+      });
+      return {
+        url: window.location.href,
+        scrollY: Math.max(0, Math.round(selected.scrollY || 0)),
+        scrollHeight: Math.max(0, Math.round(selected.scrollHeight || 0)),
+        viewportHeight: Math.max(0, Math.round(selected.viewportHeight || window.innerHeight || 0)),
+        source: selected.label
+      };
+    })()
+  `, true)
+}
+
+async function updateCurrentCanvasVisibleContext() {
+  if (canvasVisibleContextPollInFlight) return
+  canvasVisibleContextPollInFlight = true
+  try {
+    const tab = activetab !== 'None' ? activetab : null
+    if (!tab || tab.type !== 'canvastab' || tab.canvasMode !== 'browser' || !tab.view) {
+      if (lastCanvasVisibleContextKey !== 'none') {
+        lastCanvasVisibleContextKey = 'none'
+        setCurrentCanvasPageContext(null)
+      }
+      return
+    }
+
+    const scrollState = await readCanvasVisibleScrollState(tab)
+    const url = (scrollState && scrollState.url) || tab.url || ''
+    const graph = readCanvasGraphSnapshot()
+    const fileMatch = findCanvasFileForVisibleUrl(graph, url)
+    if (!fileMatch || !fileMatch.file || !Array.isArray(fileMatch.file.pages) || !fileMatch.file.pages.length) {
+      const key = `no-file:${tab.id}:${url}`
+      if (lastCanvasVisibleContextKey !== key) {
+        lastCanvasVisibleContextKey = key
+        setCurrentCanvasPageContext(null)
+      }
+      return
+    }
+
+    const context = buildCanvasPageContext(graph, fileMatch, url, scrollState || { scrollY: 0, viewportHeight: 0 })
+    const key = JSON.stringify({
+      tabId: tab.id,
+      url,
+      scrollY: context.scrollY,
+      viewportHeight: context.viewportHeight,
+      pages: context.pages.map(page => page.pageid),
+      counts: [context.concepts.length, context.details.length, context.examples.length, context.problems.length]
+    })
+    if (key !== lastCanvasVisibleContextKey) {
+      lastCanvasVisibleContextKey = key
+      setCurrentCanvasPageContext(context)
+    }
+  } catch (error) {
+    console.error("Unable to update Canvas visible context:", error)
+  } finally {
+    canvasVisibleContextPollInFlight = false
+  }
+}
+
+function ensureCanvasVisibleContextPolling() {
+  if (canvasVisibleContextPollTimer) return
+  canvasVisibleContextPollTimer = setInterval(() => {
+    updateCurrentCanvasVisibleContext()
+  }, 200)
+}
+
 function compactTab(tab) {
   if (!tab) return null
   return {
@@ -1112,7 +1538,6 @@ async function refreshCanvasDataFromTool() {
 async function runfunction(data) {
   let tool_response = ['tool_response', data.id]
   if (data.name === "add_task") {
-    console.log("main: running add_task with data", data);
      tool_response.push( newTask(
       data.input.task_name,
       data.input.priority_weight,
@@ -1233,24 +1658,6 @@ function createWindow() {
 }
 
 /**
- * Creates a new WebContentsView inside the given window, loads a URL, and
- * positions it in the tab content area.
- *
- * @param {BrowserWindow} window           - Parent window to attach the view to.
- * @param {boolean} show                   - Whether the view should be visible immediately.
- * @param {string} [url="https://www.google.com"] - Initial URL to load.
- * @returns {WebContentsView}              - The created view, ready to be tracked.
- */
-function createBrowserTab(window, show, url="https://www.google.com") {
-  view1 = new WebContentsView()
-  view1.setBounds(getBrowserBounds(window))
-  view1.setVisible(show)
-  view1.webContents.loadURL(url)
-  window.contentView.addChildView(view1)
-  return view1
-}
-
-/**
  * Renders (shows + repositions) the given tab view, or hides the active tab
  * if 'None' is passed.
  *
@@ -1279,7 +1686,6 @@ function getauth() {
   canvas_auth_csrf = get_auth_csrf()
   canvas_base_url = get_base_url()
   canvasAuthValidated = true
-  console.log('main got authtokens: ' + canvas_auth_cookie + "\ncsrf: " + canvas_auth_csrf)
   installCanvasSessionCookies()
     .then(() => settleCanvasAuthWaiters())
     .catch(error => {
@@ -1590,7 +1996,6 @@ async function setSlateAnimation(view, currclass) {
 }
 
 function addslate(window) {
-  console.log("added slate")
   
   const gotslate = getslate(window)
   try {
@@ -1602,14 +2007,6 @@ function addslate(window) {
   window.contentView.addChildView(gotslate)
   gotslate.setVisible(true)
   return gotslate
-}
-
-function hideslate(window){
-  if (slate) {
-    setSlateAnimation(slate, 'hide').finally(() => {
-      slate.setVisible(false)
-    })
-  }
 }
 
 async function runCanvasSlateNavigation(window, view, action) {
@@ -1660,9 +2057,11 @@ async function loadbrowserpool(window) {
 app.whenReady().then(() => {
   mainwindow = createWindow();
   const[winwidth, winheight] = mainwindow.getSize();
+  ensureCanvasVisibleContextPolling()
   loadbrowserpool(mainwindow).catch(error => {
     console.error("Unable to load browser pool:", error)
   })
+
   
   session.defaultSession.on('will-download', (event, item, webContents) => {
     const foundtab = currtabs.find(localtab =>
@@ -1692,25 +2091,35 @@ app.whenReady().then(() => {
     }
   })
   
-  mainwindow.on('resize', () => {
-    console.log("resizing")
+  function applyShellLayoutBounds() {
     if (activetab != "None"){
-      console.log("resizing browser")
       activetab.view.setBounds(getBrowserBounds(mainwindow, activetab))
     }
     if (authview) {
       authview.setBounds(getAuthBounds(mainwindow))
     }
     setSlateBounds(mainwindow)
+  }
+  
+  mainwindow.on('resize', () => {
+    applyShellLayoutBounds()
   })
 
+  async function gmailauth() {
+    const test1 = await creategmailauthview()
+    const test  = await getmail()
+    for (const message of test.messages) {
+      const metadata = await getmailmeta(message.id, message.threadId)
+    }
+  }
   // ─── IPC Handlers ──────────────────────────────────────────────────────────
 
   // tasks:start — Runs the placeholder start-task script for a given task.
   // in:  task (Object) — task record from the renderer
   // out: { ok: true }
   ipcMain.handle('tasks:start', (_, task) => {
-    runStartTaskPlaceholder(task);
+    const taskName = task && task.title ? task.title : 'Untitled task'
+    console.log(`[nucleus] Placeholder start-task script ran for: ${taskName}`)
     return { ok: true };
   });
 
@@ -1721,6 +2130,22 @@ app.whenReady().then(() => {
     return dataStore.getRendererDataSnapshot();
   });
 
+  ipcMain.handle('layout:workspace_sidebar_collapsed', (_, collapsed) => {
+    setWorkspaceSidebarCollapsed(Boolean(collapsed))
+    applyShellLayoutBounds()
+    return { ok: true, collapsed: Boolean(collapsed) }
+  });
+
+  gmailauth()
+
+  ipcMain.handle('layout:right_panel_width', (_, width) => {
+    const numericWidth = Number(width)
+    const panelWidth = Number.isFinite(numericWidth) ? Math.max(0, Math.round(numericWidth)) : 340
+    setRightPanelWidth(panelWidth)
+    applyShellLayoutBounds()
+    return { ok: true, width: panelWidth }
+  });
+
   ipcMain.handle('engine:url', () => {
     return getEngineUrl()
   });
@@ -1729,33 +2154,42 @@ app.whenReady().then(() => {
   // in:  payload ({ message: string })
   // out: undefined
   ipcMain.handle('prompt:send', (_, payload) => {
-    senduserprompt(["message",payload["message"]]).catch(error => {
+    senduserprompt(["message", payload["message"]]).catch(error => {
       console.error('prompt send failed:', error)
+      const window = BrowserWindow.getAllWindows()[0]
+      if (window && !window.webContents.isDestroyed()) {
+        window.webContents.send('prompt:response-done')
+      }
     });
+  });
+
+  ipcMain.handle('synapse:send', async (event, payload = {}) => {
+    const requestId = payload && payload.requestId ? payload.requestId : ''
+    const sender = event.sender
+    return synapseClient.send(payload, {
+      onDelta: delta => {
+        if (!requestId || sender.isDestroyed()) return
+        sender.send('synapse:response-chunk', { requestId, delta })
+      }
+    })
   });
 
   // tabs:new_active — Switches the active rendered tab view.
   // in:  tab ({ view: WebContentsView, ... } | 'None')
   // out: undefined
   ipcMain.handle('tabs:new_active', (_, tab) => {
-    console.log("recieved signal tabs:new_active")
     if (tab === 'None') {
-      console.log("set active tab to None")
       renderTab(tab, mainwindow)
       activetab = "None"
       return
     }
-    console.log("trying to find: " + tab.id)
     let foundtab = currtabs.find(localtab => sameTabId(localtab.id, tab.id))
     if (!foundtab) {
-      console.log("main: active tab not found: " + tab.id)
       renderTab('None', mainwindow)
       activetab = "None"
       return
     }
-    console.log("foundtab: " + foundtab.id +" " + foundtab.type)
     if (isWebContentTab(foundtab)) {
-      console.log("set activetab to foundtab to: " + foundtab.id)
       renderTab(foundtab.view, mainwindow, foundtab)
       activetab = foundtab
     } else {
@@ -1793,14 +2227,12 @@ app.whenReady().then(() => {
   })
 
   ipcMain.on('canvas:wipe-covered', () => {
-    console.log("main: got signal blank canvas page")
     if (activetab === "None" || activetab.type !== "canvastab" || !activetab.view) return
     activetab.view._nucleusBlankedForCanvasWipe = true
     activetab.view.setVisible(false)
   })
 
   ipcMain.on('canvas:blank-shown', () => {
-    console.log("main: got signal blank canvas shown")
     if (activetab === "None" || activetab.type !== "canvastab" || !activetab.view) return
     if (!activetab.view._nucleusCanvasNavigationInProgress) return
     activetab.view._nucleusBlankedForCanvasWipe = true
@@ -1808,7 +2240,6 @@ app.whenReady().then(() => {
   })
 
   ipcMain.on('canvas:wipe-hidden', () => {
-    console.log("main: got signal wipe hidden")
     if (activetab === "None" || activetab.type !== "canvastab" || !activetab.view) return
     activetab.view._nucleusBlankedForCanvasWipe = false
     if (activetab.view._nucleusCanvasNavigationInProgress) return
@@ -1894,7 +2325,6 @@ app.whenReady().then(() => {
   // in:  tabs (Array of tab objects)
   // out: undefined
   ipcMain.handle("tabs:push", async(_, tabs) => {
-    console.log('recieved tabs:push, tabs updated')
     let[winwidth, winheight] = mainwindow.getSize()
     const incomingIds = new Set(tabs.map(tab => String(tab.id)))
 
@@ -1935,7 +2365,6 @@ app.whenReady().then(() => {
       } else {
         tabids.add(tab.id)
         if (isWebContentTab(tab)){
-          console.log('found web content tab: ' + JSON.stringify(tab))
           const viewOptions = tab.type === "canvastab"
             ? {
                 webPreferences: {
@@ -2146,6 +2575,13 @@ app.whenReady().then(() => {
             await injectCanvasPreviewRedirector(frame)
           })
           view.webContents.setWindowOpenHandler(({ url }) => {
+            if (isEngineHomeUrl(url)) {
+              tab.url = 'nucleus://engine'
+              view.webContents.loadURL(getEngineUrl())
+              mainwindow.webContents.send('tabs:url_update', { id: tab.id, url: tab.url })
+              return { action: 'deny' }
+            }
+
             const searchQuery = getEngineSearchQuery(url)
             if (searchQuery !== null) {
               openEngineSearchInTab(tab, searchQuery.query, searchQuery.type).catch(error => {
@@ -2195,6 +2631,14 @@ app.whenReady().then(() => {
           });
           view.webContents.on('will-navigate', event => {
             const url = event.url
+            if (isEngineHomeUrl(url)) {
+              event.preventDefault()
+              tab.url = 'nucleus://engine'
+              view.webContents.loadURL(getEngineUrl())
+              mainwindow.webContents.send('tabs:url_update', { id: tab.id, url: tab.url })
+              return
+            }
+
             const searchQuery = getEngineSearchQuery(url)
             if (searchQuery !== null) {
               event.preventDefault()
@@ -2362,8 +2806,13 @@ app.whenReady().then(() => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
 
+
 });
 
 app.on('window-all-closed', () => {
+  if (canvasVisibleContextPollTimer) {
+    clearInterval(canvasVisibleContextPollTimer)
+    canvasVisibleContextPollTimer = null
+  }
   if (process.platform !== 'darwin') app.quit();
 });

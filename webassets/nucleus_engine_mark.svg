@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="Nucleus Engine">
+  <defs>
+    <linearGradient id="ring" x1="17" y1="15" x2="81" y2="82" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#8b5cf6"/>
+      <stop offset=".34" stop-color="#ec4899"/>
+      <stop offset=".67" stop-color="#38bdf8"/>
+      <stop offset="1" stop-color="#a3e635"/>
+    </linearGradient>
+    <linearGradient id="core" x1="30" y1="24" x2="68" y2="72" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f8fafc"/>
+      <stop offset="1" stop-color="#c4b5fd"/>
+    </linearGradient>
+  </defs>
+  <circle cx="48" cy="48" r="42" fill="#11131a"/>
+  <path fill="none" stroke="url(#ring)" stroke-linecap="round" stroke-width="8" d="M78 48a30 30 0 0 1-9 21M48 18a30 30 0 0 1 27 17M18 48a30 30 0 0 1 17-27M48 78a30 30 0 0 1-27-17"/>
+  <path fill="url(#core)" d="M31 67V29h8l18 23V29h8v38h-7.4L39 43v24z"/>
+  <circle cx="77" cy="77" r="7" fill="#8b5cf6"/>
+</svg>

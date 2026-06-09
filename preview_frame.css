@@ -1,3 +1,9 @@
+/*
+  Canvas iframe preview injection stylesheet.
+  Functionality: restyles selected Canvas preview/tool iframes embedded inside
+  Canvas pages.
+  Dependencies: main.js iframe injection target collection and app/canvas/preload.js.
+*/
 :root {
   --bg: #0f1117;
   --surface: #171a21;

@@ -1,3 +1,8 @@
+// Native Canvas dashboard renderer.
+// Functionality: renders Canvas course cards and delegates course detail pages
+// to app/canvas/course.js templates.
+// Dependencies: loaded after course.js by index.html; renderer/render.js invokes
+// window.nucleusCanvasApp.renderCanvasApp for native Canvas tabs.
 function renderCanvasAppDashboard(canvasData = {}) {
   const courses = Array.isArray(canvasData.courses)
     ? canvasData.courses.filter(course => course && course.id && course.workflow_state !== "deleted")
