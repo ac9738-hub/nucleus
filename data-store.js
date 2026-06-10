@@ -153,7 +153,11 @@ function createDataStore({ sendToRenderer, getCanvasProjectGroups, readCanvasDat
       ...metadata
     }
     if (existing) {
+      const preservedWorkspaceId = existing.workspaceId || "";
       Object.assign(existing, taskData)
+      if (!workspaceId && preservedWorkspaceId) {
+        existing.workspaceId = preservedWorkspaceId
+      }
     } else {
       tasks.push(taskData)
     }

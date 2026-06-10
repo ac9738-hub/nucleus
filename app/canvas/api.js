@@ -7,6 +7,10 @@ const fs = require('fs')
 const { spawn } = require('child_process')
 const path = require('path')
 const { startOfWeek, addWeeks, isSameWeek, differenceInCalendarWeeks } = require('date-fns')
+const { getThemePalette, getThemeColorScheme } = require('../../theme-manager')
+
+// Project root, used to resolve the active theme palette for saved homepages.
+const THEME_ROOT = path.join(__dirname, '..', '..')
 
 // Monday-based weeks throughout the weekly schedule.
 const WEEK_OPTIONS = { weekStartsOn: 1 }
@@ -1184,17 +1188,22 @@ function createCanvasApi({ canvasDataPath, getAuthState, sendCanvasDataUpdate, r
   }
 
   function withNucleusHomepageTheme(html) {
+    // Build the homepage skin from the active theme palette so saved Canvas
+    // homepages match whatever theme is selected (default / dark / white).
+    const palette = getThemePalette(THEME_ROOT)
+    const colorScheme = getThemeColorScheme(THEME_ROOT)
     const theme = `
 <style id="nucleus-canvas-homepage-theme">
   :root {
-    color-scheme: dark;
-    --nucleus-bg: #0f1117;
-    --nucleus-surface: #171a21;
-    --nucleus-surface-2: #1d212b;
-    --nucleus-border: #262b36;
-    --nucleus-text: #e7e9ee;
-    --nucleus-text-dim: #b7c0d4;
-    --nucleus-accent: #7f77dd;
+    color-scheme: ${colorScheme};
+    --nucleus-bg: ${palette.bg};
+    --nucleus-surface: ${palette.surface};
+    --nucleus-surface-2: ${palette['surface-2']};
+    --nucleus-border: ${palette.border};
+    --nucleus-text: ${palette.text};
+    --nucleus-text-dim: ${palette['text-dim']};
+    --nucleus-accent: ${palette.accent};
+    --nucleus-link: ${palette.link};
   }
 
   html,
@@ -1211,7 +1220,7 @@ function createCanvasApi({ canvasDataPath, getAuthState, sendCanvasDataUpdate, r
   }
 
   a {
-    color: #9eb6ff !important;
+    color: var(--nucleus-link) !important;
   }
 
   p,
@@ -1246,7 +1255,7 @@ function createCanvasApi({ canvasDataPath, getAuthState, sendCanvasDataUpdate, r
   h4,
   h5,
   h6 {
-    color: #ffffff !important;
+    color: var(--nucleus-text) !important;
   }
 </style>
 `

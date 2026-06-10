@@ -493,7 +493,31 @@ body.workspace-sidebar-collapsed .new-workspace-form {
   padding: 0 10px;
 }
 
-.workspace-page-tab span:first-child {
+.workspace-page-tab-icon {
+  align-items: center;
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 14px;
+  justify-content: center;
+  opacity: 0.88;
+  width: 14px;
+}
+
+.workspace-page-tab-icon img {
+  display: block;
+  height: 14px;
+  object-fit: contain;
+  width: 14px;
+}
+
+.workspace-page-tab-icon svg {
+  display: block;
+  height: 14px;
+  width: 14px;
+}
+
+.workspace-page-tab-label {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1616,6 +1640,23 @@ button.home-list-item {
 .start-task-button:hover {
   background: #918aec;
   transform: translateY(-1px);
+}
+
+.start-task-error-banner {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 10000;
+  max-width: min(560px, calc(100vw - 32px));
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: #3a1f24;
+  border: 1px solid #8b3a3a;
+  color: #ffd8d8;
+  font-size: 14px;
+  line-height: 1.4;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
 
 .workspace-panel {

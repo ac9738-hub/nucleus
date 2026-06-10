@@ -1,0 +1,55 @@
+/*
+  Engine theme layer (Nucleus / default) for the engine home + search pages.
+  Authoritative per theme: edit these token values to recolor the engine, and
+  add a per-theme background animation in the block at the bottom if you want.
+  main.js injects this file into engine WebContentsViews (internal pages only);
+  engine.html and engine.js keep only structural layout and read these tokens.
+*/
+:root {
+  color-scheme: dark;
+  --bg: #050916;
+  --bg-gradient:
+    radial-gradient(circle at 18% 8%, rgba(var(--accent-rgb), 0.16), transparent 30%),
+    radial-gradient(circle at 78% 12%, rgba(var(--accent-2-rgb), 0.10), transparent 32%),
+    radial-gradient(circle at 52% 106%, rgba(var(--accent-warm-rgb), 0.08), transparent 34%),
+    linear-gradient(180deg, #070b18 0%, #05070f 100%);
+  --surface: #0c1224;
+  --surface-2: #151c34;
+  --surface-3: #232c4e;
+  --surface-soft: rgba(var(--surface-rgb), 0.72);
+  --border: rgba(var(--border-rgb), 0.34);
+  --border-strong: rgba(var(--border-rgb), 0.34);
+  --border-solid: #3a4050;
+  --text: #f4f7ff;
+  --text-dim: #aeb8dc;
+  --text-mute: #6f7aa7;
+  --text-on-accent: #ffffff;
+  --accent: #7567d8;
+  --accent-2: #5aa9c8;
+  --accent-3: #55b89f;
+  --accent-warm: #c79a54;
+  --accent-gradient: linear-gradient(135deg, #7567d8, #596bc6);
+  --link: #c8d2ff;
+  --visited: #bfa8ff;
+  --scrollbar-thumb: #343a48;
+  --scrollbar-thumb-hover: #4a5162;
+  --accent-rgb: 117, 103, 216;
+  --accent-2-rgb: 90, 169, 200;
+  --accent-3-rgb: 85, 184, 159;
+  --accent-warm-rgb: 199, 154, 84;
+  --border-rgb: 125, 139, 190;
+  --border-strong-rgb: 87, 94, 116;
+  --bg-rgb: 5, 9, 22;
+  --surface-rgb: 12, 18, 36;
+  --surface-2-rgb: 21, 28, 52;
+  --surface-3-rgb: 35, 44, 78;
+  --shadow-rgb: 0, 0, 0;
+  --white-rgb: 255, 255, 255;
+}
+
+/*
+  Per-theme background animation slot. The base ambient drift lives in
+  engine.html / engine.js; override it here to give this theme its own motion.
+  Example:
+    body { animation: engineAmbientDrift 70s ease-in-out infinite alternate; }
+*/

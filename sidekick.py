@@ -9,6 +9,7 @@ from ollama import chat
 from openai import OpenAI
 from ollama import ChatResponse
 from dotenv import load_dotenv
+from context_format import format_context_snapshot
 import json
 import sys
 import os
@@ -44,6 +45,8 @@ context_only_system_prompt = (
     "Your task will most likely need in-app context. You have 2 options. call get_context, or respond"
 )
 runtime_system_context = ""
+runtime_call_context = ""
+runtime_context_snapshot = None
 local_system_prompt = """
 You are a routing classifier for the Nucleus student app.
 
@@ -442,14 +445,29 @@ def runclaude(prompt):
     print(f"py: running claude: {prompt}", file=sys.stderr)
     tool_calls = {}
     full_text = ""
+    model_messages = prompt
+    if runtime_call_context and model_messages:
+        last = model_messages[-1]
+        if isinstance(last, dict) and last.get("role") == "user":
+            content = last.get("content")
+            extra_block = {"type": "text", "text": runtime_call_context}
+            if isinstance(content, str):
+                merged = [{"type": "text", "text": content}, extra_block]
+            elif isinstance(content, list):
+                merged = content + [extra_block]
+            else:
+                merged = [extra_block]
+            model_messages = model_messages[:-1] + [{"role": "user", "content": merged}]
     dynamic_system_prompt = system_prompt
-    if runtime_system_context:
-        dynamic_system_prompt += "\n\nLive app context:\n" + runtime_system_context
+    snapshot_context = format_context_snapshot(runtime_context_snapshot) if runtime_context_snapshot else ""
+    live_context_parts = [part for part in (snapshot_context, runtime_system_context) if part]
+    if live_context_parts:
+        dynamic_system_prompt += "\n\nLive app context:\n" + "\n\n".join(live_context_parts)
     response = claude_client.messages.create(
         model="claude-sonnet-4-6",
         max_tokens=1000,
         system=dynamic_system_prompt + "\nThis is the syllabus for NEU 201:" + hardcoded_syllabus,
-        messages=prompt,
+        messages=model_messages,
         tools=tools,
         stream=True
     )
@@ -607,7 +625,12 @@ for line in sys.stdin:
         message_text, message_content = message_payload_to_text_and_content(line[1])
         if isinstance(line[1], dict):
             runtime_system_context = str(line[1].get("systemContext") or "")
+            runtime_call_context = str(line[1].get("callContext") or "")
+            snapshot = line[1].get("contextSnapshot")
+            runtime_context_snapshot = snapshot if isinstance(snapshot, dict) else None
         else:
             runtime_system_context = ""
+            runtime_call_context = ""
+            runtime_context_snapshot = None
         chat_history.append({"role": "user","content": message_content })
         run_classifier(prompt = [{"role": "user", "content": message_text}])

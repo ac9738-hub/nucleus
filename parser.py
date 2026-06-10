@@ -15,7 +15,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 from html import unescape
 from html.parser import HTMLParser
-from urllib.parse import urljoin, urlparse, urldefrag
+from urllib.parse import urljoin, urlparse, urldefrag, parse_qs
 import asyncio
 import os
 import json
@@ -802,6 +802,10 @@ DEEPSEEK_TOOLS = [
                     "description": {
                         "type": "string",
                         "description": "A concise description of why this concept matters in the course."
+                    },
+                    "pageid": {
+                        "type": "string",
+                        "description": "Optional page id from the [[PAGE ... | pageid=...]] header where this concept appears."
                     }
                 },
                 "required": ["conceptname", "description"],
@@ -900,6 +904,10 @@ DEEPSEEK_TOOLS = [
                     "description": {
                         "type": "string",
                         "description": "Concise explanation of the detail and how it supports the parent concept."
+                    },
+                    "pageid": {
+                        "type": "string",
+                        "description": "Optional page id from the [[PAGE ... | pageid=...]] header where this detail appears."
                     }
                 },
                 "required": ["conceptNodeId", "detailname", "description"],
@@ -926,6 +934,10 @@ DEEPSEEK_TOOLS = [
                     "description": {
                         "type": "string",
                         "description": "Concise explanation of the example and how it illustrates the parent concept."
+                    },
+                    "pageid": {
+                        "type": "string",
+                        "description": "Optional page id from the [[PAGE ... | pageid=...]] header where this example appears."
                     }
                 },
                 "required": ["conceptNodeId", "examplename", "description"],
@@ -973,6 +985,10 @@ DEEPSEEK_TOOLS = [
                         "type": "array",
                         "items": {"type": "string"},
                         "description": "Assignment node IDs this problem belongs to, if known."
+                    },
+                    "pageid": {
+                        "type": "string",
+                        "description": "Optional page id from the [[PAGE ... | pageid=...]] header where this problem appears."
                     }
                 },
                 "required": ["problemname", "steps", "answer"],
@@ -1544,6 +1560,14 @@ def file_node_for_prompt(node):
         'details': node.details,
         'examples': node.examples,
         'problems': node.problems,
+        'pages': [
+            {
+                'pageid': page.get('pageid', ''),
+                'pageNumber': page.get('pageNumber', 0)
+            }
+            for page in (node.pages or [])
+            if isinstance(page, dict)
+        ],
     }
 
 
@@ -1620,6 +1644,7 @@ def filemeta_for_prompt(filemeta):
         'name': filemeta.get('name', ''),
         'downloadurl': filemeta.get('downloadurl', ''),
         'canvaspreviewurl': filemeta.get('canvaspreviewurl', ''),
+        'yindex': filemeta.get('yindex', ''),
     }
     pages = filemeta.get('pages') or []
     if pages:
@@ -1635,6 +1660,34 @@ def filemeta_for_prompt(filemeta):
     if isinstance(current_page, dict) and current_page.get('pageid'):
         slim['currentPage'] = {'pageid': current_page.get('pageid', '')}
     return slim
+
+
+# Normalizes the block-level positional text emitted by build_pdf_page_blocks so it
+# survives round-tripping through canvas_graph.json. Each block carries absolute
+# scroll-space offsets (y0/y1) plus normalized ratios (yRatio0/yRatio1) so the main
+# process can slice a page's text down to exactly what is inside the live viewport.
+def normalize_page_blocks(blocks, max_blocks=600):
+    normalized = []
+    if not isinstance(blocks, list):
+        return normalized
+    for block in blocks:
+        if not isinstance(block, dict):
+            continue
+        text = compact_file_search_text(block.get('text', ''), 600)
+        if not text:
+            continue
+        normalized.append({
+            'text': text,
+            'x0': float(block.get('x0', 0) or 0),
+            'x1': float(block.get('x1', 0) or 0),
+            'y0': float(block.get('y0', 0) or 0),
+            'y1': float(block.get('y1', 0) or 0),
+            'yRatio0': float(block.get('yRatio0', 0) or 0),
+            'yRatio1': float(block.get('yRatio1', 0) or 0)
+        })
+        if len(normalized) >= max_blocks:
+            break
+    return normalized
 
 
 def normalize_file_pages(pages, fileid=''):
@@ -1654,6 +1707,7 @@ def normalize_file_pages(pages, fileid=''):
             'height': float(page.get('height', 0) or 0),
             'width': float(page.get('width', 0) or 0),
             'text': compact_file_search_text(page.get('text', '')),
+            'blocks': normalize_page_blocks(page.get('blocks', [])),
             'nodes': page.get('nodes', []) if isinstance(page.get('nodes', []), list) else []
         })
     return normalized
@@ -1679,21 +1733,67 @@ def merge_file_pages(existing_pages, incoming_pages):
     return merged
 
 
+# Extracts positioned text blocks for one PDF page. Each block's bbox is converted
+# into absolute scroll-space offsets (y_offset is the running height of all prior
+# pages) plus a normalized ratio against the whole document, matching the yScroll /
+# yScrollRatio scheme already used for pages. This lets the render-context pipeline
+# return exactly the lines inside the live viewport instead of the whole page.
+def build_pdf_page_blocks(page, y_offset, total_height, max_blocks=600):
+    blocks = []
+    try:
+        data = page.get_text("dict")
+    except Exception:
+        return blocks
+    total = total_height if total_height else 1.0
+    for block in data.get("blocks", []) or []:
+        # type 0 == text block (type 1 == image).
+        if block.get("type") != 0:
+            continue
+        text_parts = []
+        for line in block.get("lines", []) or []:
+            for span in line.get("spans", []) or []:
+                span_text = span.get("text", "")
+                if span_text:
+                    text_parts.append(span_text)
+        text = re.sub(r'\s+', ' ', ''.join(text_parts)).strip()
+        if not text:
+            continue
+        bbox = block.get("bbox") or [0, 0, 0, 0]
+        try:
+            bx0, by0, bx1, by1 = float(bbox[0]), float(bbox[1]), float(bbox[2]), float(bbox[3])
+        except (TypeError, ValueError, IndexError):
+            bx0 = by0 = bx1 = by1 = 0.0
+        abs_y0 = y_offset + by0
+        abs_y1 = y_offset + by1
+        blocks.append({
+            'text': text,
+            'x0': bx0,
+            'x1': bx1,
+            'y0': abs_y0,
+            'y1': abs_y1,
+            'yRatio0': abs_y0 / total,
+            'yRatio1': abs_y1 / total
+        })
+        if len(blocks) >= max_blocks:
+            break
+    return blocks
+
+
 def build_pdf_pages(filepath, fileid):
     pages = []
     doc = fitz.open(filepath)
     try:
         page_sizes = []
-        page_texts = []
+        page_handles = []
         for index in range(len(doc)):
             page = doc[index]
             rect = page.rect
-            page_texts.append(page.get_text())
+            page_handles.append(page)
             page_sizes.append((float(rect.width), float(rect.height)))
 
         total_height = sum(height for _width, height in page_sizes) or 1.0
         y_offset = 0.0
-        for index, text in enumerate(page_texts):
+        for index, page in enumerate(page_handles):
             width, height = page_sizes[index]
             page_number = index + 1
             pages.append({
@@ -1703,7 +1803,8 @@ def build_pdf_pages(filepath, fileid):
                 'yScrollRatio': y_offset / total_height,
                 'height': height,
                 'width': width,
-                'text': text,
+                'text': page.get_text(),
+                'blocks': build_pdf_page_blocks(page, y_offset, total_height),
                 'nodes': []
             })
             y_offset += height
@@ -1751,6 +1852,99 @@ def get_current_page(file_node, filemeta):
     for page in file_node.pages:
         if str(page.get('pageid') or '') == current_pageid:
             return page
+    page_from_scroll = get_page_from_filemeta_scroll(file_node, filemeta or {})
+    if page_from_scroll:
+        return page_from_scroll
+    return None
+
+
+def parse_scroll_hint_from_url(url):
+    parsed = urlparse(str(url or '').strip())
+    candidates = {}
+
+    for key, values in parse_qs(parsed.query or '').items():
+        if values:
+            candidates[str(key).casefold()] = values[-1]
+
+    fragment = str(parsed.fragment or '').strip()
+    if fragment:
+        for token in re.split(r'[&;]', fragment):
+            if '=' not in token:
+                continue
+            key, value = token.split('=', 1)
+            key = str(key).strip().casefold()
+            value = str(value).strip()
+            if key and value:
+                candidates[key] = value
+
+    absolute_keys = ['yindex', 'y', 'scroll', 'scrolltop', 'offset', 'y_scroll', 'yscroll']
+    ratio_keys = ['yscrollratio', 'y_ratio', 'scrollratio', 'ratio']
+
+    for key in absolute_keys:
+        if key in candidates:
+            try:
+                return {'y': float(candidates[key]), 'ratio': None}
+            except (TypeError, ValueError):
+                pass
+
+    for key in ratio_keys:
+        if key in candidates:
+            try:
+                ratio = float(candidates[key])
+                if 0 <= ratio <= 1:
+                    return {'y': None, 'ratio': ratio}
+            except (TypeError, ValueError):
+                pass
+
+    return {'y': None, 'ratio': None}
+
+
+def page_from_scroll_hint(file_node, y=None, ratio=None):
+    pages = [page for page in (file_node.pages or []) if isinstance(page, dict)]
+    if not pages:
+        return None
+    if len(pages) == 1:
+        return pages[0]
+
+    sorted_pages = sorted(pages, key=lambda page: float(page.get('yScroll', 0) or 0))
+    starts = [float(page.get('yScroll', 0) or 0) for page in sorted_pages]
+
+    if y is not None:
+        index = bisect.bisect_right(starts, float(y)) - 1
+        if index < 0:
+            index = 0
+        if index >= len(sorted_pages):
+            index = len(sorted_pages) - 1
+        return sorted_pages[index]
+
+    if ratio is not None:
+        ratios = [float(page.get('yScrollRatio', 0) or 0) for page in sorted_pages]
+        index = bisect.bisect_right(ratios, float(ratio)) - 1
+        if index < 0:
+            index = 0
+        if index >= len(sorted_pages):
+            index = len(sorted_pages) - 1
+        return sorted_pages[index]
+
+    return None
+
+
+def get_page_from_filemeta_scroll(file_node, filemeta):
+    if not isinstance(filemeta, dict):
+        return None
+
+    y = filemeta.get('yindex')
+    if y is not None:
+        try:
+            return page_from_scroll_hint(file_node, y=float(y), ratio=None)
+        except (TypeError, ValueError):
+            pass
+
+    for key in ('canvaspreviewurl', 'downloadurl', 'url'):
+        hint = parse_scroll_hint_from_url(filemeta.get(key, ''))
+        if hint.get('y') is not None or hint.get('ratio') is not None:
+            return page_from_scroll_hint(file_node, y=hint.get('y'), ratio=hint.get('ratio'))
+
     return None
 
 
@@ -1807,6 +2001,7 @@ async def run_deepseek(prompt, fileid, courseid, downloadurl='', canvaspreviewur
         'name': filename,
         'downloadurl': downloadurl,
         'canvaspreviewurl': canvaspreviewurl,
+        'url': canvaspreviewurl or downloadurl,
         'pages': pages or [],
         'currentPage': current_page or {}
     }
@@ -1815,7 +2010,7 @@ async def run_deepseek(prompt, fileid, courseid, downloadurl='', canvaspreviewur
         f"You are a class secretary. You will be given JSON objects, text, and pictures. Your job is to identify object type and due date. First identify if the object is either 1: assignment file 2: learning/content file or 3: the course syllabus. "
         "If the item is a class syllabus, call add_syllabus and create syllabus assignment objects from any assignment list. Also call add_exam_node for exams, tests, quizzes, midterms, and finals; these must be stored as event type test. Use add_event_node for lectures, office hours, review sessions, presentations, labs, deadline windows, or other dated course events. Test dependencies should list concept node IDs or concept names covered by the test. If the object is an assignment file, call add_assignment_node to create or update the real assignment tracker and call log_problem for any assignment-level problems. If an assignment instructs the student to use another file, reading, prompt, rubric, worksheet, slide deck, notebook, article, PDF, or document, put known file IDs in filechildren; if the file ID is not known, put the referenced resource names in lookingfor. Also call log_external_resource for every outside course resource that is not a Canvas file/node, including public class websites, textbook titles or textbook sites, publisher homework systems, code repositories, datasets, external APIs, library reserves/articles, online judges, discussion tools, video playlists, and third-party platforms. Log it even when there is no URL; use a short resource type such as website, textbook, tool, repository, dataset, article, video, or publisher. If the item is a learning/content file, first call add_file_node, then extract concepts, details, examples, and problems. First call add_concept_node for concepts, then log_detail, log_example, log_problem, and log_event for items that may need concept IDs or later confirmation. A second pass will link logged items to concept IDs; use log_* tools for anything that needs IDs later. Problems should have incoming pointers from multiple concepts and outgoing pointers to concepts. The current file URLs are attached automatically to whichever syllabus, file, or assignment object is created. \n"
         "You will only see this file text on the first pass. Put details, examples, problems, assignments, and events that need concept IDs into log_detail, log_example, log_problem, log_assignment, and log_event tool calls. Do not put extracted content in free text. "
-        "Each page is delimited by [[PAGE N | pageid=... | yScroll=... | yScrollRatio=...]] headers. When creating nodes, reference the pageid from the header of the page where the content appears. "
+        "Each page is delimited by [[PAGE N | pageid=... | yScroll=... | yScrollRatio=...]] headers. When creating nodes, include that pageid in tool arguments as pageid. "
         f"Here are your current classified assignments and files ordered by date: {current_assignment_files_groups}\nHere is the current file metadata: {json.dumps(filemeta_for_prompt(filemeta), ensure_ascii=False)}\nHere is the class syllabus if it has been found: {allsyllabi.get(courseid, 'Not found')}\n your course id is {courseid}. Last thing: do not use markdown formatting, utf-8 only"
         "\n Do not give any text response that is not a tool call"
     )
@@ -3217,6 +3412,11 @@ def minimal_tool_result(name, result):
 
 def run_tool_call(name, courseid, arguments, filemeta=None):
     filemeta = filemeta or {}
+    call_filemeta = dict(filemeta)
+    pageid_from_args = str(arguments.get('pageid') or '').strip() if isinstance(arguments, dict) else ''
+    if pageid_from_args:
+        call_filemeta['pageid'] = pageid_from_args
+        call_filemeta['currentPage'] = {'pageid': pageid_from_args}
     current_file = get_or_create_file_node(courseid, filemeta)
     if name == "get_all_assignment_names":
         return get_all_assignment_names()
@@ -3239,7 +3439,7 @@ def run_tool_call(name, courseid, arguments, filemeta=None):
             append_unique(current_file.concepts, nodeid)
             concept = find_concept_by_name_or_id(courseid, nodeid)
             if concept:
-                attach_node_to_current_page(current_file, filemeta, 'concept', concept, nodeid)
+                attach_node_to_current_page(current_file, call_filemeta, 'concept', concept, nodeid)
         return {"added": True, "courseid": courseid, "conceptNodeId": nodeid}
     if name == "add_syllabus":
         syllabus = add_syllabus(
@@ -3262,7 +3462,7 @@ def run_tool_call(name, courseid, arguments, filemeta=None):
             append_unique(current_file.examples, result.get('exampleid'))
             example = find_example_by_ref(courseid, result.get('exampleid'))
             if example:
-                attach_node_to_current_page(current_file, filemeta, 'example', example, result.get('exampleid'))
+                attach_node_to_current_page(current_file, call_filemeta, 'example', example, result.get('exampleid'))
         return result
 
     if name == "add_detail_node":
@@ -3271,7 +3471,7 @@ def run_tool_call(name, courseid, arguments, filemeta=None):
             append_unique(current_file.details, result.get('detailid'))
             detail = find_detail_by_ref(courseid, result.get('detailid'))
             if detail:
-                attach_node_to_current_page(current_file, filemeta, 'detail', detail, result.get('detailid'))
+                attach_node_to_current_page(current_file, call_filemeta, 'detail', detail, result.get('detailid'))
         return result
 
     if name == 'add_problem_node':
@@ -3290,7 +3490,7 @@ def run_tool_call(name, courseid, arguments, filemeta=None):
             append_unique(current_file.problems, result.get('problemid'))
             problem = find_problem_by_id(courseid, result.get('problemid'))
             if problem:
-                attach_node_to_current_page(current_file, filemeta, 'problem', problem, result.get('problemid'))
+                attach_node_to_current_page(current_file, call_filemeta, 'problem', problem, result.get('problemid'))
         return result
 
     if name == 'log_detail':
@@ -3957,6 +4157,7 @@ async def parse_external_file_text(courseid, fileid, name, url, text, markdown_p
         'name': name,
         'downloadurl': url,
         'canvaspreviewurl': url,
+        'url': url,
         'searchtext': text,
         'pages': pages
     }
@@ -4242,6 +4443,7 @@ async def parseclass(course):
             'name': file.get('name', ''),
             'downloadurl': file.get('url', ''),
             'canvaspreviewurl': file.get('previewurl', ''),
+            'url': file.get('previewurl', '') or file.get('url', ''),
             'searchtext': totaldoc,
             'pages': pages
         }

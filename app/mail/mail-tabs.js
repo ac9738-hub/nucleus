@@ -99,6 +99,16 @@ function updateMessageInList(message) {
   }
 }
 
+function sortMailByReceivedDate(messages) {
+  const list = Array.isArray(messages) ? messages.slice() : [];
+  list.sort((a, b) => {
+    const left = Number(a && a.receivedAtMs) || 0;
+    const right = Number(b && b.receivedAtMs) || 0;
+    return right - left;
+  });
+  return list;
+}
+
 function removeMessageFromList(id) {
   mailState.allMessages = mailState.allMessages.filter(item => item.id !== id);
   mailState.messages = mailState.messages.filter(item => item.id !== id);
@@ -121,7 +131,7 @@ function applyContactRoutingToInbox() {
   } else if (mailState.folder === "secondary" && !mailState.searchQuery) {
     visible = visible.filter(message => message.inboxCategory === "non_academic");
   }
-  mailState.messages = visible;
+  mailState.messages = sortMailByReceivedDate(visible);
 }
 
 function ensureActiveContactSelection() {
@@ -352,7 +362,7 @@ function handleInboxDelta(delta) {
       const existing = new Set(mailState.allMessages.map(item => item.id));
       freshMessages = added.filter(item => item && item.id && !existing.has(item.id));
       if (freshMessages.length) {
-        mailState.allMessages = freshMessages.concat(mailState.allMessages);
+        mailState.allMessages = sortMailByReceivedDate(freshMessages.concat(mailState.allMessages));
         changed = true;
       }
     }
@@ -362,6 +372,7 @@ function handleInboxDelta(delta) {
       const removeSet = new Set(removedIds);
       const before = mailState.allMessages.length;
       mailState.allMessages = mailState.allMessages.filter(item => !removeSet.has(item.id));
+      mailState.allMessages = sortMailByReceivedDate(mailState.allMessages);
       if (mailState.allMessages.length !== before) changed = true;
       if (mailState.selectedId && removeSet.has(mailState.selectedId)) {
         mailState.selectedId = null;
@@ -435,7 +446,9 @@ async function loadMailView(options = {}) {
     }
 
     mailState.view = result.view;
-    mailState.allMessages = result.view && Array.isArray(result.view.messages) ? result.view.messages : [];
+    mailState.allMessages = sortMailByReceivedDate(
+      result.view && Array.isArray(result.view.messages) ? result.view.messages : []
+    );
     mailState.messages = mailState.allMessages.slice();
 
     if ((folder === "inbox" || folder === "secondary") && !q) {

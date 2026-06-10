@@ -4,6 +4,10 @@ const path = require('path')
 const { google } = require('googleapis')
 const { BrowserWindow } = require('electron')
 const { classifyInboxMessage, NON_ACADEMIC } = require('./classify')
+const { getThemeRuntime, readThemeCss } = require('../../theme-manager')
+
+// Project root for resolving the active theme's mail stylesheet.
+const MAIL_THEME_ROOT = path.join(__dirname, '..', '..')
 
 const GMAIL_BASE = 'https://www.googleapis.com/gmail/v1/users/me'
 
@@ -29,6 +33,8 @@ const MAIL_FOLDERS = [
 
 let token = null
 let cachedMailCss = null
+const MAIL_CLASSIFICATION_LOG_PATH = path.join(__dirname, '..', '..', 'mail_classification_log.json')
+let mailClassificationById = null
 
 const GMAIL_MAX_CONCURRENT = 6
 const GMAIL_METADATA_BATCH_SIZE = 20
@@ -36,6 +42,47 @@ const GMAIL_METADATA_HEADERS = ['From', 'To', 'Subject', 'Date', 'Cc', 'Message-
 
 let gmailInFlight = 0
 const gmailWaitQueue = []
+
+function loadMailClassificationLog() {
+    if (mailClassificationById) return mailClassificationById
+    try {
+        if (!fs.existsSync(MAIL_CLASSIFICATION_LOG_PATH)) {
+            mailClassificationById = {}
+            return mailClassificationById
+        }
+        const parsed = JSON.parse(fs.readFileSync(MAIL_CLASSIFICATION_LOG_PATH, 'utf8'))
+        mailClassificationById = parsed && typeof parsed === 'object' ? parsed : {}
+    } catch (_) {
+        mailClassificationById = {}
+    }
+    return mailClassificationById
+}
+
+function saveMailClassificationLog() {
+    try {
+        const map = loadMailClassificationLog()
+        fs.writeFileSync(MAIL_CLASSIFICATION_LOG_PATH, JSON.stringify(map, null, 2), 'utf8')
+    } catch (_) {}
+}
+
+function getLoggedInboxCategory(messageId) {
+    const map = loadMailClassificationLog()
+    const record = map && messageId ? map[messageId] : null
+    if (!record || typeof record !== 'object') return null
+    return record.category === NON_ACADEMIC ? NON_ACADEMIC : 'academic'
+}
+
+function logInboxCategory(message, category) {
+    if (!message || !message.id) return
+    const map = loadMailClassificationLog()
+    map[message.id] = {
+        category: category === NON_ACADEMIC ? NON_ACADEMIC : 'academic',
+        date: message.date || '',
+        receivedAtMs: Number(message.receivedAtMs) || 0,
+        loggedAt: Date.now()
+    }
+    saveMailClassificationLog()
+}
 
 function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms))
@@ -180,11 +227,29 @@ if (savedMailAuth) {
     setMailAuthTokens(savedMailAuth)
 }
 
+// Returns the active theme's mail stylesheet, prefixed with the app-wide :root
+// palette tokens so embedded/standalone mail HTML matches the current theme.
+// Cached per theme so a runtime switch picks up the new skin on next render.
 function getMailCss() {
-    if (!cachedMailCss) {
-        cachedMailCss = fs.readFileSync(path.join(__dirname, 'mail.css'), 'utf8')
+    let runtime = null
+    try {
+        runtime = getThemeRuntime(MAIL_THEME_ROOT)
+    } catch (_error) {
+        runtime = null
     }
-    return cachedMailCss
+    const themeName = runtime && runtime.name ? runtime.name : 'default'
+    if (cachedMailCss && cachedMailCss.theme === themeName) {
+        return cachedMailCss.css
+    }
+
+    const mailSheet = runtime && Array.isArray(runtime.rendererStylesheets)
+        ? runtime.rendererStylesheets.find(href => href.endsWith('mail.css'))
+        : null
+    const themedCss = mailSheet ? readThemeCss(MAIL_THEME_ROOT, mailSheet, '') : ''
+    const baseCss = themedCss || fs.readFileSync(path.join(__dirname, 'mail.css'), 'utf8')
+    const varsCss = runtime && runtime.varsCss ? runtime.varsCss + '\n' : ''
+    cachedMailCss = { theme: themeName, css: varsCss + baseCss }
+    return cachedMailCss.css
 }
 
 function escapeHtml(value) {
@@ -280,6 +345,9 @@ function extractBody(payload) {
 }
 
 function formatMessageSummary(message) {
+    const receivedAtMs = Number(message && message.internalDate)
+        || Date.parse(getHeader(message, 'Date'))
+        || 0
     return {
         id: message.id,
         threadId: message.threadId,
@@ -291,6 +359,7 @@ function formatMessageSummary(message) {
         to: getHeader(message, 'To'),
         date: getHeader(message, 'Date'),
         dateLabel: formatMailDate(getHeader(message, 'Date')),
+        receivedAtMs,
         unread: hasLabel(message, 'UNREAD'),
         starred: hasLabel(message, 'STARRED'),
         inboxCategory: 'academic'
@@ -476,13 +545,17 @@ async function listMailMessages(options = {}) {
     const refs = Array.isArray(list.messages) ? list.messages : []
     const ids = refs.map(item => item && item.id).filter(Boolean)
     const messages = ids.length ? await batchGetMessageMetadata(ids) : []
-    let summaries = messages.map(formatMessageSummary)
-    summaries = await classifyInboxMessages(summaries)
+    let summaries = messages.map(formatMessageSummary).map(message => {
+        const loggedCategory = getLoggedInboxCategory(message && message.id)
+        if (!loggedCategory) return message
+        return { ...message, inboxCategory: loggedCategory }
+    })
     if (folder === 'secondary' && !q) {
         summaries = summaries.filter(message => message && message.inboxCategory === NON_ACADEMIC)
     } else if (folder === 'inbox' && !q) {
         summaries = summaries.filter(message => message && message.inboxCategory !== NON_ACADEMIC)
     }
+    summaries.sort((a, b) => (Number(b && b.receivedAtMs) || 0) - (Number(a && a.receivedAtMs) || 0))
     return {
         messages: summaries,
         nextPageToken: list.nextPageToken || '',
@@ -490,7 +563,7 @@ async function listMailMessages(options = {}) {
     }
 }
 
-async function classifyInboxMessages(messages) {
+async function classifyNewIncomingInboxMessages(messages) {
     const list = Array.isArray(messages) ? messages : []
     if (!list.length) return list
     return mapWithConcurrency(
@@ -500,10 +573,16 @@ async function classifyInboxMessages(messages) {
             if (!Array.isArray(message.labelIds) || !message.labelIds.includes('INBOX')) {
                 return { ...message, inboxCategory: 'academic' }
             }
+            const loggedCategory = getLoggedInboxCategory(message.id)
+            if (loggedCategory) {
+                return { ...message, inboxCategory: loggedCategory }
+            }
             const classification = await classifyInboxMessage(message)
+            const category = classification && classification.label === NON_ACADEMIC ? NON_ACADEMIC : 'academic'
+            logInboxCategory(message, category)
             return {
                 ...message,
-                inboxCategory: classification && classification.label === NON_ACADEMIC ? NON_ACADEMIC : 'academic'
+                inboxCategory: category
             }
         },
         Math.max(1, Math.min(4, GMAIL_MAX_CONCURRENT))
@@ -886,9 +965,10 @@ async function pollMailHistory() {
         let added = []
         if (addedIds.size) {
             const metadata = await batchGetMessageMetadata([...addedIds])
-            added = await classifyInboxMessages(metadata
+            added = await classifyNewIncomingInboxMessages(metadata
                 .map(formatMessageSummary)
                 .filter(msg => Array.isArray(msg.labelIds) && msg.labelIds.includes('INBOX')))
+            added.sort((a, b) => (Number(b && b.receivedAtMs) || 0) - (Number(a && a.receivedAtMs) || 0))
         }
 
         return {

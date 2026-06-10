@@ -8,13 +8,20 @@
 // Dependencies: renderer/preload.js IPC contract, app/canvas/api.js data sync,
 // app/canvas/auth.js auth capture view, engine.js search renderer, sidekick.py
 // and vector_retreival.py child processes.
-const { app, BrowserWindow, ipcMain, WebContentsView, session, webFrameMain } = require('electron');
+const { app, BrowserWindow, ipcMain, WebContentsView, session, webFrameMain, globalShortcut } = require('electron');
 const path = require('path');
 const fs = require('fs')
 const { spawn } = require('child_process')
 const {open_canvas_auth_window, get_auth_token, get_auth_csrf, get_base_url} = require('./app/canvas/auth')
 const { createAgentProcess } = require('./agent-process')
 const { createDataStore } = require('./data-store')
+const { createContextStore } = require('./context-store')
+const {
+  MAX_VISIBLE_TEXT_BLOCKS,
+  MAX_VISIBLE_TEXT_CHARS,
+  compactText,
+  sliceVisiblePageTextBlocks
+} = require('./context-pipeline')
 const { renderwebsearchresult, searchweb } = require('./engine')
 const { getAuthBounds, getBrowserBounds, setRightPanelWidth, setWorkspaceSidebarCollapsed } = require('./view-layout')
 const {
@@ -33,6 +40,9 @@ const {
   getThemeSelection,
   getRendererStylesheets,
   getCanvasThemeConfig,
+  getThemeRuntime,
+  buildThemeVarsCss,
+  getThemePalette,
   readThemeCss,
   setStoredTheme,
   listThemes
@@ -596,6 +606,26 @@ class BrowserPool {
     return this.inusecanvas.toArray()
   }
 
+  // Every live view across both pools and ALL states (in-use, available warm,
+  // and backup/predicted/stashed warm), normalized to { type, view }. Used by
+  // the theme system to re-skin open WebContentsViews on a runtime switch.
+  // Backup/available views are warm engine.html pages themed at warm time, so
+  // they must be re-injected too — otherwise a tab opened (or revealed) after a
+  // switch shows the previous theme. Note: in-use/available entries are
+  // { type, view } while backup entries are { view, cache }, so we tag the type
+  // explicitly here rather than reading entry.type.
+  allViews() {
+    const tag = (type, entries) => entries.map(entry => ({ type, view: entry.view }))
+    return [
+      ...tag("web", this.inuseweb.toArray()),
+      ...tag("web", this.availableweb.toArray()),
+      ...tag("web", this.backupweb.toArray()),
+      ...tag("canvas", this.inusecanvas.toArray()),
+      ...tag("canvas", this.availablecanvas.toArray()),
+      ...tag("canvas", this.backupcanvas.toArray())
+    ]
+  }
+
   availableLength(type) {
     if (type === "web") {
       return this.availableweb.length
@@ -609,14 +639,29 @@ class BrowserPool {
 
   createView(type) {
     if (type === "canvas") {
-      return new WebContentsView({
+      const canvasView = new WebContentsView({
         webPreferences: {
           preload: path.join(__dirname, "app", "canvas", "preload.js"),
           sandbox: false
         }
       })
+      wireKeyboardRoutingToWebContents(canvasView.webContents)
+      return canvasView
     }
-    return new WebContentsView()
+    const view = new WebContentsView({
+      webPreferences: {
+        preload: path.join(__dirname, "web-preload.js")
+      }
+    })
+    wireKeyboardRoutingToWebContents(view.webContents)
+    // Web views inject the active theme's engine.css on every load so engine.html
+    // and search-result pages match the theme. (External sites are skipped inside
+    // applyEngineTheme.) The preload only emits 'surface:scrolled' for the
+    // render-context pipeline; it does not expose any bridge to external pages.
+    view.webContents.on('dom-ready', () => {
+      applyEngineTheme(view.webContents)
+    })
+    return view
   }
 
   getWarmUrl(type) {
@@ -682,6 +727,7 @@ let activeThemeManifest = themeSelection.manifest
 let activeThemeName = themeSelection.activeTheme
 let canvasThemeConfig = getCanvasThemeConfig(__dirname)
 let iframeInjectionFilesById = canvasThemeConfig.iframeInjectionPathsById
+let activeThemeVarsCss = buildThemeVarsCss(getThemePalette(__dirname), themeSelection.manifest.colorScheme || 'dark')
 
 // Re-reads theme config after a runtime theme switch so newly created Canvas
 // tabs and injection lookups use the new theme. The renderer stylesheets are
@@ -693,6 +739,139 @@ function refreshThemeRuntime() {
   activeThemeName = themeSelection.activeTheme
   canvasThemeConfig = getCanvasThemeConfig(__dirname)
   iframeInjectionFilesById = canvasThemeConfig.iframeInjectionPathsById
+  activeThemeVarsCss = buildThemeVarsCss(getThemePalette(__dirname), themeSelection.manifest.colorScheme || 'dark')
+}
+
+// The active app-wide `:root` token block. Injected (harmlessly) into engine /
+// web WebContentsViews and the slate overlay so they consume the same palette
+// as the renderer shell. Custom properties don't affect arbitrary websites.
+function getActiveThemeVarsCss() {
+  return activeThemeVarsCss
+}
+
+// True for our own engine surfaces (home + file-backed search result pages).
+function isInternalEngineUrl(value) {
+  if (!value) return false
+  return value.includes('engine.html')
+    || value.includes('engine-search-cache')
+    || value.startsWith('nucleus:')
+}
+
+// Injects CSS as an AUTHOR-origin <style> appended to <head>, not via
+// webContents.insertCSS. insertCSS is user-origin and loses the cascade to a
+// page's own inline <style>/<link> :root (which is exactly why engine/slate
+// theming silently failed). Appending a <style> last in <head> guarantees our
+// theme tokens win over the page's inline fallback :root. Re-uses a fixed id so
+// repeated calls (dom-ready, theme switch) replace rather than stack.
+async function injectAuthorThemeCss(webContents, id, css) {
+  if (!webContents || webContents.isDestroyed() || !css) return
+  const js = `(() => {
+    try {
+      let s = document.getElementById(${JSON.stringify(id)});
+      if (!s) { s = document.createElement('style'); s.id = ${JSON.stringify(id)}; }
+      s.textContent = ${JSON.stringify(css)};
+      document.head.appendChild(s);
+    } catch (_e) {}
+  })();`
+  try {
+    await webContents.executeJavaScript(js, true)
+  } catch (_error) {
+    // View may be tearing down or showing a privileged page.
+  }
+}
+
+// Injects the active theme's engine stylesheet (themes/<theme>/engine.css) into
+// our own engine surfaces (home + file-backed search pages). That file is the
+// authoritative, editable theme layer for the engine. We never touch arbitrary
+// websites. Safe to call on every dom-ready.
+async function applyEngineTheme(webContents) {
+  if (!webContents || webContents.isDestroyed()) return
+  if (!isInternalEngineUrl(webContents.getURL())) return
+  const css = readThemeCss(__dirname, `themes/${activeThemeName}/engine.css`, '')
+  await injectAuthorThemeCss(webContents, 'nucleus-engine-theme', css)
+}
+
+// Re-injects the Canvas critical background + main injection stylesheet into a
+// live Canvas view. Mirrors app/canvas/preload.js so the currently displayed
+// Canvas page reskins immediately (later navigations reskin via the preload).
+async function applyCanvasTheme(webContents) {
+  if (!webContents || webContents.isDestroyed()) return
+  const gradient = canvasThemeConfig.criticalGradient
+  const critical = `
+    html, body, #application, .ic-app, .ic-Layout-wrapper,
+    .ic-app-main-content, .ic-Layout-contentWrapper {
+      background: ${gradient} !important;
+      background-attachment: fixed !important;
+    }
+  `
+  try {
+    await webContents.insertCSS(getActiveThemeVarsCss())
+    await webContents.insertCSS(critical)
+    const injection = readInjectionCssFile(canvasThemeConfig.mainInjectionPath)
+    if (injection) await webContents.insertCSS(injection)
+  } catch (_error) {
+    // Ignore views that are navigating or destroyed mid-injection.
+  }
+}
+
+// Injects the active theme's slate stylesheet (themes/<theme>/slate.css) over
+// the base slate.css, so the navigation cover matches the active theme. That
+// file is the authoritative, editable theme layer for the slate overlay.
+async function applySlateTheme() {
+  if (!slate || !slate.webContents || slate.webContents.isDestroyed()) return
+  const css = readThemeCss(__dirname, `themes/${activeThemeName}/slate.css`, '')
+  await injectAuthorThemeCss(slate.webContents, 'nucleus-slate-theme', css)
+}
+
+// Updates the OS title-bar overlay (Windows) to the active palette.
+function applyTitleBarTheme(window) {
+  const win = window || BrowserWindow.getAllWindows()[0]
+  if (!win || win.isDestroyed() || typeof win.setTitleBarOverlay !== 'function') return
+  const palette = getThemePalette(__dirname)
+  try {
+    win.setTitleBarOverlay({
+      color: palette['title-bar'],
+      symbolColor: palette['title-bar-symbol'],
+      height: 56
+    })
+  } catch (_error) {
+    // setTitleBarOverlay is only available with a titleBarOverlay window.
+  }
+}
+
+// Re-skins every live non-renderer surface after a runtime theme switch.
+function reapplyThemeToOpenSurfaces() {
+  applyTitleBarTheme()
+  applySlateTheme()
+  try {
+    const entries = browserpool.allViews()
+    console.log(`[theme-debug] reapply: ${entries.length} views (web inuse=${browserpool.inuseweb.length} avail=${browserpool.availableweb.length} backup=${browserpool.backupweb.length}; canvas inuse=${browserpool.inusecanvas.length} avail=${browserpool.availablecanvas.length} backup=${browserpool.backupcanvas.length})`)
+    entries.forEach((entry, idx) => {
+      if (!entry || !entry.view || entry.view.webContents.isDestroyed()) {
+        console.log(`[theme-debug]   #${idx} ${entry && entry.type} <destroyed/empty>`)
+        return
+      }
+      const wc = entry.view.webContents
+      let url = ''
+      try { url = wc.getURL() } catch (_e) { url = '<no-url>' }
+      console.log(`[theme-debug]   #${idx} ${entry.type} url=${String(url).slice(0, 90)}`)
+      // TEMP DIAGNOSTIC: flag any view that navigates within 4s of a theme
+      // switch — that would be the source of a "tab reset". Auto-removed.
+      const onNav = (_event, navUrl) => {
+        console.log(`[theme-debug] !! NAVIGATION after theme switch on ${entry.type} -> ${String(navUrl).slice(0, 120)}`)
+        console.log(new Error('[theme-debug] navigation stack').stack)
+      }
+      wc.on('did-start-navigation', onNav)
+      setTimeout(() => { try { wc.removeListener('did-start-navigation', onNav) } catch (_e) {} }, 4000)
+      if (entry.type === 'canvas') {
+        applyCanvasTheme(wc)
+      } else {
+        applyEngineTheme(wc)
+      }
+    })
+  } catch (error) {
+    console.error('Unable to reapply theme to open views:', error)
+  }
 }
 const canvasBlankWarmUrl = "data:text/html;charset=utf-8," + encodeURIComponent(`
   <!doctype html>
@@ -915,13 +1094,20 @@ async function senduserprompt(payload) {
       ? await vectorRetrieval.sendQuery(messageText, { mode: 'agent' })
       : []
     const retrievalContext = vectorRetrieval.contextFor(startpoints)
-    const appStateContext = buildLiveAppStateText()
     const payloadObject = typeof messagePayload === 'object' && messagePayload !== null
       ? { ...messagePayload }
       : { text: String(messagePayload || '') }
     const existingSystemContext = String(payloadObject.systemContext || '').trim()
-    payloadObject.systemContext = [existingSystemContext, appStateContext].filter(Boolean).join('\n\n')
-    payloadObject.text = `${messageText}${retrievalContext}`
+    const regionContext = String(payloadObject.regionContext || '').trim()
+    // Live app/render state now travels as a structured, versioned snapshot the
+    // sidekick formats itself; systemContext carries only ad-hoc text (region
+    // capture + any caller-provided extra context).
+    payloadObject.systemContext = [existingSystemContext, regionContext].filter(Boolean).join('\n\n')
+    payloadObject.contextSnapshot = contextStore.getSnapshot()
+    payloadObject.callContext = retrievalContext
+    delete payloadObject.regionContext
+    payloadObject.text = messageText
+    logAppState('prompt-send')
     agent.send(['message', payloadObject])
     return
   }
@@ -936,21 +1122,343 @@ async function senduserprompt(payload) {
 let currtabs = []
 let tabids = new Set()
 let activetab = 'None'
+// Reactive render-context store: single source of truth for the structured
+// snapshot shipped to the sidekick. Slices are updated by event-driven
+// contributors (renderer UI state, tab registry, per-surface screen providers).
+const contextStore = createContextStore()
+// Last UI-state payload pushed by the renderer (sections, layout, workspaces, full
+// tab list incl. center/task tabs the main process does not track in currtabs).
+let rendererUiState = null
+// Tracks which side currently owns the screen slice so main-process pulls and
+// renderer pushes never clobber each other for the active surface.
+let screenSliceOwner = 'none'
+let screenSliceSurfaceKey = ''
 let tabsPushChain = Promise.resolve()
 let slate = null
 let canvasSetupPromise = null
 let mainwindow = null
 let currentCanvasPageContext = null
+let currentHtmlPageContext = null
 let lastCanvasVisibleContextKey = ''
+let lastHtmlVisibleContextKey = ''
 let canvasVisibleContextPollInFlight = false
+let htmlVisibleContextPollInFlight = false
 let canvasVisibleContextUpdateQueued = false
+let visibleContextUpdateQueued = false
 let lastAppStateLogKey = ''
+const MAX_REGION_TEXT_BLOCKS = 40
+const MAX_REGION_TEXT_CHARS = 6000
 // Cached lightweight Canvas graph index. The on-disk canvas_graph.json can be
 // hundreds of MB, so we parse it at most once per file change and keep only the
 // fields the visible-context feature needs (plus precomputed lookup maps).
 let canvasGraphIndex = null
 let canvasGraphVisibleIndexes = null
 let canvasGraphCacheKey = ''
+
+function isRegionCaptureShortcutInput(input) {
+  if (!input || input.type !== 'keyDown') return false
+  const key = String(input.key || '').toLowerCase()
+  const code = String(input.code || '').toLowerCase()
+  const modifier = Boolean(input.control || input.meta)
+  return modifier && Boolean(input.shift) && !input.alt && (key === 'c' || code === 'keyc')
+}
+
+function logRegionCaptureDebug(stage, payload = {}) {
+  // TODO(remove): temporary region-capture shortcut diagnostics
+  console.log('[DEBUG][TODO_REMOVE] region_capture', { stage, ...payload })
+}
+
+function getActiveWebLikeMainTab() {
+  const tab = activetab !== 'None' ? activetab : null
+  if (!tab || !isWebContentTab(tab)) return null
+  if (tab.type === 'browsertab') return tab
+  if (tab.type === 'canvastab' && isCanvasBrowserTab(tab)) return tab
+  return null
+}
+
+let lastRegionCaptureShortcutAt = 0
+
+function dispatchRegionCaptureShortcut(source) {
+  const now = Date.now()
+  if (now - lastRegionCaptureShortcutAt < 500) {
+    logRegionCaptureDebug('shortcut_dispatch_debounced', { source })
+    return
+  }
+  lastRegionCaptureShortcutAt = now
+
+  const focused = BrowserWindow.getFocusedWindow()
+  if (!focused || focused.isDestroyed()) {
+    logRegionCaptureDebug('shortcut_no_focused_window', { source })
+    return
+  }
+
+  const activeWebTab = getActiveWebLikeMainTab()
+  logRegionCaptureDebug('shortcut_dispatch', {
+    source,
+    focusedWindowId: focused.id,
+    activeTabId: activeWebTab && activeWebTab.id ? activeWebTab.id : '',
+    activeTabType: activeWebTab && activeWebTab.type ? activeWebTab.type : '',
+    activeTabUrl: activeWebTab && activeWebTab.url ? activeWebTab.url : ''
+  })
+
+  if (!activeWebTab) {
+    focused.webContents.send('shortcut:region_capture_failed', {
+      reason: 'no_active_web_tab',
+      message: 'Open a browser or Canvas web tab first, then press Ctrl+Shift+C.'
+    })
+    return
+  }
+
+  focused.webContents.send('shortcut:region_capture', { tabId: activeWebTab.id })
+}
+
+function wireKeyboardRoutingToWebContents(contents) {
+  if (!contents || contents.isDestroyed() || contents._nucleusKeyboardRouted) return
+  contents._nucleusKeyboardRouted = true
+  try {
+    contents.setIgnoreMenuShortcuts(true)
+  } catch (_error) {}
+  logRegionCaptureDebug('keyboard_routing_wired', {
+    webContentsId: contents.id,
+    url: typeof contents.getURL === 'function' ? contents.getURL() : ''
+  })
+  contents.on('before-input-event', (event, input) => {
+    if (!isRegionCaptureShortcutInput(input)) return
+    event.preventDefault()
+    logRegionCaptureDebug('shortcut_before_input_event', {
+      webContentsId: contents.id,
+      url: typeof contents.getURL === 'function' ? contents.getURL() : '',
+      key: input && input.key,
+      code: input && input.code,
+      type: input && input.type,
+      control: Boolean(input && input.control),
+      shift: Boolean(input && input.shift)
+    })
+    dispatchRegionCaptureShortcut('before_input_event')
+  })
+}
+
+async function runInPageRegionOverlay(tab) {
+  if (!tab || !tab.view || tab.view.webContents.isDestroyed()) {
+    logRegionCaptureDebug('overlay_skip_no_tab_view', {
+      tabId: tab && tab.id ? tab.id : '',
+      tabType: tab && tab.type ? tab.type : ''
+    })
+    return null
+  }
+  logRegionCaptureDebug('overlay_start', {
+    tabId: tab.id,
+    tabType: tab.type,
+    url: tab.url || ''
+  })
+  const localRegion = await tab.view.webContents.executeJavaScript(`
+    (() => new Promise(resolve => {
+      if (window.__nucleusRegionOverlayActive) {
+        resolve(null);
+        return;
+      }
+      window.__nucleusRegionOverlayActive = true;
+      const doc = document;
+      const overlay = doc.createElement("div");
+      overlay.style.position = "fixed";
+      overlay.style.inset = "0";
+      overlay.style.zIndex = "2147483647";
+      overlay.style.cursor = "crosshair";
+      overlay.style.background = "rgba(8, 16, 28, 0.12)";
+      overlay.style.userSelect = "none";
+      const box = doc.createElement("div");
+      box.style.position = "fixed";
+      box.style.border = "2px solid #55b89f";
+      box.style.background = "rgba(85, 184, 159, 0.14)";
+      box.style.display = "none";
+      box.style.pointerEvents = "none";
+      const hint = doc.createElement("div");
+      hint.textContent = "Drag to capture region · Esc to cancel";
+      hint.style.position = "fixed";
+      hint.style.left = "12px";
+      hint.style.top = "12px";
+      hint.style.padding = "6px 10px";
+      hint.style.borderRadius = "8px";
+      hint.style.font = "600 12px -apple-system, Segoe UI, sans-serif";
+      hint.style.color = "#ecf3ff";
+      hint.style.background = "rgba(5, 9, 22, 0.86)";
+      hint.style.border = "1px solid rgba(117, 103, 216, 0.48)";
+      overlay.appendChild(box);
+      overlay.appendChild(hint);
+      doc.documentElement.appendChild(overlay);
+
+      let start = null;
+      let active = false;
+      const cleanup = value => {
+        window.__nucleusRegionOverlayActive = false;
+        doc.removeEventListener("keydown", onKeyDown, true);
+        overlay.removeEventListener("pointerdown", onPointerDown, true);
+        overlay.removeEventListener("pointermove", onPointerMove, true);
+        overlay.removeEventListener("pointerup", onPointerUp, true);
+        overlay.removeEventListener("pointercancel", onPointerCancel, true);
+        if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+        resolve(value);
+      };
+      const clampPoint = event => ({
+        x: Math.max(0, Math.min(window.innerWidth, Number(event.clientX) || 0)),
+        y: Math.max(0, Math.min(window.innerHeight, Number(event.clientY) || 0))
+      });
+      const paint = point => {
+        if (!start || !point) return;
+        const left = Math.min(start.x, point.x);
+        const top = Math.min(start.y, point.y);
+        const width = Math.max(0, Math.abs(point.x - start.x));
+        const height = Math.max(0, Math.abs(point.y - start.y));
+        box.style.display = width > 0 && height > 0 ? "block" : "none";
+        box.style.left = left + "px";
+        box.style.top = top + "px";
+        box.style.width = width + "px";
+        box.style.height = height + "px";
+      };
+      const onPointerDown = event => {
+        event.preventDefault();
+        active = true;
+        start = clampPoint(event);
+        paint(start);
+        try { overlay.setPointerCapture(event.pointerId); } catch (_error) {}
+      };
+      const onPointerMove = event => {
+        if (!active || !start) return;
+        event.preventDefault();
+        paint(clampPoint(event));
+      };
+      const onPointerUp = event => {
+        if (!active || !start) return;
+        event.preventDefault();
+        const point = clampPoint(event);
+        const left = Math.min(start.x, point.x);
+        const top = Math.min(start.y, point.y);
+        const width = Math.max(0, Math.abs(point.x - start.x));
+        const height = Math.max(0, Math.abs(point.y - start.y));
+        if (overlay.hasPointerCapture && overlay.hasPointerCapture(event.pointerId)) {
+          try { overlay.releasePointerCapture(event.pointerId); } catch (_error) {}
+        }
+        cleanup(width >= 8 && height >= 8 ? { x: Math.round(left), y: Math.round(top), width: Math.round(width), height: Math.round(height) } : null);
+      };
+      const onPointerCancel = () => cleanup(null);
+      const onKeyDown = event => {
+        if (event.key !== "Escape") return;
+        event.preventDefault();
+        event.stopPropagation();
+        cleanup(null);
+      };
+      doc.addEventListener("keydown", onKeyDown, true);
+      overlay.addEventListener("pointerdown", onPointerDown, true);
+      overlay.addEventListener("pointermove", onPointerMove, true);
+      overlay.addEventListener("pointerup", onPointerUp, true);
+      overlay.addEventListener("pointercancel", onPointerCancel, true);
+    }))()
+  `, true)
+  logRegionCaptureDebug('overlay_finished', {
+    tabId: tab.id,
+    localRegion: localRegion || null
+  })
+  return localRegion
+}
+
+async function captureRegionContextForTab(tab, region = {}) {
+  const browserBounds = getBrowserBounds(mainwindow, tab)
+  const boundedSelection = clampRectToBounds({
+    x: Number(region.x) || 0,
+    y: Number(region.y) || 0,
+    width: Number(region.width) || 0,
+    height: Number(region.height) || 0
+  }, browserBounds)
+  if (boundedSelection.width <= 4 || boundedSelection.height <= 4) {
+    return { ok: false, error: 'Selected region is too small.' }
+  }
+  const localRegion = {
+    x: boundedSelection.x - browserBounds.x,
+    y: boundedSelection.y - browserBounds.y,
+    width: boundedSelection.width,
+    height: boundedSelection.height
+  }
+  const result = await readHtmlVisibleTextState(tab, {
+    region: localRegion,
+    maxBlocks: MAX_REGION_TEXT_BLOCKS,
+    maxChars: MAX_REGION_TEXT_CHARS
+  })
+  // Extracted DOM text for the selected region (previously discarded). Returned on
+  // every mode so the LLM gets the actual on-screen text, not just a screenshot.
+  const regionTextBlocks = trimVisibleTextBlocks(
+    result && result.blocks,
+    MAX_REGION_TEXT_BLOCKS,
+    MAX_REGION_TEXT_CHARS
+  )
+
+  if (tab.type === 'canvastab') {
+    const graph = getCanvasVisibleGraph()
+    const activeUrl = String((result && result.url) || tab.url || '')
+    const fileMatch = findCanvasFileForVisibleUrl(graph, activeUrl)
+    if (graph && fileMatch && fileMatch.file && Array.isArray(fileMatch.file.pages) && fileMatch.file.pages.length) {
+      const scrollState = await readCanvasVisibleScrollState(tab)
+      const rangeStart = Math.max(0, (Number(scrollState && scrollState.scrollY) || 0) + (Number(localRegion.y) || 0))
+      const rangeEnd = Math.max(rangeStart + 1, rangeStart + (Number(localRegion.height) || 0))
+      const indexedContext = buildCanvasPageContextForRange(
+        graph,
+        fileMatch,
+        activeUrl,
+        rangeStart,
+        rangeEnd,
+        Number(scrollState && scrollState.scrollHeight) || 0,
+        canvasGraphVisibleIndexes
+      )
+      if (indexedContext && Array.isArray(indexedContext.pages) && indexedContext.pages.length) {
+        return {
+          ok: true,
+          mode: 'indexed',
+          tabId: tab.id,
+          type: 'canvas-indexed',
+          url: activeUrl,
+          title: String((result && result.title) || tab.label || ''),
+          region: {
+            x: Math.round(boundedSelection.x),
+            y: Math.round(boundedSelection.y),
+            width: Math.round(boundedSelection.width),
+            height: Math.round(boundedSelection.height)
+          },
+          localRegion: result && result.region ? result.region : localRegion,
+          visibleText: regionTextBlocks,
+          indexedContext
+        }
+      }
+    }
+  }
+
+  const image = await tab.view.webContents.capturePage({
+    x: Math.round(localRegion.x),
+    y: Math.round(localRegion.y),
+    width: Math.max(1, Math.round(localRegion.width)),
+    height: Math.max(1, Math.round(localRegion.height))
+  })
+  const imageData = image.toPNG().toString('base64')
+  return {
+    ok: true,
+    mode: 'screenshot',
+    tabId: tab.id,
+    type: tab.type === 'canvastab' ? 'canvas-screenshot' : 'web-screenshot',
+    url: String((result && result.url) || tab.url || ''),
+    title: String((result && result.title) || tab.label || ''),
+    region: {
+      x: Math.round(boundedSelection.x),
+      y: Math.round(boundedSelection.y),
+      width: Math.round(boundedSelection.width),
+      height: Math.round(boundedSelection.height)
+    },
+    localRegion: result && result.region ? result.region : localRegion,
+    visibleText: regionTextBlocks,
+    image: {
+      mimeType: 'image/png',
+      data: imageData,
+      name: `region-${Date.now()}.png`
+    }
+  }
+}
 
 let canvasApi
 const dataStore = createDataStore({
@@ -983,7 +1491,8 @@ function addCanvasTasks(tasks, options = {}) {
       problems: task.problems,
       unlockdate: task.unlockdate,
       downloadurl: task.downloadurl,
-      canvaspreviewurl: task.canvaspreviewurl
+      canvaspreviewurl: task.canvaspreviewurl,
+      assignmenturl: task.assignmenturl
     }
     dataStore.newTask(
       task.title,
@@ -1435,14 +1944,6 @@ async function openCanvasTabFromTool(input = {}) {
   return `Opened Canvas app in workspace ${workspaceId} using saved Canvas auth.`
 }
 
-function compactText(value, maxLength = 180) {
-  return String(value || '')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, maxLength)
-}
-
 function formatCanvasContextForLumi(context) {
   if (!context || typeof context !== 'object') return ''
 
@@ -1524,6 +2025,18 @@ function buildLightweightCanvasIndex(graph) {
           yScroll: page.yScroll,
           yScrollRatio: page.yScrollRatio,
           height: page.height,
+          // Keep the actual page text + block-level positional text so the
+          // render-context pipeline can surface what the user is reading (not just
+          // concept names). `blocks` is present only for newly re-parsed graphs;
+          // older graphs fall back to the page-level `text`.
+          text: typeof page.text === 'string' ? page.text : '',
+          blocks: (Array.isArray(page.blocks) ? page.blocks : []).map(block => ({
+            text: String(block.text || ''),
+            y0: Number(block.y0) || 0,
+            y1: Number(block.y1) || 0,
+            yRatio0: Number(block.yRatio0) || 0,
+            yRatio1: Number(block.yRatio1) || 0
+          })),
           nodes: (Array.isArray(page.nodes) ? page.nodes : []).map(ref => ({
             type: ref.type,
             id: ref.id,
@@ -1615,6 +2128,37 @@ function normalizeUrlForContext(value) {
   } catch (_error) {
     return String(value || '').replace(/#.*$/, '').replace(/\/$/, '')
   }
+}
+
+function logTabNavigationState(tab, url, eventType) {
+  try {
+    const isCanvas = tab && tab.type === "canvastab";
+    const contextWindow = isCanvas ? currentCanvasPageContext : currentHtmlPageContext;
+    const contextSummary = contextWindow
+      ? {
+          url: contextWindow.url || "",
+          fileid: contextWindow.fileid || "",
+          pageCount: Array.isArray(contextWindow.pages) ? contextWindow.pages.length : 0,
+          conceptCount: Array.isArray(contextWindow.concepts) ? contextWindow.concepts.length : 0,
+          detailCount: Array.isArray(contextWindow.details) ? contextWindow.details.length : 0,
+          exampleCount: Array.isArray(contextWindow.examples) ? contextWindow.examples.length : 0,
+          problemCount: Array.isArray(contextWindow.problems) ? contextWindow.problems.length : 0
+        }
+      : null;
+    // TODO(remove): temporary navigation state diagnostics
+    console.log("[DEBUG][TODO_REMOVE] nav_state", {
+      eventType,
+      tabId: tab && tab.id ? tab.id : "",
+      tabType: tab && tab.type ? tab.type : "",
+      workspaceId: tab && tab.workspaceId ? tab.workspaceId : "",
+      canvasMode: tab && tab.canvasMode ? tab.canvasMode : "",
+      yindex: Number(tab && tab.yindex || 0),
+      url: String(url || ""),
+      activeTabId: activetab && activetab.id ? activetab.id : (activetab || ""),
+      currentTop: slate ? "workspace" : "",
+      contextWindow: contextSummary
+    })
+  } catch (_error) {}
 }
 
 function findCanvasFileForVisibleUrl(graph, rawUrl) {
@@ -1759,6 +2303,87 @@ function getVisiblePagesForScroll(file, scrollY, viewportHeight, scrollHeight = 
   return closest ? [closest] : []
 }
 
+function getVisiblePagesForRange(file, rangeStart, rangeEnd, scrollHeight = 0) {
+  const pages = Array.isArray(file && file.pages) ? file.pages : []
+  if (!pages.length) return []
+  const start = Math.max(0, Number(rangeStart) || 0)
+  const end = Math.max(start + 1, Number(rangeEnd) || 0)
+  const sorted = [...pages].sort((a, b) => (Number(a.yScroll) || 0) - (Number(b.yScroll) || 0))
+  const browserScrollHeight = Number(scrollHeight) || 0
+  const canUseRatios = browserScrollHeight > 0 && sorted.some(page => Number(page.yScrollRatio) > 0)
+  const visible = sorted.filter((page, index) => {
+    const nextPage = sorted[index + 1]
+    const pageStart = canUseRatios
+      ? Math.max(0, (Number(page.yScrollRatio) || 0) * browserScrollHeight)
+      : Number(page.yScroll) || 0
+    const inferredHeight = nextPage
+      ? Math.max(1, (canUseRatios ? (Number(nextPage.yScrollRatio) || 0) * browserScrollHeight : Number(nextPage.yScroll) || 0) - pageStart)
+      : Number(page.height) || Math.max(1, browserScrollHeight - pageStart)
+    const pageEnd = pageStart + Math.max(1, Number(page.height) && !canUseRatios ? Number(page.height) : inferredHeight)
+    return pageEnd >= start && pageStart <= end
+  })
+  return visible
+}
+
+function buildCanvasPageContextForRange(graph, fileMatch, url, rangeStart, rangeEnd, scrollHeight, precomputedIndexes = null) {
+  const file = fileMatch.file
+  const visiblePages = getVisiblePagesForRange(file, rangeStart, rangeEnd, scrollHeight)
+  const visiblePageIds = new Set(visiblePages.map(page => String(page.pageid || '')).filter(Boolean))
+  const indexes = precomputedIndexes || buildVisibleGraphIndexes(graph)
+  const result = {
+    url,
+    courseid: String(file.courseid || fileMatch.courseId || ''),
+    fileid: String(file.fileid || fileMatch.fileId || ''),
+    filename: String(file.name || ''),
+    rangeStart: Math.round(Number(rangeStart) || 0),
+    rangeEnd: Math.round(Number(rangeEnd) || 0),
+    pages: visiblePages.map(page => ({
+      pageid: String(page.pageid || ''),
+      pageNumber: page.pageNumber || null,
+      yScroll: Number(page.yScroll) || 0,
+      yScrollRatio: Number(page.yScrollRatio) || 0
+    })),
+    concepts: [],
+    details: [],
+    examples: [],
+    problems: []
+  }
+  const target = { ...result, keys: new Set() }
+
+  visiblePages.forEach(page => {
+    ;(page.nodes || []).forEach(ref => {
+      const resolved = resolvePageNode(indexes, ref)
+      if (!resolved) return
+      addVisibleNode(target, resolved.type, resolved.node, ref)
+    })
+  })
+
+  ;(graph.concepts || []).forEach(concept => {
+    if ([...collectNodeSourcePageIds(concept)].some(pageid => visiblePageIds.has(pageid))) {
+      addVisibleNode(target, 'concept', concept)
+    }
+    ;(concept.details || []).forEach(detail => {
+      if ([...collectNodeSourcePageIds(detail)].some(pageid => visiblePageIds.has(pageid))) {
+        addVisibleNode(target, 'detail', { ...detail, courseid: concept.courseid, parentConceptId: concept.conceptid, parentConceptName: concept.name })
+      }
+    })
+    ;(concept.examples || []).forEach(example => {
+      if ([...collectNodeSourcePageIds(example)].some(pageid => visiblePageIds.has(pageid))) {
+        addVisibleNode(target, 'example', { ...example, courseid: concept.courseid, parentConceptId: concept.conceptid, parentConceptName: concept.name })
+      }
+    })
+  })
+
+  ;(graph.problems || []).forEach(problem => {
+    if ([...collectNodeSourcePageIds(problem)].some(pageid => visiblePageIds.has(pageid))) {
+      addVisibleNode(target, 'problem', problem)
+    }
+  })
+
+  delete target.keys
+  return target
+}
+
 function buildCanvasPageContext(graph, fileMatch, url, scrollState, precomputedIndexes = null) {
   const file = fileMatch.file
   const visiblePages = getVisiblePagesForScroll(file, scrollState.scrollY, scrollState.viewportHeight, scrollState.scrollHeight)
@@ -1778,6 +2403,7 @@ function buildCanvasPageContext(graph, fileMatch, url, scrollState, precomputedI
       yScroll: Number(page.yScroll) || 0,
       yScrollRatio: Number(page.yScrollRatio) || 0
     })),
+    visibleTextBlocks: sliceVisiblePageTextBlocks(visiblePages, scrollState),
     concepts: [],
     details: [],
     examples: [],
@@ -1827,6 +2453,253 @@ function setCurrentCanvasPageContext(context) {
       window.webContents.send('canvas:visible_context', currentCanvasPageContext)
     }
   })
+}
+
+function trimVisibleTextBlocks(blocks, maxBlocks = MAX_VISIBLE_TEXT_BLOCKS, maxChars = MAX_VISIBLE_TEXT_CHARS) {
+  const source = Array.isArray(blocks) ? blocks : []
+  const trimmed = []
+  let usedChars = 0
+
+  for (const block of source) {
+    if (!block || !block.text) continue
+    if (trimmed.length >= maxBlocks) break
+    const remaining = Math.max(maxChars - usedChars, 0)
+    if (!remaining) break
+    const text = compactText(block.text, Math.min(remaining, 320))
+    if (!text) continue
+    trimmed.push({
+      tag: String(block.tag || ''),
+      y: Math.round(Number(block.y) || 0),
+      x: Math.round(Number(block.x) || 0),
+      text
+    })
+    usedChars += text.length
+  }
+
+  return trimmed
+}
+
+function formatHtmlContextForLumi(context, title = 'HTML visible context (live):') {
+  if (!context || typeof context !== 'object') return ''
+  const blocks = Array.isArray(context.blocks) ? context.blocks : []
+  const lines = [
+    title,
+    `URL: ${String(context.url || '')}`,
+    `Viewport: scrollY=${Math.round(Number(context.scrollY) || 0)}, viewportHeight=${Math.round(Number(context.viewportHeight) || 0)}, scrollHeight=${Math.round(Number(context.scrollHeight) || 0)}`,
+    `Visible text blocks: ${blocks.length}`
+  ]
+
+  if (blocks.length) {
+    lines.push('Visible text sample:')
+    blocks.slice(0, 10).forEach((block, index) => {
+      lines.push(`${index + 1}. [${block.tag || 'text'} @ y=${Math.round(Number(block.y) || 0)}] ${block.text}`)
+    })
+  }
+
+  return lines.join('\n')
+}
+
+function setCurrentHtmlPageContext(context) {
+  currentHtmlPageContext = context || null
+  BrowserWindow.getAllWindows().forEach(window => {
+    if (!window.isDestroyed()) {
+      window.webContents.send('html:visible_context', currentHtmlPageContext)
+    }
+  })
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CONTEXT STORE INTEGRATION
+// Event-driven contributors that keep the reactive context slices current. Each
+// helper recomputes a single slice; the store no-ops when the value is unchanged
+// so only the part that actually changed is re-versioned.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Tab list slice: main-tracked web/native tabs (enriched) merged with renderer-only
+// tabs (center/task) the main process does not hold in currtabs.
+function recomputeTabsSlice() {
+  const mainTabs = currtabs.filter(Boolean).map(compactTabForState).filter(Boolean)
+  const seen = new Set(mainTabs.map(tab => String(tab.id)))
+  const extra = []
+  const rendererTabs = rendererUiState && Array.isArray(rendererUiState.tabs) ? rendererUiState.tabs : []
+  for (const tab of rendererTabs) {
+    if (!tab || seen.has(String(tab.id))) continue
+    seen.add(String(tab.id))
+    extra.push({
+      id: tab.id,
+      type: tab.type,
+      label: tab.label || '',
+      url: tab.url || '',
+      workspaceId: tab.workspaceId || '',
+      active: Boolean(activetab === 'None' && rendererUiState && sameTabId(rendererUiState.activeTabId, tab.id))
+    })
+  }
+  contextStore.update('tabs', [...mainTabs, ...extra])
+}
+
+function recomputeActiveTabSlice() {
+  if (activetab !== 'None') {
+    contextStore.update('activeTab', compactTabForState(activetab))
+    return
+  }
+  const ui = rendererUiState
+  if (ui && ui.activeTabId) {
+    const tab = (Array.isArray(ui.tabs) ? ui.tabs : []).find(item => sameTabId(item.id, ui.activeTabId))
+    contextStore.update('activeTab', tab
+      ? {
+        id: tab.id,
+        type: tab.type,
+        label: tab.label || '',
+        url: tab.url || '',
+        workspaceId: tab.workspaceId || '',
+        active: true
+      }
+      : null)
+    return
+  }
+  contextStore.update('activeTab', null)
+}
+
+function updateSurfaceSlice() {
+  const tab = activetab !== 'None' ? activetab : null
+  const surface = describeRenderedSurface(tab)
+  if (tab) {
+    surface.url = tab.url || ''
+  } else {
+    const ui = rendererUiState
+    if (ui && ui.top === 'section' && ui.activeSection) {
+      surface.kind = `section-${ui.activeSection}`
+      surface.description = `${ui.activeSection} section`
+    } else if (ui && ui.top === 'workspace') {
+      surface.kind = 'project-center'
+      surface.description = 'Workspace Project Center'
+    }
+  }
+  contextStore.update('surface', surface)
+}
+
+// Determines whether the main process (WebContentsView scrape) or the renderer
+// (#view DOM push) owns the screen slice for the current surface. On a surface
+// change the stale screen text is cleared so the new owner repopulates it.
+function updateScreenOwnership() {
+  const tab = activetab !== 'None' ? activetab : null
+  const owner = isHtmlVisibleContextTab(tab) ? 'main' : 'renderer'
+  const surfaceKey = tab
+    ? `${tab.id}:${tab.type}:${tab.canvasMode || ''}`
+    : `home:${(rendererUiState && rendererUiState.activeSection) || ''}:${(rendererUiState && rendererUiState.activeTabId) || ''}`
+  if (owner !== screenSliceOwner || surfaceKey !== screenSliceSurfaceKey) {
+    screenSliceOwner = owner
+    screenSliceSurfaceKey = surfaceKey
+    contextStore.update('screen', null)
+  }
+}
+
+// Builds the screen slice for WebContentsView surfaces (websites + Canvas web /
+// PDF previews) from the live HTML scrape and Canvas graph indexing. No-ops when
+// the renderer owns the active surface (native apps / home / sections).
+function composeScreenSliceFromMain() {
+  if (screenSliceOwner !== 'main') return
+  const tab = activetab !== 'None' ? activetab : null
+  if (!isHtmlVisibleContextTab(tab)) return
+  const canvas = currentCanvasPageContext
+  const html = currentHtmlPageContext
+  let screen = null
+
+  if (canvas && Array.isArray(canvas.pages) && canvas.pages.length) {
+    const textBlocks = Array.isArray(canvas.visibleTextBlocks) ? canvas.visibleTextBlocks : []
+    const fallbackBlocks = html && Array.isArray(html.blocks) ? html.blocks : []
+    const text = textBlocks.length ? textBlocks : fallbackBlocks
+    const charCount = text.reduce((sum, block) => sum + (block && block.text ? block.text.length : 0), 0)
+    screen = {
+      source: textBlocks.length ? 'pdf' : 'canvas-graph',
+      surfaceKind: 'canvas-web',
+      url: String(canvas.url || ''),
+      title: String((html && html.title) || tab.label || ''),
+      scroll: {
+        y: Math.round(Number(canvas.scrollY) || 0),
+        ratio: Number(canvas.scrollHeight) ? (Number(canvas.scrollY) || 0) / Number(canvas.scrollHeight) : 0,
+        viewportHeight: Math.round(Number(canvas.viewportHeight) || 0),
+        contentHeight: Math.round(Number(canvas.scrollHeight) || 0)
+      },
+      text,
+      canvas: {
+        fileid: String(canvas.fileid || ''),
+        filename: String(canvas.filename || ''),
+        courseid: String(canvas.courseid || ''),
+        pages: canvas.pages,
+        concepts: canvas.concepts || [],
+        details: canvas.details || [],
+        examples: canvas.examples || [],
+        problems: canvas.problems || []
+      },
+      truncated: false,
+      charCount
+    }
+  } else if (html) {
+    const blocks = Array.isArray(html.blocks) ? html.blocks : []
+    const charCount = blocks.reduce((sum, block) => sum + (block && block.text ? block.text.length : 0), 0)
+    screen = {
+      source: 'webcontents',
+      surfaceKind: tab.type === 'canvastab' ? 'canvas-web' : 'web',
+      url: String(html.url || ''),
+      title: String(html.title || tab.label || ''),
+      scroll: {
+        y: Math.round(Number(html.scrollY) || 0),
+        ratio: Number(html.scrollHeight) ? (Number(html.scrollY) || 0) / Number(html.scrollHeight) : 0,
+        viewportHeight: Math.round(Number(html.viewportHeight) || 0),
+        contentHeight: Math.round(Number(html.scrollHeight) || 0)
+      },
+      text: blocks,
+      canvas: null,
+      truncated: false,
+      charCount
+    }
+  }
+
+  contextStore.update('screen', screen)
+}
+
+// Applies the renderer UI-state push (sections, layout, workspace catalog, full
+// tab list) into the app/layout/workspaces slices and refreshes derived slices.
+function applyRendererUiState(ui) {
+  rendererUiState = ui && typeof ui === 'object' ? ui : null
+  if (rendererUiState) {
+    contextStore.update('app', {
+      top: String(rendererUiState.top || 'section'),
+      activeSection: String(rendererUiState.activeSection || ''),
+      activeWorkspaceId: rendererUiState.activeWorkspaceId || null
+    })
+    contextStore.update('layout', {
+      workspaceSidebarCollapsed: Boolean(rendererUiState.workspaceSidebarCollapsed),
+      aiPanel: {
+        width: Math.round(Number(rendererUiState.aiPanelWidth) || 0),
+        minimized: Boolean(rendererUiState.aiPanelMinimized)
+      }
+    })
+    const tabsList = Array.isArray(rendererUiState.tabs) ? rendererUiState.tabs : []
+    const open = Array.isArray(rendererUiState.workspaces)
+      ? rendererUiState.workspaces.map(workspace => ({
+        id: workspace.id,
+        name: workspace.name || '',
+        description: workspace.description || '',
+        openTabIds: tabsList.filter(tab => tab && tab.workspaceId === workspace.id).map(tab => tab.id)
+      }))
+      : []
+    contextStore.update('workspaces', { active: rendererUiState.activeWorkspaceId || null, open })
+  }
+  recomputeTabsSlice()
+  recomputeActiveTabSlice()
+  updateSurfaceSlice()
+  updateScreenOwnership()
+}
+
+// Refreshes the slices that depend on which surface is active. Called whenever the
+// active tab / rendered surface changes.
+function refreshContextForActiveSurface() {
+  recomputeTabsSlice()
+  recomputeActiveTabSlice()
+  updateSurfaceSlice()
+  updateScreenOwnership()
 }
 
 // Per-tab fields the LLM state cares about (every open tab, active or not).
@@ -1891,7 +2764,8 @@ function buildAppStateSnapshot() {
     rendered: describeRenderedSurface(active),
     activeTab: active ? compactTabForState(active) : null,
     openTabs: tabs,
-    canvas: currentCanvasPageContext || null
+    canvas: currentCanvasPageContext || null,
+    visibleText: currentHtmlPageContext || null
   }
 }
 
@@ -1932,6 +2806,15 @@ function buildLiveAppStateText() {
     lines.push(canvasBlock)
   }
 
+  const htmlTitle = snapshot.visibleText && snapshot.visibleText.type === 'canvas-html'
+    ? 'Canvas HTML visible context (live):'
+    : 'HTML visible context (live):'
+  const htmlBlock = formatHtmlContextForLumi(snapshot.visibleText, htmlTitle)
+  if (htmlBlock) {
+    lines.push('')
+    lines.push(htmlBlock)
+  }
+
   return lines.join('\n')
 }
 
@@ -1942,13 +2825,8 @@ function buildLiveAppStateText() {
 function logAppState(reason = '') {
   try {
     const snapshot = buildAppStateSnapshot()
-    const systemContext = buildLiveAppStateText()
-    const key = JSON.stringify({
-      rendered: snapshot.rendered,
-      activeTabId: snapshot.activeTab ? snapshot.activeTab.id : null,
-      tabs: snapshot.openTabs.map(tab => `${tab.id}:${tab.type}:${tab.canvasMode || ''}:${tab.url}`),
-      canvasKey: lastCanvasVisibleContextKey
-    })
+    const contextSnapshot = contextStore.getSnapshot()
+    const key = JSON.stringify(contextSnapshot.versions)
     if (key === lastAppStateLogKey) return
     lastAppStateLogKey = key
 
@@ -1971,7 +2849,17 @@ function logAppState(reason = '') {
             : []
         }
         : null,
-      systemContext
+      visibleText: snapshot.visibleText
+        ? {
+          url: String(snapshot.visibleText.url || ''),
+          scrollY: Math.round(Number(snapshot.visibleText.scrollY) || 0),
+          viewportHeight: Math.round(Number(snapshot.visibleText.viewportHeight) || 0),
+          scrollHeight: Math.round(Number(snapshot.visibleText.scrollHeight) || 0),
+          blocks: Array.isArray(snapshot.visibleText.blocks) ? snapshot.visibleText.blocks.length : 0
+        }
+        : null,
+      // The structured snapshot shipped to the sidekick (single source of truth).
+      snapshot: contextSnapshot
     }
     fs.appendFile(
       path.join(__dirname, 'llm_context_log.jsonl'),
@@ -2016,6 +2904,287 @@ async function readCanvasVisibleScrollState(tab) {
       };
     })()
   `, true)
+}
+
+async function readHtmlVisibleTextState(tab, options = {}) {
+  if (!tab || !tab.view || tab.view.webContents.isDestroyed()) return null
+  const region = options && options.region && typeof options.region === 'object' ? options.region : null
+  const maxBlocks = Number.isFinite(options.maxBlocks) ? options.maxBlocks : MAX_VISIBLE_TEXT_BLOCKS
+  const maxChars = Number.isFinite(options.maxChars) ? options.maxChars : MAX_VISIBLE_TEXT_CHARS
+  const payload = JSON.stringify({
+    region: region ? {
+      x: Math.round(Number(region.x) || 0),
+      y: Math.round(Number(region.y) || 0),
+      width: Math.max(0, Math.round(Number(region.width) || 0)),
+      height: Math.max(0, Math.round(Number(region.height) || 0))
+    } : null,
+    maxBlocks: Math.max(1, Math.round(maxBlocks)),
+    maxChars: Math.max(200, Math.round(maxChars))
+  })
+  return tab.view.webContents.executeJavaScript(`
+    (() => {
+      const opts = ${payload};
+      const doc = document.documentElement;
+      const body = document.body;
+      const viewportWidth = window.innerWidth || (doc && doc.clientWidth) || 0;
+      const viewportHeight = window.innerHeight || (doc && doc.clientHeight) || 0;
+      const pageScrollY = window.scrollY || (doc && doc.scrollTop) || (body && body.scrollTop) || 0;
+      const pageScrollX = window.scrollX || (doc && doc.scrollLeft) || (body && body.scrollLeft) || 0;
+      const selectors = [
+        "main","article","section","aside","nav","header","footer",
+        "h1","h2","h3","h4","h5","h6","p","li","dt","dd","blockquote","pre","code",
+        "td","th","caption","figcaption","label","button","a","span","div"
+      ].join(",");
+      const region = opts.region;
+      const viewportRegion = region
+        ? {
+            left: Math.max(0, Math.min(viewportWidth, Number(region.x) || 0)),
+            top: Math.max(0, Math.min(viewportHeight, Number(region.y) || 0)),
+            right: Math.max(0, Math.min(viewportWidth, (Number(region.x) || 0) + (Number(region.width) || 0))),
+            bottom: Math.max(0, Math.min(viewportHeight, (Number(region.y) || 0) + (Number(region.height) || 0)))
+          }
+        : { left: 0, top: 0, right: viewportWidth, bottom: viewportHeight };
+
+      if (viewportRegion.right <= viewportRegion.left || viewportRegion.bottom <= viewportRegion.top) {
+        return {
+          url: window.location.href,
+          title: document.title || "",
+          scrollY: Math.max(0, Math.round(pageScrollY)),
+          scrollX: Math.max(0, Math.round(pageScrollX)),
+          scrollHeight: Math.max(0, Math.round((doc && doc.scrollHeight) || 0)),
+          viewportHeight: Math.max(0, Math.round(viewportHeight)),
+          viewportWidth: Math.max(0, Math.round(viewportWidth)),
+          region: region ? {
+            x: Math.round(viewportRegion.left),
+            y: Math.round(viewportRegion.top),
+            width: Math.round(viewportRegion.right - viewportRegion.left),
+            height: Math.round(viewportRegion.bottom - viewportRegion.top)
+          } : null,
+          blocks: []
+        };
+      }
+
+      const nodes = Array.from(document.querySelectorAll(selectors));
+      const seen = new Set();
+      const blocks = [];
+      let chars = 0;
+
+      for (const node of nodes) {
+        if (!node || typeof node.getBoundingClientRect !== "function") continue;
+        const rect = node.getBoundingClientRect();
+        if (!rect || rect.width < 6 || rect.height < 6) continue;
+        const intersects = rect.right > viewportRegion.left
+          && rect.left < viewportRegion.right
+          && rect.bottom > viewportRegion.top
+          && rect.top < viewportRegion.bottom;
+        if (!intersects) continue;
+
+        const style = window.getComputedStyle(node);
+        if (!style || style.visibility === "hidden" || style.display === "none" || Number(style.opacity) === 0) continue;
+
+        let text = (node.innerText || node.textContent || "").replace(/\\s+/g, " ").trim();
+        if (!text || text.length < 2) continue;
+        if (text.length > 280) text = text.slice(0, 280).trim();
+        const key = text.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+
+        const remaining = Math.max(Number(opts.maxChars) - chars, 0);
+        if (!remaining) break;
+        if (text.length > remaining) text = text.slice(0, remaining).trim();
+        if (!text) break;
+
+        blocks.push({
+          tag: String(node.tagName || "").toLowerCase(),
+          text,
+          y: Math.round(pageScrollY + rect.top),
+          x: Math.round(pageScrollX + rect.left)
+        });
+        chars += text.length;
+        if (blocks.length >= Number(opts.maxBlocks)) break;
+      }
+
+      blocks.sort((a, b) => (a.y - b.y) || (a.x - b.x));
+      return {
+        url: window.location.href,
+        title: document.title || "",
+        scrollY: Math.max(0, Math.round(pageScrollY)),
+        scrollX: Math.max(0, Math.round(pageScrollX)),
+        scrollHeight: Math.max(0, Math.round((doc && doc.scrollHeight) || 0)),
+        viewportHeight: Math.max(0, Math.round(viewportHeight)),
+        viewportWidth: Math.max(0, Math.round(viewportWidth)),
+        region: region ? {
+          x: Math.round(viewportRegion.left),
+          y: Math.round(viewportRegion.top),
+          width: Math.round(viewportRegion.right - viewportRegion.left),
+          height: Math.round(viewportRegion.bottom - viewportRegion.top)
+        } : null,
+        blocks
+      };
+    })()
+  `, true)
+}
+
+// Per-child-frame visible-text extraction script. The main-frame scrape in
+// readHtmlVisibleTextState cannot see into cross-origin iframes (Canvas PDF
+// previews, embeds), so we run this in each child frame and merge the results.
+function buildFrameVisibleTextScript(payloadJson) {
+  return `
+    (() => {
+      const opts = ${payloadJson};
+      const doc = document.documentElement;
+      const body = document.body;
+      const viewportWidth = window.innerWidth || (doc && doc.clientWidth) || 0;
+      const viewportHeight = window.innerHeight || (doc && doc.clientHeight) || 0;
+      const pageScrollY = window.scrollY || (doc && doc.scrollTop) || (body && body.scrollTop) || 0;
+      const pageScrollX = window.scrollX || (doc && doc.scrollLeft) || (body && body.scrollLeft) || 0;
+      const selectors = ["h1","h2","h3","h4","h5","h6","p","li","dt","dd","blockquote","pre","code","td","th","caption","figcaption","span","div","a"].join(",");
+      const nodes = Array.from(document.querySelectorAll(selectors));
+      const seen = new Set();
+      const blocks = [];
+      let chars = 0;
+      for (const node of nodes) {
+        if (!node || typeof node.getBoundingClientRect !== "function") continue;
+        const rect = node.getBoundingClientRect();
+        if (!rect || rect.width < 6 || rect.height < 6) continue;
+        const intersects = rect.right > 0 && rect.left < viewportWidth && rect.bottom > 0 && rect.top < viewportHeight;
+        if (!intersects) continue;
+        const style = window.getComputedStyle(node);
+        if (!style || style.visibility === "hidden" || style.display === "none" || Number(style.opacity) === 0) continue;
+        let text = (node.innerText || node.textContent || "").replace(/\\s+/g, " ").trim();
+        if (!text || text.length < 2) continue;
+        if (text.length > 280) text = text.slice(0, 280).trim();
+        const key = text.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const remaining = Math.max(Number(opts.maxChars) - chars, 0);
+        if (!remaining) break;
+        if (text.length > remaining) text = text.slice(0, remaining).trim();
+        if (!text) break;
+        blocks.push({ tag: String(node.tagName || "").toLowerCase(), text, y: Math.round(pageScrollY + rect.top), x: Math.round(pageScrollX + rect.left) });
+        chars += text.length;
+        if (blocks.length >= Number(opts.maxBlocks)) break;
+      }
+      blocks.sort((a, b) => (a.y - b.y) || (a.x - b.x));
+      return blocks;
+    })()
+  `
+}
+
+async function readChildFrameTextBlocks(tab, maxBlocks = MAX_VISIBLE_TEXT_BLOCKS, maxChars = MAX_VISIBLE_TEXT_CHARS) {
+  const out = []
+  try {
+    if (!tab || !tab.view || tab.view.webContents.isDestroyed()) return out
+    const mainFrame = tab.view.webContents.mainFrame
+    if (!mainFrame) return out
+    const frames = Array.isArray(mainFrame.framesInSubtree) ? mainFrame.framesInSubtree : []
+    let remainingBlocks = Math.max(0, Math.round(maxBlocks))
+    let remainingChars = Math.max(0, Math.round(maxChars))
+    for (const frame of frames) {
+      if (!frame || frame === mainFrame) continue
+      if (remainingBlocks <= 0 || remainingChars <= 0) break
+      try {
+        const payloadJson = JSON.stringify({ maxBlocks: remainingBlocks, maxChars: remainingChars })
+        const frameBlocks = await frame.executeJavaScript(buildFrameVisibleTextScript(payloadJson), true)
+        if (!Array.isArray(frameBlocks)) continue
+        const frameUrl = String(frame.url || '')
+        for (const block of frameBlocks) {
+          if (!block || !block.text) continue
+          out.push({
+            tag: String(block.tag || 'frame'),
+            text: String(block.text),
+            y: Math.round(Number(block.y) || 0),
+            x: Math.round(Number(block.x) || 0),
+            frame: frameUrl
+          })
+          remainingBlocks -= 1
+          remainingChars -= String(block.text).length
+          if (remainingBlocks <= 0 || remainingChars <= 0) break
+        }
+      } catch (_frameError) {
+        // Cross-process or detached frames can reject executeJavaScript; skip them.
+      }
+    }
+  } catch (_error) {
+    // Never let frame walking break the main visible-context path.
+  }
+  return out
+}
+
+function clampRectToBounds(rect, bounds) {
+  const left = Math.max(Number(bounds.x) || 0, Number(rect.x) || 0)
+  const top = Math.max(Number(bounds.y) || 0, Number(rect.y) || 0)
+  const right = Math.min((Number(bounds.x) || 0) + (Number(bounds.width) || 0), (Number(rect.x) || 0) + (Number(rect.width) || 0))
+  const bottom = Math.min((Number(bounds.y) || 0) + (Number(bounds.height) || 0), (Number(rect.y) || 0) + (Number(rect.height) || 0))
+  return {
+    x: left,
+    y: top,
+    width: Math.max(0, right - left),
+    height: Math.max(0, bottom - top)
+  }
+}
+
+function isHtmlVisibleContextTab(tab) {
+  return Boolean(tab && isWebContentTab(tab) && tab.view && !tab.view.webContents.isDestroyed())
+}
+
+async function updateCurrentHtmlVisibleContext() {
+  if (htmlVisibleContextPollInFlight) return
+  htmlVisibleContextPollInFlight = true
+  try {
+    const tab = activetab !== 'None' ? activetab : null
+    if (!isHtmlVisibleContextTab(tab)) {
+      if (lastHtmlVisibleContextKey !== 'none') {
+        lastHtmlVisibleContextKey = 'none'
+        setCurrentHtmlPageContext(null)
+      }
+      return
+    }
+
+    const state = await readHtmlVisibleTextState(tab)
+    let rawBlocks = Array.isArray(state && state.blocks) ? state.blocks.slice() : []
+    // Merge cross-origin / iframe text (e.g. Canvas PDF previews) the main-frame
+    // scrape cannot reach. Budgeted so frame text never starves main-frame text.
+    try {
+      const frameBlocks = await readChildFrameTextBlocks(tab, MAX_VISIBLE_TEXT_BLOCKS, MAX_VISIBLE_TEXT_CHARS)
+      if (frameBlocks.length) rawBlocks = rawBlocks.concat(frameBlocks)
+    } catch (_frameError) {
+      // Frame walking is best-effort; ignore failures.
+    }
+    const blocks = trimVisibleTextBlocks(rawBlocks)
+    const context = state
+      ? {
+        type: tab.type === 'canvastab' ? 'canvas-html' : 'web-html',
+        tabId: String(tab.id || ''),
+        url: String((state && state.url) || tab.url || ''),
+        title: String((state && state.title) || tab.label || ''),
+        scrollY: Math.round(Number(state && state.scrollY) || 0),
+        scrollX: Math.round(Number(state && state.scrollX) || 0),
+        scrollHeight: Math.round(Number(state && state.scrollHeight) || 0),
+        viewportHeight: Math.round(Number(state && state.viewportHeight) || 0),
+        viewportWidth: Math.round(Number(state && state.viewportWidth) || 0),
+        blocks
+      }
+      : null
+
+    const key = context
+      ? JSON.stringify({
+        tabId: context.tabId,
+        url: context.url,
+        scrollY: context.scrollY,
+        viewportHeight: context.viewportHeight,
+        first: context.blocks.slice(0, 8).map(block => `${block.tag}:${block.y}:${block.text}`)
+      })
+      : `none:${tab.id}`
+    if (key !== lastHtmlVisibleContextKey) {
+      lastHtmlVisibleContextKey = key
+      setCurrentHtmlPageContext(context)
+    }
+  } catch (error) {
+    console.error("Unable to update HTML visible context:", error)
+  } finally {
+    htmlVisibleContextPollInFlight = false
+  }
 }
 
 async function updateCurrentCanvasVisibleContext() {
@@ -2067,15 +3236,25 @@ async function updateCurrentCanvasVisibleContext() {
 // Coalesces visible-context refreshes into a single trailing update. Invoked on
 // Canvas scroll, tab activation, and navigation rather than on a fixed timer, so
 // the main thread is only touched when the visible region can actually change.
-function scheduleCanvasVisibleContextUpdate() {
-  if (canvasVisibleContextUpdateQueued) return
+function scheduleVisibleContextUpdate() {
+  if (visibleContextUpdateQueued) return
+  visibleContextUpdateQueued = true
   canvasVisibleContextUpdateQueued = true
   setTimeout(async () => {
+    visibleContextUpdateQueued = false
     canvasVisibleContextUpdateQueued = false
     await updateCurrentCanvasVisibleContext()
+    await updateCurrentHtmlVisibleContext()
+    // Recompute the reactive screen slice from the freshly pulled contexts. No-ops
+    // when unchanged, so a scroll that does not move the viewport text is free.
+    composeScreenSliceFromMain()
     // Also captures tab open/close/switch that don't change the Canvas context.
     logAppState('surface-update')
   }, 80)
+}
+
+function scheduleCanvasVisibleContextUpdate() {
+  scheduleVisibleContextUpdate()
 }
 
 function compactTab(tab) {
@@ -2354,13 +3533,14 @@ async function runfunction(data) {
  * @returns {BrowserWindow} - The newly created main window instance.
  */
 function createWindow() {
+  const palette = getThemePalette(__dirname)
   const window = new BrowserWindow({
     width: 1000,
     height: 700,
     titleBarStyle: 'hidden',
     titleBarOverlay: {
-      color: '#171a21',
-      symbolColor: '#e7e9ee',
+      color: palette['title-bar'],
+      symbolColor: palette['title-bar-symbol'],
       height: 56
     },
     webPreferences: {
@@ -2370,6 +3550,7 @@ function createWindow() {
     }
   });
 
+  wireKeyboardRoutingToWebContents(window.webContents)
   window.loadFile(path.join(__dirname, 'index.html'));
   return window;
 }
@@ -2396,9 +3577,41 @@ function clearViewTabWireState(view) {
   view._nucleusWiredTabId = null
   view._nucleusWireKey = null
   view._nucleusTabWired = false
+  view._nucleusTitleWired = false
   view._nucleusPredictiveSwapHandlerAttached = false
   view._nucleusPredictiveHandlersAttached = false
   view._nucleusPredictive = false
+}
+
+function sendTabTitleUpdate(tab, title) {
+  const window = mainwindow
+  if (!tab || !window || window.isDestroyed() || !isWebContentTab(tab)) return
+  const clean = String(title || '').trim()
+  if (!clean) return
+  window.webContents.send('tabs:title_update', { id: tab.id, title: clean })
+}
+
+function pushTabTitleFromView(window, view, tab) {
+  if (!view || view.webContents.isDestroyed()) return
+  const ownerTab = resolveTabForView(view, tab)
+  if (!ownerTab || !isWebContentTab(ownerTab)) return
+  try {
+    const title = view.webContents.getTitle()
+    if (title) sendTabTitleUpdate(ownerTab, title)
+  } catch (_error) {}
+}
+
+function wireTabTitleUpdates(window, view, tab) {
+  if (!view || view._nucleusTitleWired) return
+  view._nucleusTitleWired = true
+  view.webContents.on('page-title-updated', (_event, title) => {
+    const ownerTab = resolveTabForView(view, tab)
+    if (!ownerTab || ownerTab.view !== view) return
+    sendTabTitleUpdate(ownerTab, title)
+  })
+  view.webContents.on('did-finish-load', () => {
+    pushTabTitleFromView(window, view, tab)
+  })
 }
 
 function getTabWireKey(tab) {
@@ -2462,23 +3675,27 @@ function syncActiveSurfaceFromMainTab(window, mainTab) {
   if (!mainTab) {
     renderTab("None", window)
     activetab = "None"
+    refreshContextForActiveSurface()
     scheduleCanvasVisibleContextUpdate()
     return
   }
   if (isWebContentTab(mainTab) && mainTab.view) {
     renderTab(mainTab.view, window, mainTab)
     activetab = mainTab
+    refreshContextForActiveSurface()
     scheduleCanvasVisibleContextUpdate()
     return
   }
   if (isNativeSurfaceTab(mainTab)) {
     renderTab("None", window)
     activetab = mainTab
+    refreshContextForActiveSurface()
     scheduleCanvasVisibleContextUpdate()
     return
   }
   renderTab("None", window)
   activetab = "None"
+  refreshContextForActiveSurface()
   scheduleCanvasVisibleContextUpdate()
 }
 
@@ -2678,12 +3895,14 @@ function attachCanvasPredictiveNavigationHandlers(window, tab, view) {
   view.webContents.on("did-navigate", (_event, url) => {
     if (tab.view !== view) return
     tab.url = url
+    logTabNavigationState(tab, url, "did-navigate")
     window.webContents.send("tabs:url_update", { id: tab.id, url })
   })
 
   view.webContents.on("did-navigate-in-page", (_event, url) => {
     if (tab.view !== view) return
     tab.url = url
+    logTabNavigationState(tab, url, "did-navigate-in-page")
     window.webContents.send("tabs:url_update", { id: tab.id, url })
   })
 
@@ -2734,6 +3953,8 @@ async function swapCanvasPredictiveView(window, tab, prediction, url) {
   tab.url = normalizeCanvasNavigationUrl(url)
 
   window.webContents.send("tabs:url_update", { id: tab.id, url: tab.url })
+  wireTabTitleUpdates(window, prediction.view, tab)
+  pushTabTitleFromView(window, prediction.view, tab)
   renderTab(prediction.view, window, tab)
   revealCanvasView(prediction.view)
   window.webContents.send("canvas:navigation-finished", "done")
@@ -3123,6 +4344,7 @@ function getslate(window) {
     slate._nucleusSlateLoaded = false
     slate.webContents.once('did-finish-load', () => {
       slate._nucleusSlateLoaded = true
+      applySlateTheme()
     })
     slate.webContents.loadFile(path.join(__dirname, 'slate.html'))
     slate.setVisible(false)
@@ -3271,6 +4493,19 @@ async function loadbrowserpool(window) {
 
 app.whenReady().then(() => {
   mainwindow = createWindow();
+  // Global shortcut fallback when before-input-event does not run (e.g. some focus edge cases).
+  try {
+    const shortcutRegistered = globalShortcut.register('CommandOrControl+Shift+C', () => {
+      logRegionCaptureDebug('global_shortcut_fired')
+      dispatchRegionCaptureShortcut('global_shortcut')
+    })
+    logRegionCaptureDebug('global_shortcut_registered', { ok: Boolean(shortcutRegistered), shortcut: 'CommandOrControl+Shift+C' })
+  } catch (error) {
+    logRegionCaptureDebug('global_shortcut_register_failed', {
+      error: error && error.message ? error.message : String(error)
+    })
+    console.warn('Unable to register region capture global shortcut:', error)
+  }
   const[winwidth, winheight] = mainwindow.getSize();
   loadbrowserpool(mainwindow).catch(error => {
     console.error("Unable to load browser pool:", error)
@@ -3317,6 +4552,7 @@ app.whenReady().then(() => {
   
   mainwindow.on('resize', () => {
     applyShellLayoutBounds()
+    scheduleVisibleContextUpdate()
   })
 
   // ─── IPC Handlers ──────────────────────────────────────────────────────────
@@ -3536,10 +4772,9 @@ app.whenReady().then(() => {
     return getEngineUrl()
   });
   ipcMain.on('theme:get_config', event => {
-    event.returnValue = {
-      name: getThemeSelection(__dirname).activeTheme,
-      rendererStylesheets: getRendererStylesheets(__dirname)
-    }
+    // Full runtime payload (name, palette, varsCss, stylesheets) so the renderer
+    // can inject the app-wide :root token block synchronously before first paint.
+    event.returnValue = getThemeRuntime(__dirname)
   })
 
   // theme:list — Available themes plus the active one.
@@ -3554,12 +4789,21 @@ app.whenReady().then(() => {
   // stylesheet list so the renderer can hot-swap its <link> tags (no reload).
   ipcMain.handle('theme:set', (_, name) => {
     try {
+      console.log(`[theme-debug] theme:set -> ${name} (activeTab=${typeof activetab === 'object' ? (activetab && activetab.id) : activetab})`)
       setStoredTheme(__dirname, name)
       refreshThemeRuntime()
+      const runtime = getThemeRuntime(__dirname)
+      // Re-skin every live non-renderer surface so the switch is app-wide and
+      // instant (no relaunch): Canvas WebContentsViews, engine views, the slate
+      // overlay, and the OS title bar.
+      reapplyThemeToOpenSurfaces()
       return {
         ok: true,
-        active: getThemeSelection(__dirname).activeTheme,
-        rendererStylesheets: getRendererStylesheets(__dirname)
+        active: runtime.name,
+        rendererStylesheets: runtime.rendererStylesheets,
+        varsCss: runtime.varsCss,
+        colorScheme: runtime.colorScheme,
+        palette: runtime.palette
       }
     } catch (error) {
       console.error('Unable to set theme:', error)
@@ -3646,13 +4890,117 @@ app.whenReady().then(() => {
     }
   })
 
-  // canvas:scrolled — the active Canvas tab reports a scroll position change so
-  // the main process can refresh the visible-context (replaces fixed polling).
-  ipcMain.on('canvas:scrolled', (event) => {
-    if (activetab === "None" || !isCanvasBrowserTab(activetab) || !activetab.view) return
+  // surface:scrolled — the active WebContentsView (web or Canvas) reports a scroll
+  // position change so the main process can refresh the render-context screen slice
+  // event-driven (on every y-scroll) instead of on a fixed poll. Shared channel for
+  // plain web (web-preload.js) and Canvas (app/canvas/preload.js) views.
+  ipcMain.on('surface:scrolled', (event) => {
+    if (activetab === "None" || !isHtmlVisibleContextTab(activetab) || !activetab.view) return
     if (activetab.view.webContents.isDestroyed()) return
     if (event.sender !== activetab.view.webContents) return
-    scheduleCanvasVisibleContextUpdate()
+    scheduleVisibleContextUpdate()
+  })
+
+  // context:ui_state — the renderer pushes its UI state (sections, sidebar/AI panel
+  // layout, workspace catalog, full tab list) whenever it renders. Feeds the app /
+  // layout / workspaces / tabs / surface slices.
+  ipcMain.on('context:ui_state', (_event, payload = {}) => {
+    applyRendererUiState(payload && typeof payload === 'object' ? payload : null)
+    logAppState('ui-state')
+  })
+
+  // context:screen_text — the renderer pushes visible #view text for native-surface
+  // apps (Mail / Canvas-native / Synapse / Project Center) and home/section views,
+  // which render into the renderer DOM and cannot be scraped from the main process.
+  ipcMain.on('context:screen_text', (_event, payload = {}) => {
+    if (screenSliceOwner !== 'renderer') return
+    if (!payload || typeof payload !== 'object') return
+    const incoming = Array.isArray(payload.blocks) ? payload.blocks : []
+    const text = []
+    let chars = 0
+    for (const block of incoming) {
+      if (!block || !block.text) continue
+      if (text.length >= MAX_VISIBLE_TEXT_BLOCKS || chars >= MAX_VISIBLE_TEXT_CHARS) break
+      const value = compactText(String(block.text), 320)
+      if (!value) continue
+      text.push({
+        tag: String(block.tag || 'text'),
+        text: value,
+        y: Math.round(Number(block.y) || 0),
+        x: Math.round(Number(block.x) || 0)
+      })
+      chars += value.length
+    }
+    const scroll = payload.scroll && typeof payload.scroll === 'object' ? payload.scroll : {}
+    contextStore.update('screen', {
+      source: 'renderer-dom',
+      surfaceKind: String(payload.kind || ''),
+      url: String(payload.url || ''),
+      title: String(payload.title || ''),
+      scroll: {
+        y: Math.round(Number(scroll.y) || 0),
+        ratio: Number(scroll.contentHeight) ? (Number(scroll.y) || 0) / Number(scroll.contentHeight) : 0,
+        viewportHeight: Math.round(Number(scroll.viewportHeight) || 0),
+        contentHeight: Math.round(Number(scroll.contentHeight) || 0)
+      },
+      text,
+      canvas: null,
+      truncated: incoming.length > text.length,
+      charCount: chars
+    })
+    logAppState('renderer-screen')
+  })
+
+  ipcMain.handle('region:text_context', async (_, payload = {}) => {
+    try {
+      const tabId = String(payload.tabId || '')
+      const tab = currtabs.find(item => item && sameTabId(item.id, tabId))
+      if (!tab || !isWebContentTab(tab) || !tab.view || tab.view.webContents.isDestroyed()) {
+        return { ok: false, error: 'Active web tab not found for region capture.' }
+      }
+      const region = payload.region && typeof payload.region === 'object' ? payload.region : {}
+      return captureRegionContextForTab(tab, region)
+    } catch (error) {
+      return { ok: false, error: error && error.message ? error.message : String(error) }
+    }
+  })
+
+  ipcMain.handle('region:capture_shortcut', async (_, payload = {}) => {
+    try {
+      const tabId = String(payload.tabId || '')
+      logRegionCaptureDebug('capture_shortcut_ipc_start', { tabId })
+      const tab = currtabs.find(item => item && sameTabId(item.id, tabId))
+      if (!tab || !isWebContentTab(tab) || !tab.view || tab.view.webContents.isDestroyed()) {
+        logRegionCaptureDebug('capture_shortcut_ipc_no_tab', { tabId })
+        return { ok: false, error: 'Active web tab not found for region capture.' }
+      }
+      const localRegion = await runInPageRegionOverlay(tab)
+      if (!localRegion || Number(localRegion.width) <= 4 || Number(localRegion.height) <= 4) {
+        logRegionCaptureDebug('capture_shortcut_cancelled', { tabId, localRegion: localRegion || null })
+        return { ok: false, cancelled: true, error: 'Region capture cancelled.' }
+      }
+      const browserBounds = getBrowserBounds(mainwindow, tab)
+      const absoluteRegion = {
+        x: Math.round((Number(browserBounds.x) || 0) + (Number(localRegion.x) || 0)),
+        y: Math.round((Number(browserBounds.y) || 0) + (Number(localRegion.y) || 0)),
+        width: Math.round(Number(localRegion.width) || 0),
+        height: Math.round(Number(localRegion.height) || 0)
+      }
+      logRegionCaptureDebug('capture_shortcut_region_selected', { tabId, absoluteRegion })
+      const result = await captureRegionContextForTab(tab, absoluteRegion)
+      logRegionCaptureDebug('capture_shortcut_finished', {
+        tabId,
+        ok: Boolean(result && result.ok),
+        mode: result && result.mode ? result.mode : '',
+        error: result && result.error ? result.error : ''
+      })
+      return result
+    } catch (error) {
+      logRegionCaptureDebug('capture_shortcut_error', {
+        error: error && error.message ? error.message : String(error)
+      })
+      return { ok: false, error: error && error.message ? error.message : String(error) }
+    }
   })
 
   ipcMain.handle('tabs:navigate', async (_, tabid, value) => {
@@ -4102,12 +5450,20 @@ app.whenReady().then(() => {
           })
           view.webContents.on('did-navigate', (_event, url) => {
             tab.url = url
+            logTabNavigationState(tab, url, "did-navigate")
             mainwindow.webContents.send('tabs:url_update', { id: tab.id, url })
+            scheduleVisibleContextUpdate()
           });
           view.webContents.on('did-navigate-in-page', (_event, url) => {
             tab.url = url
+            logTabNavigationState(tab, url, "did-navigate-in-page")
             mainwindow.webContents.send('tabs:url_update', { id: tab.id, url })
+            scheduleVisibleContextUpdate()
           });
+          view.webContents.on('did-finish-load', () => {
+            scheduleVisibleContextUpdate()
+          })
+          wireTabTitleUpdates(mainwindow, view, tab)
           view._nucleusTabWired = true
           if (tab.type === "canvastab") {
             attachCanvasPredictiveNavigationHandlers(mainwindow, tab, view)
@@ -4125,6 +5481,7 @@ app.whenReady().then(() => {
             if (backupContentMatches) {
               tab.url = tab.url || recycledUrl || initialUrl
               mainwindow.webContents.send('tabs:url_update', { id: tab.id, url: tab.url })
+              pushTabTitleFromView(mainwindow, view, tab)
               mainwindow.webContents.send('canvas:navigation-finished', 'done')
               revealCanvasView(view)
               refreshCanvasPredictiveViews(mainwindow, tab).catch(error => {
@@ -4160,6 +5517,7 @@ app.whenReady().then(() => {
             if (fromBackup) {
               tab.url = tab.url || view.webContents.getURL() || initialUrl
               mainwindow.webContents.send('tabs:url_update', { id: tab.id, url: tab.url })
+              pushTabTitleFromView(mainwindow, view, tab)
             } else {
               await view.webContents.loadURL(initialUrl)
             }
@@ -4275,3 +5633,7 @@ app.whenReady().then(() => {
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
+
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll()
+})

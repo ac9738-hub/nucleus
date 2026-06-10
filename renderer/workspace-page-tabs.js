@@ -214,7 +214,8 @@ async function newWebContentTab(url, workspaceId, setactive = false, injection =
     canvasNativePage: type === "canvastab" ? "dashboard" : undefined,
     nativeHistory: type === "canvastab" ? [] : undefined,
     workspaceId,
-    label: type === "canvastab" ? "Canvas" : "chrome",
+    label: "New Tab",
+    pageTitle: "",
     url,
     injection,
     yindex: type === "canvastab" ? 0 : undefined,
@@ -236,6 +237,7 @@ async function newWebContentTab(url, workspaceId, setactive = false, injection =
     await syncActiveTab();
     render();
   }
+  return { ok: true, tabId: newtab.id };
 }
 
 function isCanvasNativeTab(tab) {
@@ -247,7 +249,7 @@ function isCanvasBrowserTab(tab) {
 }
 
 // open new browser tab
-function newbrowsertab(url = null, workspaceId, setactive = false, injection = null) {
+async function newbrowsertab(url = null, workspaceId, setactive = false, injection = null) {
   return newWebContentTab(url, workspaceId, setactive, injection, "browsertab");
 }
 
@@ -287,7 +289,7 @@ async function ensureCanvasAuthBeforeOpening() {
 async function newCanvasTab(url, workspaceId, setactive = false, injection = null) {
   const hasAuth = await ensureCanvasAuthBeforeOpening();
   if (!hasAuth) {
-    return null;
+    return { ok: false, error: "Canvas authentication is not ready." };
   }
   return newWebContentTab(url, workspaceId, setactive, injection || getCanvasInjectionConfig(), "canvastab");
 }
@@ -303,7 +305,7 @@ function isCanvasUrl(value) {
   }
 }
 
-function openUrlInWorkspaceTab(url, workspaceId, setactive = false, injection = null) {
+async function openUrlInWorkspaceTab(url, workspaceId, setactive = false, injection = null) {
   if (isCanvasUrl(url)) {
     return newCanvasTab(url, workspaceId, setactive, injection || getCanvasInjectionConfig());
   }
@@ -359,31 +361,50 @@ async function restoreCanvasNativePage(tab) {
   render();
 }
 
-async function openCanvasAppTab(workspaceId = getBrowserWorkspaceId(), courseId = null) {
-  const existing = state.tabs.find(tab => tab.type === "canvastab" && tab.workspaceId === workspaceId);
-  const tab = existing || {
-    id: `canvas:${workspaceId}`,
-    type: "canvastab",
-    canvasMode: "native",
-    canvasNativePage: "dashboard",
-    nativeHistory: [],
-    workspaceId,
-    label: "Canvas",
-    courseId: null,
-    courseSection: "homepage",
-    yindex: 0
-  };
+async function openCanvasAppTab(workspaceId = getBrowserWorkspaceId(), courseId = null, options = {}) {
+  const hasAuth = await ensureCanvasAuthBeforeOpening();
+  if (!hasAuth) {
+    return { ok: false, error: "Canvas authentication is not ready." };
+  }
 
+  const nativeTabId = `canvas:${workspaceId}`;
+  let tab = state.tabs.find(item => sameTabId(item.id, nativeTabId));
+  if (!tab) {
+    tab = state.tabs.find(item =>
+      item.type === "canvastab"
+      && item.workspaceId === workspaceId
+      && item.canvasMode !== "browser"
+    );
+  }
+  const isNewTab = !tab;
+  if (!tab) {
+    tab = {
+      id: nativeTabId,
+      type: "canvastab",
+      canvasMode: "native",
+      canvasNativePage: "dashboard",
+      nativeHistory: [],
+      workspaceId,
+      label: "Canvas",
+      courseId: null,
+      courseSection: "homepage",
+      yindex: 0
+    };
+  }
+
+  const courseSection = options.courseSection || "homepage";
+  tab.type = "canvastab";
   tab.canvasMode = "native";
   tab.loading = false;
   tab.url = "";
+  tab.injection = null;
   if (courseId) {
     if (tab.canvasNativePage !== "course" || String(tab.courseId || "") !== String(courseId)) {
       pushCanvasNativeHistory(tab);
     }
     tab.canvasNativePage = "course";
     tab.courseId = courseId;
-    tab.courseSection = "homepage";
+    tab.courseSection = courseSection;
     tab.yindex = 0;
   } else {
     tab.canvasNativePage = "dashboard";
@@ -392,7 +413,7 @@ async function openCanvasAppTab(workspaceId = getBrowserWorkspaceId(), courseId 
     tab.yindex = 0;
   }
 
-  if (!existing) {
+  if (isNewTab) {
     state.tabs.push(tab);
   }
 
@@ -408,6 +429,7 @@ async function openCanvasAppTab(workspaceId = getBrowserWorkspaceId(), courseId 
   if (window.nucleus && window.nucleus.openCanvasApp) {
     window.nucleus.openCanvasApp();
   }
+  return { ok: true, tabId: tab.id };
 }
 
 async function openCanvasAppInExistingTab(tabId) {

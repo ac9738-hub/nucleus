@@ -53,9 +53,10 @@ const injection = readThemeCss(
 webFrame.insertCSS(injection)
 
 // Notify the main process when the visible region changes so it can refresh the
-// Canvas visible-context. This replaces a fixed 200ms main-process poll: the
-// main process only does work when the user actually scrolls. Capture phase
-// catches scrolling inside nested scroll containers, not just the window.
+// render-context "screen" slice. This replaces a fixed 200ms main-process poll:
+// the main process only does work when the user actually scrolls. Capture phase
+// catches scrolling inside nested scroll containers, not just the window. The
+// unified 'surface:scrolled' channel is shared with plain web views (web-preload.js).
 let canvasScrollNotifyScheduled = false
 function notifyCanvasScroll() {
   if (canvasScrollNotifyScheduled) return
@@ -63,7 +64,7 @@ function notifyCanvasScroll() {
   setTimeout(() => {
     canvasScrollNotifyScheduled = false
     try {
-      ipcRenderer.send('canvas:scrolled')
+      ipcRenderer.send('surface:scrolled')
     } catch (_error) {
       // Channel may be unavailable during teardown.
     }

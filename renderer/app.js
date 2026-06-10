@@ -83,6 +83,86 @@ function renderWorkspaceTabs() {
   });
 }
 
+function isWebPageTab(tab) {
+  return tab && (tab.type === "browsertab" || (tab.type === "canvastab" && tab.canvasMode === "browser"));
+}
+
+function titleFromUrl(url) {
+  const text = String(url || "").trim();
+  if (!text) return "";
+  if (text.startsWith("nucleus://search")) return "Search";
+  if (text.startsWith("nucleus://")) return "";
+  try {
+    const parsed = new URL(text);
+    return parsed.hostname.replace(/^www\./i, "") || "";
+  } catch (_) {
+    return "";
+  }
+}
+
+function getCanvasTabCourseName(tab) {
+  if (!tab || !tab.courseId) return "";
+  const courses = canvasData && Array.isArray(canvasData.courses) ? canvasData.courses : [];
+  const course = courses.find(item => String(item.id) === String(tab.courseId));
+  return course ? (course.name || course.course_code || "") : "";
+}
+
+const NATIVE_TAB_ICONS = {
+  canvas: "app/canvas/assets/canvas_icon.png",
+  mail: "app/mail/assets/mail_icon.svg",
+  synapse: "app/synapse/assets/synapse_icon.png"
+};
+
+const WEB_TAB_ICON_SVG = `<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.2"/><ellipse cx="8" cy="8" rx="6" ry="2.2" fill="none" stroke="currentColor" stroke-width="1"/><path d="M8 2v12" fill="none" stroke="currentColor" stroke-width="1"/></svg>`;
+
+const CENTER_TAB_ICON_SVG = `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 7.5 8 3l5 4.5V13a1 1 0 0 1-1 1h-3v-4H7v4H4a1 1 0 0 1-1-1V7.5z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>`;
+
+function getNativeTabIconKind(tab) {
+  if (!tab) return null;
+  if (tab.type === "center") return "center";
+  if (tab.type === "mailtab") return "mail";
+  if (tab.type === "synapsetab") return "synapse";
+  if (tab.type === "canvastab" && tab.canvasMode !== "browser") return "canvas";
+  return null;
+}
+
+function renderWorkspaceTabIcon(tab) {
+  const kind = getNativeTabIconKind(tab);
+  if (kind) {
+    if (kind === "center") {
+      return `<span class="workspace-page-tab-icon workspace-page-tab-icon-center">${CENTER_TAB_ICON_SVG}</span>`;
+    }
+    const src = NATIVE_TAB_ICONS[kind];
+    return `<span class="workspace-page-tab-icon workspace-page-tab-icon-${kind}"><img src="${escapeHtml(src)}" alt="" draggable="false"></span>`;
+  }
+  if (isWebPageTab(tab)) {
+    return `<span class="workspace-page-tab-icon workspace-page-tab-icon-web">${WEB_TAB_ICON_SVG}</span>`;
+  }
+  return "";
+}
+
+function getTabDisplayTitle(tab) {
+  if (!tab) return "Tab";
+  if (tab.type === "center") return tab.label || "Project Center";
+  if (tab.type === "mailtab") return "Mail";
+  if (tab.type === "synapsetab") return "Synapse";
+  if (tab.type === "canvastab" && tab.canvasMode !== "browser") {
+    if (tab.canvasNativePage === "course") {
+      const courseName = getCanvasTabCourseName(tab);
+      if (courseName) return courseName;
+    }
+    return "Canvas";
+  }
+  if (isWebPageTab(tab)) {
+    const pageTitle = String(tab.pageTitle || "").trim();
+    if (pageTitle) return pageTitle;
+    const label = String(tab.label || "").trim();
+    if (label && label !== "chrome" && label !== "Canvas") return label;
+    return titleFromUrl(tab.url) || "New Tab";
+  }
+  return tab.label || "Tab";
+}
+
 // render the workspacepagetabs under the primary tabs ** no container
 function renderWorkspacePageTabs() {
   const pageTabs = document.getElementById("workspace-page-tabs");
@@ -91,12 +171,16 @@ function renderWorkspacePageTabs() {
   pageTabs.classList.toggle("is-hidden", state.top !== "workspace");
 
   // build html only if workspace on top
-  pageTabs.innerHTML = state.top === "workspace" ? visibleTabs.map(tab => `
-    <button type="button" class="workspace-page-tab ${sameTabId(tab.id, state.activeTabId) ? "active" : ""}" data-tab-id="${escapeHtml(tab.id)}">
-      <span>${escapeHtml(tab.label)}</span>
+  pageTabs.innerHTML = state.top === "workspace" ? visibleTabs.map(tab => {
+    const displayTitle = getTabDisplayTitle(tab);
+    return `
+    <button type="button" class="workspace-page-tab ${sameTabId(tab.id, state.activeTabId) ? "active" : ""}" data-tab-id="${escapeHtml(tab.id)}" title="${escapeHtml(displayTitle)}">
+      ${renderWorkspaceTabIcon(tab)}
+      <span class="workspace-page-tab-label">${escapeHtml(displayTitle)}</span>
       ${tab.type !== "center" ? `<span class="close-tab" data-close-tab="${escapeHtml(tab.id)}">x</span>` : ""}
     </button>
-  `).join("") : "";
+  `;
+  }).join("") : "";
 
   // new tab button (+)
   if (state.top === "workspace") {
@@ -717,7 +801,7 @@ function renderTaskWorkspace(tab) {
         <h2>Workspace</h2>
         <p>${escapeHtml(task.details)}</p>
       </div>
-      <button type="button" class="start-task-button">Begin work</button>
+      <button type="button" class="start-task-button" data-start-task="${escapeHtml(task.id)}">Begin work</button>
     </section>
   `;
 }
@@ -959,4 +1043,8 @@ function render() {
   renderBrowserToolbar();
   renderCanvasToolbar();
   renderView();
+  // Push the refreshed UI state + on-screen text into the render-context store.
+  if (typeof syncRenderContext === "function") {
+    syncRenderContext();
+  }
 }

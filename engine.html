@@ -10,13 +10,23 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Nucleus Engine</title>
   <style>
+    /* Fallback palette: overridden at load by the app-wide :root token block
+       injected from main.js (applyEngineThemeVars). Keep in sync with
+       themes/default/manifest.json palette. */
     :root {
       color-scheme: dark;
-      --bg: #0f1117;
-      --surface: #171a21;
-      --border: #262b36;
-      --text: #e7e9ee;
-      --text-dim: #9aa1b1;
+      --bg: #050916;
+      --bg-gradient:
+        radial-gradient(circle at 18% 8%, rgba(117, 103, 216, 0.16), transparent 30%),
+        radial-gradient(circle at 78% 12%, rgba(90, 169, 200, 0.1), transparent 32%),
+        radial-gradient(circle at 52% 106%, rgba(199, 154, 84, 0.08), transparent 34%),
+        linear-gradient(180deg, #070b18 0%, #05070f 100%);
+      --surface: #0c1224;
+      --surface-2: #151c34;
+      --border: rgba(125, 139, 190, 0.18);
+      --text: #f4f7ff;
+      --text-dim: #aeb8dc;
+      --accent: #7567d8;
     }
 
     * {
@@ -24,11 +34,7 @@
     }
 
     body {
-      background:
-        radial-gradient(circle at 18% 8%, rgba(117, 103, 216, 0.16), transparent 30%),
-        radial-gradient(circle at 78% 12%, rgba(90, 169, 200, 0.1), transparent 32%),
-        radial-gradient(circle at 52% 106%, rgba(199, 154, 84, 0.08), transparent 34%),
-        linear-gradient(180deg, #101219 0%, #0d0f15 100%);
+      background: var(--bg-gradient);
       background-attachment: fixed;
       background-position: 0% 0%, 100% 0%, 50% 100%, 50% 50%;
       background-size: 140% 140%, 150% 150%, 135% 135%, 100% 100%;
@@ -87,8 +93,8 @@
     }
 
     #engine-search-input {
-      background: #151821;
-      border: 1px solid #2b3140;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
       border-radius: 999px;
       box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
       color: var(--text);
@@ -102,9 +108,9 @@
     }
 
     #engine-search-input:focus {
-      background: #181c26;
-      border-color: #766dff;
-      box-shadow: 0 20px 52px rgba(0, 0, 0, 0.34), 0 0 0 3px rgba(118, 109, 255, 0.18);
+      background: var(--surface);
+      border-color: var(--accent);
+      box-shadow: 0 20px 52px rgba(0, 0, 0, 0.34), 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
     }
 
     #engine-search-input::placeholder {

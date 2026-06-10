@@ -11,6 +11,8 @@ contextBridge.exposeInMainWorld('nucleus', {
   startTask:    (task)    => ipcRenderer.invoke('tasks:start', task),
   tabschanged:  (tabs, activeTabId = null) => ipcRenderer.invoke('tabs:push', { tabs, activeTabId }),
   newactivetab: (tab)     => ipcRenderer.invoke('tabs:new_active', tab),
+  pushUiState:  (uiState) => ipcRenderer.send('context:ui_state', uiState),
+  pushScreenText: (payload) => ipcRenderer.send('context:screen_text', payload),
   navigateBrowserTab: (tabid, value) => ipcRenderer.invoke('tabs:navigate', tabid, value),
   backBrowserTab: (tabid) => ipcRenderer.invoke('tabs:back', tabid),
   setWorkspaceSidebarCollapsed: (collapsed) => ipcRenderer.invoke('layout:workspace_sidebar_collapsed', collapsed),
@@ -42,6 +44,8 @@ contextBridge.exposeInMainWorld('nucleus', {
   getinjection: () => ipcRenderer.invoke('injection:get'),
   writeActiveTabHtml: () => ipcRenderer.invoke('tabs:write_active_html'),
   writeActiveTabFramesHtml: () => ipcRenderer.invoke('tabs:write_active_frames_html'),
+  captureRegionContext: (payload) => ipcRenderer.invoke('region:text_context', payload),
+  captureRegionShortcut: (payload) => ipcRenderer.invoke('region:capture_shortcut', payload),
   on: (channel, cb) => {
   const listener = (_, data) => cb(data);
   ipcRenderer.on(channel, listener);

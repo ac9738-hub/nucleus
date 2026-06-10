@@ -105,6 +105,9 @@ function applyAiPanelLayout(syncNative = true) {
   if (syncNative) {
     syncRightPanelWidth(reservedWidth);
   }
+  if (typeof syncContextUiState === "function") {
+    syncContextUiState();
+  }
 }
 
 function minimizeAiPanel() {
@@ -183,6 +186,152 @@ function setupAiPanelControls() {
   applyAiPanelLayout();
 }
 
+
+// ─── Render-context contributors ──────────────────────────────────────────────
+// The renderer owns UI state (sections, layout, workspace catalog, full tab list)
+// and paints native apps / home into #view. These push that state + on-screen text
+// into the main-process reactive context store so the sidekick snapshot is complete.
+
+// Returns the surface kind for the renderer-painted (#view) surface, or null when
+// the active surface is a WebContentsView (web / Canvas browser) the main process
+// scrapes directly and therefore owns.
+function getRendererSurfaceKind() {
+  if (state.top !== "workspace") {
+    return `section-${state.activeSection || "home"}`;
+  }
+  const tab = Array.isArray(state.tabs)
+    ? state.tabs.find(item => sameTabId(item.id, state.activeTabId))
+    : null;
+  if (!tab) return "project-center";
+  if (tab.type === "center") return "project-center";
+  if (tab.type === "task") return "task";
+  if (tab.type === "canvastab" && tab.canvasMode !== "browser") return "canvas-native";
+  if (tab.type === "synapsetab") return "synapse";
+  if (tab.type === "mailtab") return "mail";
+  // browsertab and Canvas browser tabs are WebContentsView surfaces (main owns).
+  return null;
+}
+
+function extractRendererVisibleText(maxBlocks = 24, maxChars = 2600) {
+  const view = document.getElementById("view");
+  const content = document.querySelector(".content");
+  if (!view || !content) return null;
+  const contentRect = content.getBoundingClientRect();
+  const selectors = "h1,h2,h3,h4,h5,h6,p,li,dt,dd,blockquote,pre,code,td,th,caption,figcaption,label,button,a,span,div";
+  const nodes = Array.from(view.querySelectorAll(selectors));
+  const seen = new Set();
+  const blocks = [];
+  let chars = 0;
+  for (const node of nodes) {
+    if (!node || typeof node.getBoundingClientRect !== "function") continue;
+    const rect = node.getBoundingClientRect();
+    if (!rect || rect.width < 6 || rect.height < 6) continue;
+    const intersects = rect.bottom > contentRect.top
+      && rect.top < contentRect.bottom
+      && rect.right > contentRect.left
+      && rect.left < contentRect.right;
+    if (!intersects) continue;
+    const style = window.getComputedStyle(node);
+    if (!style || style.visibility === "hidden" || style.display === "none" || Number(style.opacity) === 0) continue;
+    let text = (node.innerText || node.textContent || "").replace(/\s+/g, " ").trim();
+    if (!text || text.length < 2) continue;
+    if (text.length > 280) text = text.slice(0, 280).trim();
+    const key = text.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const remaining = Math.max(maxChars - chars, 0);
+    if (!remaining) break;
+    if (text.length > remaining) text = text.slice(0, remaining).trim();
+    if (!text) break;
+    blocks.push({
+      tag: String(node.tagName || "").toLowerCase(),
+      text,
+      y: Math.round(content.scrollTop + (rect.top - contentRect.top)),
+      x: Math.round(rect.left - contentRect.left)
+    });
+    chars += text.length;
+    if (blocks.length >= maxBlocks) break;
+  }
+  blocks.sort((a, b) => (a.y - b.y) || (a.x - b.x));
+  return {
+    scroll: {
+      y: Math.round(content.scrollTop),
+      viewportHeight: Math.round(content.clientHeight),
+      contentHeight: Math.round(content.scrollHeight)
+    },
+    blocks
+  };
+}
+
+function syncContextUiState() {
+  if (!window.nucleus || typeof window.nucleus.pushUiState !== "function") return;
+  try {
+    window.nucleus.pushUiState({
+      top: state.top,
+      activeSection: state.activeSection,
+      activeWorkspaceId: state.activeWorkspaceId,
+      activeTabId: state.activeTabId,
+      workspaceSidebarCollapsed: state.workspaceSidebarCollapsed,
+      aiPanelWidth: state.aiPanelWidth,
+      aiPanelMinimized: state.aiPanelMinimized,
+      workspaces: Array.isArray(workspaces)
+        ? workspaces.map(workspace => ({
+            id: workspace.id,
+            name: workspace.name,
+            description: workspace.description
+          }))
+        : [],
+      tabs: Array.isArray(state.tabs)
+        ? state.tabs.map(tab => ({
+            id: tab.id,
+            type: tab.type,
+            label: tab.label,
+            workspaceId: tab.workspaceId,
+            url: tab.url || "",
+            canvasMode: tab.canvasMode
+          }))
+        : []
+    });
+  } catch (error) {
+    console.error("Unable to push UI state context:", error);
+  }
+}
+
+function syncContextScreenText() {
+  if (!window.nucleus || typeof window.nucleus.pushScreenText !== "function") return;
+  const kind = getRendererSurfaceKind();
+  if (!kind) return; // WebContentsView surface; main process owns the screen slice.
+  const extracted = extractRendererVisibleText();
+  if (!extracted) return;
+  try {
+    window.nucleus.pushScreenText({
+      kind,
+      url: "",
+      title: document.title || "",
+      scroll: extracted.scroll,
+      blocks: extracted.blocks
+    });
+  } catch (error) {
+    console.error("Unable to push screen-text context:", error);
+  }
+}
+
+// Called from the global render() funnel (app.js) so any app-state change refreshes
+// the relevant context slices.
+function syncRenderContext() {
+  syncContextUiState();
+  syncContextScreenText();
+}
+
+let screenTextScrollScheduled = false;
+function scheduleRendererScreenTextSync() {
+  if (screenTextScrollScheduled) return;
+  screenTextScrollScheduled = true;
+  requestAnimationFrame(() => {
+    screenTextScrollScheduled = false;
+    syncContextScreenText();
+  });
+}
 
 // ─── Navigation ───────────────────────────────────────────────────────────────
 
@@ -275,6 +424,9 @@ function hideNewWorkspaceForm() {
 
 function renderWorkspaceSidebarCollapseState() {
   document.body.classList.toggle("workspace-sidebar-collapsed", Boolean(state.workspaceSidebarCollapsed));
+  if (typeof syncContextUiState === "function") {
+    syncContextUiState();
+  }
   const toggle = document.getElementById("workspace-sidebar-toggle");
   if (!toggle) return;
   const collapsed = Boolean(state.workspaceSidebarCollapsed);
@@ -330,6 +482,72 @@ async function deleteWorkspace(workspaceId) {
 let renderafterupdate = false;
 let pendingworkspaceID = null;
 let pendingtabID = null;
+let startTaskErrorTimeout = null;
+
+function showStartTaskError(message) {
+  console.error(message);
+  let banner = document.getElementById("start-task-error");
+  if (!banner) {
+    banner = document.createElement("div");
+    banner.id = "start-task-error";
+    banner.className = "start-task-error-banner";
+    banner.setAttribute("role", "alert");
+    document.body.appendChild(banner);
+  }
+  banner.textContent = message;
+  banner.hidden = false;
+  clearTimeout(startTaskErrorTimeout);
+  startTaskErrorTimeout = setTimeout(() => {
+    banner.hidden = true;
+  }, 8000);
+}
+
+function revertStartTaskNavigation() {
+  state.top = "section";
+  state.activeSection = "tasks";
+  render();
+}
+
+function isCanvasSourceTask(task) {
+  return task && task.source === "canvas" && task.courseId;
+}
+
+function canvasTaskSection(task) {
+  if (task.type === "canvas-study-task") return "files";
+  if (task.type === "canvas-assignment") return "assignments";
+  return "homepage";
+}
+
+function isLikelyDownloadUrl(url) {
+  if (!url) return false;
+  try {
+    const parsed = new URL(url, window.location.href);
+    const path = parsed.pathname.toLowerCase();
+    if (/\.(pdf|zip|docx?|pptx?|xlsx?|csv|png|jpe?g|gif|webp)(\?|$)/.test(path)) {
+      return true;
+    }
+    if (path.includes("/files/") && (path.endsWith("/download") || parsed.searchParams.has("download_frd"))) {
+      return true;
+    }
+  } catch (_error) {
+    return false;
+  }
+  return false;
+}
+
+function pickPrimaryBrowserUrl(task) {
+  const candidates = [
+    task.assignmenturl,
+    ...(Array.isArray(task.urls) ? task.urls : [])
+  ].map(value => String(value || "").trim()).filter(Boolean);
+
+  for (const url of candidates) {
+    if (!isLikelyDownloadUrl(url)) {
+      return url;
+    }
+  }
+  return candidates[0] || "";
+}
 
 async function ensureTaskWorkspace(task) {
   if (!task.workspaceId) {
@@ -370,14 +588,36 @@ async function ensureTaskWorkspace(task) {
 
 async function startTask(taskId) {
   const task = tasks.find(item => item.id === taskId);
-  if (!task) return;
+  if (!task) {
+    showStartTaskError("Task not found.");
+    return;
+  }
 
-  const taskUrls = Array.isArray(task.urls) ? task.urls.filter(Boolean) : [];
-  if (taskUrls.length) {
-    const workspaceId = await ensureTaskWorkspace(task);
-    if (!workspaceId) return;
-    for (let index = 0; index < taskUrls.length; index += 1) {
-      await openUrlInWorkspaceTab(taskUrls[index], workspaceId, index === 0);
+  const workspaceId = await ensureTaskWorkspace(task);
+  if (!workspaceId) {
+    showStartTaskError("Unable to create a workspace for this task.");
+    return;
+  }
+
+  if (isCanvasSourceTask(task)) {
+    const result = await openCanvasAppTab(workspaceId, task.courseId, {
+      courseSection: canvasTaskSection(task)
+    });
+    if (!result || result.ok === false) {
+      revertStartTaskNavigation();
+      showStartTaskError(result && result.error ? result.error : "Unable to open Canvas for this task.");
+      return;
+    }
+    return;
+  }
+
+  const primaryUrl = pickPrimaryBrowserUrl(task);
+  if (primaryUrl) {
+    const result = await openUrlInWorkspaceTab(primaryUrl, workspaceId, true);
+    if (!result || result.ok === false) {
+      revertStartTaskNavigation();
+      showStartTaskError(result && result.error ? result.error : "Unable to open the task link.");
+      return;
     }
     await syncTabs();
     await syncActiveTab();
@@ -385,22 +625,15 @@ async function startTask(taskId) {
     return;
   }
 
-  const workspaceId = await ensureTaskWorkspace(task);
-  if (!workspaceId) return;
-
-  if (task.source === "canvas" && task.courseId) {
-    await openCanvasAppTab(workspaceId, task.courseId);
-    return;
-  }
-
-  renderafterupdate = true;
-  pendingworkspaceID = workspaceId;
-  pendingtabID = ensureWorkspaceCenter(workspaceId);
+  await syncTabs();
+  await syncActiveTab();
+  render();
 
   try {
     await window.nucleus.startTask(task);
   } catch (error) {
     console.error("Unable to start task:", error);
+    showStartTaskError("Unable to start this task.");
   }
 }
 
@@ -416,6 +649,8 @@ function startagent() {
   let currentResponse = null;
   let sidekickResponseInFlight = false;
   let pendingAttachments = [];
+  let pendingRegionContext = null;
+  let pendingRegionAttachmentId = null;
   const MAX_ATTACHMENT_BYTES = 8 * 1024 * 1024;
 
   function setSidekickInFlight(value) {
@@ -462,9 +697,186 @@ function startagent() {
     `).join("");
     attachmentsContainer.querySelectorAll("[data-attachment-id]").forEach(button => {
       button.addEventListener("click", () => {
-        pendingAttachments = pendingAttachments.filter(item => item.id !== button.dataset.attachmentId);
+        const removedId = button.dataset.attachmentId;
+        pendingAttachments = pendingAttachments.filter(item => item.id !== removedId);
+        if (removedId === pendingRegionAttachmentId) {
+          pendingRegionAttachmentId = null;
+          pendingRegionContext = null;
+        }
         renderPendingAttachments();
       });
+    });
+  }
+
+  function removePendingRegionAttachment() {
+    if (!pendingRegionAttachmentId) return;
+    pendingAttachments = pendingAttachments.filter(item => item.id !== pendingRegionAttachmentId);
+    pendingRegionAttachmentId = null;
+  }
+
+  function upsertRegionAttachment(attachment, contextText) {
+    removePendingRegionAttachment();
+    pendingRegionAttachmentId = attachment.id;
+    pendingAttachments.push(attachment);
+    pendingRegionContext = contextText;
+    renderPendingAttachments();
+  }
+
+  function getActiveWebLikeTab() {
+    if (!Array.isArray(state.tabs)) return null;
+    const active = state.tabs.find(item => sameTabId(item.id, state.activeTabId));
+    if (!active) return null;
+    if (active.type === "browsertab") return active;
+    if (active.type === "canvastab" && active.canvasMode === "browser") return active;
+    return null;
+  }
+
+  function regionVisibleTextLines(result) {
+    const blocks = result && Array.isArray(result.visibleText) ? result.visibleText : [];
+    if (!blocks.length) return [];
+    const lines = ["Visible text in region:"];
+    blocks.slice(0, 20).forEach((block, index) => {
+      lines.push(`${index + 1}. [${block.tag || "text"}] ${block.text}`);
+    });
+    return lines;
+  }
+
+  function applyRegionCaptureResult(result, activeTab) {
+    if (result.mode === "indexed" && result.indexedContext) {
+      const context = result.indexedContext;
+      const pageLabel = Array.isArray(context.pages) && context.pages.length
+        ? context.pages.map(page => page.pageNumber || page.pageid || "").filter(Boolean).join(", ")
+        : "none";
+      const contextText = [
+        "Selected screen region context (indexed):",
+        `URL: ${result.url || activeTab.url || ""}`,
+        `Region (app px): x=${result.region && result.region.x}, y=${result.region && result.region.y}, w=${result.region && result.region.width}, h=${result.region && result.region.height}`,
+        `Pages: ${pageLabel}`,
+        `Concepts: ${Array.isArray(context.concepts) ? context.concepts.map(item => item.name).filter(Boolean).join("; ") : ""}`,
+        `Details: ${Array.isArray(context.details) ? context.details.map(item => item.name).filter(Boolean).join("; ") : ""}`,
+        `Examples: ${Array.isArray(context.examples) ? context.examples.map(item => item.name).filter(Boolean).join("; ") : ""}`,
+        `Problems: ${Array.isArray(context.problems) ? context.problems.map(item => item.name).filter(Boolean).join("; ") : ""}`,
+        ...regionVisibleTextLines(result)
+      ].join("\n");
+      upsertRegionAttachment({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        name: `Screen context${pageLabel && pageLabel !== "none" ? ` · pages ${pageLabel}` : ""}`,
+        type: "application/x-nucleus-region-context",
+        size: 0,
+        kind: "metadata",
+        note: "Indexed context capture",
+        source: "region"
+      }, contextText);
+    } else if (result.mode === "screenshot" && result.image && result.image.data) {
+      const contextText = [
+        "Selected screen region context:",
+        `URL: ${result.url || activeTab.url || ""}`,
+        `Region (app px): x=${result.region && result.region.x}, y=${result.region && result.region.y}, w=${result.region && result.region.width}, h=${result.region && result.region.height}`,
+        "Indexed context unavailable; attached screenshot instead.",
+        ...regionVisibleTextLines(result)
+      ].join("\n");
+      upsertRegionAttachment({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        name: result.image.name || "Region screenshot.png",
+        type: result.image.mimeType || "image/png",
+        size: 0,
+        kind: "image",
+        data: result.image.data,
+        source: "region"
+      }, contextText);
+    } else {
+      const contextText = [
+        "Selected screen region context:",
+        `URL: ${result.url || activeTab.url || ""}`,
+        `Region (app px): x=${result.region && result.region.x}, y=${result.region && result.region.y}, w=${result.region && result.region.width}, h=${result.region && result.region.height}`,
+        ...regionVisibleTextLines(result)
+      ].join("\n");
+      upsertRegionAttachment({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        name: "Screen context",
+        type: "application/x-nucleus-region-context",
+        size: 0,
+        kind: "metadata",
+        note: "Context capture",
+        source: "region"
+      }, contextText);
+    }
+    const systemMessage = document.createElement("div");
+    systemMessage.classList.add("ai-message", "system");
+    systemMessage.innerText = result.mode === "indexed"
+      ? "Captured indexed context and added it to input as a removable object."
+      : "Captured selected region and added it to input as a removable object.";
+    messages.appendChild(systemMessage);
+    messages.scrollTop = messages.scrollHeight;
+  }
+
+  async function captureRegionFromShortcut(payload = {}) {
+    // TODO(remove): temporary region-capture shortcut diagnostics
+    console.log('[DEBUG][TODO_REMOVE] region_capture', {
+      stage: 'renderer_shortcut_received',
+      payloadTabId: payload && payload.tabId ? payload.tabId : '',
+      activeTabId: state && state.activeTabId ? state.activeTabId : ''
+    })
+    if (!window.nucleus || typeof window.nucleus.captureRegionShortcut !== "function") {
+      console.log('[DEBUG][TODO_REMOVE] region_capture', { stage: 'renderer_missing_ipc_bridge' })
+      return;
+    }
+    const activeTab = payload && payload.tabId
+      ? (Array.isArray(state.tabs) ? state.tabs.find(item => sameTabId(item.id, payload.tabId)) : null)
+      : getActiveWebLikeTab();
+    if (!activeTab) {
+      console.log('[DEBUG][TODO_REMOVE] region_capture', { stage: 'renderer_no_active_web_tab' })
+      const systemMessage = document.createElement("div");
+      systemMessage.classList.add("ai-message", "system");
+      systemMessage.innerText = "Region capture needs an active browser or Canvas web tab.";
+      messages.appendChild(systemMessage);
+      messages.scrollTop = messages.scrollHeight;
+      return;
+    }
+    console.log('[DEBUG][TODO_REMOVE] region_capture', {
+      stage: 'renderer_capture_start',
+      tabId: activeTab.id,
+      tabType: activeTab.type,
+      url: activeTab.url || ''
+    })
+    try {
+      const result = await window.nucleus.captureRegionShortcut({ tabId: activeTab.id });
+      console.log('[DEBUG][TODO_REMOVE] region_capture', {
+        stage: 'renderer_capture_finished',
+        tabId: activeTab.id,
+        ok: Boolean(result && result.ok),
+        mode: result && result.mode ? result.mode : '',
+        cancelled: Boolean(result && result.cancelled),
+        error: result && result.error ? result.error : ''
+      })
+      if (!result || !result.ok) {
+        if (result && result.cancelled) return;
+        throw new Error((result && result.error) || "Unable to capture region.");
+      }
+      applyRegionCaptureResult(result, activeTab);
+    } catch (error) {
+      const systemMessage = document.createElement("div");
+      systemMessage.classList.add("ai-message", "system");
+      systemMessage.innerText = error && error.message ? error.message : String(error);
+      messages.appendChild(systemMessage);
+      messages.scrollTop = messages.scrollHeight;
+    }
+  }
+
+  if (window.nucleus && typeof window.nucleus.on === "function") {
+    window.nucleus.on("shortcut:region_capture", (payload) => {
+      console.log('[DEBUG][TODO_REMOVE] region_capture', { stage: 'renderer_ipc_event_received', payload })
+      captureRegionFromShortcut(payload || {});
+    });
+    window.nucleus.on("shortcut:region_capture_failed", (payload) => {
+      console.log('[DEBUG][TODO_REMOVE] region_capture', { stage: 'renderer_ipc_event_failed', payload })
+      const systemMessage = document.createElement("div");
+      systemMessage.classList.add("ai-message", "system");
+      systemMessage.innerText = payload && payload.message
+        ? payload.message
+        : "Region capture is unavailable on the current tab.";
+      messages.appendChild(systemMessage);
+      messages.scrollTop = messages.scrollHeight;
     });
   }
 
@@ -561,10 +973,14 @@ function startagent() {
     setSidekickInFlight(true);
     window.nucleus.sendprompt({
       text: promptText,
-      attachments: attachmentsToSend
+      attachments: attachmentsToSend,
+      systemContext: "",
+      regionContext: pendingRegionContext || ""
     });
     input.value = "";
     pendingAttachments = [];
+    pendingRegionContext = null;
+    pendingRegionAttachmentId = null;
     renderPendingAttachments();
     messages.scrollTop = messages.scrollHeight;
   }
@@ -653,6 +1069,8 @@ async function renderThemeOptions() {
       try {
         const result = await window.nucleus.setTheme(name);
         if (result && result.ok) {
+          // Swapping the stylesheet link is enough: each theme's styles.css owns
+          // its own :root tokens, so the new file fully reskins the renderer.
           applyThemeStylesheets(result.rendererStylesheets);
           container.querySelectorAll(".theme-option").forEach(option => {
             option.classList.toggle("active", option.dataset.theme === (result.active || name));
@@ -708,6 +1126,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     manuallyAddWorkspace();
   });
   document.querySelector(".content").addEventListener("scroll", rememberActiveCanvasYIndex);
+  // Refresh on-screen text for renderer-painted (native app / home) surfaces on
+  // every y-scroll, mirroring the WebContentsView scroll-driven refresh.
+  document.querySelector(".content").addEventListener("scroll", scheduleRendererScreenTextSync);
   setupAiPanelControls();
 
   const data = await window.nucleus.getData();
@@ -769,9 +1190,19 @@ document.addEventListener("DOMContentLoaded", async () => {
     const tab = state.tabs.find(item => sameTabId(item.id, payload.id));
     if (!tab) return;
     tab.url = payload.url;
+    if (isWebPageTab(tab)) {
+      renderWorkspacePageTabs();
+    }
     if (sameTabId(tab.id, state.activeTabId)) {
       renderBrowserToolbar();
     }
+  });
+
+  window.nucleus.on('tabs:title_update', payload => {
+    const tab = state.tabs.find(item => sameTabId(item.id, payload.id));
+    if (!tab || !isWebPageTab(tab)) return;
+    tab.pageTitle = String(payload.title || "").trim();
+    renderWorkspacePageTabs();
   });
 
   window.nucleus.on('canvas:visible_context', payload => {
@@ -795,7 +1226,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       openCanvasAppTab(payload.workspaceId, payload.courseId || null);
       return;
     }
-    newCanvasTab(payload.url, payload.workspaceId, true, getCanvasInjectionConfig());
+    newCanvasTab(payload.url, payload.workspaceId, true, getCanvasInjectionConfig()).then(result => {
+      if (result && result.ok === false) {
+        showStartTaskError(result.error || "Unable to open Canvas link.");
+      }
+    });
   });
   window.nucleus.on('tabs:tool_focus_tab', payload => {
     const tab = payload && state.tabs.find(item => sameTabId(item.id, payload.tabId));

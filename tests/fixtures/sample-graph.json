@@ -1,0 +1,45 @@
+{
+  "files": {
+    "demo": {
+      "1001": {
+        "fileid": "1001",
+        "courseid": "demo",
+        "name": "Sample Syllabus.pdf",
+        "pages": [
+          {
+            "pageid": "1001:page:1",
+            "pageNumber": 1,
+            "yScroll": 0,
+            "yScrollRatio": 0,
+            "height": 792,
+            "text": "Course overview and grading policy.",
+            "blocks": [
+              {
+                "text": "Course overview",
+                "y0": 0,
+                "y1": 40,
+                "yRatio0": 0.0,
+                "yRatio1": 0.05
+              },
+              {
+                "text": "Grading policy",
+                "y0": 400,
+                "y1": 440,
+                "yRatio0": 0.5,
+                "yRatio1": 0.55
+              }
+            ]
+          },
+          {
+            "pageid": "1001:page:2",
+            "pageNumber": 2,
+            "yScroll": 792,
+            "yScrollRatio": 0.5,
+            "height": 792,
+            "text": "Legacy page text without blocks."
+          }
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,15 @@
+/*
+  Slate overlay theme layer (Nucleus / default). Injected by main.js over the
+  base slate.css during Canvas navigation. Edit the colors here; add per-theme
+  slide animation overrides below if you want this theme to move differently.
+*/
+:root {
+  --slate-bg: #050916;
+  --slate-surface: #0c1224;
+  --slate-edge: rgba(125, 139, 190, 0.34);
+}
+
+/*
+  Per-theme animation slot. The base slide keyframes live in slate.css; override
+  .slate / @keyframes here to give this theme its own navigation motion.
+*/

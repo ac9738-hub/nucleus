@@ -1,0 +1,55 @@
+/*
+  Engine theme layer (Graphite) for the engine home + search pages.
+  Authoritative per theme: edit these token values to recolor the engine, and
+  add a per-theme background animation in the block at the bottom if you want.
+  main.js injects this file into engine WebContentsViews (internal pages only);
+  engine.html and engine.js keep only structural layout and read these tokens.
+*/
+:root {
+  color-scheme: dark;
+  --bg: #0a0b0e;
+  --bg-gradient:
+    radial-gradient(circle at 18% 8%, rgba(var(--accent-rgb), 0.12), transparent 30%),
+    radial-gradient(circle at 78% 12%, rgba(var(--accent-2-rgb), 0.08), transparent 32%),
+    radial-gradient(circle at 52% 106%, rgba(var(--accent-warm-rgb), 0.06), transparent 34%),
+    linear-gradient(180deg, #101116 0%, #08090c 100%);
+  --surface: #15171c;
+  --surface-2: #1e2128;
+  --surface-3: #2c303a;
+  --surface-soft: rgba(var(--surface-rgb), 0.74);
+  --border: rgba(var(--border-rgb), 0.30);
+  --border-strong: rgba(var(--border-rgb), 0.30);
+  --border-solid: #3a3f4b;
+  --text: #ececf1;
+  --text-dim: #a6adba;
+  --text-mute: #6e7480;
+  --text-on-accent: #ffffff;
+  --accent: #8b8df0;
+  --accent-2: #5fb0cf;
+  --accent-3: #57c0a4;
+  --accent-warm: #d0a45f;
+  --accent-gradient: linear-gradient(135deg, #8b8df0, #6f70d0);
+  --link: #c8d2ff;
+  --visited: #c3b0ff;
+  --scrollbar-thumb: #2c2f38;
+  --scrollbar-thumb-hover: #3d414d;
+  --accent-rgb: 139, 141, 240;
+  --accent-2-rgb: 95, 176, 207;
+  --accent-3-rgb: 87, 192, 164;
+  --accent-warm-rgb: 208, 164, 95;
+  --border-rgb: 150, 160, 180;
+  --border-strong-rgb: 120, 130, 150;
+  --bg-rgb: 10, 11, 14;
+  --surface-rgb: 21, 23, 28;
+  --surface-2-rgb: 30, 33, 40;
+  --surface-3-rgb: 44, 48, 58;
+  --shadow-rgb: 0, 0, 0;
+  --white-rgb: 255, 255, 255;
+}
+
+/*
+  Per-theme background animation slot. The base ambient drift lives in
+  engine.html / engine.js; override it here to give this theme its own motion.
+  Example:
+    body { animation: engineAmbientDrift 70s ease-in-out infinite alternate; }
+*/

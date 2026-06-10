@@ -602,17 +602,24 @@ function renderwebsearchresult(result, query = "", mode = "all") {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${escapeHtml(query || "Search")} - Nucleus Engine</title>
   <style>
+    /* Fallback palette: overridden at load by the app-wide :root token block
+       injected from main.js (applyEngineThemeVars). */
     :root {
       color-scheme: dark;
-      --bg: #0f1117;
-      --surface: #171a21;
-      --surface-2: #1d212b;
-      --surface-soft: rgba(23, 26, 33, 0.72);
-      --border: rgba(87, 94, 116, 0.34);
-      --text: #e7e9ee;
-      --text-dim: #9aa1b1;
-      --text-mute: #6b7280;
-      --accent: #8c83ff;
+      --bg: #050916;
+      --bg-gradient:
+        radial-gradient(circle at 18% 8%, rgba(117, 103, 216, 0.16), transparent 30%),
+        radial-gradient(circle at 78% 12%, rgba(90, 169, 200, 0.1), transparent 32%),
+        radial-gradient(circle at 52% 106%, rgba(199, 154, 84, 0.08), transparent 34%),
+        linear-gradient(180deg, #070b18 0%, #05070f 100%);
+      --surface: #0c1224;
+      --surface-2: #151c34;
+      --surface-soft: rgba(12, 18, 36, 0.72);
+      --border: rgba(125, 139, 190, 0.34);
+      --text: #f4f7ff;
+      --text-dim: #aeb8dc;
+      --text-mute: #6f7aa7;
+      --accent: #7567d8;
       --link: #c8d2ff;
       --visited: #bfa8ff;
     }
@@ -620,11 +627,7 @@ function renderwebsearchresult(result, query = "", mode = "all") {
     * { box-sizing: border-box; }
 
     body {
-      background:
-        radial-gradient(circle at 18% 8%, rgba(117, 103, 216, 0.16), transparent 30%),
-        radial-gradient(circle at 78% 12%, rgba(90, 169, 200, 0.1), transparent 32%),
-        radial-gradient(circle at 52% 106%, rgba(199, 154, 84, 0.08), transparent 34%),
-        linear-gradient(180deg, #101219 0%, #0d0f15 100%);
+      background: var(--bg-gradient);
       background-attachment: fixed;
       background-position: 0% 0%, 100% 0%, 50% 100%, 50% 50%;
       background-size: 140% 140%, 150% 150%, 135% 135%, 100% 100%;

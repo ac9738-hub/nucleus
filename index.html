@@ -16,6 +16,11 @@
       const stylesheets = theme && Array.isArray(theme.rendererStylesheets)
         ? theme.rendererStylesheets
         : ["styles.css", "app/synapse/synapse.css", "app/mail/mail.css"];
+      // The active theme's stylesheet is authoritative for the renderer: its own
+      // :root defines the tokens, so editing themes/<name>/styles.css changes the
+      // shell directly. We intentionally do NOT inject the manifest palette here
+      // (that injection is only for the no-stylesheet surfaces: engine, canvas,
+      // slate, mail, title bar). Theme switching swaps these links in render.js.
       stylesheets.forEach(href => {
         const link = document.createElement("link");
         link.rel = "stylesheet";

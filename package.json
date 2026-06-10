@@ -4,7 +4,12 @@
   "description": "",
   "main": "main.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node --test tests/*.test.js",
+    "test:context": "node --test tests/*.test.js && python tests/test_format_context_snapshot.py",
+    "reparse:pdf-blocks": "python scripts/reparse_pdf_blocks.py",
+    "reparse:pdf-blocks:dry": "python scripts/reparse_pdf_blocks.py --dry-run",
+    "eval:context": "node scripts/evaluate-context.js",
+    "eval:context:full": "node scripts/run-context-eval.js",
     "start": "set ELECTRON_RUN_AS_NODE=&& electron .",
     "start:default": "set ELECTRON_RUN_AS_NODE=&& set NUCLEUS_THEME=default&& electron .",
     "start:dark": "set ELECTRON_RUN_AS_NODE=&& set NUCLEUS_THEME=dark&& electron .",
