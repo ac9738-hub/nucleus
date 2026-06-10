@@ -85,6 +85,12 @@ function getDependencyCount(task) {
   if (Number.isFinite(task.dependency_count)) return task.dependency_count;
   if (Number.isFinite(task.dependencyCount)) return task.dependencyCount;
   if (Array.isArray(task.dependencies)) return task.dependencies.length;
+  if (Array.isArray(task.submissionDependencies) && task.submissionDependencies.length) {
+    return task.submissionDependencies.length;
+  }
+  if (Array.isArray(task.conceptRequirements) && task.conceptRequirements.length) {
+    return task.conceptRequirements.length;
+  }
   if (Array.isArray(task.problems)) return task.problems.length;
   return 0;
 }

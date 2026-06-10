@@ -28,6 +28,12 @@ import time
 import hashlib
 import threading
 
+from canvas_parser.graph import GraphEdgeStore, GRAPH_VERSION, make_stable_id, upgrade_graph_state
+from canvas_parser.content.links import extract_canvas_file_ids_from_html, extract_links_from_html
+from canvas_parser.content.extractors import detect_extractor, extract_text_from_file
+from canvas_parser.extract.orphan_resolver import resolve_logged_orphans
+from canvas_parser.schedule.learning_blocks import build_hybrid_learning_blocks
+
 try:
     import numpy as np
 except ModuleNotFoundError:
@@ -75,6 +81,9 @@ syllabusNodes = {}
 fileNodes = {}
 conceptNodes = {}
 learningBlocks = {}
+graphEdges = GraphEdgeStore()
+moduleOrderHints = {}
+externalPlatforms = {}
 problems = {}
 logged_details = {}
 logged_examples = {}
@@ -90,12 +99,16 @@ completed_model_calls = {
 parsed_items = {
     'assignment': [],
     'file': [],
-    'external': []
+    'external': [],
+    'page': [],
+    'module_item': [],
 }
 parsed_item_keys = {
     'assignment': set(),
     'file': set(),
-    'external': set()
+    'external': set(),
+    'page': set(),
+    'module_item': set(),
 }
 eventNodes = {}
 assignment_description_summary_cache = {}
@@ -381,7 +394,7 @@ def calcvector(content):
 class conceptNode():
     def __init__(self, courseid='No courseid', name='No name', conceptid=None, description=None):
         self.name = name
-        self.conceptid = conceptid
+        self.conceptid = conceptid or make_stable_id('concept', courseid, name)
         self.description = html_to_text(description)
         self.courseid = courseid
         self.content_vector = calcvector(description)
@@ -390,6 +403,9 @@ class conceptNode():
         self.examples = []
         self.problems = []
         self.sourcePages = []
+        self.prerequisiteConceptIds = []
+        self.aliases = []
+        self.moduleOrderHints = []
 
     def to_dict(self):
         return {
@@ -401,7 +417,10 @@ class conceptNode():
             'details': [f.to_dict() for f in self.details],
             'examples': [f.to_dict() for f in self.examples],
             'problems': self.problems,
-            'sourcePages': self.sourcePages
+            'sourcePages': self.sourcePages,
+            'prerequisiteConceptIds': self.prerequisiteConceptIds,
+            'aliases': self.aliases,
+            'moduleOrderHints': self.moduleOrderHints,
         }
 
 
@@ -585,9 +604,9 @@ def normalize_date(value):
 
 
 class assignmentNode():
-    def __init__(self, name='No name', unlockdate='', duedate='', gradepercentage='', description='', problems=None, downloadurl='', canvaspreviewurl='', filechildren=None, lookingfor=None):
+    def __init__(self, name='No name', unlockdate='', duedate='', gradepercentage='', description='', problems=None, downloadurl='', canvaspreviewurl='', filechildren=None, lookingfor=None, submission_types=None, submission_links=None, submission_dependencies=None, concept_requirements=None, assignmentid=None, courseid=''):
         self.name = name
-        self.assignmentid = name + 'id'
+        self.assignmentid = assignmentid or make_stable_id('assignment', courseid or 'global', name)
         self.unlockdate = normalize_date(unlockdate)
         self.duedate = normalize_date(duedate)
         self.gradepercentage = normalize_gradepercentage(gradepercentage)
@@ -597,9 +616,13 @@ class assignmentNode():
         self.canvaspreviewurl = canvaspreviewurl
         self.filechildren = filechildren or []
         self.lookingfor = lookingfor or []
+        self.submissionTypes = submission_types or []
+        self.submissionLinks = submission_links or []
+        self.submissionDependencies = submission_dependencies or []
+        self.conceptRequirements = concept_requirements or []
         self.embedded = {}
 
-    def update(self, unlockdate=None, duedate=None, gradepercentage=None, description=None, problems=None, downloadurl=None, canvaspreviewurl=None, filechildren=None, lookingfor=None):
+    def update(self, unlockdate=None, duedate=None, gradepercentage=None, description=None, problems=None, downloadurl=None, canvaspreviewurl=None, filechildren=None, lookingfor=None, submission_types=None, submission_links=None, submission_dependencies=None, concept_requirements=None):
         changed_embedding_text = False
         if unlockdate:
             self.unlockdate = normalize_date(unlockdate)
@@ -625,6 +648,20 @@ class assignmentNode():
         if lookingfor:
             for target in lookingfor:
                 append_unique(self.lookingfor, str(target))
+        if submission_types:
+            for entry in submission_types:
+                append_unique(self.submissionTypes, str(entry))
+        if submission_links:
+            for entry in submission_links:
+                if isinstance(entry, dict) and entry.get('url') and entry not in self.submissionLinks:
+                    self.submissionLinks.append(entry)
+        if submission_dependencies:
+            for entry in submission_dependencies:
+                if isinstance(entry, dict) and entry not in self.submissionDependencies:
+                    self.submissionDependencies.append(entry)
+        if concept_requirements:
+            for concept_id in concept_requirements:
+                append_unique(self.conceptRequirements, str(concept_id))
         if changed_embedding_text:
             self.embedded = {}
 
@@ -641,7 +678,11 @@ class assignmentNode():
             'downloadurl': self.downloadurl,
             'canvaspreviewurl': self.canvaspreviewurl,
             'filechildren': self.filechildren,
-            'lookingfor': self.lookingfor
+            'lookingfor': self.lookingfor,
+            'submissionTypes': self.submissionTypes,
+            'submissionLinks': self.submissionLinks,
+            'submissionDependencies': self.submissionDependencies,
+            'conceptRequirements': self.conceptRequirements,
         }
 
 
@@ -723,11 +764,31 @@ class syllabusNode():
 
 
 class learningBlock():
-    def __init__(self, name='No name', concept=None, details=[], problems=[]):
-        self.name = name
-        self.concept = concept
-        self.details = details
-        self.problems = problems
+    def __init__(self, block_id='', courseid='', order=0, concept_id='', explanation='', detail_refs=None, examples=None, practice_problems=None, source_refs=None, order_source='merged'):
+        self.blockId = block_id
+        self.courseid = courseid
+        self.order = order
+        self.conceptId = concept_id
+        self.explanation = explanation
+        self.detailRefs = detail_refs or []
+        self.examples = examples or []
+        self.practiceProblems = practice_problems or []
+        self.sourceRefs = source_refs or []
+        self.orderSource = order_source
+
+    def to_dict(self):
+        return {
+            'blockId': self.blockId,
+            'courseid': self.courseid,
+            'order': self.order,
+            'conceptId': self.conceptId,
+            'explanation': self.explanation,
+            'detailRefs': self.detailRefs,
+            'examples': self.examples,
+            'practiceProblems': self.practiceProblems,
+            'sourceRefs': self.sourceRefs,
+            'orderSource': self.orderSource,
+        }
 
 
 DEEPSEEK_TOOLS = [
@@ -1413,6 +1474,59 @@ DEEPSEEK_TOOLS = [
                 "required": ["courseid", "name", "type"]
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "log_concept_prerequisite",
+            "description": "Record that one concept should be understood before another concept.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "fromConceptId": {"type": "string", "description": "Prerequisite concept ID or name."},
+                    "toConceptId": {"type": "string", "description": "Dependent concept ID or name."},
+                    "rationale": {"type": "string", "description": "Why this prerequisite exists."}
+                },
+                "required": ["fromConceptId", "toConceptId"],
+                "additionalProperties": False
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "add_concept_prerequisite_edge",
+            "description": "Link two existing concept nodes with a prerequisite edge.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "fromConceptId": {"type": "string"},
+                    "toConceptId": {"type": "string"}
+                },
+                "required": ["fromConceptId", "toConceptId"],
+                "additionalProperties": False
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "add_learning_block",
+            "description": "Create a sequential learning block for a concept with explanation, examples, and practice problems.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "conceptNodeId": {"type": "string"},
+                    "explanation": {"type": "string"},
+                    "detailRefs": {"type": "array", "items": {"type": "string"}},
+                    "exampleRefs": {"type": "array", "items": {"type": "string"}},
+                    "practiceProblemIds": {"type": "array", "items": {"type": "string"}},
+                    "order": {"type": "integer"}
+                },
+                "required": ["conceptNodeId"],
+                "additionalProperties": False
+            }
+        }
     }
 ]
 
@@ -1437,6 +1551,7 @@ DEEPSEEK_PASS1_TOOL_NAMES = (
     "log_assignment",
     "log_event",
     "log_external_resource",
+    "log_concept_prerequisite",
 )
 
 DEEPSEEK_PASS2_TOOL_NAMES = (
@@ -1447,6 +1562,8 @@ DEEPSEEK_PASS2_TOOL_NAMES = (
     "add_problem_node",
     "update_assignment_node",
     "update_event_node",
+    "add_concept_prerequisite_edge",
+    "add_learning_block",
 )
 
 DEEPSEEK_FINAL_PASS_TOOL_NAMES = (
@@ -2489,7 +2606,19 @@ def add_assignment_node(courseid, name, unlockdate='', duedate='', gradepercenta
         existing.update(unlockdate, duedate, gradepercentage, description, problems_arg, downloadurl, canvaspreviewurl, filechildren, lookingfor)
         resolve_assignment_looking_for(courseid, existing)
         return existing.assignmentid
-    assignment = assignmentNode(name, unlockdate, duedate, gradepercentage, description, problems_arg, downloadurl, canvaspreviewurl, filechildren, lookingfor)
+    assignment = assignmentNode(
+        name,
+        unlockdate,
+        duedate,
+        gradepercentage,
+        description,
+        problems_arg,
+        downloadurl,
+        canvaspreviewurl,
+        filechildren,
+        lookingfor,
+        courseid=courseid,
+    )
     syllabusNodes[courseid].assignments.append(assignment)
     resolve_assignment_looking_for(courseid, assignment)
     print(
@@ -2592,10 +2721,35 @@ def add_file_node(courseid, filemeta, filename=''):
 
 
 def add_concept_node(courseid, conceptname, description):
-    nodeid = conceptname + 'id'
+    existing = find_concept_by_name_or_id(courseid, conceptname)
+    if existing:
+        if description and not existing.description:
+            existing.description = html_to_text(description)
+        return existing.conceptid
+    nodeid = make_stable_id('concept', courseid, conceptname)
     conceptNodes[courseid] = conceptNodes.get(courseid, [])
     conceptNodes[courseid].append(conceptNode(courseid, conceptname, nodeid, description))
     return nodeid
+
+
+def add_concept_prerequisite_edge(courseid, from_concept_id, to_concept_id, source='llm', confidence=0.85):
+    from_concept = find_concept_by_name_or_id(courseid, from_concept_id)
+    to_concept = find_concept_by_name_or_id(courseid, to_concept_id)
+    if not from_concept or not to_concept:
+        return {'status': 'missing concept', 'from': from_concept_id, 'to': to_concept_id}
+    append_unique(to_concept.prerequisiteConceptIds, from_concept.conceptid)
+    graphEdges.add_edge('concept', from_concept.conceptid, 'concept', to_concept.conceptid, 'prerequisite', confidence=confidence, source=source)
+    return {'status': 'SUCCESS', 'from': from_concept.conceptid, 'to': to_concept.conceptid}
+
+
+def record_module_order_hint(courseid, concept_id, module_id, position):
+    hint = {'moduleId': str(module_id), 'position': int(position or 0)}
+    concept = find_concept_by_name_or_id(courseid, concept_id)
+    if concept:
+        if not any(existing.get('moduleId') == hint['moduleId'] for existing in concept.moduleOrderHints):
+            concept.moduleOrderHints.append(hint)
+    moduleOrderHints.setdefault(courseid, {})
+    moduleOrderHints[courseid].setdefault(str(concept_id), []).append(hint)
 
 
 def embed_text_for_field(label, text):
@@ -3363,10 +3517,27 @@ def update_event_node(courseid, eventNodeId='', eventname='', startdate='', endd
     return {'status': 'SUCCESS', 'eventNodeId': event.eventid}
 
 
-def add_learning_block(courseid, blockname, concept, details, problems_arg):
-    learningBlocks.setdefault(courseid, [])
-    learningBlocks[courseid].append(learningBlock(blockname, concept, details, problems_arg))
-    return 'SUCCESS'
+def add_learning_block(courseid, concept_id, explanation='', detail_refs=None, example_refs=None, practice_problem_ids=None, source_refs=None, order=None):
+    concept = find_concept_by_name_or_id(courseid, concept_id)
+    if not concept:
+        return {'status': 'missing concept', 'conceptId': concept_id}
+    block_order = order or (len(learningBlocks.get(courseid, [])) + 1)
+    block = learningBlock(
+        block_id=f"{courseid}-{concept.conceptid}-block-{block_order}",
+        courseid=courseid,
+        order=block_order,
+        concept_id=concept.conceptid,
+        explanation=explanation or concept.description,
+        detail_refs=detail_refs or [make_child_node_ref('detail', concept.conceptid, detail.name) for detail in concept.details],
+        examples=example_refs or [make_child_node_ref('example', concept.conceptid, example.name) for example in concept.examples],
+        practice_problems=practice_problem_ids or list(concept.problems),
+        source_refs=source_refs or concept.sourcePages,
+    )
+    learningBlocks.setdefault(courseid, []).append(block)
+    if block_order > 1:
+        prior = learningBlocks[courseid][-2]
+        graphEdges.add_edge('learningBlock', prior.blockId, 'learningBlock', block.blockId, 'next', source='llm')
+    return {'status': 'SUCCESS', 'blockId': block.blockId}
 
 
 def minimal_tool_result(name, result):
@@ -3652,6 +3823,34 @@ def run_tool_call(name, courseid, arguments, filemeta=None):
             arguments.get('dependencies', [])
         )
 
+    if name == 'log_concept_prerequisite':
+        return add_concept_prerequisite_edge(
+            courseid,
+            arguments.get('fromConceptId', ''),
+            arguments.get('toConceptId', ''),
+            source='llm-log',
+        )
+
+    if name == 'add_concept_prerequisite_edge':
+        return add_concept_prerequisite_edge(
+            courseid,
+            arguments.get('fromConceptId', ''),
+            arguments.get('toConceptId', ''),
+            source='llm',
+        )
+
+    if name == 'add_learning_block':
+        return add_learning_block(
+            courseid,
+            arguments.get('conceptNodeId', ''),
+            arguments.get('explanation', ''),
+            arguments.get('detailRefs', []),
+            arguments.get('exampleRefs', []),
+            arguments.get('practiceProblemIds', []),
+            None,
+            arguments.get('order'),
+        )
+
     return {"error": f"Unknown tool: {name}"}
 
 
@@ -3720,13 +3919,20 @@ def extract_pdf_text(filepath):
     return pages_to_prompt_text(build_pdf_pages(filepath, Path(filepath).name))
 
 
-def processfile(fileid, url):
+def processfile(fileid, url, content_type='', filename=''):
     filepath = folder / str(fileid)
     if not downloadtopath(filepath, url):
         return None
-    pages = build_pdf_pages(filepath, str(fileid))
+    extractor_kind = detect_extractor(content_type, filename or str(fileid))
+    if not extractor_kind:
+        extractor_kind = 'pdf'
+    extracted = extract_text_from_file(filepath, extractor_kind, build_pdf_pages=build_pdf_pages)
+    pages = extracted.get('pages', []) or []
+    text = extracted.get('text', '') or ''
+    if pages:
+        text = pages_to_prompt_text(pages)
     return {
-        'text': pages_to_prompt_text(pages),
+        'text': text,
         'pages': pages
     }
 
@@ -4283,16 +4489,36 @@ def parse_assignment_payload(file):
     if not isinstance(content, dict):
         content = {}
 
+    description_html = content.get('description_html') or content.get('description', '')
+    description_text = content.get('description_text') or html_to_text(description_html)
+    html_url = content.get('html_url') or file.get('url', '')
+    submission_links = extract_links_from_html(description_html, html_url)
+    submission_dependencies = []
+    for file_id in extract_canvas_file_ids_from_html(description_html):
+        submission_dependencies.append({'type': 'file', 'fileId': file_id})
+    for link in submission_links:
+        if link.get('platform') == 'gradescope':
+            submission_dependencies.append({
+                'type': 'external_platform',
+                'platform': 'gradescope',
+                'url': link.get('url', ''),
+                'label': link.get('label', ''),
+            })
+
     return {
         'assignmentname': content.get('assignmentname') or file.get('name') or str(file.get('id', '')),
-        'description': html_to_text(content.get('description', '')),
+        'description': description_text,
+        'description_html': description_html,
         'duedate': content.get('duedate', ''),
         'unlockdate': content.get('unlockdate', ''),
         'gradepercentage': content.get('gradepercentage', ''),
         'points_possible': content.get('points_possible', ''),
-        'html_url': content.get('html_url') or file.get('url', ''),
+        'html_url': html_url,
         'previewurl': file.get('previewurl', ''),
-        'url': file.get('url', '')
+        'url': file.get('url', ''),
+        'submission_types': content.get('submission_types', []) or [],
+        'submission_links': submission_links,
+        'submission_dependencies': submission_dependencies,
     }
 
 
@@ -4333,8 +4559,28 @@ def process_canvas_assignment(fileid, courseid, file):
         payload['description'],
         [],
         payload['url'],
-        payload['previewurl'] or payload['html_url']
+        payload['previewurl'] or payload['html_url'],
+        filechildren=extract_canvas_file_ids_from_html(payload.get('description_html', '')),
+        lookingfor=[],
     )
+    assignment = find_assignment_node(courseid, assignmentid=assignmentid)
+    if assignment:
+        assignment.update(
+            submission_types=payload.get('submission_types'),
+            submission_links=payload.get('submission_links'),
+            submission_dependencies=payload.get('submission_dependencies'),
+        )
+        for dependency in payload.get('submission_dependencies', []) or []:
+            if dependency.get('type') == 'external_platform' and dependency.get('platform') == 'gradescope':
+                graphEdges.add_edge(
+                    'assignment',
+                    assignment.assignmentid,
+                    'external_platform',
+                    dependency.get('url', ''),
+                    'requires_submission',
+                    source='canvas-html',
+                    metadata=dependency,
+                )
     enqueue_assignment_description_summary(courseid, assignmentid, payload['description'])
     indicator = transform(normalize_date(payload['duedate'])) if isvaliddate(normalize_date(payload['duedate'])) else float('inf')
     existing_index = next(
@@ -4403,6 +4649,62 @@ async def parseclass(course):
             )
             continue
         totaldoc = file.get('content')
+        if batch_type == 'page':
+            if is_item_parsed('page', courseid, fileid):
+                continue
+            content = file.get('content', {})
+            if isinstance(content, str):
+                try:
+                    content = json.loads(content)
+                except json.JSONDecodeError:
+                    content = {'body_html': content}
+            body_html = content.get('body_html') or content.get('body') or ''
+            body_text = content.get('body_text') or html_to_text(body_html)
+            filemeta = {
+                'fileid': str(fileid),
+                'courseid': courseid,
+                'name': file.get('name', '') or content.get('title', ''),
+                'downloadurl': file.get('url', ''),
+                'canvaspreviewurl': file.get('previewurl', '') or file.get('url', ''),
+                'url': file.get('previewurl', '') or file.get('url', ''),
+                'searchtext': body_text,
+                'pages': [],
+            }
+            current_file = get_or_create_file_node(courseid, filemeta)
+            if body_text:
+                await run_deepseek(
+                    body_text,
+                    fileid,
+                    courseid,
+                    file.get('url', ''),
+                    file.get('previewurl', ''),
+                    file.get('name', ''),
+                    pages=[],
+                )
+            attach_logged_nodes_to_file(courseid, filemeta)
+            mark_item_parsed('page', courseid, fileid, file.get('name', ''))
+            write_state()
+            continue
+
+        if batch_type == 'module_item':
+            content = file.get('content', {})
+            if isinstance(content, str):
+                try:
+                    content = json.loads(content)
+                except json.JSONDecodeError:
+                    content = {}
+            module_id = content.get('moduleId')
+            position = content.get('position', 0)
+            item_type = str(content.get('itemType', '')).casefold()
+            if module_id and item_type in {'page', 'assignment', 'file', 'externalurl', 'externaltool'}:
+                moduleOrderHints.setdefault(courseid, {})
+                moduleOrderHints[courseid][str(fileid)] = {'moduleId': str(module_id), 'position': int(position or 0), 'itemType': item_type}
+            if item_type in {'externalurl', 'externaltool'} and content.get('external_url'):
+                log_external_resource(courseid, file.get('name', '') or content.get('title', ''), item_type, content.get('external_url'))
+            mark_item_parsed('module_item', courseid, fileid, file.get('name', ''))
+            write_state()
+            continue
+
         if batch_type == 'assignment':
             if is_item_parsed('assignment', courseid, fileid):
                 print(
@@ -4426,7 +4728,12 @@ async def parseclass(course):
                     flush=True
                 )
                 continue
-            processed = processfile(fileid, url)
+            processed = processfile(
+                fileid,
+                url,
+                content_type=file.get('content_type', ''),
+                filename=file.get('name', ''),
+            )
             if not processed:
                 print(
                     f"parser: skipped file after download failure type={batch_type} course={courseid} id={fileid} url={url}",
@@ -4520,6 +4827,9 @@ def reconstruct_concept_node(data):
     node.examples = [reconstruct_example_node(example) for example in data.get('examples', []) or []]
     node.problems = data.get('problems', []) or []
     node.sourcePages = data.get('sourcePages', []) or []
+    node.prerequisiteConceptIds = data.get('prerequisiteConceptIds', []) or []
+    node.aliases = data.get('aliases', []) or []
+    node.moduleOrderHints = data.get('moduleOrderHints', []) or []
     return node
 
 
@@ -4549,11 +4859,31 @@ def reconstruct_assignment_node(data):
         data.get('downloadurl', ''),
         data.get('canvaspreviewurl', ''),
         data.get('filechildren', []) or [],
-        data.get('lookingfor', []) or []
+        data.get('lookingfor', []) or [],
+        data.get('submissionTypes', []) or [],
+        data.get('submissionLinks', []) or [],
+        data.get('submissionDependencies', []) or [],
+        data.get('conceptRequirements', []) or [],
+        assignmentid=data.get('assignmentid'),
     )
     node.assignmentid = data.get('assignmentid', node.assignmentid)
     node.embedded = data.get('embedded', {}) or {}
     return node
+
+
+def reconstruct_learning_block(data):
+    return learningBlock(
+        block_id=data.get('blockId', ''),
+        courseid=data.get('courseid', ''),
+        order=int(data.get('order', 0) or 0),
+        concept_id=data.get('conceptId', ''),
+        explanation=data.get('explanation', ''),
+        detail_refs=data.get('detailRefs', []) or [],
+        examples=data.get('examples', []) or [],
+        practice_problems=data.get('practiceProblems', []) or [],
+        source_refs=data.get('sourceRefs', []) or [],
+        order_source=data.get('orderSource', 'merged'),
+    )
 
 
 def reconstruct_syllabus_node(data):
@@ -4609,15 +4939,24 @@ def reconstruct_event_node(data):
 
 def load_state_from_disk():
     global logged_details, logged_examples, logged_problems, logged_assignments, logged_events, looking_for_files, externalResources, external_crawl_state
-    global completed_model_calls, parsed_items, parsed_item_keys
+    global completed_model_calls, parsed_items, parsed_item_keys, graphEdges, learningBlocks, moduleOrderHints, externalPlatforms
     if not CANVAS_GRAPH_PATH.exists():
         return
     try:
         with open(CANVAS_GRAPH_PATH, 'r', encoding='utf-8') as file:
-            state = json.load(file)
+            state = upgrade_graph_state(json.load(file))
     except (json.JSONDecodeError, OSError) as error:
         print(f"parser debug resume: could not load canvas_graph.json: {error}", flush=True)
         return
+
+    graphEdges = GraphEdgeStore(state.get('edges', []) or [])
+    learningBlocks.clear()
+    for courseid, blocks in (state.get('learningBlocks', {}) or {}).items():
+        learningBlocks[courseid] = [reconstruct_learning_block(block) for block in blocks or []]
+    moduleOrderHints.clear()
+    moduleOrderHints.update(state.get('moduleOrderHints', {}) or {})
+    externalPlatforms.clear()
+    externalPlatforms.update(state.get('external_platforms', {}) or {})
 
     conceptNodes.clear()
     for item in state.get('concepts', []) or []:
@@ -4667,6 +5006,8 @@ def load_state_from_disk():
     parsed_items.setdefault('assignment', [])
     parsed_items.setdefault('file', [])
     parsed_items.setdefault('external', [])
+    parsed_items.setdefault('page', [])
+    parsed_items.setdefault('module_item', [])
     for item in completed_model_calls.get('deepseek_file_passes', []) or []:
         courseid = item.get('courseid')
         fileid = item.get('fileid')
@@ -4687,6 +5028,8 @@ def load_state_from_disk():
     parsed_item_keys.setdefault('assignment', set())
     parsed_item_keys.setdefault('file', set())
     parsed_item_keys.setdefault('external', set())
+    parsed_item_keys.setdefault('page', set())
+    parsed_item_keys.setdefault('module_item', set())
 
     print(
         f"parser debug resume: loaded {sum(len(nodes) for nodes in conceptNodes.values())} concepts, "
@@ -4708,6 +5051,45 @@ def queue_pending_assignment_summaries():
                 enqueue_assignment_description_summary(courseid, assignment.assignmentid, assignment.description)
 
 
+def build_learning_blocks_for_course(courseid):
+    concepts = [node.to_dict() for node in conceptNodes.get(courseid, [])]
+    prerequisite_map = {
+        concept.get('conceptid'): concept.get('prerequisiteConceptIds', [])
+        for concept in concepts
+        if concept.get('conceptid')
+    }
+    problems_by_concept = {}
+    for problem in problems.get(courseid, []) or []:
+        for concept_id in problem.incomingConceptNodeIds + problem.outgoingConceptNodeIds:
+            problems_by_concept.setdefault(concept_id, [])
+            if problem.problemid not in problems_by_concept[concept_id]:
+                problems_by_concept[concept_id].append(problem.problemid)
+    return build_hybrid_learning_blocks(
+        courseid,
+        concepts,
+        moduleOrderHints.get(courseid, {}),
+        prerequisite_map,
+        problems_by_concept,
+    )
+
+
+def finalize_graph_processing():
+    for courseid in set(list(conceptNodes.keys()) + list(syllabusNodes.keys())):
+        resolve_logged_orphans(
+            courseid,
+            logged_details,
+            logged_examples,
+            logged_problems,
+            conceptNodes.get(courseid, []),
+            add_detail_node,
+            add_example_node,
+            add_problem_node,
+        )
+        generated_blocks = build_learning_blocks_for_course(courseid)
+        if generated_blocks:
+            learningBlocks[courseid] = [reconstruct_learning_block(block) for block in generated_blocks]
+
+
 def write_state(embed=False):
     if embed:
         update_embedded_fields()
@@ -4717,6 +5099,7 @@ def write_state(embed=False):
     event_nodes = []
     syllabi = {}
     files = {}
+    serialized_learning_blocks = {}
     for course_nodes in conceptNodes.values():
         for node in course_nodes:
             concepts.append(node.to_dict())
@@ -4741,12 +5124,20 @@ def write_state(embed=False):
             normalize_file_node_links(courseid, file_node)
             files[courseid][fileid] = file_node.to_dict()
 
-    state = {
+    for courseid, blocks in learningBlocks.items():
+        serialized_learning_blocks[courseid] = [block.to_dict() for block in blocks]
+
+    state = upgrade_graph_state({
+        'graph_version': GRAPH_VERSION,
         'concepts': concepts,
         'problems': problem_nodes,
         'events': event_nodes,
         'syllabi': syllabi,
         'files': files,
+        'edges': graphEdges.to_list(),
+        'learningBlocks': serialized_learning_blocks,
+        'moduleOrderHints': moduleOrderHints,
+        'external_platforms': externalPlatforms,
         'logged_details': logged_details,
         'logged_examples': logged_examples,
         'logged_problems': logged_problems,
@@ -4757,7 +5148,7 @@ def write_state(embed=False):
         'external_crawl_state': external_crawl_state,
         'completed_model_calls': completed_model_calls,
         'parsed_items': parsed_items
-    }
+    })
 
     atomic_write_json(CANVAS_GRAPH_PATH, state)
 
@@ -4798,6 +5189,8 @@ async def main():
             syllabus_parse_batches.append(line)
         elif batch_type == 'assignment':
             assignment_parse_batches.append(line)
+        elif batch_type in {'page', 'module_item'}:
+            deferred_parse_batches.append(line)
         else:
             deferred_parse_batches.append(line)
         write_state()
@@ -4816,6 +5209,7 @@ async def main():
         await asyncio.gather(*parse_tasks)
 
     await parse_external_resources_after_canvas()
+    finalize_graph_processing()
     write_state()
 
     update_embedded_fields()

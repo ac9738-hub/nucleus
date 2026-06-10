@@ -1,6 +1,8 @@
 node_modules/
 .env
 mail_auth.json
+gradescope_auth.json
+gradescope_state.json
 .venv/
 __pycache__/
 *.pyc

@@ -703,6 +703,14 @@ def node_neighbors(nodetype, node):
             assignment_problems = getattr(assignment, "problems", []) or []
             if any(problemid in assignment_problems for problemid in getattr(node, "problems", []) or []):
                 neighbors.append(("assignment", assignment))
+        conceptid = getattr(node, "conceptid", "")
+        for prereq_id in getattr(node, "prerequisiteConceptIds", []) or []:
+            prereq = find_concept(prereq_id)
+            if prereq:
+                neighbors.append(("concept", prereq))
+        for other in allnodes["concepts"]:
+            if conceptid and conceptid in (getattr(other, "prerequisiteConceptIds", []) or []):
+                neighbors.append(("concept", other))
         return neighbors
 
     if nodetype == "problem":

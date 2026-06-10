@@ -752,6 +752,7 @@ function make_canvas_tasks(rootDir) {
           getCourseHomeUrl(canvasLookup, syllabus.courseid || courseid)
         ])
       }
+      const learningBlocks = (allCanvasNodes.learningBlocks && allCanvasNodes.learningBlocks[courseid]) || []
       tasks.push({
         id: `canvas-assignment-${courseid}-${assignmentId}`,
         workspaceId: '',
@@ -773,7 +774,13 @@ function make_canvas_tasks(rootDir) {
         urls: assignmentUrls,
         problems: Array.isArray(assignment.problems) ? assignment.problems : [],
         filechildren: Array.isArray(assignment.filechildren) ? assignment.filechildren : [],
-        assignmentFiles
+        assignmentFiles,
+        submissionTypes: Array.isArray(assignment.submissionTypes) ? assignment.submissionTypes : [],
+        submissionLinks: Array.isArray(assignment.submissionLinks) ? assignment.submissionLinks : [],
+        submissionDependencies: Array.isArray(assignment.submissionDependencies) ? assignment.submissionDependencies : [],
+        conceptRequirements: Array.isArray(assignment.conceptRequirements) ? assignment.conceptRequirements : [],
+        lookingforUnresolved: Array.isArray(assignment.lookingfor) ? assignment.lookingfor : [],
+        learningBlocks
       })
     })
   })
@@ -1009,6 +1016,74 @@ function createCanvasApi({ canvasDataPath, getAuthState, sendCanvasDataUpdate, r
     return headers
   }
 
+  function parseLinkHeader(linkHeader) {
+    const links = {}
+    String(linkHeader || '').split(',').forEach(part => {
+      const section = part.split(';')
+      if (section.length < 2) return
+      const url = section[0].trim().replace(/^<|>$/g, '')
+      const relMatch = section[1].match(/rel="([^"]+)"/)
+      if (relMatch) {
+        links[relMatch[1]] = url
+      }
+    })
+    return links
+  }
+
+  const PARSEABLE_FILE_TYPES = new Set([
+    'application/pdf',
+    'text/plain',
+    'text/markdown',
+    'application/json',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+  ])
+
+  const PARSEABLE_FILE_EXTENSIONS = new Set(['.pdf', '.txt', '.md', '.json', '.docx', '.pptx', '.ipynb'])
+
+  function isParseableCanvasFile(file) {
+    const contentType = String(file && file['content-type'] || '').split(';')[0].trim().toLowerCase()
+    if (PARSEABLE_FILE_TYPES.has(contentType)) return true
+    const name = String(file && (file.display_name || file.filename || file.name) || '').toLowerCase()
+    return Array.from(PARSEABLE_FILE_EXTENSIONS).some(ext => name.endsWith(ext))
+  }
+
+  async function fetchCanvasPaginated(url, context, errors) {
+    const items = []
+    let nextUrl = url.includes('?') ? `${url}&per_page=100` : `${url}?per_page=100`
+
+    while (nextUrl) {
+      await acquireCanvasSlot()
+      try {
+        const response = await fetch(nextUrl, {
+          method: 'GET',
+          headers: getCanvasApiHeaders()
+        })
+        if (!response.ok) {
+          const body = await response.text()
+          throw new Error(`Canvas API request failed ${response.status} ${response.statusText}: ${nextUrl}${body ? ` (${body.slice(0, 200)})` : ''}`)
+        }
+        const pageItems = await response.json()
+        if (Array.isArray(pageItems)) {
+          items.push(...pageItems)
+        }
+        const links = parseLinkHeader(response.headers.get('link'))
+        nextUrl = links.next || ''
+      } catch (error) {
+        errors.push({
+          context,
+          url: nextUrl,
+          message: formatCanvasError(error)
+        })
+        break
+      } finally {
+        releaseCanvasSlot()
+      }
+    }
+
+    return items
+  }
+
   async function fetchCanvasJson(url) {
     for (let attempt = 0; attempt < 5; attempt += 1) {
       await acquireCanvasSlot()
@@ -1079,8 +1154,36 @@ function createCanvasApi({ canvasDataPath, getAuthState, sendCanvasDataUpdate, r
     const buckets = {}
 
     await mapWithConcurrency(courses, async tcourse => {
-      const url = canvasBaseUrl + '/api/v1/courses/' + tcourse.id + `/${pathName}?per_page=100`
-      buckets[tcourse.id] = await fetchCanvasJsonOrEmpty(url, `course ${tcourse.id} ${pathName}`, errors)
+      const url = canvasBaseUrl + '/api/v1/courses/' + tcourse.id + `/${pathName}`
+      buckets[tcourse.id] = await fetchCanvasPaginated(url, `course ${tcourse.id} ${pathName}`, errors)
+    })
+
+    return buckets
+  }
+
+  async function fetchCanvasPages(courses, errors) {
+    const { canvasBaseUrl } = getAuthState()
+    const buckets = {}
+
+    await mapWithConcurrency(courses, async tcourse => {
+      const pageList = await fetchCanvasPaginated(
+        `${canvasBaseUrl}/api/v1/courses/${tcourse.id}/pages`,
+        `course ${tcourse.id} pages`,
+        errors
+      )
+      const pages = []
+      for (const page of pageList) {
+        if (!page || !page.url) continue
+        const body = await fetchCanvasJsonOrNull(
+          `${canvasBaseUrl}/api/v1/courses/${tcourse.id}/pages/${encodeURIComponent(page.url)}`,
+          `course ${tcourse.id} page ${page.url}`,
+          errors
+        )
+        if (body) {
+          pages.push(body)
+        }
+      }
+      buckets[tcourse.id] = pages
     })
 
     return buckets
@@ -1105,8 +1208,8 @@ function createCanvasApi({ canvasDataPath, getAuthState, sendCanvasDataUpdate, r
     })
 
     await mapWithConcurrency(jobs, async ({ courseId, module }) => {
-      const items = await fetchCanvasJsonOrEmpty(
-        withCanvasPerPage(module.items_url),
+      const items = await fetchCanvasPaginated(
+        module.items_url,
         `course ${courseId} module ${module.id} items`,
         errors
       )
@@ -1348,6 +1451,10 @@ ${html}
               documenttype: 'assignment',
               assignmentname: assignment.name,
               description: stripHtmlToText(assignment.description || ''),
+              description_text: stripHtmlToText(assignment.description || ''),
+              description_html: assignment.description || '',
+              submission_types: Array.isArray(assignment.submission_types) ? assignment.submission_types : [],
+              external_tool_tag: assignment.external_tool_tag || null,
               duedate: assignment.due_at || '',
               unlockdate: assignment.unlock_at || '',
               lockdate: assignment.lock_at || '',
@@ -1367,8 +1474,15 @@ ${html}
       data1.file[courseid].forEach(file => {
         if (file.id && file["content-type"] && file["mime_class"]) {
           file.previewurl = `${canvasBaseUrl}/courses/${courseid}/files?preview=${file.id}`
-          if (file["content-type"] === 'application/pdf') {
-            parseingfiles.push({url: file.url, previewurl: file.previewurl, id: file.id, name: file.display_name || file.filename || file.name || '', courseid:courseid})
+          if (isParseableCanvasFile(file)) {
+            parseingfiles.push({
+              url: file.url,
+              previewurl: file.previewurl,
+              id: file.id,
+              name: file.display_name || file.filename || file.name || '',
+              courseid,
+              content_type: file['content-type'] || ''
+            })
           }
         } else {
           file.previewurl = null
@@ -1377,8 +1491,59 @@ ${html}
       writeParserLine({ type: "file", content: parseingfiles })
     })
 
+    data1.pages = await fetchCanvasPages(course, canvasErrors)
+    for (const [courseid, pages] of Object.entries(data1.pages)) {
+      if (!Array.isArray(pages) || !pages.length) continue
+      const parsingPages = pages.map(page => ({
+        id: page.page_id || page.url,
+        url: page.html_url || '',
+        previewurl: page.html_url || '',
+        courseid,
+        name: page.title || page.url || 'Canvas page',
+        content: JSON.stringify({
+          documenttype: 'page',
+          title: page.title || '',
+          url: page.url || '',
+          body_html: page.body || '',
+          body_text: stripHtmlToText(page.body || ''),
+          html_url: page.html_url || ''
+        }, null, 2)
+      }))
+      writeParserLine({ type: 'page', content: parsingPages })
+    }
+
     data1.modules = await fetchCanvasCourseBuckets(course, 'modules', canvasErrors)
     data1.module_items = await fetchCanvasModuleItemBuckets(data1.modules, canvasErrors)
+    for (const [courseid, modules] of Object.entries(data1.module_items || {})) {
+      const parsingModuleItems = []
+      Object.entries(modules || {}).forEach(([moduleId, items]) => {
+        if (!Array.isArray(items)) return
+        items.forEach(item => {
+          if (!item || !item.id) return
+          parsingModuleItems.push({
+            id: item.id,
+            url: item.html_url || item.external_url || '',
+            previewurl: item.html_url || item.external_url || '',
+            courseid,
+            name: item.title || item.type || 'Module item',
+            content: JSON.stringify({
+              documenttype: 'module_item',
+              moduleId,
+              position: item.position || 0,
+              itemType: item.type || '',
+              title: item.title || '',
+              html_url: item.html_url || '',
+              external_url: item.external_url || '',
+              content_id: item.content_id || '',
+              page_url: item.page_url || ''
+            }, null, 2)
+          })
+        })
+      })
+      if (parsingModuleItems.length) {
+        writeParserLine({ type: 'module_item', content: parsingModuleItems })
+      }
+    }
     if (canvasErrors.length) {
       data1.errors = canvasErrors
       summarizeCanvasErrors(canvasErrors)
@@ -1386,6 +1551,15 @@ ${html}
       delete data1.errors
     }
     data1.weekly_schedule = buildWeeklySchedule(data1, canvasRootDir)
+    try {
+      const { syncGradescopeState } = require('../platforms/gradescope/sync')
+      const gradescopeResult = await syncGradescopeState(data1)
+      if (gradescopeResult.synced) {
+        data1.gradescope = gradescopeResult.state
+      }
+    } catch (error) {
+      console.warn('Gradescope sync skipped:', error.message || error)
+    }
     fs.writeFileSync(canvasDataPath, JSON.stringify(data1, null, 2))
     if (!writeParserLine('None')) {
       console.warn('Canvas parser did not receive completion signal; parsing may not start.')
