@@ -50,11 +50,17 @@
 
     return (
       '<aside class="synapse-sidebar" aria-label="Past chats">' +
-      '<div class="synapse-sidebar-top">' +
-      '<div><span class="synapse-eyebrow">Synapse</span><h2>Chats</h2></div>' +
-      '<button type="button" class="synapse-sidebar-toggle" data-synapse-toggle-sidebar aria-label="Hide chat history">x</button>' +
+      '<div class="synapse-sidebar-head">' +
+      '<div class="synapse-brand">' +
+      '<span class="synapse-brand-mark" aria-hidden="true"></span>' +
+      "<div>" +
+      "<h2>Synapse</h2>" +
+      '<p class="synapse-brand-tagline">AI conversations</p>' +
       "</div>" +
-      '<button type="button" class="synapse-new-chat-button" data-synapse-new-conversation>New chat</button>' +
+      "</div>" +
+      '<button type="button" class="synapse-sidebar-toggle" data-synapse-toggle-sidebar aria-label="Hide chat history">&lsaquo;</button>' +
+      "</div>" +
+      '<button type="button" class="synapse-new-chat-button" data-synapse-new-conversation><span class="synapse-new-chat-icon" aria-hidden="true">+</span>New chat</button>' +
       '<div class="synapse-history-list">' + (items || '<div class="synapse-history-empty">No past chats yet.</div>') + "</div>" +
       "</aside>" +
       (collapsed

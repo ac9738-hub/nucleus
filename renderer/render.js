@@ -724,12 +724,22 @@ document.addEventListener("DOMContentLoaded", async () => {
       openCanvasAppInExistingTab(payload.tabId);
     } else if (payload.app === "synapse") {
       openSynapseAppInExistingTab(payload.tabId);
+    } else if (payload.app === "mail") {
+      openMailAppInExistingTab(payload.tabId);
     }
   });
   window.nucleus.on("canvas:navigation", () => {
+    const activeTab = getActiveTab();
+    if (!activeTab || activeTab.type !== "canvastab" || activeTab.canvasMode !== "browser") {
+      return;
+    }
     handlecanvaspagechange();
   });
   window.nucleus.on("canvas:blank", () => {
+    const activeTab = getActiveTab();
+    if (!activeTab || activeTab.type !== "canvastab" || activeTab.canvasMode !== "browser") {
+      return;
+    }
     showCanvasBlankSlate();
   });
   window.nucleus.on("canvas:view-ready", payload => {

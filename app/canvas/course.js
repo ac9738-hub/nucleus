@@ -172,6 +172,76 @@ function renderModules(modules, moduleItems = {}) {
   }).join("");
 }
 
+function getWeeklySchedule(canvasData, courseId) {
+  const schedule = canvasData && canvasData.weekly_schedule;
+  if (!schedule) return [];
+
+  const weeks = schedule[courseId] || schedule[String(courseId)];
+  return Array.isArray(weeks) ? weeks : [];
+}
+
+function renderWeeklyFiles(files) {
+  if (!files.length) return "";
+
+  return `
+    <div class="course-week-group">
+      <h3 class="course-week-subheading">Files</h3>
+      <div class="course-module-items">
+        ${files.map(file => `
+          <a class="course-module-item" href="${escapeHtml(sanitizeurl(file.url || file.canvaspreviewurl) || "#")}">
+            <span>${escapeHtml(file.name || "Untitled file")}</span>
+            <small>File</small>
+          </a>
+        `).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function renderWeeklyLoggedAssignments(assignments) {
+  if (!assignments.length) return "";
+
+  return `
+    <div class="course-week-group">
+      <h3 class="course-week-subheading">Assignments</h3>
+      <div class="course-module-items">
+        ${assignments.map(assignment => {
+          const description = assignment.description ? assignment.description.slice(0, 140) : "";
+          return `
+            <a class="course-module-item course-week-assignment-item" href="${escapeHtml(sanitizeurl(assignment.url) || "#")}">
+              <span>
+                ${escapeHtml(assignment.name || "Untitled assignment")}
+                ${description ? `<small class="course-week-assignment-copy">${escapeHtml(description)}</small>` : ""}
+              </span>
+              <small>${escapeHtml(formatDate(assignment.duedate))}</small>
+            </a>
+          `;
+        }).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function renderWeeklySchedule(weeks) {
+  if (!weeks.length) {
+    return renderEmptyState("weekly schedule — sync Canvas and run the parser to log assignments");
+  }
+
+  return weeks.map(week => `
+    <article class="course-item course-module course-week">
+      <div class="course-item-main">
+        <span class="course-item-title">${escapeHtml(week.weekLabel || "Week")}</span>
+        ${renderWeeklyFiles(Array.isArray(week.files) ? week.files : [])}
+        ${renderWeeklyLoggedAssignments(Array.isArray(week.assignments) ? week.assignments : [])}
+      </div>
+      <div class="course-item-meta">
+        <span>${Array.isArray(week.files) ? week.files.length : 0} files</span>
+        <span>${Array.isArray(week.assignments) ? week.assignments.length : 0} assignments</span>
+      </div>
+    </article>
+  `).join("");
+}
+
 function renderFiles(files) {
   if (!files.length) return renderEmptyState("files");
 
@@ -195,7 +265,7 @@ function getCourseFrontPage(canvasData, courseId) {
   return frontPages[courseId] || frontPages[String(courseId)] || null
 }
 
-function renderCourseSection(section, assignments, modules, moduleItems, files, frontPage) {
+function renderCourseSection(section, assignments, modules, moduleItems, files, frontPage, weeklySchedule) {
   if (section === "homepage") {
     return `
       <section class="course-section course-homepage-section" data-course-section-page="homepage">
@@ -224,6 +294,15 @@ function renderCourseSection(section, assignments, modules, moduleItems, files, 
     `
   }
 
+  if (section === "weekly") {
+    return `
+      <section class="course-section" data-course-section-page="weekly">
+        <h2>Weekly</h2>
+        <div class="course-list">${renderWeeklySchedule(weeklySchedule)}</div>
+      </section>
+    `
+  }
+
   return `
     <section class="course-section" data-course-section-page="assignments">
       <h2>Assignments</h2>
@@ -239,10 +318,11 @@ function createCourseHtmlTemplate(course, canvasData = {}, activeSection = "assi
   const moduleItems = getCourseMapBucket(canvasData, "module_items", courseId);
   const files = getCourseBucket(canvasData, "file", courseId);
   const frontPage = getCourseFrontPage(canvasData, courseId);
+  const weeklySchedule = getWeeklySchedule(canvasData, courseId);
   const hasHomepage = Boolean(frontPage && frontPage.body);
   const validSections = hasHomepage
-    ? ["homepage", "assignments", "modules", "files"]
-    : ["assignments", "modules", "files"];
+    ? ["homepage", "assignments", "weekly", "modules", "files"]
+    : ["assignments", "weekly", "modules", "files"];
   const section = validSections.includes(activeSection)
     ? activeSection
     : hasHomepage
@@ -259,6 +339,7 @@ function createCourseHtmlTemplate(course, canvasData = {}, activeSection = "assi
         </div>
         <div class="course-summary">
           <span><strong>${assignments.length}</strong> assignments</span>
+          <span><strong>${weeklySchedule.length}</strong> weeks</span>
           <span><strong>${modules.length}</strong> modules</span>
           <span><strong>${files.length}</strong> files</span>
         </div>
@@ -267,11 +348,12 @@ function createCourseHtmlTemplate(course, canvasData = {}, activeSection = "assi
       <nav class="course-tabs" aria-label="Course content">
         ${hasHomepage ? `<button type="button" class="${section === "homepage" ? "active" : ""}" data-course-section="homepage">Homepage</button>` : ""}
         <button type="button" class="${section === "assignments" ? "active" : ""}" data-course-section="assignments">Assignments</button>
+        <button type="button" class="${section === "weekly" ? "active" : ""}" data-course-section="weekly">Weekly</button>
         <button type="button" class="${section === "modules" ? "active" : ""}" data-course-section="modules">Modules</button>
         <button type="button" class="${section === "files" ? "active" : ""}" data-course-section="files">Files</button>
       </nav>
 
-      ${renderCourseSection(section, assignments, modules, moduleItems, files, frontPage)}
+      ${renderCourseSection(section, assignments, modules, moduleItems, files, frontPage, weeklySchedule)}
     </section>
   `;
 }

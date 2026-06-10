@@ -395,6 +395,263 @@ function findCanvasAssignment(lookup, courseid, assignment) {
   return null
 }
 
+function readCanvasGraphFromRoot(rootDir) {
+  const parsedStatePath = path.join(rootDir, 'canvas_graph.json')
+  if (!fs.existsSync(parsedStatePath)) {
+    return {}
+  }
+
+  try {
+    const raw = fs.readFileSync(parsedStatePath, 'utf8')
+    return raw.trim() ? JSON.parse(raw) : {}
+  } catch (error) {
+    console.error('Unable to read Canvas graph for weekly schedule:', error)
+    return {}
+  }
+}
+
+function parseWeekNumberFromLabel(label) {
+  const match = String(label || '').match(/\bweek\s*(\d+)\b/i)
+  return match ? Number.parseInt(match[1], 10) : null
+}
+
+function weekBucketFromDate(dateStr) {
+  if (!dateStr) {
+    return { sortKey: Number.MAX_SAFE_INTEGER, label: 'Unscheduled' }
+  }
+
+  const date = new Date(dateStr)
+  if (Number.isNaN(date.getTime())) {
+    return { sortKey: Number.MAX_SAFE_INTEGER, label: 'Unscheduled' }
+  }
+
+  const start = new Date(date)
+  start.setHours(0, 0, 0, 0)
+  const day = start.getDay()
+  start.setDate(start.getDate() - ((day + 6) % 7))
+
+  return {
+    sortKey: start.getTime(),
+    label: `Week of ${start.toLocaleDateString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    })}`
+  }
+}
+
+function getCourseArrayBucket(canvasData, bucketName, courseId) {
+  const bucket = canvasData && canvasData[bucketName]
+  if (!bucket) return []
+
+  const value = bucket[courseId] || bucket[String(courseId)]
+  return Array.isArray(value) ? value : []
+}
+
+function getCourseObjectBucket(canvasData, bucketName, courseId) {
+  const bucket = canvasData && canvasData[bucketName]
+  if (!bucket) return {}
+
+  const value = bucket[courseId] || bucket[String(courseId)]
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : {}
+}
+
+function resolveWeeklyFile(graphFiles, courseId, fileId, canvasFiles) {
+  const courseFileMap = graphFiles[courseId] || graphFiles[String(courseId)] || {}
+  const graphFile = courseFileMap[fileId] || courseFileMap[String(fileId)]
+  if (graphFile) {
+    return compactStudyFile(graphFile, courseId)
+  }
+
+  const canvasFile = (canvasFiles || []).find(file => String(file.id) === String(fileId))
+  if (!canvasFile) return null
+
+  return {
+    id: String(canvasFile.id || ''),
+    name: canvasFile.display_name || canvasFile.filename || canvasFile.name || 'Untitled file',
+    courseid: String(courseId),
+    description: canvasFile['content-type'] || canvasFile.mime_class || '',
+    url: canvasFile.previewurl || canvasFile.url || '',
+    downloadurl: canvasFile.url || '',
+    canvaspreviewurl: canvasFile.previewurl || ''
+  }
+}
+
+function matchLoggedAssignment(loggedAssignments, moduleItem, canvasAssignment) {
+  const contentId = String(moduleItem && moduleItem.content_id || '').trim()
+  if (contentId) {
+    const byId = loggedAssignments.find(assignment => String(assignment.assignmentid || '').trim() === contentId)
+    if (byId) return byId
+  }
+
+  const titleKey = normalizeLookupText(moduleItem && moduleItem.title)
+  if (titleKey) {
+    const byTitle = loggedAssignments.find(assignment => normalizeLookupText(assignment.name) === titleKey)
+    if (byTitle) return byTitle
+  }
+
+  if (canvasAssignment) {
+    const canvasNameKey = normalizeLookupText(canvasAssignment.name)
+    if (canvasNameKey) {
+      return loggedAssignments.find(assignment => normalizeLookupText(assignment.name) === canvasNameKey) || null
+    }
+  }
+
+  return null
+}
+
+function compactWeeklyAssignment(assignment, canvasAssignment) {
+  return {
+    assignmentid: assignment.assignmentid || '',
+    name: assignment.name || 'Untitled assignment',
+    description: stripHtmlToText(assignment.description || ''),
+    duedate: assignment.duedate || '',
+    unlockdate: assignment.unlockdate || '',
+    url: (canvasAssignment && canvasAssignment.html_url)
+      || assignment.canvaspreviewurl
+      || assignment.downloadurl
+      || '',
+    points_possible: canvasAssignment && canvasAssignment.points_possible,
+    filechildren: Array.isArray(assignment.filechildren) ? assignment.filechildren.map(String) : []
+  }
+}
+
+function createWeeklyBucket(weekLabel, sortKey) {
+  return {
+    weekLabel,
+    sortKey,
+    files: [],
+    assignments: [],
+    seenFileIds: new Set(),
+    seenAssignmentIds: new Set()
+  }
+}
+
+function addWeeklyFile(bucket, file) {
+  if (!file) return
+  const fileId = String(file.id || file.name || '').trim()
+  if (!fileId || bucket.seenFileIds.has(fileId)) return
+  bucket.seenFileIds.add(fileId)
+  bucket.files.push(file)
+}
+
+function addWeeklyAssignment(bucket, assignment) {
+  if (!assignment) return
+  const assignmentId = String(assignment.assignmentid || assignment.name || '').trim()
+  if (!assignmentId || bucket.seenAssignmentIds.has(assignmentId)) return
+  bucket.seenAssignmentIds.add(assignmentId)
+  bucket.assignments.push(assignment)
+}
+
+function finalizeWeeklyBucket(bucket) {
+  return {
+    weekLabel: bucket.weekLabel,
+    sortKey: bucket.sortKey,
+    files: bucket.files,
+    assignments: bucket.assignments
+  }
+}
+
+function buildWeeklySchedule(canvasData, rootDir) {
+  const graph = readCanvasGraphFromRoot(rootDir)
+  const graphFiles = graph.files || {}
+  const syllabi = graph.syllabi || {}
+  const lookup = makeCanvasTaskLookup(rootDir)
+  const schedule = {}
+  const courses = Array.isArray(canvasData && canvasData.courses) ? canvasData.courses : []
+
+  courses.forEach(course => {
+    if (!course || !course.id) return
+
+    const courseId = String(course.id)
+    const syllabus = syllabi[courseId] || syllabi[course.id]
+    const loggedAssignments = syllabus && Array.isArray(syllabus.assignments) ? syllabus.assignments : []
+    const modules = getCourseArrayBucket(canvasData, 'modules', courseId)
+      .slice()
+      .sort((left, right) => (left.position || 0) - (right.position || 0))
+    const moduleItems = getCourseObjectBucket(canvasData, 'module_items', courseId)
+    const canvasFiles = getCourseArrayBucket(canvasData, 'file', courseId)
+    const weekBuckets = []
+    const placedAssignmentIds = new Set()
+
+    modules.forEach(module => {
+      const weekNum = parseWeekNumberFromLabel(module.name)
+      if (weekNum == null) return
+
+      const bucket = createWeeklyBucket(module.name || `Week ${weekNum}`, weekNum)
+      const items = (moduleItems[module.id] || moduleItems[String(module.id)] || [])
+        .slice()
+        .sort((left, right) => (left.position || 0) - (right.position || 0))
+      const fileItems = items.filter(item => String(item.type || '').toLowerCase() === 'file')
+      const assignmentItems = items.filter(item => {
+        const type = String(item.type || '').toLowerCase()
+        return type === 'assignment' || type === 'quiz' || type === 'discussion'
+      })
+
+      fileItems.forEach(item => {
+        const file = resolveWeeklyFile(graphFiles, courseId, item.content_id, canvasFiles)
+        if (file) {
+          addWeeklyFile(bucket, file)
+          return
+        }
+
+        addWeeklyFile(bucket, {
+          id: String(item.id || item.content_id || item.title || ''),
+          name: item.title || 'Untitled file',
+          courseid: courseId,
+          description: item.type || 'File',
+          url: item.html_url || item.url || '',
+          downloadurl: item.url || '',
+          canvaspreviewurl: item.html_url || ''
+        })
+      })
+
+      assignmentItems.forEach(item => {
+        const canvasAssignment = lookup.assignmentByCourseAndId.get(`${courseId}:${String(item.content_id || '')}`)
+        const loggedAssignment = matchLoggedAssignment(loggedAssignments, item, canvasAssignment)
+        if (!loggedAssignment) return
+
+        const compactAssignment = compactWeeklyAssignment(loggedAssignment, canvasAssignment)
+        compactAssignment.filechildren.forEach(fileId => {
+          addWeeklyFile(bucket, resolveWeeklyFile(graphFiles, courseId, fileId, canvasFiles))
+        })
+        addWeeklyAssignment(bucket, compactAssignment)
+        placedAssignmentIds.add(String(loggedAssignment.assignmentid || loggedAssignment.name || ''))
+      })
+
+      weekBuckets.push(finalizeWeeklyBucket(bucket))
+    })
+
+    const dateBuckets = new Map()
+    loggedAssignments.forEach(assignment => {
+      const assignmentKey = String(assignment.assignmentid || assignment.name || '').trim()
+      if (!assignmentKey || placedAssignmentIds.has(assignmentKey)) return
+
+      const week = weekBucketFromDate(assignment.duedate || assignment.unlockdate)
+      const bucketKey = String(week.sortKey)
+      if (!dateBuckets.has(bucketKey)) {
+        dateBuckets.set(bucketKey, createWeeklyBucket(week.label, week.sortKey))
+      }
+
+      const bucket = dateBuckets.get(bucketKey)
+      const canvasAssignment = findCanvasAssignment(lookup, courseId, assignment)
+      const compactAssignment = compactWeeklyAssignment(assignment, canvasAssignment)
+      compactAssignment.filechildren.forEach(fileId => {
+        addWeeklyFile(bucket, resolveWeeklyFile(graphFiles, courseId, fileId, canvasFiles))
+      })
+      addWeeklyAssignment(bucket, compactAssignment)
+      placedAssignmentIds.add(assignmentKey)
+    })
+
+    const datedWeeks = Array.from(dateBuckets.values()).map(finalizeWeeklyBucket)
+    schedule[courseId] = weekBuckets
+      .concat(datedWeeks)
+      .sort((left, right) => left.sortKey - right.sortKey)
+  })
+
+  return schedule
+}
+
 function make_canvas_tasks(rootDir) {
   const parsedStatePath = path.join(rootDir, 'canvas_graph.json')
   if (!fs.existsSync(parsedStatePath)) {
@@ -521,9 +778,11 @@ function getParserProcess(authState, rootDir, onCanvasTasks) {
   }
 
   parserProc = spawn('python', [path.join(rootDir, "parser.py")], {
+    cwd: rootDir,
     env: {
       ...process.env,
       PYTHONIOENCODING: 'utf-8',
+      PYTHONUNBUFFERED: '1',
       CANVAS_AUTH_COOKIE: authState.canvasAuthCookie || '',
       CANVAS_AUTH_CSRF: authState.canvasAuthCsrf || '',
       CANVAS_BASE_URL: authState.canvasBaseUrl || ''
@@ -531,6 +790,14 @@ function getParserProcess(authState, rootDir, onCanvasTasks) {
   })
   let stdoutBuffer = ''
   let handledCompletion = false
+  parserProc.on('error', error => {
+    console.error('parser process error:', error && error.message ? error.message : error)
+  })
+  parserProc.on('exit', (code, signal) => {
+    if (code !== 0 && code !== null) {
+      console.error(`parser exited with code ${code}${signal ? ` signal ${signal}` : ''}`)
+    }
+  })
   parserProc.stdout.on('data', chunk => {
     const text = chunk.toString()
     console.log(text)
@@ -572,7 +839,10 @@ function createCanvasApi({ canvasDataPath, getAuthState, sendCanvasDataUpdate, r
 
     try {
       const raw = fs.readFileSync(canvasDataPath, 'utf8')
-      return raw.trim() ? JSON.parse(raw) : null
+      if (!raw.trim()) return null
+      const data = JSON.parse(raw)
+      data.weekly_schedule = buildWeeklySchedule(data, canvasRootDir)
+      return data
     } catch (error) {
       console.error("Unable to read Canvas data:", error)
       return null
@@ -626,6 +896,52 @@ function createCanvasApi({ canvasDataPath, getAuthState, sendCanvasDataUpdate, r
     }]
   }
 
+  const CANVAS_MAX_CONCURRENT = 4
+  let canvasInFlight = 0
+  const canvasWaitQueue = []
+
+  function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms))
+  }
+
+  async function acquireCanvasSlot() {
+    if (canvasInFlight < CANVAS_MAX_CONCURRENT) {
+      canvasInFlight += 1
+      return
+    }
+    await new Promise(resolve => canvasWaitQueue.push(resolve))
+    canvasInFlight += 1
+  }
+
+  function releaseCanvasSlot() {
+    canvasInFlight = Math.max(0, canvasInFlight - 1)
+    const next = canvasWaitQueue.shift()
+    if (next) next()
+  }
+
+  async function mapWithConcurrency(items, mapper, concurrency = CANVAS_MAX_CONCURRENT) {
+    if (!items.length) return []
+    const results = new Array(items.length)
+    let index = 0
+    const limit = Math.max(1, Math.min(concurrency, items.length))
+
+    async function worker() {
+      while (index < items.length) {
+        const current = index
+        index += 1
+        results[current] = await mapper(items[current], current)
+      }
+    }
+
+    await Promise.all(Array.from({ length: limit }, () => worker()))
+    return results
+  }
+
+  function formatCanvasError(error) {
+    const message = error && error.message ? error.message : String(error)
+    return message.split('\n')[0]
+  }
+
   function getCanvasApiHeaders() {
     const { canvasAuthCookie, canvasAuthCsrf } = getAuthState()
     const headers = {
@@ -638,28 +954,49 @@ function createCanvasApi({ canvasDataPath, getAuthState, sendCanvasDataUpdate, r
   }
 
   async function fetchCanvasJson(url) {
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: getCanvasApiHeaders()
-    })
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await acquireCanvasSlot()
+      try {
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: getCanvasApiHeaders()
+        })
 
-    if (!response.ok) {
-      const body = await response.text()
-      throw new Error(`Canvas API request failed ${response.status} ${response.statusText}: ${url}\n${body.slice(0, 500)}`)
+        if (response.status === 429 && attempt < 4) {
+          const retryAfterHeader = Number(response.headers.get('retry-after'))
+          const waitMs = Number.isFinite(retryAfterHeader) && retryAfterHeader > 0
+            ? retryAfterHeader * 1000
+            : (attempt + 1) * 1500
+          await sleep(waitMs)
+          continue
+        }
+
+        if (!response.ok) {
+          const body = await response.text()
+          const detail = response.status === 429
+            ? 'Rate limit exceeded'
+            : body.slice(0, 200)
+          throw new Error(`Canvas API request failed ${response.status} ${response.statusText}: ${url}${detail ? ` (${detail})` : ''}`)
+        }
+
+        return response.json()
+      } finally {
+        releaseCanvasSlot()
+      }
     }
 
-    return response.json()
+    throw new Error(`Canvas API request failed 429 Too Many Requests: ${url} (Rate limit exceeded)`)
   }
 
   async function fetchCanvasJsonOrEmpty(url, context, errors) {
     try {
       return await fetchCanvasJson(url)
     } catch (error) {
-      console.warn(`Canvas ${context} skipped: ${error.message}`)
+      const message = formatCanvasError(error)
       errors.push({
         context,
         url,
-        message: error.message
+        message
       })
       return []
     }
@@ -669,9 +1006,8 @@ function createCanvasApi({ canvasDataPath, getAuthState, sendCanvasDataUpdate, r
     try {
       return await fetchCanvasJson(url)
     } catch (error) {
-      const message = error && error.message ? error.message : String(error)
+      const message = formatCanvasError(error)
       if (!message.includes('404')) {
-        console.warn(`Canvas ${context} skipped: ${message}`)
         errors.push({
           context,
           url,
@@ -684,15 +1020,13 @@ function createCanvasApi({ canvasDataPath, getAuthState, sendCanvasDataUpdate, r
 
   async function fetchCanvasCourseBuckets(courses, pathName, errors) {
     const { canvasBaseUrl } = getAuthState()
-    const requests = courses.map(tcourse => {
-      const url = canvasBaseUrl + '/api/v1/courses/' + tcourse.id + `/${pathName}?per_page=100`
-      return fetchCanvasJsonOrEmpty(url, `course ${tcourse.id} ${pathName}`, errors)
-    })
-    const responses = await Promise.all(requests)
     const buckets = {}
-    for (let i = 0; i < responses.length; i++) {
-      buckets[courses[i].id] = responses[i]
-    }
+
+    await mapWithConcurrency(courses, async tcourse => {
+      const url = canvasBaseUrl + '/api/v1/courses/' + tcourse.id + `/${pathName}?per_page=100`
+      buckets[tcourse.id] = await fetchCanvasJsonOrEmpty(url, `course ${tcourse.id} ${pathName}`, errors)
+    })
+
     return buckets
   }
 
@@ -702,7 +1036,7 @@ function createCanvasApi({ canvasDataPath, getAuthState, sendCanvasDataUpdate, r
 
   async function fetchCanvasModuleItemBuckets(modulesByCourse, errors) {
     const buckets = {}
-    const requests = []
+    const jobs = []
 
     Object.entries(modulesByCourse).forEach(([courseId, modules]) => {
       buckets[courseId] = {}
@@ -710,59 +1044,79 @@ function createCanvasApi({ canvasDataPath, getAuthState, sendCanvasDataUpdate, r
 
       modules.forEach(module => {
         if (!module || !module.id || !module.items_url) return
-        const request = fetchCanvasJsonOrEmpty(
-          withCanvasPerPage(module.items_url),
-          `course ${courseId} module ${module.id} items`,
-          errors
-        ).then(items => {
-          buckets[courseId][module.id] = items
-        })
-        requests.push(request)
+        jobs.push({ courseId, module })
       })
     })
 
-    await Promise.all(requests)
+    await mapWithConcurrency(jobs, async ({ courseId, module }) => {
+      const items = await fetchCanvasJsonOrEmpty(
+        withCanvasPerPage(module.items_url),
+        `course ${courseId} module ${module.id} items`,
+        errors
+      )
+      buckets[courseId][module.id] = items
+    })
+
     return buckets
   }
 
   async function fetchCanvasFrontPages(courses, errors) {
     const { canvasBaseUrl } = getAuthState()
-    const requests = courses.map(tcourse => {
-      const url = canvasBaseUrl + '/api/v1/courses/' + tcourse.id + '/front_page'
-      return fetchCanvasJsonOrNull(url, `course ${tcourse.id} front page`, errors)
-    })
-    const responses = await Promise.all(requests)
     const buckets = {}
-    for (let i = 0; i < responses.length; i++) {
-      if (responses[i]) {
-        buckets[courses[i].id] = responses[i]
+
+    await mapWithConcurrency(courses, async tcourse => {
+      const url = canvasBaseUrl + '/api/v1/courses/' + tcourse.id + '/front_page'
+      const page = await fetchCanvasJsonOrNull(url, `course ${tcourse.id} front page`, errors)
+      if (page) {
+        buckets[tcourse.id] = page
       }
-    }
+    })
+
     return buckets
   }
 
   async function fetchCanvasCourseSyllabi(courses, errors) {
     const { canvasBaseUrl } = getAuthState()
-    const requests = courses.map(tcourse => {
-      const url = canvasBaseUrl + '/api/v1/courses/' + tcourse.id + '?include[]=syllabus_body'
-      return fetchCanvasJsonOrNull(url, `course ${tcourse.id} syllabus`, errors)
-    })
-    const responses = await Promise.all(requests)
     const buckets = {}
-    for (let i = 0; i < responses.length; i++) {
-      const course = responses[i]
+
+    await mapWithConcurrency(courses, async tcourse => {
+      const url = canvasBaseUrl + '/api/v1/courses/' + tcourse.id + '?include[]=syllabus_body'
+      const course = await fetchCanvasJsonOrNull(url, `course ${tcourse.id} syllabus`, errors)
       const syllabusBody = course && stripHtmlToText(course.syllabus_body || '')
       if (syllabusBody) {
-        buckets[courses[i].id] = {
-          id: courses[i].id,
-          name: courses[i].name || course.name || '',
-          html_url: course.html_url || courses[i].html_url || '',
+        buckets[tcourse.id] = {
+          id: tcourse.id,
+          name: tcourse.name || course.name || '',
+          html_url: course.html_url || tcourse.html_url || '',
           syllabus_body: course.syllabus_body || '',
           syllabus_text: syllabusBody
         }
       }
-    }
+    })
+
     return buckets
+  }
+
+  function summarizeCanvasErrors(errors) {
+    if (!Array.isArray(errors) || !errors.length) return
+
+    const rateLimited = errors.filter(error => String(error.message || '').includes('429')).length
+    const contexts = {}
+    errors.forEach(error => {
+      const key = String(error.context || 'unknown').replace(/\s+\d+$/, '')
+      contexts[key] = (contexts[key] || 0) + 1
+    })
+    const breakdown = Object.entries(contexts)
+      .sort((left, right) => right[1] - left[1])
+      .slice(0, 5)
+      .map(([label, count]) => `${label} (${count})`)
+      .join(', ')
+
+    console.warn(
+      `Canvas sync finished with ${errors.length} skipped requests` +
+      `${rateLimited ? `, ${rateLimited} rate-limited` : ''}` +
+      `${breakdown ? `: ${breakdown}` : ''}`
+    )
   }
 
   function saveCanvasHomepages(courses, frontPages) {
@@ -904,9 +1258,18 @@ ${html}
         }, null, 2)
       })
     })
+    function writeParserLine(payload) {
+      if (!proc || proc.killed || !proc.stdin || proc.stdin.destroyed || proc.stdin.writableEnded) {
+        console.warn('parser stdin unavailable; skipped parser payload')
+        return false
+      }
+      const line = payload === 'None' ? 'None' : JSON.stringify(payload)
+      proc.stdin.write(`${line}\n`, 'utf8')
+      return true
+    }
+
     if (parsingSyllabi.length) {
-      const parserdata = {"type": "syllabus", "content": parsingSyllabi}
-      proc.stdin.write(JSON.stringify(parserdata) + '\n', 'utf8')
+      writeParserLine({ type: "syllabus", content: parsingSyllabi })
     }
     data1.assignments = await fetchCanvasCourseBuckets(course, 'assignments', canvasErrors)
     for (const [courseid, assignments] of Object.entries(data1.assignments)) {
@@ -934,8 +1297,7 @@ ${html}
         }
       }
       if (parsingAssignments.length) {
-        const parserdata = {"type": "assignment", "content": parsingAssignments}
-        proc.stdin.write(JSON.stringify(parserdata) + '\n', 'utf8')
+        writeParserLine({ type: "assignment", content: parsingAssignments })
       }
     }
     data1.file = await fetchCanvasCourseBuckets(course, 'files', canvasErrors)
@@ -951,20 +1313,22 @@ ${html}
           file.previewurl = null
         }
       })
-      const parserdata = {"type": "file", "content": parseingfiles}
-      proc.stdin.write(JSON.stringify(parserdata) + '\n', 'utf8')
+      writeParserLine({ type: "file", content: parseingfiles })
     })
-    proc.stdin.write('None\n', 'utf8')
-  
 
     data1.modules = await fetchCanvasCourseBuckets(course, 'modules', canvasErrors)
     data1.module_items = await fetchCanvasModuleItemBuckets(data1.modules, canvasErrors)
     if (canvasErrors.length) {
       data1.errors = canvasErrors
+      summarizeCanvasErrors(canvasErrors)
     } else {
       delete data1.errors
     }
+    data1.weekly_schedule = buildWeeklySchedule(data1, canvasRootDir)
     fs.writeFileSync(canvasDataPath, JSON.stringify(data1, null, 2))
+    if (!writeParserLine('None')) {
+      console.warn('Canvas parser did not receive completion signal; parsing may not start.')
+    }
     sendCanvasDataUpdate()
   }
 

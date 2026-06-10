@@ -1183,14 +1183,16 @@ button.home-list-item {
 }
 
 .canvas-app-icon img,
-.synapse-app-icon img {
+.synapse-app-icon img,
+.mail-app-icon img {
   display: block;
   height: 100%;
   object-fit: cover;
   width: 100%;
 }
 
-.synapse-app-icon {
+.synapse-app-icon,
+.mail-app-icon {
   overflow: hidden;
 }
 
@@ -1473,6 +1475,37 @@ button.home-list-item {
   flex: 0 0 auto;
   font-size: 11px;
   text-transform: uppercase;
+}
+
+.course-week-group + .course-week-group {
+  margin-top: 14px;
+}
+
+.course-week-subheading {
+  color: var(--text-dim);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  margin: 12px 0 6px;
+  text-transform: uppercase;
+}
+
+.course-week-assignment-item {
+  align-items: flex-start;
+}
+
+.course-week-assignment-item > span {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.course-week-assignment-copy {
+  color: var(--text-mute);
+  display: block;
+  font-size: 11px;
+  line-height: 1.35;
+  text-transform: none;
 }
 
 .course-item-meta {

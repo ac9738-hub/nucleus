@@ -127,7 +127,9 @@ FUZZY_STOPWORDS = {
 RETRIEVAL_SEMANTIC_SCORE_CUTOFF = 0.45
 BROWSER_INTERNAL_SCORE_CUTOFF = RETRIEVAL_SEMANTIC_SCORE_CUTOFF
 BROWSER_RETRIEVAL_CANDIDATES = 12
-COURSE_NAME_KEYWORD_BOOST_WEIGHT = 1.5
+COURSE_SEMANTIC_FUZZY_STRONG_THRESHOLD = 1.3
+COURSE_SEMANTIC_FUZZY_POOL_THRESHOLD = 0.35
+GLOBAL_COURSE_BUCKET_KEY = "__global__"
 
 PREFIX_PATTERN = re.compile(
     r"^(?:" + "|".join(re.escape(prefix) for prefix in QUERY_PREFIXES) + r")\s+",
@@ -246,8 +248,8 @@ def fuzzy_match_name(node, courseid=None):
     return course_scoped_embedding_name(scoped_courseid, name)
 
 
-def combine_retrieval_scores(embedding_similarity, fuzzy_similarity, course_similarity):
-    return embedding_similarity + fuzzy_similarity + (COURSE_NAME_KEYWORD_BOOST_WEIGHT * course_similarity)
+def combine_retrieval_scores(embedding_similarity, fuzzy_similarity, course_similarity=0.0):
+    return embedding_similarity + fuzzy_similarity + float(course_similarity or 0.0)
 
 
 def load_course_lookup(path=CANVAS_DATA_PATH):
@@ -285,11 +287,12 @@ def get_course_name(courseid):
     return ""
 
 
-def course_keyword_similarity(query_terms, courseid):
-    item = COURSE_LOOKUP.get(str(courseid or ""))
+def course_keyword_similarity(query_terms, courseid, catalog=None):
+    item = (catalog or COURSE_CATALOG).get(str(courseid or ""))
     if not item:
         return 0.0
-    return fuzzy_name_similarity(query_terms, item.get("keyword_name", ""))
+    keyword_name = item.get("keyword_name") or item.get("name") or ""
+    return keyword_set_similarity(query_terms, split_fuzzy_keywords(keyword_name))
 
 
 def vectorize_embedding(value):
@@ -462,6 +465,162 @@ def reconstruct_nodes(path=CANVAS_GRAPH_PATH):
     }
 
 allnodes = reconstruct_nodes()
+_course_embeddings_cache = None
+
+
+def build_course_catalog(allnodes_ref=None):
+    nodes = allnodes_ref or allnodes
+    catalog = {
+        str(courseid): dict(info)
+        for courseid, info in COURSE_LOOKUP.items()
+    }
+    for courseid in nodes.get("syllabi", {}):
+        cid = str(courseid)
+        if cid not in catalog:
+            catalog[cid] = {
+                "name": f"Canvas {cid}",
+                "keyword_name": f"canvas {cid}",
+            }
+    return catalog
+
+
+def build_course_names_list(catalog=None):
+    catalog = catalog or build_course_catalog()
+    return [
+        {
+            "courseid": courseid,
+            "name": info.get("name", ""),
+            "keyword_name": info.get("keyword_name", "") or info.get("name", ""),
+        }
+        for courseid, info in sorted(catalog.items(), key=lambda item: item[1].get("name", ""))
+    ]
+
+
+def build_course_buckets(allnodes_ref=None):
+    nodes = allnodes_ref or allnodes
+    buckets = {}
+
+    def add(courseid, nodetype, node):
+        cid = str(courseid or "").strip()
+        bucket_key = cid if cid else GLOBAL_COURSE_BUCKET_KEY
+        buckets.setdefault(bucket_key, []).append((nodetype, node, cid))
+
+    for conceptnode in nodes.get("concepts", []) or []:
+        courseid = getattr(conceptnode, "courseid", "")
+        add(courseid, "concept", conceptnode)
+        for detailnode in conceptnode.details:
+            add(courseid, "detail", detailnode)
+        for examplenode in conceptnode.examples:
+            add(courseid, "example", examplenode)
+
+    for problemnode in nodes.get("problems", []) or []:
+        add(getattr(problemnode, "courseid", ""), "problem", problemnode)
+
+    for eventnode in nodes.get("events", []) or []:
+        add(getattr(eventnode, "courseid", ""), "event", eventnode)
+
+    for courseid, syllabusnode in (nodes.get("syllabi", {}) or {}).items():
+        cid = str(courseid)
+        add(cid, "syllabus", syllabusnode)
+        for assignmentnode in syllabusnode.assignments:
+            add(cid, "assignment", assignmentnode)
+
+    for courseid, coursefiles in (nodes.get("files", {}) or {}).items():
+        for filenode in coursefiles.values():
+            add(courseid, "file", filenode)
+
+    return buckets
+
+
+COURSE_CATALOG = build_course_catalog()
+COURSE_NAMES_LIST = build_course_names_list(COURSE_CATALOG)
+COURSE_BUCKETS = build_course_buckets()
+
+
+def get_course_embeddings(catalog=None):
+    global _course_embeddings_cache
+    if _course_embeddings_cache is not None:
+        return _course_embeddings_cache
+
+    catalog = catalog or COURSE_CATALOG
+    courseids = []
+    texts = []
+    for courseid, info in catalog.items():
+        courseids.append(str(courseid))
+        texts.append(info.get("keyword_name") or info.get("name") or str(courseid))
+
+    if not texts:
+        _course_embeddings_cache = {}
+        return _course_embeddings_cache
+
+    response = openai_client.embeddings.create(
+        input=texts,
+        model="text-embedding-3-small"
+    )
+    _course_embeddings_cache = {
+        courseid: np.array(item.embedding, dtype=np.float32)
+        for courseid, item in zip(courseids, response.data)
+    }
+    return _course_embeddings_cache
+
+
+def score_courses_for_query(query_terms, embeddedq, catalog=None, course_embeddings=None):
+    catalog = catalog or COURSE_CATALOG
+    course_embeddings = course_embeddings or get_course_embeddings(catalog)
+    scored = []
+
+    for courseid, info in catalog.items():
+        keyword_name = info.get("keyword_name") or info.get("name") or ""
+        keyword_score = keyword_set_similarity(query_terms, split_fuzzy_keywords(keyword_name))
+        fuzzy_score = fuzzy_name_similarity(query_terms, keyword_name)
+        course_vector = course_embeddings.get(str(courseid))
+        semantic_score = float(np.dot(embeddedq, course_vector)) if course_vector is not None else 0.0
+        scored.append({
+            "courseid": str(courseid),
+            "name": info.get("name", ""),
+            "keyword_score": keyword_score,
+            "fuzzy_score": fuzzy_score,
+            "semantic_score": semantic_score,
+            "semantic_fuzzy": semantic_score + fuzzy_score,
+        })
+
+    scored.sort(
+        key=lambda item: (item["keyword_score"], item["semantic_fuzzy"], item["fuzzy_score"]),
+        reverse=True
+    )
+    return scored
+
+
+def select_course_search_pool(course_scores):
+    keyword_matches = [item for item in course_scores if item["keyword_score"] > 0]
+    candidates = keyword_matches if keyword_matches else course_scores
+
+    strong_matches = [
+        item for item in candidates
+        if item["semantic_fuzzy"] >= COURSE_SEMANTIC_FUZZY_STRONG_THRESHOLD
+    ]
+    if strong_matches:
+        return {item["courseid"] for item in strong_matches}, "strong", strong_matches
+
+    moderate_matches = [
+        item for item in candidates
+        if item["semantic_fuzzy"] >= COURSE_SEMANTIC_FUZZY_POOL_THRESHOLD
+    ]
+    if moderate_matches:
+        return {item["courseid"] for item in moderate_matches}, "moderate", moderate_matches
+
+    return None, "all", course_scores
+
+
+def iter_bucket_nodes(course_pool=None):
+    if course_pool is None:
+        for entries in COURSE_BUCKETS.values():
+            yield from entries
+        return
+
+    for courseid in course_pool:
+        yield from COURSE_BUCKETS.get(str(courseid), [])
+
 
 def node_identity(nodetype, node):
     return (
@@ -673,6 +832,18 @@ def retreive(query, k = 3, mode = "agent"):
     )
     embeddedq = np.array(qv.data[0].embedding, dtype=np.float32)
     query_terms = fuzzy_query_terms(query)
+    course_embeddings = get_course_embeddings()
+    course_scores = score_courses_for_query(query_terms, embeddedq, course_embeddings=course_embeddings)
+    course_pool, pool_mode, matched_courses = select_course_search_pool(course_scores)
+    course_score_by_id = {item["courseid"]: item for item in course_scores}
+
+    print(
+        "Course pool: "
+        f"mode={pool_mode}, "
+        f"courses={sorted(course_pool) if course_pool else 'all'}, "
+        f"top={[item['name'] for item in matched_courses[:3]]}",
+        file=sys.stderr
+    )
 
     def push_node(overall_similarity, semantic_similarity, fuzzy_similarity, course_similarity, nodetype, node):
         nonlocal heap_counter
@@ -701,33 +872,14 @@ def retreive(query, k = 3, mode = "agent"):
             description_similarity = 0.0
         embedding_similarity = max(name_similarity, description_similarity)
         fuzzy_similarity = fuzzy_name_similarity(query_terms, fuzzy_match_name(node, courseid))
-        course_similarity = course_keyword_similarity(query_terms, courseid or getattr(node, "courseid", ""))
-        overall_similarity = combine_retrieval_scores(embedding_similarity, fuzzy_similarity, course_similarity)
+        resolved_courseid = str(courseid or getattr(node, "courseid", "") or "")
+        course_match = course_score_by_id.get(resolved_courseid, {})
+        course_similarity = course_match.get("semantic_fuzzy", 0.0)
+        overall_similarity = combine_retrieval_scores(embedding_similarity, fuzzy_similarity)
         push_node(overall_similarity, embedding_similarity, fuzzy_similarity, course_similarity, nodetype, node)
 
-    for conceptnode in allnodes["concepts"]:
-        courseid = getattr(conceptnode, "courseid", "")
-        rank_node("concept", conceptnode, courseid)
-        for detailnode in conceptnode.details:
-            rank_node("detail", detailnode, courseid)
-        for examplenode in conceptnode.examples:
-            rank_node("example", examplenode, courseid)
-
-    for problemnode in allnodes["problems"]:
-        rank_node("problem", problemnode)
-
-    for eventnode in allnodes["events"]:
-        rank_node("event", eventnode)
-
-    for syllabusnode in allnodes["syllabi"].values():
-        courseid = getattr(syllabusnode, "courseid", "")
-        rank_node("syllabus", syllabusnode, courseid)
-        for assignmentnode in syllabusnode.assignments:
-            rank_node("assignment", assignmentnode, courseid)
-
-    for coursefiles in allnodes["files"].values():
-        for filenode in coursefiles.values():
-            rank_node("file", filenode, getattr(filenode, "courseid", ""))
+    for nodetype, node, courseid in iter_bucket_nodes(course_pool):
+        rank_node(nodetype, node, courseid)
 
     candidate_count = BROWSER_RETRIEVAL_CANDIDATES if mode == "browser" else k
     cutoff_score = BROWSER_INTERNAL_SCORE_CUTOFF

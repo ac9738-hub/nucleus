@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="Mail">
+  <defs>
+    <linearGradient id="mailGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7567d8"/>
+      <stop offset="100%" stop-color="#5aa9c8"/>
+    </linearGradient>
+  </defs>
+  <rect width="96" height="96" rx="20" fill="#0c1224"/>
+  <rect x="14" y="24" width="68" height="48" rx="10" fill="url(#mailGrad)"/>
+  <path d="M14 30 L48 54 L82 30" fill="none" stroke="#f4f7ff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

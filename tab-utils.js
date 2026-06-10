@@ -10,6 +10,14 @@ function isWebContentTab(tab) {
   return tab && (tab.type === "browsertab" || (tab.type === "canvastab" && tab.canvasMode === "browser"))
 }
 
+function isCanvasBrowserTab(tab) {
+  return tab && tab.type === "canvastab" && tab.canvasMode === "browser"
+}
+
+function isCanvasNativeTab(tab) {
+  return tab && tab.type === "canvastab" && tab.canvasMode !== "browser"
+}
+
 function normalizeFrameUrl(value) {
   if (!value) return ""
   try {
@@ -71,6 +79,8 @@ function normalizeBrowserUrl(value) {
 
 module.exports = {
   getFrameSnapshotName,
+  isCanvasBrowserTab,
+  isCanvasNativeTab,
   isLikelyDownloadUrl,
   isWebContentTab,
   normalizeBrowserUrl,

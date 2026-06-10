@@ -92,7 +92,7 @@ function sameTabId(left, right) {
 
 // push tab changes in renderer to main
 async function syncTabs() {
-  await window.nucleus.tabschanged(state.tabs);
+  await window.nucleus.tabschanged(state.tabs, state.activeTabId);
 }
 
 // get the activeTab
@@ -143,10 +143,18 @@ function getActiveCanvasTab() {
   return null;
 }
 
+function isNativeAppTab(tab) {
+  return tab && (
+    tab.type === "mailtab" ||
+    tab.type === "synapsetab" ||
+    (tab.type === "canvastab" && tab.canvasMode !== "browser")
+  );
+}
+
 // push the activetab in renderer to main to sync
 function syncActiveTab() {
   const activeTab = getActiveTab();
-  if (state.top === "workspace" && isWebContentTab(activeTab)) {
+  if (state.top === "workspace" && activeTab && (isWebContentTab(activeTab) || isNativeAppTab(activeTab))) {
     return window.nucleus.newactivetab(activeTab);
   }
   return window.nucleus.newactivetab("None");
@@ -253,7 +261,26 @@ function waitforwipe(wipeelement) {
   })
 }
 
+function isCanvasNativeTab(tab) {
+  return tab && tab.type === "canvastab" && tab.canvasMode !== "browser";
+}
+
+function isCanvasBrowserTab(tab) {
+  return tab && tab.type === "canvastab" && tab.canvasMode === "browser";
+}
+
+function resetCanvasWebChrome() {
+  hideCanvasBlankSlate();
+  const wipe = document.getElementById("tab-wipe");
+  if (wipe) {
+    wipe.classList.remove("show", "hide");
+  }
+}
+
 function showCanvasBlankSlate() {
+  const activeTab = getActiveTab();
+  if (!isCanvasBrowserTab(activeTab)) return;
+
   const blankSlate = document.getElementById('canvas-blank-slate')
   if (blankSlate) {
     blankSlate.classList.add('is-visible')
@@ -272,6 +299,9 @@ function hideCanvasBlankSlate() {
 
 // run the canvas wipe on its own timeline; loading reveals the view separately.
 async function handlecanvaspagechange() {
+  const activeTab = getActiveTab();
+  if (!isCanvasBrowserTab(activeTab)) return;
+
   const wipe = document.getElementById('tab-wipe')
 
   wipe.classList.remove('hide')
@@ -393,6 +423,8 @@ function pushCanvasNativeHistory(tab) {
 }
 
 async function restoreCanvasNativePage(tab) {
+  resetCanvasWebChrome();
+
   const history = Array.isArray(tab.nativeHistory) ? tab.nativeHistory : [];
   const nativeState = history.pop() || { page: "dashboard", courseId: null };
   tab.canvasMode = "native";
@@ -405,6 +437,8 @@ async function restoreCanvasNativePage(tab) {
 }
 
 async function openCanvasAppTab(workspaceId = getBrowserWorkspaceId(), courseId = null) {
+  resetCanvasWebChrome();
+
   const existing = state.tabs.find(tab => tab.type === "canvastab" && tab.workspaceId === workspaceId);
   const tab = existing || {
     id: `canvas:${workspaceId}`,
@@ -458,6 +492,8 @@ async function openCanvasAppTab(workspaceId = getBrowserWorkspaceId(), courseId 
 async function openCanvasAppInExistingTab(tabId) {
   const tab = state.tabs.find(item => sameTabId(item.id, tabId));
   if (!tab) return;
+
+  resetCanvasWebChrome();
 
   tab.type = "canvastab";
   tab.canvasMode = "native";

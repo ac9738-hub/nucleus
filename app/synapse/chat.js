@@ -79,8 +79,11 @@
     if (!list.length) {
       return (
         '<div class="synapse-thread-empty">' +
+        '<div class="synapse-empty-hero">' +
+        '<div class="synapse-empty-mark" aria-hidden="true"></div>' +
         "<h3>New conversation</h3>" +
         "<p>Ask anything. Synapse routes your message to a model and streams the reply.</p>" +
+        "</div>" +
         "</div>"
       );
     }
@@ -122,7 +125,9 @@
       "</div>" +
 
       '<form class="synapse-composer" data-synapse-send>' +
+      '<div class="synapse-composer-field">' +
       '<textarea data-synapse-input rows="1" placeholder="Message Synapse..." autocomplete="off"></textarea>' +
+      "</div>" +
       '<button type="submit" class="synapse-send-button" data-synapse-send-button>Send</button>' +
       "</form>" +
       "</section>"

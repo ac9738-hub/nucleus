@@ -1,0 +1,119 @@
+{
+  "contacts": {
+    "allen.chen2024@gmail.com": {
+      "email": "allen.chen2024@gmail.com",
+      "name": "Allen (alt)",
+      "addedAt": "2026-06-09T23:16:09.689Z"
+    },
+    "mail@junminghuang.com": {
+      "email": "mail@junminghuang.com",
+      "name": "Junming",
+      "addedAt": "2026-06-10T02:29:02.789Z"
+    }
+  },
+  "chats": {
+    "allen.chen2024@gmail.com": [
+      {
+        "messageId": "19eaead55c8f5322",
+        "threadId": "19eaead55c8f5322",
+        "subject": "wassup",
+        "from": "Allen Chen <allen.chen2024@gmail.com>",
+        "sender": "Allen Chen",
+        "date": "Tue, 9 Jun 2026 19:17:17 -0400",
+        "dateLabel": "7:17 PM",
+        "snippet": "how are you doing can you send me the lab report?",
+        "summary": "Request for lab report from sender. Deadline unclear.",
+        "summaryStatus": "ready",
+        "addedAt": "2026-06-09T23:17:41.757Z"
+      },
+      {
+        "messageId": "19eaeb845080ceb0",
+        "threadId": "19eaeb845080ceb0",
+        "subject": "hi",
+        "from": "ac9738@princeton.edu",
+        "sender": "ac9738@princeton.edu",
+        "to": "allen.chen2024@gmail.com",
+        "date": "Tue, 9 Jun 2026 16:29:32 -0700",
+        "dateLabel": "7:29 PM",
+        "snippet": "hey",
+        "summary": "hey",
+        "summaryStatus": "ready",
+        "direction": "outgoing",
+        "addedAt": "2026-06-09T23:29:31.503Z"
+      },
+      {
+        "messageId": "19eaeb8cf194429b",
+        "threadId": "19eaeb8cf194429b",
+        "subject": "whats the plan",
+        "from": "ac9738@princeton.edu",
+        "sender": "ac9738@princeton.edu",
+        "to": "allen.chen2024@gmail.com",
+        "date": "Tue, 9 Jun 2026 16:30:07 -0700",
+        "dateLabel": "7:30 PM",
+        "snippet": "What are we going to do today?",
+        "summary": "What are we going to do today?",
+        "summaryStatus": "ready",
+        "direction": "outgoing",
+        "addedAt": "2026-06-09T23:30:07.292Z"
+      },
+      {
+        "messageId": "19eaec0424bd347d",
+        "threadId": "19eaec0424bd347d",
+        "subject": "follow up",
+        "from": "Allen Chen <allen.chen2024@gmail.com>",
+        "sender": "Allen Chen",
+        "date": "Tue, 9 Jun 2026 19:37:56 -0400",
+        "dateLabel": "7:37 PM",
+        "snippet": "Here&#39;s one that&#39;s realistic and has a good mix of structured info, buried details, and implicit context for your model to catch: From: Sarah Chen s.chen@bridgewaterpartners.io To: Alex Morgan a",
+        "summary": "\"Follow-up on Meridian acquisition: review comments from Willkie Farr and Harlow Capital, discuss financing terms and Thursday's meeting logistics.\"",
+        "summaryStatus": "ready",
+        "direction": "incoming",
+        "addedAt": "2026-06-09T23:38:34.219Z"
+      }
+    ],
+    "mail@junminghuang.com": [
+      {
+        "messageId": "19ea8aad6d3eb8c8",
+        "threadId": "19ea8aad6d3eb8c8",
+        "subject": "Communication thread: Allen and Junming",
+        "from": "Junming Huang <mail@junminghuang.com>",
+        "sender": "Junming Huang",
+        "date": "Mon, 8 Jun 2026 15:16:24 -0400",
+        "dateLabel": "Jun 8",
+        "snippet": "Hi Allen, Welcome aboard. I&#39;m glad to have you join the team, and I look forward to working with you. To ensure smoother communication and keep our inboxes organized, I kindly request that we",
+        "summary": "Download ground truth datasets and link them to OpenAlex by June 10th. Verify Chinese scientists leaving the US using attached zip file by June 15th. Book time with Junming for chat whenever needed.",
+        "summaryStatus": "ready",
+        "direction": "incoming",
+        "addedAt": "2026-06-10T02:29:02.805Z"
+      },
+      {
+        "messageId": "19ea80074962e4be",
+        "threadId": "19e43757b9eb90b5",
+        "subject": "Re: Allen Chen internship project discussion",
+        "from": "Junming Huang <mail@junminghuang.com>",
+        "sender": "Junming Huang",
+        "date": "Mon, 8 Jun 2026 12:10:43 -0400",
+        "dateLabel": "Jun 8",
+        "snippet": "Besides, please apply for this internship position on JobX so we could finish the payment paperwork. Research Assistant Job ID 7536 Job Type Undergraduate Jobs Employer PII-Contemporary China Center",
+        "summary": "Apply for this internship position on JobX to finish payment paperwork. The job ID is 7536.",
+        "summaryStatus": "ready",
+        "direction": "incoming",
+        "addedAt": "2026-06-10T02:29:02.806Z"
+      },
+      {
+        "messageId": "19ea7fae971ba397",
+        "threadId": "19e43757b9eb90b5",
+        "subject": "Re: Allen Chen internship project discussion",
+        "from": "Junming Huang <mail@junminghuang.com>",
+        "sender": "Junming Huang",
+        "date": "Mon, 8 Jun 2026 12:04:38 -0400",
+        "dateLabel": "Jun 8",
+        "snippet": "Yes. My office is 363 Wallace Hall. Are you coming in person or remotely? Junming Huang Paul and Marcia Wythes Center on Contemporary China at Princeton University http://www.junminghuang.com/ mail@",
+        "summary": "Meet Friday 3pm to review Q2 budget; bring revised forecast.",
+        "summaryStatus": "ready",
+        "direction": "incoming",
+        "addedAt": "2026-06-10T02:29:02.806Z"
+      }
+    ]
+  }
+}

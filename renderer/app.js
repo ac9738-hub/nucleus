@@ -390,6 +390,7 @@ function tabKindLabel(tab) {
   if (!tab) return "Tab";
   if (tab.type === "canvastab") return tab.canvasMode === "browser" ? "Canvas page" : "Canvas";
   if (tab.type === "synapsetab") return "Synapse";
+  if (tab.type === "mailtab") return "Mail";
   if (tab.type === "browsertab") return "Browser";
   if (tab.type === "task") return "Task";
   return "Workspace";
@@ -618,6 +619,33 @@ function renderCalendarPlaceholder() {
   `;
 }
 
+function renderWorkspaceApps() {
+  const apps = [
+    { name: "Canvas", open: "data-open-canvas-app", iconClass: "canvas-app-icon", icon: "app/canvas/assets/canvas_icon.png" },
+    { name: "Synapse", open: "data-open-synapse-app", iconClass: "synapse-app-icon", icon: "app/synapse/assets/synapse_icon.png" },
+    { name: "Mail", open: "data-open-mail-app", iconClass: "mail-app-icon", icon: "app/mail/assets/mail_icon.svg" }
+  ];
+
+  return `
+    <section class="project-section">
+      <div class="section-heading">
+        <h2>Apps</h2>
+        <span>${apps.length}</span>
+      </div>
+      <div class="app-grid">
+        ${apps.map(app => `
+          <article class="app-launch-card" ${app.open}="true" tabindex="0" role="button" aria-label="Open ${escapeHtml(app.name)}">
+            <div class="app-icon ${escapeHtml(app.iconClass)}" aria-hidden="true">
+              <img src="${escapeHtml(app.icon)}" alt="">
+            </div>
+            <span class="app-name">${escapeHtml(app.name)}</span>
+          </article>
+        `).join("")}
+      </div>
+    </section>
+  `;
+}
+
 //  return the html of the projectcenter tab
 function renderProjectCenter(workspace) {
   return `
@@ -625,6 +653,8 @@ function renderProjectCenter(workspace) {
       <h1>${escapeHtml(workspace.name)} Project Center</h1>
       <p>${escapeHtml(workspace.description)}</p>
     </header>
+
+    ${renderWorkspaceApps()}
 
     <section class="workspace-panel">
       <div>
@@ -684,6 +714,7 @@ function renderView() {
   } else if (activeTab.type === "task") {
     view.innerHTML = renderTaskWorkspace(activeTab);
   } else if (activeTab.type === "canvastab" && activeTab.canvasMode !== "browser") {
+    resetCanvasWebChrome();
     view.innerHTML = window.nucleusCanvasApp
       ? window.nucleusCanvasApp.renderCanvasApp(activeTab, canvasData)
       : `<section class="workspace-panel"><div><h2>Canvas</h2><p>The Canvas app script did not load.</p></div></section>`;
@@ -691,6 +722,10 @@ function renderView() {
     view.innerHTML = window.nucleusSynapseApp
       ? window.nucleusSynapseApp.renderSynapseApp(activeTab, synapseState)
       : `<section class="workspace-panel"><div><h2>Synapse</h2><p>The Synapse app script did not load.</p></div></section>`;
+  } else if (activeTab.type === "mailtab") {
+    view.innerHTML = window.nucleusMailApp
+      ? window.nucleusMailApp.renderMailApp(activeTab, mailState)
+      : `<section class="workspace-panel"><div><h2>Mail</h2><p>The Mail app script did not load.</p></div></section>`;
   } else if (isWebContentTab(activeTab)) {
     view.innerHTML = "";
   } else {
@@ -758,7 +793,7 @@ function renderView() {
       const activeTab = getActiveTab();
       if (!activeTab || activeTab.type !== "canvastab" || activeTab.canvasMode === "browser") return;
       const section = button.dataset.courseSection;
-      if (!["homepage", "assignments", "modules", "files"].includes(section)) return;
+      if (!["homepage", "assignments", "weekly", "modules", "files"].includes(section)) return;
       rememberActiveCanvasYIndex();
       activeTab.courseSection = section;
       activeTab.yindex = 0;
@@ -769,11 +804,11 @@ function renderView() {
 
   view.querySelectorAll("[data-open-canvas-app]").forEach(card => {
     const openCanvas = () => openCanvasAppTab(getBrowserWorkspaceId());
-    card.addEventListener("click", () => activateAppIcon(card, openCanvas));
+    card.addEventListener("click", () => openCanvas());
     card.addEventListener("keydown", event => {
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
-        activateAppIcon(card, openCanvas);
+        openCanvas();
       }
     });
   });
@@ -803,6 +838,17 @@ function renderView() {
       }
     });
   });
+  view.querySelectorAll("[data-open-mail-app]").forEach(card => {
+    const openMail = () => openMailAppTab(getBrowserWorkspaceId());
+    card.addEventListener("click", () => activateAppIcon(card, openMail));
+    card.addEventListener("keydown", event => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        activateAppIcon(card, openMail);
+      }
+    });
+  });
+
   // --- Synapse handlers ---
   view.querySelectorAll("[data-open-synapse-app]").forEach(card => {
     const openSynapse = () => openSynapseAppTab(getBrowserWorkspaceId());
@@ -868,6 +914,9 @@ function renderView() {
 
   // Mount/teardown the Synapse streaming chat controller for this view.
   mountSynapseControllerIfNeeded(view, activeTab);
+  if (window.nucleusMailApp && typeof window.nucleusMailApp.mountMailControllerIfNeeded === "function") {
+    window.nucleusMailApp.mountMailControllerIfNeeded(view, activeTab);
+  }
 }
 
 // renders whole page
