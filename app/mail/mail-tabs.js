@@ -114,7 +114,14 @@ function getRoutedMessageIdSet() {
 function applyContactRoutingToInbox() {
   const routedIds = getRoutedMessageIdSet();
   const source = Array.isArray(mailState.allMessages) ? mailState.allMessages : mailState.messages;
-  mailState.messages = source.filter(message => message && !routedIds.has(message.id));
+  let visible = source.filter(Boolean);
+  if (mailState.folder === "inbox" && !mailState.searchQuery) {
+    visible = visible.filter(message => message.inboxCategory !== "non_academic");
+    visible = visible.filter(message => !routedIds.has(message.id));
+  } else if (mailState.folder === "secondary" && !mailState.searchQuery) {
+    visible = visible.filter(message => message.inboxCategory === "non_academic");
+  }
+  mailState.messages = visible;
 }
 
 function ensureActiveContactSelection() {
@@ -223,6 +230,29 @@ function openMailComposeToContact(email) {
   openMailCompose({ mode: "new", to: recipient });
 }
 
+function replyToChatEntry(messageId) {
+  const email = mailState.contactsUi.activeContactEmail;
+  if (!email) {
+    setMailStatus("Select a contact before replying.");
+    return;
+  }
+
+  const chats = mailState.contactsData && mailState.contactsData.chats ? mailState.contactsData.chats : {};
+  const entries = Array.isArray(chats[email]) ? chats[email] : [];
+  const entry = entries.find(item => item && item.messageId === messageId) || null;
+
+  const baseSubject = entry && entry.subject ? entry.subject : "";
+  const subject = /^re:/i.test(baseSubject) ? baseSubject : `Re: ${baseSubject}`.trim();
+
+  openMailCompose({
+    mode: "reply",
+    to: email,
+    subject: subject || "Re:",
+    threadId: entry ? entry.threadId || "" : "",
+    replyToId: messageId
+  });
+}
+
 async function openMailChatDetail(messageId) {
   if (!messageId || !window.nucleus || typeof window.nucleus.getMailMessage !== "function") return;
 
@@ -298,7 +328,7 @@ function handleInboxDelta(delta) {
 
   // historyId aged out of Gmail's window: resync from scratch.
   if (delta.reset) {
-    if (active && mailState.folder === "inbox" && !mailState.searchQuery) {
+    if (active && (mailState.folder === "inbox" || mailState.folder === "secondary") && !mailState.searchQuery) {
       refreshMailInbox();
     } else {
       mailState.initialized = false;
@@ -313,7 +343,7 @@ function handleInboxDelta(delta) {
     changed = true;
   }
 
-  const onInbox = mailState.folder === "inbox" && !mailState.searchQuery;
+  const onInbox = (mailState.folder === "inbox" || mailState.folder === "secondary") && !mailState.searchQuery;
   let freshMessages = [];
 
   if (onInbox) {
@@ -408,7 +438,7 @@ async function loadMailView(options = {}) {
     mailState.allMessages = result.view && Array.isArray(result.view.messages) ? result.view.messages : [];
     mailState.messages = mailState.allMessages.slice();
 
-    if (folder === "inbox" && !q) {
+    if ((folder === "inbox" || folder === "secondary") && !q) {
       await syncMailContactsFromInbox(mailState.allMessages);
     } else {
       applyContactRoutingToInbox();

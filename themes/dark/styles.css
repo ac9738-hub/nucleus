@@ -2362,3 +2362,27 @@ body.workspace-sidebar-collapsed .profile-meta {
 /* =========================
    MOBILE
 ========================= */
+
+/* dark theme package overrides */
+:root {
+  color-scheme: dark;
+  --bg: #090d14;
+  --surface: #121824;
+  --surface-2: #1a2233;
+  --border: rgba(118, 133, 170, 0.24);
+  --text: #edf2ff;
+  --text-dim: #a9b7d6;
+  --text-mute: #7484a9;
+  --accent: #7489ff;
+  --accent-2: #5aa9c8;
+  --accent-3: #59c2a2;
+  --accent-warm: #c69b5c;
+}
+
+body {
+  background:
+    radial-gradient(circle at 18% 10%, rgba(116, 137, 255, 0.16), transparent 30%),
+    radial-gradient(circle at 76% 16%, rgba(90, 169, 200, 0.12), transparent 32%),
+    linear-gradient(145deg, #0b111c 0%, #090d14 55%, #070b11 100%);
+  color: var(--text);
+}

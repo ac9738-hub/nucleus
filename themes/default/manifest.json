@@ -1,0 +1,16 @@
+{
+  "name": "default",
+  "rendererStylesheets": [
+    "themes/default/styles.css",
+    "themes/default/synapse.css",
+    "themes/default/mail.css"
+  ],
+  "canvas": {
+    "criticalGradient": "linear-gradient(135deg, #0c1224 0%, #050916 100%)",
+    "mainInjectionPath": "themes/default/injection.css",
+    "iframeInjectionPathsById": {
+      "preview_frame": "themes/default/preview_frame.css",
+      "tool_content": "themes/default/injection.css"
+    }
+  }
+}

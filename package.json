@@ -5,7 +5,10 @@
   "main": "main.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "set ELECTRON_RUN_AS_NODE=&& electron ."
+    "start": "set ELECTRON_RUN_AS_NODE=&& electron .",
+    "start:default": "set ELECTRON_RUN_AS_NODE=&& set NUCLEUS_THEME=default&& electron .",
+    "start:dark": "set ELECTRON_RUN_AS_NODE=&& set NUCLEUS_THEME=dark&& electron .",
+    "start:white": "set ELECTRON_RUN_AS_NODE=&& set NUCLEUS_THEME=white&& electron ."
   },
   "keywords": [],
   "author": "",
@@ -17,6 +20,7 @@
   "dependencies": {
     "@datastructures-js/priority-queue": "^6.3.5",
     "axios": "^1.16.1",
+    "date-fns": "^4.4.0",
     "googleapis": "^173.0.0"
   }
 }

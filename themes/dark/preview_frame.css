@@ -1,0 +1,166 @@
+/*
+  Canvas iframe preview injection stylesheet.
+  Functionality: restyles selected Canvas preview/tool iframes embedded inside
+  Canvas pages.
+  Dependencies: main.js iframe injection target collection and app/canvas/preload.js.
+*/
+:root {
+  --bg: #0f1117;
+  --surface: #171a21;
+  --surface-2: #1d212b;
+  --surface-3: #242936;
+  --border: #262b36;
+  --text: #e7e9ee;
+  --text-dim: #9aa1b1;
+  --accent: #938cff;
+}
+
+html,
+body {
+  background: var(--surface) !important;
+  color: var(--text) !important;
+  color-scheme: dark !important;
+}
+
+body,
+body * {
+  color: var(--text) !important;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+div,
+span {
+  color: var(--text) !important;
+}
+
+[style*="background"],
+[style*="background-color"] {
+  background-color: transparent !important;
+}
+
+.file-upload-submission-table {
+  background: var(--surface) !important;
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+  color: var(--text) !important;
+  margin: 0 !important;
+  width: 100% !important;
+}
+
+.file-upload-submission-table thead,
+.file-upload-submission-table tbody,
+.file-upload-submission-table tr,
+.file-upload-submission-table th,
+.file-upload-submission-table td {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+
+.file-upload-submission-table th {
+  color: var(--text-dim) !important;
+  font-weight: 700 !important;
+  padding: 10px 12px !important;
+}
+
+.file-upload-submission-table td {
+  padding: 11px 12px !important;
+  vertical-align: middle !important;
+}
+
+.file-upload-submission {
+  background: var(--surface-2) !important;
+}
+
+.file-upload-submission > td {
+  background: var(--surface-2) !important;
+  border-top: 1px solid var(--border) !important;
+  border-bottom: 1px solid var(--border) !important;
+}
+
+.file-upload-submission > td:first-child {
+  border-left: 1px solid var(--border) !important;
+}
+
+.file-upload-submission > td:last-child {
+  border-right: 1px solid var(--border) !important;
+}
+
+.file-upload-submission-info {
+  min-width: 0 !important;
+}
+
+.file-upload-submission-info__link,
+.file-upload-submission-info__link:visited {
+  color: var(--text) !important;
+  font-weight: 600 !important;
+  text-decoration: none !important;
+}
+
+.file-upload-submission-info__link:hover,
+.modal_preview_link:hover {
+  color: var(--accent) !important;
+  text-decoration: underline !important;
+}
+
+.file-upload-submission-info__filesize {
+  color: var(--text-dim) !important;
+  margin-left: 6px !important;
+}
+
+.file-upload-submission-attachment {
+  text-align: right !important;
+  white-space: nowrap !important;
+}
+
+.modal_preview_link,
+.modal_preview_link:visited,
+.Button--link.modal_preview_link {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  color: var(--accent) !important;
+  font-weight: 600 !important;
+  padding: 0 !important;
+  text-decoration: none !important;
+}
+
+.asset-report-status-container,
+.file-upload-submission-turnitin {
+  background: var(--surface-2) !important;
+  color: var(--text-dim) !important;
+}
+
+button,
+.Button,
+.btn,
+input,
+textarea,
+select {
+  background: var(--surface-2) !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+
+/* dark theme package overrides */
+:root {
+  --bg: #090d14;
+  --surface: #141b2a;
+  --surface-2: #1b2437;
+  --surface-3: #232d43;
+  --border: rgba(118, 133, 170, 0.24);
+  --text: #edf2ff;
+  --text-dim: #a9b7d6;
+  --accent: #7489ff;
+}
+
+html,
+body {
+  color-scheme: dark !important;
+}

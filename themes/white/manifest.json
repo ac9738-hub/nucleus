@@ -1,0 +1,16 @@
+{
+  "name": "white",
+  "rendererStylesheets": [
+    "themes/white/styles.css",
+    "themes/white/synapse.css",
+    "themes/white/mail.css"
+  ],
+  "canvas": {
+    "criticalGradient": "linear-gradient(135deg, #ffffff 0%, #eef2f8 100%)",
+    "mainInjectionPath": "themes/white/injection.css",
+    "iframeInjectionPathsById": {
+      "preview_frame": "themes/white/preview_frame.css",
+      "tool_content": "themes/white/injection.css"
+    }
+  }
+}

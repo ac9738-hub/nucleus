@@ -289,11 +289,12 @@ function renderTaskCard(task) {
   const cardStyle = borderColor ? ` style="--task-course-border:${borderColor}"` : "";
   const courseName = getCanvasCourseDisplayName(task);
   const encodedUrls = encodeURIComponent(JSON.stringify(urls));
+  const dueText = formatTaskDueDisplay(task.due);
   return `
     <article class="task-card" data-id="${escapeHtml(task.id)}" data-task-urls="${escapeHtml(encodedUrls)}"${cardStyle}>
       <div class="task-header">
         <span class="task-course" style="background:${escapeHtml(task.color)}">${escapeHtml(courseName)}</span>
-        <span class="task-due">Due ${escapeHtml(task.due)}</span>
+        <span class="task-due">${escapeHtml(dueText)}</span>
       </div>
       <h2>${escapeHtml(task.title)}</h2>
       <p title="${escapeHtml(details)}">${escapeHtml(details)}</p>
@@ -316,6 +317,36 @@ function getTasksForCards() {
 function dueTimestamp(value) {
   const timestamp = Date.parse(value || "");
   return Number.isFinite(timestamp) ? timestamp : Number.POSITIVE_INFINITY;
+}
+
+function formatDueDateDDMM(value) {
+  const timestamp = dueTimestamp(value);
+  if (!Number.isFinite(timestamp)) return "No due date";
+  const date = new Date(timestamp);
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  return `${day}/${month}`;
+}
+
+function getDaysTillDue(value) {
+  const timestamp = dueTimestamp(value);
+  if (!Number.isFinite(timestamp)) return null;
+  const due = new Date(timestamp);
+  const dueDay = new Date(due.getFullYear(), due.getMonth(), due.getDate());
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const msPerDay = 24 * 60 * 60 * 1000;
+  return Math.ceil((dueDay - today) / msPerDay);
+}
+
+function formatTaskDueDisplay(value) {
+  const ddmm = formatDueDateDDMM(value);
+  const days = getDaysTillDue(value);
+  if (days == null) return ddmm;
+  if (days < 0) return `${ddmm} • ${Math.abs(days)}d overdue`;
+  if (days === 0) return `${ddmm} • due today`;
+  if (days === 1) return `${ddmm} • 1 day left`;
+  return `${ddmm} • ${days} days left`;
 }
 
 function formatHubDue(value) {
@@ -673,11 +704,12 @@ function renderTaskWorkspace(tab) {
   const task = tasks.find(item => item.id === tab.taskId);
   if (!task) return renderProjectCenter(getWorkspace(state.activeWorkspaceId));
   const courseName = getCanvasCourseDisplayName(task);
+  const dueText = formatTaskDueDisplay(task.due);
 
   return `
     <header>
       <h1>${escapeHtml(task.title)}</h1>
-      <p>${escapeHtml(courseName)} / Due ${escapeHtml(task.due)} / ${escapeHtml(task.estimate)}</p>
+      <p>${escapeHtml(courseName)} / ${escapeHtml(dueText)} / ${escapeHtml(task.estimate)}</p>
     </header>
 
     <section class="workspace-panel">

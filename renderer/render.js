@@ -600,6 +600,84 @@ function startagent() {
 }
 
 
+// ─── Settings + Theme ─────────────────────────────────────────────────────────
+
+// Replaces the active theme <link> tags so a theme switch applies without a
+// full window reload (preserving open tabs and app state).
+function applyThemeStylesheets(stylesheets) {
+  if (!Array.isArray(stylesheets) || !stylesheets.length) return;
+  const head = document.head;
+  const previous = Array.from(head.querySelectorAll('link[data-theme-style]'));
+  // Cache-bust so the same path under a new theme reloads even if cached.
+  const stamp = Date.now();
+  const fresh = stylesheets.map(href => {
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = `${href}?v=${stamp}`;
+    link.dataset.themeStyle = "1";
+    head.appendChild(link);
+    return link;
+  });
+  // Remove the old sheets once the new ones are in the DOM to avoid a flash.
+  requestAnimationFrame(() => previous.forEach(link => link.remove()));
+  return fresh;
+}
+
+async function renderThemeOptions() {
+  const container = document.getElementById("theme-options");
+  if (!container || !window.nucleus || typeof window.nucleus.listThemes !== "function") return;
+
+  let data;
+  try {
+    data = await window.nucleus.listThemes();
+  } catch (error) {
+    console.error("Unable to list themes:", error);
+    return;
+  }
+
+  const themes = (data && Array.isArray(data.themes)) ? data.themes : [];
+  const active = data && data.active ? data.active : "default";
+
+  container.innerHTML = themes.map(theme => `
+    <button type="button" class="theme-option ${theme.name === active ? "active" : ""}" data-theme="${escapeHtml(theme.name)}">
+      <span class="theme-swatch theme-swatch--${escapeHtml(theme.name)}" aria-hidden="true"></span>
+      <span class="theme-option-label">${escapeHtml(theme.label || theme.name)}</span>
+      <span class="theme-option-check" aria-hidden="true">✓</span>
+    </button>
+  `).join("");
+
+  container.querySelectorAll(".theme-option").forEach(button => {
+    button.addEventListener("click", async () => {
+      const name = button.dataset.theme;
+      if (!name || button.classList.contains("active")) return;
+      try {
+        const result = await window.nucleus.setTheme(name);
+        if (result && result.ok) {
+          applyThemeStylesheets(result.rendererStylesheets);
+          container.querySelectorAll(".theme-option").forEach(option => {
+            option.classList.toggle("active", option.dataset.theme === (result.active || name));
+          });
+        }
+      } catch (error) {
+        console.error("Unable to set theme:", error);
+      }
+    });
+  });
+}
+
+function openSettings() {
+  const overlay = document.getElementById("settings-overlay");
+  if (!overlay) return;
+  overlay.classList.remove("is-hidden");
+  renderThemeOptions();
+}
+
+function closeSettings() {
+  const overlay = document.getElementById("settings-overlay");
+  if (!overlay) return;
+  overlay.classList.add("is-hidden");
+}
+
 // ─── Startup ──────────────────────────────────────────────────────────────────
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -608,6 +686,22 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
   document.getElementById("workspace-sidebar-toggle").addEventListener("click", toggleWorkspaceSidebar);
   document.getElementById("new-workspace-button").addEventListener("click", showNewWorkspaceForm);
+
+  const openSettingsButton = document.getElementById("open-settings-button");
+  if (openSettingsButton) openSettingsButton.addEventListener("click", openSettings);
+  const profileCard = document.getElementById("profile-card");
+  if (profileCard) profileCard.addEventListener("click", openSettings);
+  const closeSettingsButton = document.getElementById("close-settings-button");
+  if (closeSettingsButton) closeSettingsButton.addEventListener("click", closeSettings);
+  const settingsOverlay = document.getElementById("settings-overlay");
+  if (settingsOverlay) {
+    settingsOverlay.addEventListener("click", event => {
+      if (event.target === settingsOverlay) closeSettings();
+    });
+  }
+  document.addEventListener("keydown", event => {
+    if (event.key === "Escape") closeSettings();
+  });
   document.getElementById("cancel-new-workspace").addEventListener("click", hideNewWorkspaceForm);
   document.getElementById("new-workspace-form").addEventListener("submit", event => {
     event.preventDefault();

@@ -5,6 +5,9 @@
 const { contextBridge, ipcRenderer } = require('electron');
  
 contextBridge.exposeInMainWorld('nucleus', {
+  getThemeConfig: () => ipcRenderer.sendSync('theme:get_config'),
+  listThemes: () => ipcRenderer.invoke('theme:list'),
+  setTheme: (name) => ipcRenderer.invoke('theme:set', name),
   startTask:    (task)    => ipcRenderer.invoke('tasks:start', task),
   tabschanged:  (tabs, activeTabId = null) => ipcRenderer.invoke('tabs:push', { tabs, activeTabId }),
   newactivetab: (tab)     => ipcRenderer.invoke('tabs:new_active', tab),

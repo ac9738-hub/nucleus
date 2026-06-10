@@ -30,6 +30,14 @@ const {
 const { createCanvasApi } = require('./app/canvas/api')
 const { createSynapseClient } = require('./app/synapse/client')
 const {
+  getThemeSelection,
+  getRendererStylesheets,
+  getCanvasThemeConfig,
+  readThemeCss,
+  setStoredTheme,
+  listThemes
+} = require('./theme-manager')
+const {
   creategmailauthview,
   get_token,
   getmail,
@@ -669,9 +677,22 @@ class BrowserPool {
 const browserpool = new BrowserPool()
 const envPath = path.join(__dirname, '.env')
 const synapseClient = createSynapseClient({ getApiKey: () => getEnvValue('ANTHROPIC_API_KEY') })
-const iframeInjectionFilesById = {
-  preview_frame: 'preview_frame.css',
-  tool_content: 'injection.css'
+let themeSelection = getThemeSelection(__dirname)
+let activeThemeManifest = themeSelection.manifest
+let activeThemeName = themeSelection.activeTheme
+let canvasThemeConfig = getCanvasThemeConfig(__dirname)
+let iframeInjectionFilesById = canvasThemeConfig.iframeInjectionPathsById
+
+// Re-reads theme config after a runtime theme switch so newly created Canvas
+// tabs and injection lookups use the new theme. The renderer stylesheets are
+// hot-swapped separately by the renderer; the warm-blank data URL keeps its
+// original identity (used in equality checks) and refreshes on next restart.
+function refreshThemeRuntime() {
+  themeSelection = getThemeSelection(__dirname)
+  activeThemeManifest = themeSelection.manifest
+  activeThemeName = themeSelection.activeTheme
+  canvasThemeConfig = getCanvasThemeConfig(__dirname)
+  iframeInjectionFilesById = canvasThemeConfig.iframeInjectionPathsById
 }
 const canvasBlankWarmUrl = "data:text/html;charset=utf-8," + encodeURIComponent(`
   <!doctype html>
@@ -681,7 +702,7 @@ const canvasBlankWarmUrl = "data:text/html;charset=utf-8," + encodeURIComponent(
       <style>
         html,
         body {
-          background: linear-gradient(135deg, #0c1224 0%, #050916 100%);
+          background: ${canvasThemeConfig.criticalGradient};
           background-attachment: fixed;
           margin: 0;
           min-height: 100%;
@@ -894,14 +915,14 @@ async function senduserprompt(payload) {
       ? await vectorRetrieval.sendQuery(messageText, { mode: 'agent' })
       : []
     const retrievalContext = vectorRetrieval.contextFor(startpoints)
-    if (typeof messagePayload === 'object' && messagePayload !== null) {
-      agent.send(['message', {
-        ...messagePayload,
-        text: `${messageText}${retrievalContext}`
-      }])
-    } else {
-      agent.send(['message', `${messageText}${retrievalContext}`])
-    }
+    const appStateContext = buildLiveAppStateText()
+    const payloadObject = typeof messagePayload === 'object' && messagePayload !== null
+      ? { ...messagePayload }
+      : { text: String(messagePayload || '') }
+    const existingSystemContext = String(payloadObject.systemContext || '').trim()
+    payloadObject.systemContext = [existingSystemContext, appStateContext].filter(Boolean).join('\n\n')
+    payloadObject.text = `${messageText}${retrievalContext}`
+    agent.send(['message', payloadObject])
     return
   }
   agent.send(payload)
@@ -923,6 +944,7 @@ let currentCanvasPageContext = null
 let lastCanvasVisibleContextKey = ''
 let canvasVisibleContextPollInFlight = false
 let canvasVisibleContextUpdateQueued = false
+let lastAppStateLogKey = ''
 // Cached lightweight Canvas graph index. The on-disk canvas_graph.json can be
 // hundreds of MB, so we parse it at most once per file change and keep only the
 // fields the visible-context feature needs (plus precomputed lookup maps).
@@ -998,7 +1020,7 @@ addCanvasTasks(canvasApi.getCanvasTasksFromDisk(), { restartVector: false })
 
 // return the contents of a file
 function readInjectionCssFile(filename) {
-  return fs.readFileSync(path.join(__dirname, filename), 'utf-8')
+  return readThemeCss(__dirname, filename, '')
 }
 
 function getEngineUrl() {
@@ -1421,6 +1443,44 @@ function compactText(value, maxLength = 180) {
     .slice(0, maxLength)
 }
 
+function formatCanvasContextForLumi(context) {
+  if (!context || typeof context !== 'object') return ''
+
+  const pages = Array.isArray(context.pages) ? context.pages : []
+  const pageSummary = pages.length
+    ? pages.map(page => {
+      const num = page && page.pageNumber != null ? `p${page.pageNumber}` : 'p?'
+      const y = Math.round(Number(page && page.yScroll) || 0)
+      const ratio = Number(page && page.yScrollRatio)
+      const ratioText = Number.isFinite(ratio) && ratio > 0 ? ` (${(ratio * 100).toFixed(1)}%)` : ''
+      return `${num}@y=${y}${ratioText}`
+    }).join(', ')
+    : 'none'
+
+  const concepts = Array.isArray(context.concepts) ? context.concepts : []
+  const details = Array.isArray(context.details) ? context.details : []
+  const examples = Array.isArray(context.examples) ? context.examples : []
+  const problems = Array.isArray(context.problems) ? context.problems : []
+  const conceptNames = concepts
+    .map(item => String(item && item.name || '').trim())
+    .filter(Boolean)
+    .slice(0, 8)
+    .join(', ')
+
+  const lines = [
+    'Canvas visible context (live):',
+    `URL: ${String(context.url || '')}`,
+    `File: ${String(context.filename || '')}${context.fileid ? ` (${context.fileid})` : ''}`,
+    `Course: ${String(context.courseid || '')}`,
+    `Viewport: scrollY=${Math.round(Number(context.scrollY) || 0)}, viewportHeight=${Math.round(Number(context.viewportHeight) || 0)}, scrollHeight=${Math.round(Number(context.scrollHeight) || 0)}`,
+    `Visible pages: ${pageSummary}`,
+    `Visible nodes: concepts=${concepts.length}, details=${details.length}, examples=${examples.length}, problems=${problems.length}`,
+    conceptNames ? `Top concepts: ${conceptNames}` : ''
+  ].filter(Boolean)
+
+  return lines.join('\n')
+}
+
 function pruneCanvasSourcePages(node) {
   return Array.isArray(node && node.sourcePages)
     ? node.sourcePages.map(page => ({ pageid: page && page.pageid }))
@@ -1761,11 +1821,166 @@ function buildCanvasPageContext(graph, fileMatch, url, scrollState, precomputedI
 
 function setCurrentCanvasPageContext(context) {
   currentCanvasPageContext = context || null
+  logAppState('canvas-context')
   BrowserWindow.getAllWindows().forEach(window => {
     if (!window.isDestroyed()) {
       window.webContents.send('canvas:visible_context', currentCanvasPageContext)
     }
   })
+}
+
+// Per-tab fields the LLM state cares about (every open tab, active or not).
+function compactTabForState(tab) {
+  if (!tab) return null
+  const active = activetab !== 'None' && sameTabId(activetab.id, tab.id)
+  const entry = {
+    id: tab.id,
+    type: tab.type,
+    label: tab.label || '',
+    url: tab.url || '',
+    workspaceId: tab.workspaceId || '',
+    active
+  }
+  if (tab.courseId) entry.courseId = tab.courseId
+  if (tab.type === 'canvastab') entry.canvasMode = tab.canvasMode || 'native'
+  if (tab.courseSection) entry.courseSection = tab.courseSection
+  if (tab.canvasNativePage) entry.canvasNativePage = tab.canvasNativePage
+  if (tab.loading) entry.loading = true
+  return entry
+}
+
+// Describes the surface actually painted in the main content area right now.
+function describeRenderedSurface(activeTab) {
+  if (!activeTab) {
+    return { kind: 'home', description: 'Home / launcher (no tab surface active)' }
+  }
+  if (isCanvasBrowserTab(activeTab)) {
+    return {
+      kind: 'canvas-web',
+      description: `Canvas web page${activeTab.url ? ` — ${activeTab.url}` : ''}`
+    }
+  }
+  if (isCanvasNativeTab(activeTab)) {
+    const parts = []
+    if (activeTab.courseId) parts.push(`course ${activeTab.courseId}`)
+    if (activeTab.courseSection) parts.push(`section: ${activeTab.courseSection}`)
+    if (activeTab.canvasNativePage) parts.push(`page: ${activeTab.canvasNativePage}`)
+    return {
+      kind: 'canvas-native',
+      description: `Canvas native view${parts.length ? ` — ${parts.join(', ')}` : ''}`
+    }
+  }
+  if (activeTab.type === 'mailtab') {
+    return { kind: 'mail', description: 'Mail app' }
+  }
+  if (activeTab.type === 'synapsetab') {
+    return { kind: 'synapse', description: 'Synapse AI chat app' }
+  }
+  if (activeTab.type === 'browsertab') {
+    return { kind: 'web', description: `Web page${activeTab.url ? ` — ${activeTab.url}` : ''}` }
+  }
+  return { kind: activeTab.type || 'unknown', description: activeTab.type || 'unknown surface' }
+}
+
+// Aggregates the full user-facing state: what is rendered now, the active tab,
+// every other open tab, and the live Canvas visible-context when present.
+function buildAppStateSnapshot() {
+  const active = activetab !== 'None' ? activetab : null
+  const tabs = currtabs.filter(Boolean).map(compactTabForState).filter(Boolean)
+  return {
+    rendered: describeRenderedSurface(active),
+    activeTab: active ? compactTabForState(active) : null,
+    openTabs: tabs,
+    canvas: currentCanvasPageContext || null
+  }
+}
+
+// Renders the snapshot into the plain-text block injected into the LLM system
+// prompt (senduserprompt) and mirrored into llm_context_log.jsonl.
+function buildLiveAppStateText() {
+  const snapshot = buildAppStateSnapshot()
+  const describeTabLine = tab => {
+    const meta = []
+    if (tab.workspaceId) meta.push(`ws: ${tab.workspaceId}`)
+    if (tab.courseId) meta.push(`course: ${tab.courseId}`)
+    if (tab.canvasMode) meta.push(`mode: ${tab.canvasMode}`)
+    if (tab.courseSection) meta.push(`section: ${tab.courseSection}`)
+    if (tab.canvasNativePage) meta.push(`page: ${tab.canvasNativePage}`)
+    if (tab.loading) meta.push('loading')
+    const flag = tab.active ? '* ' : '  '
+    const url = tab.url ? ` — ${tab.url}` : ''
+    const metaText = meta.length ? ` (${meta.join(', ')})` : ''
+    return `${flag}[${tab.type}] "${tab.label || 'Untitled'}"${url}${metaText}`
+  }
+
+  const lines = ['Live app state:']
+  lines.push(`Currently rendered: ${snapshot.rendered.description}`)
+  lines.push(snapshot.activeTab
+    ? `Active tab: ${describeTabLine(snapshot.activeTab).trim()}`
+    : 'Active tab: none (home / launcher)')
+  lines.push('')
+  lines.push(`Open tabs (${snapshot.openTabs.length}):`)
+  if (snapshot.openTabs.length) {
+    snapshot.openTabs.forEach(tab => lines.push(describeTabLine(tab)))
+  } else {
+    lines.push('  (none)')
+  }
+
+  const canvasBlock = formatCanvasContextForLumi(snapshot.canvas)
+  if (canvasBlock) {
+    lines.push('')
+    lines.push(canvasBlock)
+  }
+
+  return lines.join('\n')
+}
+
+// Appends one JSONL record of the full app state handed to the LLM whenever it
+// changes (tab open/close/switch, page change, y-scroll). `systemContext` is
+// byte-identical to what senduserprompt() injects. De-duplicated so identical
+// consecutive snapshots are not re-logged. Async write keeps the main thread free.
+function logAppState(reason = '') {
+  try {
+    const snapshot = buildAppStateSnapshot()
+    const systemContext = buildLiveAppStateText()
+    const key = JSON.stringify({
+      rendered: snapshot.rendered,
+      activeTabId: snapshot.activeTab ? snapshot.activeTab.id : null,
+      tabs: snapshot.openTabs.map(tab => `${tab.id}:${tab.type}:${tab.canvasMode || ''}:${tab.url}`),
+      canvasKey: lastCanvasVisibleContextKey
+    })
+    if (key === lastAppStateLogKey) return
+    lastAppStateLogKey = key
+
+    const entry = {
+      ts: new Date().toISOString(),
+      reason,
+      rendered: snapshot.rendered,
+      activeTab: snapshot.activeTab,
+      openTabs: snapshot.openTabs,
+      canvas: snapshot.canvas
+        ? {
+          url: String(snapshot.canvas.url || ''),
+          fileid: String(snapshot.canvas.fileid || ''),
+          courseid: String(snapshot.canvas.courseid || ''),
+          scrollY: Math.round(Number(snapshot.canvas.scrollY) || 0),
+          viewportHeight: Math.round(Number(snapshot.canvas.viewportHeight) || 0),
+          scrollHeight: Math.round(Number(snapshot.canvas.scrollHeight) || 0),
+          visiblePages: Array.isArray(snapshot.canvas.pages)
+            ? snapshot.canvas.pages.map(page => page && page.pageNumber)
+            : []
+        }
+        : null,
+      systemContext
+    }
+    fs.appendFile(
+      path.join(__dirname, 'llm_context_log.jsonl'),
+      JSON.stringify(entry) + '\n',
+      error => { if (error) console.error('Unable to write app-state log:', error) }
+    )
+  } catch (error) {
+    console.error('Unable to log app state:', error)
+  }
 }
 
 async function readCanvasVisibleScrollState(tab) {
@@ -1855,9 +2070,11 @@ async function updateCurrentCanvasVisibleContext() {
 function scheduleCanvasVisibleContextUpdate() {
   if (canvasVisibleContextUpdateQueued) return
   canvasVisibleContextUpdateQueued = true
-  setTimeout(() => {
+  setTimeout(async () => {
     canvasVisibleContextUpdateQueued = false
-    updateCurrentCanvasVisibleContext()
+    await updateCurrentCanvasVisibleContext()
+    // Also captures tab open/close/switch that don't change the Canvas context.
+    logAppState('surface-update')
   }, 80)
 }
 
@@ -3318,6 +3535,37 @@ app.whenReady().then(() => {
   ipcMain.handle('engine:url', () => {
     return getEngineUrl()
   });
+  ipcMain.on('theme:get_config', event => {
+    event.returnValue = {
+      name: getThemeSelection(__dirname).activeTheme,
+      rendererStylesheets: getRendererStylesheets(__dirname)
+    }
+  })
+
+  // theme:list — Available themes plus the active one.
+  ipcMain.handle('theme:list', () => {
+    return {
+      active: getThemeSelection(__dirname).activeTheme,
+      themes: listThemes(__dirname)
+    }
+  })
+
+  // theme:set — Persists the chosen theme and returns the new renderer
+  // stylesheet list so the renderer can hot-swap its <link> tags (no reload).
+  ipcMain.handle('theme:set', (_, name) => {
+    try {
+      setStoredTheme(__dirname, name)
+      refreshThemeRuntime()
+      return {
+        ok: true,
+        active: getThemeSelection(__dirname).activeTheme,
+        rendererStylesheets: getRendererStylesheets(__dirname)
+      }
+    } catch (error) {
+      console.error('Unable to set theme:', error)
+      return { ok: false, error: String(error && error.message || error) }
+    }
+  })
 
   // prompt:send — Forwards a user message to the Python agent.
   // in:  payload ({ message: string })
@@ -3942,7 +4190,12 @@ app.whenReady().then(() => {
   })
 
   ipcMain.handle('injection:get', () => {
-    return fs.readFileSync(path.join(__dirname, 'injection.css'), 'utf-8')
+    const pathFromTheme = activeThemeManifest
+      && activeThemeManifest.canvas
+      && activeThemeManifest.canvas.mainInjectionPath
+      ? activeThemeManifest.canvas.mainInjectionPath
+      : 'injection.css'
+    return readThemeCss(__dirname, pathFromTheme, '')
   })
 
   ipcMain.handle('tabs:write_active_html', async () => {

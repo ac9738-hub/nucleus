@@ -6,6 +6,10 @@
 const fs = require('fs')
 const { spawn } = require('child_process')
 const path = require('path')
+const { startOfWeek, addWeeks, isSameWeek, differenceInCalendarWeeks } = require('date-fns')
+
+// Monday-based weeks throughout the weekly schedule.
+const WEEK_OPTIONS = { weekStartsOn: 1 }
 
 const canvasCourseColors = ["#1d9e75", "#378add", "#7f77dd", "#d85a30", "#d4537e", "#c58d35"]
 
@@ -410,34 +414,37 @@ function readCanvasGraphFromRoot(rootDir) {
   }
 }
 
-function parseWeekNumberFromLabel(label) {
-  const match = String(label || '').match(/\bweek\s*(\d+)\b/i)
-  return match ? Number.parseInt(match[1], 10) : null
-}
-
-function weekBucketFromDate(dateStr) {
-  if (!dateStr) {
-    return { sortKey: Number.MAX_SAFE_INTEGER, label: 'Unscheduled' }
-  }
+// Snaps a date to the Monday 00:00 that starts its calendar week. Returns the
+// epoch ms of that Monday, or null when the date is missing/unparseable. Weekly
+// buckets are keyed purely on this value so grouping is date-driven only.
+function startOfWeekMs(dateStr) {
+  if (!dateStr) return null
 
   const date = new Date(dateStr)
-  if (Number.isNaN(date.getTime())) {
-    return { sortKey: Number.MAX_SAFE_INTEGER, label: 'Unscheduled' }
-  }
+  if (Number.isNaN(date.getTime())) return null
 
-  const start = new Date(date)
-  start.setHours(0, 0, 0, 0)
-  const day = start.getDay()
-  start.setDate(start.getDate() - ((day + 6) % 7))
+  return startOfWeek(date, WEEK_OPTIONS).getTime()
+}
 
-  return {
-    sortKey: start.getTime(),
-    label: `Week of ${start.toLocaleDateString(undefined, {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
-    })}`
-  }
+// Earliest week-start among a list of date strings (skips undated entries).
+function earliestWeekStartMs(dateStrings) {
+  let earliest = null
+  dateStrings.forEach(dateStr => {
+    const ms = startOfWeekMs(dateStr)
+    if (ms != null && (earliest == null || ms < earliest)) earliest = ms
+  })
+  return earliest
+}
+
+// Universal "Mon D – Mon D, YYYY" range for a week-start ms.
+function formatWeekDateRange(weekStartMs) {
+  if (weekStartMs == null) return ''
+
+  const start = new Date(weekStartMs)
+  const end = new Date(weekStartMs + 6 * 24 * 60 * 60 * 1000)
+  const startLabel = start.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+  const endLabel = end.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+  return `${startLabel} – ${endLabel}`
 }
 
 function getCourseArrayBucket(canvasData, bucketName, courseId) {
@@ -516,10 +523,10 @@ function compactWeeklyAssignment(assignment, canvasAssignment) {
   }
 }
 
-function createWeeklyBucket(weekLabel, sortKey) {
+function createWeeklyBucket(weekStartMs) {
   return {
-    weekLabel,
-    sortKey,
+    weekStartMs: weekStartMs == null ? null : weekStartMs,
+    sortKey: weekStartMs == null ? Number.MAX_SAFE_INTEGER : weekStartMs,
     files: [],
     assignments: [],
     seenFileIds: new Set(),
@@ -543,9 +550,15 @@ function addWeeklyAssignment(bucket, assignment) {
   bucket.assignments.push(assignment)
 }
 
-function finalizeWeeklyBucket(bucket) {
+function finalizeWeeklyBucket(bucket, weekNumber) {
+  const scheduled = bucket.weekStartMs != null
   return {
-    weekLabel: bucket.weekLabel,
+    weekNumber: scheduled ? weekNumber : null,
+    weekLabel: scheduled ? `Week ${weekNumber}` : 'Unscheduled',
+    dateRange: formatWeekDateRange(bucket.weekStartMs),
+    weekStart: scheduled ? new Date(bucket.weekStartMs).toISOString() : '',
+    weekEnd: scheduled ? new Date(bucket.weekStartMs + 6 * 24 * 60 * 60 * 1000).toISOString() : '',
+    isCurrentWeek: scheduled && isSameWeek(bucket.weekStartMs, Date.now(), WEEK_OPTIONS),
     sortKey: bucket.sortKey,
     files: bucket.files,
     assignments: bucket.assignments
@@ -571,14 +584,24 @@ function buildWeeklySchedule(canvasData, rootDir) {
       .sort((left, right) => (left.position || 0) - (right.position || 0))
     const moduleItems = getCourseObjectBucket(canvasData, 'module_items', courseId)
     const canvasFiles = getCourseArrayBucket(canvasData, 'file', courseId)
-    const weekBuckets = []
+
+    // All weekly grouping is keyed on the Monday that starts a calendar week.
+    // null keys an "Unscheduled" bucket for objects that carry no usable date.
+    const weekBuckets = new Map()
     const placedAssignmentIds = new Set()
 
-    modules.forEach(module => {
-      const weekNum = parseWeekNumberFromLabel(module.name)
-      if (weekNum == null) return
+    const getWeekBucket = weekStartMs => {
+      const key = weekStartMs == null ? 'unscheduled' : String(weekStartMs)
+      if (!weekBuckets.has(key)) {
+        weekBuckets.set(key, createWeeklyBucket(weekStartMs))
+      }
+      return weekBuckets.get(key)
+    }
 
-      const bucket = createWeeklyBucket(module.name || `Week ${weekNum}`, weekNum)
+    // Module pass: keep a module's materials together. Its files inherit the
+    // earliest dated assignment in the module (files have no date of their own),
+    // while each assignment lands in the week of its own due/unlock date.
+    modules.forEach(module => {
       const items = (moduleItems[module.id] || moduleItems[String(module.id)] || [])
         .slice()
         .sort((left, right) => (left.position || 0) - (right.position || 0))
@@ -588,29 +611,44 @@ function buildWeeklySchedule(canvasData, rootDir) {
         return type === 'assignment' || type === 'quiz' || type === 'discussion'
       })
 
-      fileItems.forEach(item => {
-        const file = resolveWeeklyFile(graphFiles, courseId, item.content_id, canvasFiles)
-        if (file) {
-          addWeeklyFile(bucket, file)
-          return
-        }
-
-        addWeeklyFile(bucket, {
-          id: String(item.id || item.content_id || item.title || ''),
-          name: item.title || 'Untitled file',
-          courseid: courseId,
-          description: item.type || 'File',
-          url: item.html_url || item.url || '',
-          downloadurl: item.url || '',
-          canvaspreviewurl: item.html_url || ''
-        })
-      })
-
+      const resolvedAssignments = []
       assignmentItems.forEach(item => {
         const canvasAssignment = lookup.assignmentByCourseAndId.get(`${courseId}:${String(item.content_id || '')}`)
         const loggedAssignment = matchLoggedAssignment(loggedAssignments, item, canvasAssignment)
         if (!loggedAssignment) return
+        resolvedAssignments.push({ loggedAssignment, canvasAssignment })
+      })
 
+      const moduleWeekMs = earliestWeekStartMs(
+        resolvedAssignments.map(entry => entry.loggedAssignment.duedate || entry.loggedAssignment.unlockdate)
+      )
+
+      // Date-only: a module with no datable assignment has nowhere to anchor its
+      // (dateless) files, so it is skipped rather than dumped into a week.
+      if (moduleWeekMs != null) {
+        const fileBucket = getWeekBucket(moduleWeekMs)
+        fileItems.forEach(item => {
+          const file = resolveWeeklyFile(graphFiles, courseId, item.content_id, canvasFiles)
+          if (file) {
+            addWeeklyFile(fileBucket, file)
+            return
+          }
+
+          addWeeklyFile(fileBucket, {
+            id: String(item.id || item.content_id || item.title || ''),
+            name: item.title || 'Untitled file',
+            courseid: courseId,
+            description: item.type || 'File',
+            url: item.html_url || item.url || '',
+            downloadurl: item.url || '',
+            canvaspreviewurl: item.html_url || ''
+          })
+        })
+      }
+
+      resolvedAssignments.forEach(({ loggedAssignment, canvasAssignment }) => {
+        const weekStartMs = startOfWeekMs(loggedAssignment.duedate || loggedAssignment.unlockdate) ?? moduleWeekMs
+        const bucket = getWeekBucket(weekStartMs)
         const compactAssignment = compactWeeklyAssignment(loggedAssignment, canvasAssignment)
         compactAssignment.filechildren.forEach(fileId => {
           addWeeklyFile(bucket, resolveWeeklyFile(graphFiles, courseId, fileId, canvasFiles))
@@ -618,22 +656,14 @@ function buildWeeklySchedule(canvasData, rootDir) {
         addWeeklyAssignment(bucket, compactAssignment)
         placedAssignmentIds.add(String(loggedAssignment.assignmentid || loggedAssignment.name || ''))
       })
-
-      weekBuckets.push(finalizeWeeklyBucket(bucket))
     })
 
-    const dateBuckets = new Map()
+    // Remaining logged assignments (not reached through any module).
     loggedAssignments.forEach(assignment => {
       const assignmentKey = String(assignment.assignmentid || assignment.name || '').trim()
       if (!assignmentKey || placedAssignmentIds.has(assignmentKey)) return
 
-      const week = weekBucketFromDate(assignment.duedate || assignment.unlockdate)
-      const bucketKey = String(week.sortKey)
-      if (!dateBuckets.has(bucketKey)) {
-        dateBuckets.set(bucketKey, createWeeklyBucket(week.label, week.sortKey))
-      }
-
-      const bucket = dateBuckets.get(bucketKey)
+      const bucket = getWeekBucket(startOfWeekMs(assignment.duedate || assignment.unlockdate))
       const canvasAssignment = findCanvasAssignment(lookup, courseId, assignment)
       const compactAssignment = compactWeeklyAssignment(assignment, canvasAssignment)
       compactAssignment.filechildren.forEach(fileId => {
@@ -643,10 +673,32 @@ function buildWeeklySchedule(canvasData, rootDir) {
       placedAssignmentIds.add(assignmentKey)
     })
 
-    const datedWeeks = Array.from(dateBuckets.values()).map(finalizeWeeklyBucket)
-    schedule[courseId] = weekBuckets
-      .concat(datedWeeks)
-      .sort((left, right) => left.sortKey - right.sortKey)
+    const unscheduledBucket = weekBuckets.get('unscheduled') || null
+    const scheduledStarts = Array.from(weekBuckets.values())
+      .filter(bucket => bucket.weekStartMs != null)
+      .map(bucket => bucket.weekStartMs)
+
+    const courseWeeks = []
+    if (scheduledStarts.length) {
+      // Build a contiguous run of calendar weeks from the earliest object's week
+      // through the latest, materializing empty weeks so none are skipped.
+      const firstWeek = startOfWeek(Math.min(...scheduledStarts), WEEK_OPTIONS)
+      const lastWeek = startOfWeek(Math.max(...scheduledStarts), WEEK_OPTIONS)
+      const totalWeeks = differenceInCalendarWeeks(lastWeek, firstWeek, WEEK_OPTIONS) + 1
+
+      for (let index = 0; index < totalWeeks; index += 1) {
+        const weekStartMs = startOfWeek(addWeeks(firstWeek, index), WEEK_OPTIONS).getTime()
+        const bucket = weekBuckets.get(String(weekStartMs)) || createWeeklyBucket(weekStartMs)
+        courseWeeks.push(finalizeWeeklyBucket(bucket, index + 1))
+      }
+    }
+
+    // "Unscheduled" (dateless objects) always sorts last and stays unnumbered.
+    if (unscheduledBucket) {
+      courseWeeks.push(finalizeWeeklyBucket(unscheduledBucket, null))
+    }
+
+    schedule[courseId] = courseWeeks
   })
 
   return schedule

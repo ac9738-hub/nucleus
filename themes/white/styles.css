@@ -2362,3 +2362,47 @@ body.workspace-sidebar-collapsed .profile-meta {
 /* =========================
    MOBILE
 ========================= */
+
+/* white theme package overrides */
+:root {
+  color-scheme: light;
+  --bg: #f6f8fc;
+  --surface: #ffffff;
+  --surface-2: #edf1f8;
+  --border: rgba(87, 104, 141, 0.22);
+  --text: #162033;
+  --text-dim: #4f5f82;
+  --text-mute: #6d7d9d;
+  --accent: #4e66d7;
+  --accent-2: #3f8ec4;
+  --accent-3: #3ea487;
+  --accent-warm: #b9853f;
+}
+
+body {
+  background:
+    radial-gradient(circle at 20% 10%, rgba(78, 102, 215, 0.09), transparent 30%),
+    radial-gradient(circle at 80% 15%, rgba(63, 142, 196, 0.08), transparent 33%),
+    linear-gradient(145deg, #f7f9fd 0%, #eef3fb 55%, #e9eff9 100%);
+  color: var(--text);
+}
+
+.app-header {
+  background: rgba(246, 249, 255, 0.86);
+  border-bottom-color: rgba(96, 116, 154, 0.24);
+}
+
+.sidebar {
+  background:
+    radial-gradient(circle at 28% 0%, rgba(78, 102, 215, 0.10), transparent 34%),
+    linear-gradient(180deg, rgba(245, 248, 255, 0.95), rgba(236, 242, 252, 0.98)),
+    var(--surface);
+  border-right-color: rgba(96, 116, 154, 0.28);
+}
+
+.ai-panel {
+  background:
+    radial-gradient(circle at 50% 0%, rgba(78, 102, 215, 0.10), transparent 34%),
+    linear-gradient(180deg, rgba(245, 248, 255, 0.96), rgba(236, 242, 252, 0.98));
+  border-left-color: rgba(96, 116, 154, 0.24);
+}

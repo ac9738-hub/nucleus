@@ -6,6 +6,7 @@
 
   const FOLDERS = [
     { id: "inbox", label: "Inbox", icon: "IN" },
+    { id: "secondary", label: "Secondary Inbox", icon: "2°" },
     { id: "starred", label: "Starred", icon: "★" },
     { id: "sent", label: "Sent", icon: "→" },
     { id: "drafts", label: "Drafts", icon: "✎" },
@@ -126,10 +127,6 @@
     return Boolean(state && (state.detailLoading || state.selectedId));
   }
 
-  function renderBackButton() {
-    return '<button type="button" class="mail-back-button" data-mail-back aria-label="Back to inbox">← Back</button>';
-  }
-
   function renderDetailActions(message) {
     const inTrash = Array.isArray(message.labelIds) && message.labelIds.includes("TRASH");
     return (
@@ -145,54 +142,52 @@
     );
   }
 
-  function renderReadingPanel(state) {
+  function renderContentPane(state) {
+    return `<div class="mail-list-panel" data-mail-list-panel>${renderListPanel(state)}</div>`;
+  }
+
+  function renderReadingOverlay(state) {
+    if (!state.detailLoading && !state.selectedId) return "";
+
     if (state.detailLoading) {
       return (
-        '<div class="mail-reading-view">' +
-        '<header class="mail-reading-header">' + renderBackButton() + "</header>" +
-        '<div class="mail-reading-empty"><h3>Opening message</h3><p>Loading message content...</p></div>' +
-        "</div>"
-      );
-    }
-
-    if (!state.selectedMessage) {
-      return (
-        '<div class="mail-reading-view">' +
-        '<header class="mail-reading-header">' + renderBackButton() + "</header>" +
-        '<div class="mail-reading-empty"><h3>Unable to open message</h3><p>Go back and try another email.</p></div>' +
-        "</div>"
+        '<div class="mail-chat-detail-overlay" data-mail-reading-overlay>' +
+        '<section class="mail-chat-detail-panel mail-reading-overlay-panel" role="dialog" aria-label="Email">' +
+        '<header class="mail-chat-detail-header"><h2>Opening email</h2><button type="button" class="mail-icon-button" data-mail-back>Close</button></header>' +
+        '<div class="mail-chat-detail-loading">Loading full email...</div>' +
+        "</section></div>"
       );
     }
 
     const message = state.selectedMessage;
-    const sender = parseSender(message.from);
+    if (!message) {
+      return (
+        '<div class="mail-chat-detail-overlay" data-mail-reading-overlay>' +
+        '<section class="mail-chat-detail-panel mail-reading-overlay-panel" role="dialog" aria-label="Email">' +
+        '<header class="mail-chat-detail-header"><h2>Unable to open email</h2><button type="button" class="mail-icon-button" data-mail-back>Close</button></header>' +
+        '<div class="mail-chat-detail-loading">This message could not be loaded. Try another email.</div>' +
+        "</section></div>"
+      );
+    }
 
+    const sender = parseSender(message.from);
     return (
-      '<div class="mail-reading-view">' +
-      '<article class="mail-detail">' +
-      '<header class="mail-detail-header">' +
-      '<div class="mail-detail-top">' + renderBackButton() + renderDetailActions(message) + "</div>" +
-      '<div class="mail-detail-titleblock">' +
-      '<div class="mail-detail-line1">' +
-      `<span class="mail-detail-sender">${escapeHtml(sender)}</span>` +
-      `<time class="mail-detail-date">${escapeHtml(formatDetailDate(message))}</time>` +
-      "</div>" +
-      `<h2 class="mail-detail-subject">${escapeHtml(message.subject || "(no subject)")}</h2>` +
-      "</div>" +
-      '<div class="mail-detail-meta">' +
+      '<div class="mail-chat-detail-overlay" data-mail-reading-overlay>' +
+      '<section class="mail-chat-detail-panel mail-reading-overlay-panel" role="dialog" aria-label="Email">' +
+      '<header class="mail-chat-detail-header">' +
+      `<div><h2>${escapeHtml(message.subject || "(no subject)")}</h2>` +
+      `<p class="mail-chat-detail-from">${escapeHtml(sender)} · ${escapeHtml(formatDetailDate(message))}</p></div>` +
+      '<button type="button" class="mail-icon-button" data-mail-back>Close</button>' +
+      "</header>" +
+      '<div class="mail-chat-detail-actions">' + renderDetailActions(message) + "</div>" +
+      '<div class="mail-chat-detail-meta">' +
+      `<div><span class="mail-meta-label">From</span><span>${escapeHtml(message.from || "")}</span></div>` +
       `<div><span class="mail-meta-label">To</span><span>${escapeHtml(message.to || "")}</span></div>` +
       (message.cc ? `<div><span class="mail-meta-label">Cc</span><span>${escapeHtml(message.cc)}</span></div>` : "") +
-      "</div></header>" +
-      renderMessageBody(message) +
-      "</article></div>"
+      "</div>" +
+      '<div class="mail-chat-detail-body">' + renderMessageBody(message) + "</div>" +
+      "</section></div>"
     );
-  }
-
-  function renderContentPane(state) {
-    if (isReadingView(state)) {
-      return `<div class="mail-reading-panel" data-mail-reading-panel>${renderReadingPanel(state)}</div>`;
-    }
-    return `<div class="mail-list-panel" data-mail-list-panel>${renderListPanel(state)}</div>`;
   }
 
   function renderComposeOverlay(state) {
@@ -232,10 +227,13 @@
   function renderToolbar(state) {
     const title = folderTitle(state);
     const count = state.messages.length;
+    const sectionLabel = state.searchQuery
+      ? "Search"
+      : (state.folder === "secondary" ? "Secondary" : "Primary");
     return (
       '<header class="mail-toolbar">' +
       '<div class="mail-toolbar-copy">' +
-      `<p class="mail-eyebrow">${state.searchQuery ? "Search" : "Primary"}</p>` +
+      `<p class="mail-eyebrow">${sectionLabel}</p>` +
       `<h1 data-mail-toolbar-title>${escapeHtml(title)}${count ? ` <span>(${count})</span>` : ""}</h1>` +
       "</div>" +
       '<div class="mail-toolbar-actions">' +
@@ -293,12 +291,19 @@
     if (!outgoing && status === "pending") bodyClass += " is-pending";
     if (!outgoing && status === "failed") bodyClass += " is-failed";
 
+    const dateLabel = entry.dateLabel || entry.date || "";
+    const messageId = escapeHtml(entry.messageId);
+
     return (
       `<div class="mail-chat-message${outgoing ? " is-outgoing" : ""}">` +
-      `<button type="button" class="mail-chat-bubble${bodyClass}" data-mail-chat-bubble="${escapeHtml(entry.messageId)}">` +
+      `<button type="button" class="mail-chat-bubble${bodyClass}" data-mail-chat-bubble="${messageId}">` +
       `<span class="mail-chat-bubble-text">${escapeHtml(body)}</span>` +
-      `<span class="mail-chat-bubble-foot">${escapeHtml(entry.subject || "(no subject)")} · ${escapeHtml(entry.dateLabel || entry.date || "")}</span>` +
-      "</button></div>"
+      `<span class="mail-chat-bubble-foot">${escapeHtml(entry.subject || "(no subject)")}</span>` +
+      "</button>" +
+      '<div class="mail-chat-meta">' +
+      (dateLabel ? `<time class="mail-chat-date">${escapeHtml(dateLabel)}</time>` : "") +
+      `<button type="button" class="mail-chat-reply-button" data-mail-chat-reply="${messageId}" title="Reply" aria-label="Reply">↩</button>` +
+      "</div></div>"
     );
   }
 
@@ -373,6 +378,7 @@
   }
 
   function renderContactsPanel(state) {
+    if (state.folder !== "inbox" || state.searchQuery) return "";
     const data = getContactsData(state);
     const ui = getContactsUi(state);
     const threadOpen = Boolean(ui.threadOpen && ui.activeContactEmail && data.contacts[ui.activeContactEmail]);
@@ -416,7 +422,7 @@
       `<div><span class="mail-meta-label">To</span><span>${escapeHtml(message.to || "")}</span></div>` +
       (message.cc ? `<div><span class="mail-meta-label">Cc</span><span>${escapeHtml(message.cc)}</span></div>` : "") +
       "</div>" +
-      renderMessageBody(message) +
+      '<div class="mail-chat-detail-body">' + renderMessageBody(message) + "</div>" +
       "</section></div>"
     );
   }
@@ -433,6 +439,7 @@
       '<div class="mail-content" data-mail-content>' +
       `<div class="mail-content-pane" data-mail-content-pane>${renderContentPane(state)}</div>` +
       "</div></main>" +
+      '<div data-mail-reading-host>' + renderReadingOverlay(state) + "</div>" +
       '<div data-mail-compose-host>' + renderComposeOverlay(state) + "</div>" +
       '<div data-mail-chat-detail-host>' + renderChatDetailOverlay(state) + "</div>" +
       "</section>"
@@ -475,14 +482,20 @@
     status.textContent = state.statusMessage;
   }
 
+  function patchMailReadingOverlay(root, state) {
+    const host = root.querySelector("[data-mail-reading-host]");
+    if (!host) return;
+    host.innerHTML = renderReadingOverlay(state);
+  }
+
   function patchMailContent(root, state) {
     patchMailShellState(root, state);
     const host = root.querySelector("[data-mail-content-pane]");
     if (host) host.innerHTML = renderContentPane(state);
+    patchMailReadingOverlay(root, state);
   }
 
   function patchMailList(root, state) {
-    if (isReadingView(state)) return;
     const panel = root.querySelector("[data-mail-list-panel]");
     if (panel) {
       panel.innerHTML = renderListPanel(state);
@@ -492,17 +505,8 @@
   }
 
   function patchMailReading(root, state) {
-    if (!isReadingView(state)) {
-      patchMailContent(root, state);
-      return;
-    }
-    const panel = root.querySelector("[data-mail-reading-panel]");
-    if (panel) {
-      panel.innerHTML = renderReadingPanel(state);
-      patchMailShellState(root, state);
-      return;
-    }
-    patchMailContent(root, state);
+    patchMailReadingOverlay(root, state);
+    patchMailShellState(root, state);
   }
 
   function patchMailCompose(root, state) {
@@ -612,7 +616,7 @@
   }
 
   function handleMailClick(event) {
-    const target = event.target.closest("[data-mail-folder], [data-mail-refresh], [data-mail-compose], [data-mail-back], [data-mail-contacts-add], [data-mail-contacts-add-cancel], [data-mail-contacts-back], [data-mail-contacts-compose], [data-mail-contact-row], [data-mail-chat-bubble], [data-mail-chat-detail-close], [data-mail-star], [data-mail-star-detail], [data-mail-reply], [data-mail-forward], [data-mail-archive], [data-mail-trash], [data-mail-restore], [data-mail-delete], [data-mail-unread-toggle], [data-mail-compose-close], .mail-row[data-mail-id]");
+    const target = event.target.closest("[data-mail-folder], [data-mail-refresh], [data-mail-compose], [data-mail-back], [data-mail-contacts-add], [data-mail-contacts-add-cancel], [data-mail-contacts-back], [data-mail-contacts-compose], [data-mail-contact-row], [data-mail-chat-reply], [data-mail-chat-bubble], [data-mail-chat-detail-close], [data-mail-star], [data-mail-star-detail], [data-mail-reply], [data-mail-forward], [data-mail-archive], [data-mail-trash], [data-mail-restore], [data-mail-delete], [data-mail-unread-toggle], [data-mail-compose-close], .mail-row[data-mail-id]");
     if (!target) return;
 
     if (target.matches("[data-mail-contacts-add]") && typeof toggleMailContactsAddForm === "function") {
@@ -637,6 +641,13 @@
 
     if (target.matches("[data-mail-contact-row]") && typeof setActiveMailContact === "function") {
       setActiveMailContact(target.dataset.mailContactRow);
+      return;
+    }
+
+    if (target.matches("[data-mail-chat-reply]") && typeof replyToChatEntry === "function") {
+      event.preventDefault();
+      event.stopPropagation();
+      replyToChatEntry(target.dataset.mailChatReply);
       return;
     }
 
@@ -789,6 +800,12 @@
     }
   }
 
+  function handleMailReadingOverlayClick(event) {
+    if (event.target.matches("[data-mail-reading-overlay]") && typeof closeMailMessage === "function") {
+      closeMailMessage();
+    }
+  }
+
   function mountMailControllerIfNeeded(viewEl, activeTab) {
     if (!viewEl || !activeTab || activeTab.type !== "mailtab") return;
 
@@ -803,6 +820,7 @@
     root.addEventListener("submit", handleMailComposeSubmit);
     root.addEventListener("click", handleMailComposeOverlayClick);
     root.addEventListener("click", handleMailChatDetailOverlayClick);
+    root.addEventListener("click", handleMailReadingOverlayClick);
   }
 
   if (typeof window !== "undefined") {

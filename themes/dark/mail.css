@@ -1183,3 +1183,14 @@
     display: none;
   }
 }
+
+/* dark theme package overrides */
+.mail-sidebar {
+  background:
+    radial-gradient(circle at 28% 0%, rgba(116, 137, 255, 0.16), transparent 36%),
+    linear-gradient(180deg, rgba(10, 15, 27, 0.95), rgba(8, 12, 20, 0.98));
+}
+
+.mail-main {
+  background: rgba(12, 18, 30, 0.82);
+}

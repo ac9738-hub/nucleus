@@ -227,19 +227,33 @@ function renderWeeklySchedule(weeks) {
     return renderEmptyState("weekly schedule — sync Canvas and run the parser to log assignments");
   }
 
-  return weeks.map(week => `
-    <article class="course-item course-module course-week">
+  return weeks.map(week => {
+    const files = Array.isArray(week.files) ? week.files : [];
+    const assignments = Array.isArray(week.assignments) ? week.assignments : [];
+    const isEmpty = !files.length && !assignments.length;
+    const classes = ["course-item", "course-module", "course-week"];
+    if (week.isCurrentWeek) classes.push("course-week--current");
+    if (isEmpty) classes.push("course-week--empty");
+
+    return `
+    <article class="${classes.join(" ")}">
       <div class="course-item-main">
-        <span class="course-item-title">${escapeHtml(week.weekLabel || "Week")}</span>
-        ${renderWeeklyFiles(Array.isArray(week.files) ? week.files : [])}
-        ${renderWeeklyLoggedAssignments(Array.isArray(week.assignments) ? week.assignments : [])}
+        <span class="course-item-title">
+          ${escapeHtml(week.weekLabel || "Week")}
+          ${week.isCurrentWeek ? `<span class="course-week-current-badge">Current</span>` : ""}
+        </span>
+        ${week.dateRange ? `<span class="course-week-range">${escapeHtml(week.dateRange)}</span>` : ""}
+        ${renderWeeklyFiles(files)}
+        ${renderWeeklyLoggedAssignments(assignments)}
+        ${isEmpty ? `<span class="course-week-empty-note">No files or assignments this week</span>` : ""}
       </div>
       <div class="course-item-meta">
-        <span>${Array.isArray(week.files) ? week.files.length : 0} files</span>
-        <span>${Array.isArray(week.assignments) ? week.assignments.length : 0} assignments</span>
+        <span>${files.length} files</span>
+        <span>${assignments.length} assignments</span>
       </div>
     </article>
-  `).join("");
+  `;
+  }).join("");
 }
 
 function renderFiles(files) {

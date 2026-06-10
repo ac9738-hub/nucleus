@@ -43,6 +43,7 @@ context_only_system_prompt = (
     "You are a helpful assistant for a student organization app called Nucleus. "
     "Your task will most likely need in-app context. You have 2 options. call get_context, or respond"
 )
+runtime_system_context = ""
 local_system_prompt = """
 You are a routing classifier for the Nucleus student app.
 
@@ -441,10 +442,13 @@ def runclaude(prompt):
     print(f"py: running claude: {prompt}", file=sys.stderr)
     tool_calls = {}
     full_text = ""
+    dynamic_system_prompt = system_prompt
+    if runtime_system_context:
+        dynamic_system_prompt += "\n\nLive app context:\n" + runtime_system_context
     response = claude_client.messages.create(
         model="claude-sonnet-4-6",
         max_tokens=1000,
-        system=system_prompt + "\nThis is the syllabus for NEU 201:" + hardcoded_syllabus,
+        system=dynamic_system_prompt + "\nThis is the syllabus for NEU 201:" + hardcoded_syllabus,
         messages=prompt,
         tools=tools,
         stream=True
@@ -601,5 +605,9 @@ for line in sys.stdin:
         runclaude(prompt = chat_history)
     elif line[0] == "message":
         message_text, message_content = message_payload_to_text_and_content(line[1])
+        if isinstance(line[1], dict):
+            runtime_system_context = str(line[1].get("systemContext") or "")
+        else:
+            runtime_system_context = ""
         chat_history.append({"role": "user","content": message_content })
         run_classifier(prompt = [{"role": "user", "content": message_text}])

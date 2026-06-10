@@ -17,6 +17,8 @@ const Config = {
   EXTERNAL_K: 0.60,
   EXTERNAL_THRESHOLD: 1.0,
 
+  STUDY_TASK_MULTIPLIER: 0.85,
+
   MAX_EFFORT_HOURS: 15.0
 };
 
@@ -91,6 +93,12 @@ function getTaskType(task) {
   return task.task_type || task.taskType || task.type || "academic";
 }
 
+function isStudyTask(task, taskType) {
+  const typeValue = String(taskType || getTaskType(task) || "").toLowerCase();
+  const titleValue = String(task && (task.name || task.title) || "").toLowerCase();
+  return typeValue.includes("study") || titleValue.includes("study");
+}
+
 function calcUrgency(days, gradeWeight, taskType = "academic", cfg = Config) {
   let k;
   let threshold;
@@ -156,12 +164,13 @@ function calcPriority(task, cfg = Config) {
   const importance = calcImportance(gradeWeight);
   const effort = calcEffort(estimatedHours, cfg);
   const dependency = calcDependency(dependencyCount);
+  const studyMultiplier = isStudyTask(task, taskType) ? cfg.STUDY_TASK_MULTIPLIER : 1.0;
   const rawScore = (
     urgency * cfg.W_URGENCY +
     importance * cfg.W_IMPORTANCE +
     effort * cfg.W_EFFORT +
     dependency * cfg.W_DEPENDENCY
-  );
+  ) * studyMultiplier;
 
   return {
     task_id: task.id,

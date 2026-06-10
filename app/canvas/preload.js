@@ -2,15 +2,16 @@
 // Functionality: injects Canvas-specific CSS into main frames and selected
 // iframe previews so WebContentsView Canvas tabs match the app shell.
 // Dependencies: main.js configures this preload for canvastab WebContentsViews.
-const fs = require('fs')
 const path = require('path')
 const { webFrame, ipcRenderer } = require('electron')
+const { getCanvasThemeConfig, readThemeCss } = require('../../theme-manager')
 
 // Match the slate overlay (slate.css) exactly so the page reveals on top of the
 // slide with no color jump. background-attachment: fixed anchors the gradient to
 // the viewport on every wrapper, so the stacked layers line up seamlessly and
 // match the viewport-sized slate.
-const CANVAS_THEME_GRADIENT = 'linear-gradient(135deg, #0c1224 0%, #050916 100%)'
+const canvasThemeConfig = getCanvasThemeConfig(path.join(__dirname, '..', '..'))
+const CANVAS_THEME_GRADIENT = canvasThemeConfig.criticalGradient
 
 const criticalInjection = `
   html,
@@ -43,7 +44,11 @@ if (document.body) {
   }, { once: true })
 }
 
-const injection = fs.readFileSync(path.join(__dirname, '..', '..', 'injection.css'), 'utf-8')
+const injection = readThemeCss(
+  path.join(__dirname, '..', '..'),
+  canvasThemeConfig.mainInjectionPath,
+  ''
+)
 
 webFrame.insertCSS(injection)
 

@@ -1,0 +1,16 @@
+{
+  "name": "dark",
+  "rendererStylesheets": [
+    "themes/dark/styles.css",
+    "themes/dark/synapse.css",
+    "themes/dark/mail.css"
+  ],
+  "canvas": {
+    "criticalGradient": "linear-gradient(135deg, #12161f 0%, #090d14 100%)",
+    "mainInjectionPath": "themes/dark/injection.css",
+    "iframeInjectionPathsById": {
+      "preview_frame": "themes/dark/preview_frame.css",
+      "tool_content": "themes/dark/injection.css"
+    }
+  }
+}

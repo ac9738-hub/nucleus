@@ -6,6 +6,8 @@ __pycache__/
 *.pyc
 
 # Local/generated Canvas and browser data
+settings.json
+llm_context_log.jsonl
 assignmenthtml.json
 canvas_data.json
 canvas_graph.json

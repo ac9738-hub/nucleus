@@ -3,11 +3,13 @@ const fs = require('fs')
 const path = require('path')
 const { google } = require('googleapis')
 const { BrowserWindow } = require('electron')
+const { classifyInboxMessage, NON_ACADEMIC } = require('./classify')
 
 const GMAIL_BASE = 'https://www.googleapis.com/gmail/v1/users/me'
 
 const FOLDER_LABELS = {
     inbox: 'INBOX',
+    secondary: 'INBOX',
     starred: 'STARRED',
     sent: 'SENT',
     drafts: 'DRAFT',
@@ -17,6 +19,7 @@ const FOLDER_LABELS = {
 
 const MAIL_FOLDERS = [
     { id: 'inbox', label: 'Inbox', icon: 'IN' },
+    { id: 'secondary', label: 'Secondary Inbox', icon: '2°' },
     { id: 'starred', label: 'Starred', icon: '★' },
     { id: 'sent', label: 'Sent', icon: '→' },
     { id: 'drafts', label: 'Drafts', icon: '✎' },
@@ -289,7 +292,8 @@ function formatMessageSummary(message) {
         date: getHeader(message, 'Date'),
         dateLabel: formatMailDate(getHeader(message, 'Date')),
         unread: hasLabel(message, 'UNREAD'),
-        starred: hasLabel(message, 'STARRED')
+        starred: hasLabel(message, 'STARRED'),
+        inboxCategory: 'academic'
     }
 }
 
@@ -462,7 +466,8 @@ async function listMailMessages(options = {}) {
     const pageToken = options.pageToken || ''
 
     const params = new URLSearchParams({ maxResults: String(maxResults) })
-    const labelId = FOLDER_LABELS[folder]
+    const normalizedFolder = folder === 'secondary' ? 'inbox' : folder
+    const labelId = FOLDER_LABELS[normalizedFolder]
     if (labelId && !q) params.set('labelIds', labelId)
     if (q) params.set('q', q)
     if (pageToken) params.set('pageToken', pageToken)
@@ -471,11 +476,38 @@ async function listMailMessages(options = {}) {
     const refs = Array.isArray(list.messages) ? list.messages : []
     const ids = refs.map(item => item && item.id).filter(Boolean)
     const messages = ids.length ? await batchGetMessageMetadata(ids) : []
-    return {
-        messages: messages.map(formatMessageSummary),
-        nextPageToken: list.nextPageToken || '',
-        resultSizeEstimate: list.resultSizeEstimate || messages.length
+    let summaries = messages.map(formatMessageSummary)
+    summaries = await classifyInboxMessages(summaries)
+    if (folder === 'secondary' && !q) {
+        summaries = summaries.filter(message => message && message.inboxCategory === NON_ACADEMIC)
+    } else if (folder === 'inbox' && !q) {
+        summaries = summaries.filter(message => message && message.inboxCategory !== NON_ACADEMIC)
     }
+    return {
+        messages: summaries,
+        nextPageToken: list.nextPageToken || '',
+        resultSizeEstimate: list.resultSizeEstimate || summaries.length
+    }
+}
+
+async function classifyInboxMessages(messages) {
+    const list = Array.isArray(messages) ? messages : []
+    if (!list.length) return list
+    return mapWithConcurrency(
+        list,
+        async message => {
+            if (!message) return message
+            if (!Array.isArray(message.labelIds) || !message.labelIds.includes('INBOX')) {
+                return { ...message, inboxCategory: 'academic' }
+            }
+            const classification = await classifyInboxMessage(message)
+            return {
+                ...message,
+                inboxCategory: classification && classification.label === NON_ACADEMIC ? NON_ACADEMIC : 'academic'
+            }
+        },
+        Math.max(1, Math.min(4, GMAIL_MAX_CONCURRENT))
+    )
 }
 
 async function getMailMessage(id) {
@@ -854,9 +886,9 @@ async function pollMailHistory() {
         let added = []
         if (addedIds.size) {
             const metadata = await batchGetMessageMetadata([...addedIds])
-            added = metadata
+            added = await classifyInboxMessages(metadata
                 .map(formatMessageSummary)
-                .filter(msg => Array.isArray(msg.labelIds) && msg.labelIds.includes('INBOX'))
+                .filter(msg => Array.isArray(msg.labelIds) && msg.labelIds.includes('INBOX')))
         }
 
         return {
