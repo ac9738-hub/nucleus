@@ -13,16 +13,21 @@
    ========================= */
 
 :root {
-  --bg: #181a1f;
-  --surface: #22252b;
-  --surface-2: #2b2f37;
-  --border: #3a404a;
+  /* Matches the Nucleus app shell palette (styles.css :root). The page shell
+     uses --page-gradient (identical to slate.css) so canvas pages blend into
+     the app background with no jump; object surfaces are kept lighter than the
+     gradient's lightest stop (#0c1224) so cards/panels keep contrast. */
+  --bg: #050916;
+  --page-gradient: linear-gradient(135deg, #0c1224 0%, #050916 100%);
+  --surface: #141d38;
+  --surface-2: #1d2748;
+  --border: rgba(125, 139, 190, 0.20);
 
-  --text: #e7e9ee;
-  --text-dim: #b0b5c0;
-  --text-mute: #858c98;
+  --text: #f4f7ff;
+  --text-dim: #aeb8dc;
+  --text-mute: #6f7aa7;
 
-  --accent: #7f77dd;
+  --accent: #7567d8;
   --accent-hover: #938cff;
 
   --danger: #ef4444;
@@ -30,8 +35,8 @@
 
   --radius: 12px;
 
-  --ic-brand-primary: #7f77dd !important;
-  --ic-brand-global-nav-bgd: #181a1f !important;
+  --ic-brand-primary: #7567d8 !important;
+  --ic-brand-global-nav-bgd: #050916 !important;
 }
 
 /* =========================
@@ -39,7 +44,12 @@
    ========================= */
 
 html,
-body,
+body {
+  background: var(--page-gradient) !important;
+  background-attachment: fixed !important;
+  color: var(--text) !important;
+}
+
 #application,
 #main,
 #content,
@@ -50,7 +60,7 @@ body,
 .ic-Layout-columns,
 .ic-Layout-contentMain,
 div[role="main"] {
-  background: var(--bg) !important;
+  background: transparent !important;
   color: var(--text) !important;
 }
 
@@ -227,8 +237,8 @@ button:hover,
 .Button:hover,
 .btn:hover,
 input[type="submit"]:hover {
-  background: #333842 !important;
-  border-color: #4a515e !important;
+  background: #232d52 !important;
+  border-color: #2c3760 !important;
 }
 
 .btn-primary,
@@ -314,11 +324,11 @@ tr:hover {
   --controls-layout-bg-color: var(--surface) !important;
   --controls-layout-border-color: var(--border) !important;
   --media-button-icon-color: var(--text) !important;
-  --timeline-track-bg-color: #444b56 !important;
-  --timeline-track-progress-bg-color: #5c6472 !important;
+  --timeline-track-bg-color: #232c4e !important;
+  --timeline-track-progress-bg-color: #3a4670 !important;
   --timeline-track-fill-bg-color: var(--accent) !important;
   --timeline-thumb-color: var(--accent-hover) !important;
-  --volume-track-bg-color: #444b56 !important;
+  --volume-track-bg-color: #232c4e !important;
   --volume-track-fill-bg-color: var(--accent) !important;
   --volume-thumb-bg-color: var(--accent-hover) !important;
   background: var(--surface) !important;
@@ -367,8 +377,8 @@ tr:hover {
 [data-media-player] [aria-label="Settings"]:hover,
 [data-media-player] [aria-label="Fullscreen"]:hover,
 [data-media-player] #kebab-menu-button:hover {
-  background: #333842 !important;
-  border-color: #4a515e !important;
+  background: #232d52 !important;
+  border-color: #2c3760 !important;
   color: #fff !important;
 }
 
@@ -390,12 +400,12 @@ tr:hover {
 
 [data-media-time-slider] [class*="_track"],
 [data-media-volume-slider] [class*="_track"] {
-  background: #444b56 !important;
+  background: #232c4e !important;
   border-radius: 999px !important;
 }
 
 [data-media-time-slider] [class*="_progress"] {
-  background: #5c6472 !important;
+  background: #3a4670 !important;
   border-radius: 999px !important;
 }
 
@@ -456,7 +466,7 @@ select {
    ========================= */
 
 * {
-  scrollbar-color: #4a515e transparent;
+  scrollbar-color: #2c3760 transparent;
   scrollbar-width: thin;
   transition:
     background-color 0.15s ease,
@@ -474,14 +484,14 @@ select {
 }
 
 *::-webkit-scrollbar-thumb {
-  background: #4a515e;
+  background: #2c3760;
   background-clip: padding-box;
   border: 2px solid transparent;
   border-radius: 999px;
 }
 
 *::-webkit-scrollbar-thumb:hover {
-  background: #5c6472;
+  background: #3a4670;
   background-clip: padding-box;
 }
 
@@ -492,7 +502,7 @@ select {
 .assignment-show,
 .assignment-content,
 #assignment_show {
-  background: var(--bg) !important;
+  background: transparent !important;
 }
 
 .assignment,
@@ -544,7 +554,7 @@ select {
 .student-assignment-overview table,
 .student-assignment-overview td,
 .student-assignment-overview th {
-  background: #262a31 !important;
+  background: var(--surface) !important;
   border-color: var(--border) !important;
 }
 
@@ -886,7 +896,7 @@ body:not(:has(#application)) a[href*="preview="]:hover {
 #submission_details,
 .summary,
 .details {
-  background: #262a31 !important;
+  background: var(--surface) !important;
   border-color: var(--border) !important;
 }
 
@@ -987,8 +997,8 @@ ul.ig-list {
 .quiz-submission .alert,
 .quiz_results .alert,
 .alert.lock_explanation {
-  background: #24242b !important;
-  border: 1px solid #57505f !important;
+  background: #11182e !important;
+  border: 1px solid #3a4366 !important;
   border-left: 4px solid #d7b879 !important;
   border-radius: 8px !important;
   box-shadow: none !important;
@@ -1131,7 +1141,7 @@ ul.ig-list {
 .answer:hover,
 .answer:focus-within {
   background: var(--surface-2) !important;
-  border-color: #4a515e !important;
+  border-color: #2c3760 !important;
 }
 
 .answer label,
@@ -1156,7 +1166,7 @@ ul.ig-list {
 .answer.correct_answer,
 .answer_for_selected_answer,
 .selected_answer {
-  background: rgba(127, 119, 221, 0.16) !important;
+  background: rgba(117, 103, 216, 0.16) !important;
   border-color: var(--accent) !important;
 }
 
@@ -1180,7 +1190,7 @@ ul.ig-list {
 .question_neutral_comment,
 .question_correct_comment,
 .question_incorrect_comment {
-  background: #202329 !important;
+  background: #0c1326 !important;
   border: 1px solid var(--border) !important;
   border-radius: 10px !important;
   color: var(--text-dim) !important;
@@ -1199,7 +1209,7 @@ ul.ig-list {
 .quiz_comment code,
 .answer_comment_html code,
 .question_text code {
-  background: #14161a !important;
+  background: #070c1a !important;
   border: 1px solid var(--border) !important;
   border-radius: 6px !important;
   color: #d7d3ff !important;

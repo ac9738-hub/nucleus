@@ -44,7 +44,9 @@ const {
   modifyMailMessage,
   trashMailMessage,
   untrashMailMessage,
-  deleteMailMessage
+  deleteMailMessage,
+  startMailWatcher,
+  stopMailWatcher
 } = require('./app/mail/api')
 const {
   getMailContactsState,
@@ -679,7 +681,8 @@ const canvasBlankWarmUrl = "data:text/html;charset=utf-8," + encodeURIComponent(
       <style>
         html,
         body {
-          background: #0f1117;
+          background: linear-gradient(135deg, #0c1224 0%, #050916 100%);
+          background-attachment: fixed;
           margin: 0;
           min-height: 100%;
         }
@@ -2878,22 +2881,6 @@ function getCanvasTabForView(view) {
   return null
 }
 
-function startCanvasNavigation(window, view, options = {}) {
-  const tab = getCanvasTabForView(view)
-  if (!isCanvasBrowserTab(tab)) return
-
-  const showWipe = options.showWipe !== false
-  if (view && !showWipe) {
-    view._nucleusCanvasNavigationInProgress = true
-    view._nucleusBlankedForCanvasWipe = true
-  }
-  if (showWipe) {
-    window.webContents.send('canvas:navigation')
-  } else {
-    window.webContents.send('canvas:blank')
-  }
-}
-
 function markIntentionalDownload(view, url) {
   if (!view) return
   view._nucleusIntentionalDownload = {
@@ -2933,7 +2920,7 @@ function setSlateBounds(window) {
   slate.setBounds(getBrowserBounds(window, tab))
 }
 
-async function setSlateAnimation(view, currclass) {
+async function setSlateAnimation(view, phase, direction = 'right') {
   if (!view) return
 
   if (!view._nucleusSlateLoaded) {
@@ -2941,6 +2928,7 @@ async function setSlateAnimation(view, currclass) {
       view.webContents.once('did-finish-load', resolve)
     })
   }
+  const currclass = `${phase}-${direction === 'left' ? 'left' : 'right'}`
   try {
     return view.webContents.executeJavaScript(`
       new Promise(resolve => {
@@ -2965,7 +2953,7 @@ async function setSlateAnimation(view, currclass) {
 
         slate.addEventListener('animationend', onAnimationEnd);
         setTimeout(finish, 1000);
-        slate.classList.remove('show', 'hide');
+        slate.classList.remove('show-right', 'hide-right', 'show-left', 'hide-left');
         void slate.offsetWidth;
         slate.classList.add(${JSON.stringify(currclass)});
       });
@@ -2990,7 +2978,16 @@ function addslate(window) {
   return gotslate
 }
 
-async function runCanvasSlateNavigation(window, view, action) {
+// Reveals the freshly loaded canvas page over the slate (forward links): the
+// page is raised above the slate and shown, then the slate is dropped behind it
+// with no exit animation, so the page simply "loads on top" of the slide.
+function revealCanvasOverSlate(window, view, tab, gotslate) {
+  attachWebContentView(window, view, tab)
+  view.setVisible(true)
+  gotslate.setVisible(false)
+}
+
+async function runCanvasSlateNavigation(window, view, action, options = {}) {
   if (!view) return
   const tab = getCanvasTabForView(view)
   if (tab && !isCanvasBrowserTab(tab)) {
@@ -3000,35 +2997,49 @@ async function runCanvasSlateNavigation(window, view, action) {
     return action()
   }
 
+  const direction = options.direction === 'left' ? 'left' : 'right'
+  const revealOnTop = options.revealOnTop !== false
+
   view._nucleusSlateNavigationInProgress = true
   try {
     const gotslate = addslate(window)
-    await setSlateAnimation(gotslate, 'show')
+    await setSlateAnimation(gotslate, 'show', direction)
     view.setVisible(false)
     const result = await action()
-    view.setVisible(true)
-    await setSlateAnimation(gotslate, 'hide')
-    gotslate.setVisible(false)
+    if (revealOnTop) {
+      revealCanvasOverSlate(window, view, tab, gotslate)
+    } else {
+      view.setVisible(true)
+      await setSlateAnimation(gotslate, 'hide', direction)
+      gotslate.setVisible(false)
+    }
     return result
   } finally {
     view._nucleusSlateNavigationInProgress = false
   }
 }
 
-async function coverCurrentCanvasNavigationWithSlate(window, view, navpromise) {
+async function coverCurrentCanvasNavigationWithSlate(window, view, navpromise, options = {}) {
   if (!view || view._nucleusSlateNavigationInProgress) return
   const tab = getCanvasTabForView(view)
   if (!isCanvasBrowserTab(tab)) return
 
+  const direction = options.direction === 'left' ? 'left' : 'right'
+  const revealOnTop = options.revealOnTop !== false
+
   view._nucleusSlateNavigationInProgress = true
   try {
     const gotslate = addslate(window)
-    await setSlateAnimation(gotslate, 'show')
+    await setSlateAnimation(gotslate, 'show', direction)
     view.setVisible(false)
     await waitForCanvasNavigationAndSettle(view, navpromise)
-    view.setVisible(true)
-    await setSlateAnimation(gotslate, 'hide')
-    gotslate.setVisible(false)
+    if (revealOnTop) {
+      revealCanvasOverSlate(window, view, tab, gotslate)
+    } else {
+      view.setVisible(true)
+      await setSlateAnimation(gotslate, 'hide', direction)
+      gotslate.setVisible(false)
+    }
   } finally {
     view._nucleusSlateNavigationInProgress = false
   }
@@ -3270,6 +3281,32 @@ app.whenReady().then(() => {
     }
   })
 
+  ipcMain.handle('mail:start_watch', async (event, payload = {}) => {
+    try {
+      const sender = event && event.sender ? event.sender : null
+      const result = await startMailWatcher({
+        intervalMs: payload && payload.intervalMs,
+        onDelta: delta => {
+          if (sender && !sender.isDestroyed()) {
+            sender.send('mail:inbox_delta', delta)
+          }
+        }
+      })
+      return { ok: true, historyId: result && result.historyId }
+    } catch (error) {
+      return { ok: false, error: mailError(error) }
+    }
+  })
+
+  ipcMain.handle('mail:stop_watch', async () => {
+    try {
+      stopMailWatcher()
+      return { ok: true }
+    } catch (error) {
+      return { ok: false, error: mailError(error) }
+    }
+  })
+
   ipcMain.handle('layout:right_panel_width', (_, width) => {
     const numericWidth = Number(width)
     const panelWidth = Number.isFinite(numericWidth) ? Math.max(0, Math.round(numericWidth)) : 340
@@ -3361,26 +3398,6 @@ app.whenReady().then(() => {
     }
   })
 
-  ipcMain.on('canvas:wipe-covered', () => {
-    if (activetab === "None" || !isCanvasBrowserTab(activetab) || !activetab.view) return
-    activetab.view._nucleusBlankedForCanvasWipe = true
-    activetab.view.setVisible(false)
-  })
-
-  ipcMain.on('canvas:blank-shown', () => {
-    if (activetab === "None" || !isCanvasBrowserTab(activetab) || !activetab.view) return
-    if (!activetab.view._nucleusCanvasNavigationInProgress) return
-    activetab.view._nucleusBlankedForCanvasWipe = true
-    activetab.view.setVisible(false)
-  })
-
-  ipcMain.on('canvas:wipe-hidden', () => {
-    if (activetab === "None" || !isCanvasBrowserTab(activetab) || !activetab.view) return
-    activetab.view._nucleusBlankedForCanvasWipe = false
-    if (activetab.view._nucleusCanvasNavigationInProgress) return
-    revealCanvasView(activetab.view)
-  })
-
   // canvas:scrolled — the active Canvas tab reports a scroll position change so
   // the main process can refresh the visible-context (replaces fixed polling).
   ipcMain.on('canvas:scrolled', (event) => {
@@ -3451,7 +3468,7 @@ app.whenReady().then(() => {
           })
           foundtab.view.webContents.goBack()
           await waitForCanvasNavigationAndSettle(foundtab.view, navpromise)
-        })
+        }, { direction: 'left', revealOnTop: false })
         if (foundtab.view.webContents.getURL() === canvasBlankWarmUrl) {
           foundtab.view.setVisible(false)
           foundtab.url = ""

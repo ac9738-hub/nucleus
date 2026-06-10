@@ -35,6 +35,8 @@ let mailState = {
 let mailLoadPromise = null;
 let mailStatusTimer = null;
 let mailContactsUnsubscribe = null;
+let mailInboxDeltaUnsubscribe = null;
+let mailWatchStarted = false;
 
 function getActiveMailTab() {
   const activeTab = typeof getActiveTab === "function" ? getActiveTab() : null;
@@ -266,6 +268,98 @@ function bindMailContactsUpdates() {
   });
 }
 
+function bindMailInboxDelta() {
+  if (mailInboxDeltaUnsubscribe || !window.nucleus || typeof window.nucleus.on !== "function") {
+    return;
+  }
+  mailInboxDeltaUnsubscribe = window.nucleus.on("mail:inbox_delta", payload => {
+    handleInboxDelta(payload);
+  });
+}
+
+async function ensureMailWatchStarted() {
+  if (mailWatchStarted || !window.nucleus || typeof window.nucleus.startMailWatch !== "function") {
+    return;
+  }
+  mailWatchStarted = true;
+  try {
+    const result = await window.nucleus.startMailWatch({ intervalMs: 15000 });
+    if (!result || !result.ok) {
+      mailWatchStarted = false;
+    }
+  } catch (_) {
+    mailWatchStarted = false;
+  }
+}
+
+function handleInboxDelta(delta) {
+  if (!delta) return;
+  const active = isMailTabActive();
+
+  // historyId aged out of Gmail's window: resync from scratch.
+  if (delta.reset) {
+    if (active && mailState.folder === "inbox" && !mailState.searchQuery) {
+      refreshMailInbox();
+    } else {
+      mailState.initialized = false;
+    }
+    return;
+  }
+
+  let changed = false;
+
+  if (delta.labelStats && mailState.view) {
+    mailState.view.labelStats = delta.labelStats;
+    changed = true;
+  }
+
+  const onInbox = mailState.folder === "inbox" && !mailState.searchQuery;
+  let freshMessages = [];
+
+  if (onInbox) {
+    const added = Array.isArray(delta.added) ? delta.added : [];
+    if (added.length) {
+      const existing = new Set(mailState.allMessages.map(item => item.id));
+      freshMessages = added.filter(item => item && item.id && !existing.has(item.id));
+      if (freshMessages.length) {
+        mailState.allMessages = freshMessages.concat(mailState.allMessages);
+        changed = true;
+      }
+    }
+
+    const removedIds = Array.isArray(delta.removedIds) ? delta.removedIds : [];
+    if (removedIds.length) {
+      const removeSet = new Set(removedIds);
+      const before = mailState.allMessages.length;
+      mailState.allMessages = mailState.allMessages.filter(item => !removeSet.has(item.id));
+      if (mailState.allMessages.length !== before) changed = true;
+      if (mailState.selectedId && removeSet.has(mailState.selectedId)) {
+        mailState.selectedId = null;
+        mailState.selectedMessage = null;
+        if (active) updateMailUI("reading");
+      }
+    }
+
+    if (changed) applyContactRoutingToInbox();
+  }
+
+  if (changed) {
+    syncMailStateToTab();
+    if (active) {
+      updateMailUI("list");
+      updateMailUI("sidebar");
+    }
+  }
+
+  if (freshMessages.length) {
+    if (active) {
+      const count = freshMessages.length;
+      setMailStatus(count === 1 ? "1 new message" : `${count} new messages`);
+      syncMailContactsFromInbox(mailState.allMessages);
+    }
+  }
+}
+
 async function ensureMailAuthReady() {
   if (!window.nucleus || typeof window.nucleus.ensureMailAuth !== "function") {
     throw new Error("Mail bridge is not available.");
@@ -302,6 +396,8 @@ async function loadMailView(options = {}) {
   try {
     await ensureMailAuthReady();
     bindMailContactsUpdates();
+    bindMailInboxDelta();
+    ensureMailWatchStarted();
     await loadMailContactsState();
     const result = await window.nucleus.getMailView({ folder, q });
     if (!result || !result.ok) {
@@ -685,3 +781,4 @@ async function openMailAppInExistingTab(tabId) {
 }
 
 bindMailContactsUpdates();
+bindMailInboxDelta();

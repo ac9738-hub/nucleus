@@ -714,7 +714,6 @@ function renderView() {
   } else if (activeTab.type === "task") {
     view.innerHTML = renderTaskWorkspace(activeTab);
   } else if (activeTab.type === "canvastab" && activeTab.canvasMode !== "browser") {
-    resetCanvasWebChrome();
     view.innerHTML = window.nucleusCanvasApp
       ? window.nucleusCanvasApp.renderCanvasApp(activeTab, canvasData)
       : `<section class="workspace-panel"><div><h2>Canvas</h2><p>The Canvas app script did not load.</p></div></section>`;

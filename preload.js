@@ -31,15 +31,14 @@ contextBridge.exposeInMainWorld('nucleus', {
   trashMail: (payload) => ipcRenderer.invoke('mail:trash', payload),
   untrashMail: (payload) => ipcRenderer.invoke('mail:untrash', payload),
   deleteMail: (payload) => ipcRenderer.invoke('mail:delete', payload),
+  startMailWatch: (payload) => ipcRenderer.invoke('mail:start_watch', payload),
+  stopMailWatch: () => ipcRenderer.invoke('mail:stop_watch'),
   getMailContacts: () => ipcRenderer.invoke('mail:get_contacts'),
   addMailContact: (payload) => ipcRenderer.invoke('mail:add_contact', payload),
   syncMailContacts: (payload) => ipcRenderer.invoke('mail:sync_contacts', payload),
   getinjection: () => ipcRenderer.invoke('injection:get'),
   writeActiveTabHtml: () => ipcRenderer.invoke('tabs:write_active_html'),
   writeActiveTabFramesHtml: () => ipcRenderer.invoke('tabs:write_active_frames_html'),
-  canvasBlankShown: () => ipcRenderer.send('canvas:blank-shown'),
-  canvasWipeCovered: () => ipcRenderer.send('canvas:wipe-covered'),
-  canvasWipeHidden: () => ipcRenderer.send('canvas:wipe-hidden'),
   on: (channel, cb) => {
   const listener = (_, data) => cb(data);
   ipcRenderer.on(channel, listener);

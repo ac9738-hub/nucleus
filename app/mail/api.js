@@ -745,6 +745,173 @@ async function ensureMailAuth() {
     return Boolean(get_token())
 }
 
+// --- Inbox watcher (Gmail history delta sync) ---
+// Polls users.history.list against a stored historyId to detect new/removed
+// inbox messages, then pushes the deltas to the renderer via onDelta.
+
+const MAIL_WATCH_DEFAULT_INTERVAL = 15000
+
+let mailWatchTimer = null
+let mailWatchHistoryId = null
+let mailWatchPolling = false
+let mailWatchOnDelta = null
+let mailWatchIntervalMs = MAIL_WATCH_DEFAULT_INTERVAL
+
+async function safeLabelStats() {
+    try {
+        return await getLabelStats()
+    } catch (_) {
+        return null
+    }
+}
+
+async function listMailHistory(startHistoryId) {
+    const events = []
+    let pageToken = ''
+    let latestHistoryId = startHistoryId
+
+    do {
+        const params = new URLSearchParams({ startHistoryId: String(startHistoryId), maxResults: '500' })
+        params.append('historyTypes', 'messageAdded')
+        params.append('historyTypes', 'messageDeleted')
+        params.append('historyTypes', 'labelAdded')
+        params.append('historyTypes', 'labelRemoved')
+        if (pageToken) params.set('pageToken', pageToken)
+
+        const data = await gmailRequest(`/history?${params.toString()}`)
+        if (Array.isArray(data.history)) events.push(...data.history)
+        if (data.historyId) latestHistoryId = data.historyId
+        pageToken = data.nextPageToken || ''
+    } while (pageToken)
+
+    return { events, historyId: latestHistoryId }
+}
+
+function collectHistoryChanges(events) {
+    const addedIds = new Set()
+    const removedIds = new Set()
+
+    events.forEach(item => {
+        if (!item) return
+        ;(item.messagesAdded || []).forEach(entry => {
+            const msg = entry && entry.message
+            if (msg && msg.id && Array.isArray(msg.labelIds) && msg.labelIds.includes('INBOX')) {
+                addedIds.add(msg.id)
+            }
+        })
+        ;(item.labelsAdded || []).forEach(entry => {
+            const msg = entry && entry.message
+            const labels = entry && Array.isArray(entry.labelIds) ? entry.labelIds : []
+            if (msg && msg.id && labels.includes('INBOX')) addedIds.add(msg.id)
+        })
+        ;(item.messagesDeleted || []).forEach(entry => {
+            const msg = entry && entry.message
+            if (msg && msg.id) removedIds.add(msg.id)
+        })
+        ;(item.labelsRemoved || []).forEach(entry => {
+            const msg = entry && entry.message
+            const labels = entry && Array.isArray(entry.labelIds) ? entry.labelIds : []
+            if (msg && msg.id && labels.includes('INBOX')) removedIds.add(msg.id)
+        })
+    })
+
+    // A message that was added and then left the inbox in the same window is a removal.
+    removedIds.forEach(id => addedIds.delete(id))
+    return { addedIds, removedIds }
+}
+
+async function pollMailHistory() {
+    if (mailWatchPolling || !get_token()) return null
+    mailWatchPolling = true
+
+    try {
+        if (!mailWatchHistoryId) {
+            const profile = await getProfile()
+            mailWatchHistoryId = profile.historyId || null
+            return null
+        }
+
+        let result
+        try {
+            result = await listMailHistory(mailWatchHistoryId)
+        } catch (error) {
+            // A 404 means the stored historyId is older than Gmail's retention
+            // window; re-baseline and ask the renderer to reload from scratch.
+            const message = String((error && error.message) || '').toLowerCase()
+            if (message.includes('404') || message.includes('not found') || message.includes('invalid')) {
+                const profile = await getProfile()
+                mailWatchHistoryId = profile.historyId || null
+                return { reset: true, historyId: mailWatchHistoryId, labelStats: await safeLabelStats() }
+            }
+            throw error
+        }
+
+        mailWatchHistoryId = result.historyId || mailWatchHistoryId
+
+        const { addedIds, removedIds } = collectHistoryChanges(result.events)
+        if (!addedIds.size && !removedIds.size) return null
+
+        let added = []
+        if (addedIds.size) {
+            const metadata = await batchGetMessageMetadata([...addedIds])
+            added = metadata
+                .map(formatMessageSummary)
+                .filter(msg => Array.isArray(msg.labelIds) && msg.labelIds.includes('INBOX'))
+        }
+
+        return {
+            added,
+            removedIds: [...removedIds],
+            labelStats: await safeLabelStats(),
+            historyId: mailWatchHistoryId
+        }
+    } finally {
+        mailWatchPolling = false
+    }
+}
+
+async function runMailWatchTick() {
+    try {
+        const delta = await pollMailHistory()
+        if (delta && typeof mailWatchOnDelta === 'function') {
+            mailWatchOnDelta(delta)
+        }
+    } catch (_) {
+        // Swallow transient polling errors; the next tick retries.
+    }
+}
+
+async function startMailWatcher(options = {}) {
+    if (typeof options.onDelta === 'function') mailWatchOnDelta = options.onDelta
+    const interval = Number(options.intervalMs)
+    mailWatchIntervalMs = interval > 0 ? interval : MAIL_WATCH_DEFAULT_INTERVAL
+
+    if (mailWatchTimer) {
+        return { ok: true, historyId: mailWatchHistoryId }
+    }
+
+    // Seed the baseline historyId now so the first tick can already report deltas.
+    if (!mailWatchHistoryId && get_token()) {
+        try {
+            const profile = await getProfile()
+            mailWatchHistoryId = profile.historyId || null
+        } catch (_) {}
+    }
+
+    mailWatchTimer = setInterval(runMailWatchTick, mailWatchIntervalMs)
+    if (mailWatchTimer && typeof mailWatchTimer.unref === 'function') mailWatchTimer.unref()
+    return { ok: true, historyId: mailWatchHistoryId }
+}
+
+function stopMailWatcher() {
+    if (mailWatchTimer) {
+        clearInterval(mailWatchTimer)
+        mailWatchTimer = null
+    }
+    mailWatchOnDelta = null
+    return { ok: true }
+}
+
 // Legacy aliases
 async function getmail(options = {}) {
     return listMailMessages(options)
@@ -766,6 +933,8 @@ module.exports = {
     trashMailMessage,
     untrashMailMessage,
     deleteMailMessage,
+    startMailWatcher,
+    stopMailWatcher,
     buildHtml,
     getInboxHtml,
     getmail,

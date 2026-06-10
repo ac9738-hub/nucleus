@@ -69,6 +69,20 @@
         "summaryStatus": "ready",
         "direction": "incoming",
         "addedAt": "2026-06-09T23:38:34.219Z"
+      },
+      {
+        "messageId": "19eb07a83cbb1a56",
+        "threadId": "19eb07a83cbb1a56",
+        "subject": "work",
+        "from": "Allen Chen <allen.chen2024@gmail.com>",
+        "sender": "Allen Chen",
+        "date": "Wed, 10 Jun 2026 03:40:56 -0400",
+        "dateLabel": "3:40 AM",
+        "snippet": "Dear Dr. Patel, I hope this message finds you well. My name is Dr. Sarah Nguyen, and I am an Assistant Professor of Biomedical Informatics at the University of Michigan. I came across your recent",
+        "summary": "Dr. Sarah Nguyen invites collaboration on integrating large language models into clinical decision support systems, seeking expertise in uncertainty quantification and model explainability. She proposes a 30-minute introductory call to discuss potential areas of collaboration.",
+        "summaryStatus": "ready",
+        "direction": "incoming",
+        "addedAt": "2026-06-10T07:41:23.323Z"
       }
     ],
     "mail@junminghuang.com": [

@@ -728,20 +728,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       openMailAppInExistingTab(payload.tabId);
     }
   });
-  window.nucleus.on("canvas:navigation", () => {
-    const activeTab = getActiveTab();
-    if (!activeTab || activeTab.type !== "canvastab" || activeTab.canvasMode !== "browser") {
-      return;
-    }
-    handlecanvaspagechange();
-  });
-  window.nucleus.on("canvas:blank", () => {
-    const activeTab = getActiveTab();
-    if (!activeTab || activeTab.type !== "canvastab" || activeTab.canvasMode !== "browser") {
-      return;
-    }
-    showCanvasBlankSlate();
-  });
   window.nucleus.on("canvas:view-ready", payload => {
     if (payload && payload.id) {
       const tab = state.tabs.find(item => sameTabId(item.id, payload.id));
@@ -749,7 +735,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         tab.loading = false;
       }
     }
-    hideCanvasBlankSlate();
   });
 
   render();

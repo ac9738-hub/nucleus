@@ -6,33 +6,40 @@ const fs = require('fs')
 const path = require('path')
 const { webFrame, ipcRenderer } = require('electron')
 
+// Match the slate overlay (slate.css) exactly so the page reveals on top of the
+// slide with no color jump. background-attachment: fixed anchors the gradient to
+// the viewport on every wrapper, so the stacked layers line up seamlessly and
+// match the viewport-sized slate.
+const CANVAS_THEME_GRADIENT = 'linear-gradient(135deg, #0c1224 0%, #050916 100%)'
+
 const criticalInjection = `
   html,
-  body {
-    background: #181a1f !important;
-  }
-
   body,
   #application,
   .ic-app,
   .ic-Layout-wrapper,
   .ic-app-main-content,
   .ic-Layout-contentWrapper {
-    background-color: #181a1f !important;
+    background: ${CANVAS_THEME_GRADIENT} !important;
+    background-attachment: fixed !important;
   }
 `
 
 webFrame.insertCSS(criticalInjection)
 
-if (document.documentElement) {
-  document.documentElement.style.backgroundColor = '#181a1f'
+function applyCanvasThemeBackground(element) {
+  if (!element) return
+  element.style.background = CANVAS_THEME_GRADIENT
+  element.style.backgroundAttachment = 'fixed'
 }
 
+applyCanvasThemeBackground(document.documentElement)
+
 if (document.body) {
-  document.body.style.backgroundColor = '#181a1f'
+  applyCanvasThemeBackground(document.body)
 } else {
   document.addEventListener('DOMContentLoaded', () => {
-    document.body.style.backgroundColor = '#181a1f'
+    applyCanvasThemeBackground(document.body)
   }, { once: true })
 }
 

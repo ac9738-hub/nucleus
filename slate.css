@@ -1,13 +1,18 @@
 /*
   Canvas slate animation styles.
-  Functionality: visual cover used while Canvas WebContentsView navigation settles.
+  Functionality: themed cover panel that slides over the Canvas WebContentsView
+  during navigation. Forward navigations slide in from the right and the loaded
+  page is revealed on top of the slate (no exit); back navigations slide in from
+  the left and retract left to reveal the page.
   Dependencies: slate.html markup and main.js slate WebContentsView lifecycle.
 */
 :root {
-  --slate-bg: #181a1f;
-  --slate-shadow: rgba(0, 0, 0, 0.24);
-  --slate-duration: 630ms;
-  --slate-ease: ease-in-out;
+  /* Matches the app shell palette (styles.css --bg / --surface / --accent). */
+  --slate-bg: #050916;
+  --slate-surface: #0c1224;
+  --slate-edge: rgba(117, 103, 216, 0.22);
+  --slate-duration: 440ms;
+  --slate-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
 * {
@@ -24,48 +29,44 @@ body {
 }
 
 .slate {
-  background:
-    linear-gradient(90deg, transparent 0, var(--slate-shadow) 18px, transparent 48px),
-    var(--slate-bg);
+  background: linear-gradient(135deg, var(--slate-surface) 0%, var(--slate-bg) 100%);
   height: 100%;
   opacity: 0;
   transform: translateX(100%);
   width: 100%;
+  will-change: transform;
 }
 
-.slate.show {
-  animation: slate-wipe-from-right var(--slate-duration) var(--slate-ease) forwards;
+.slate.show-right {
+  box-shadow: -28px 0 56px var(--slate-edge);
+  animation: slate-enter-right var(--slate-duration) var(--slate-ease) forwards;
 }
 
-.slate.hide {
-  animation: slate-wipe-to-right var(--slate-duration) var(--slate-ease) forwards;
+.slate.show-left,
+.slate.hide-left {
+  box-shadow: 28px 0 56px var(--slate-edge);
 }
 
-@keyframes slate-wipe-from-right {
-  0% {
-    opacity: 1;
-    transform: translateX(100%);
-  }
-
-  100% {
-    opacity: 1;
-    transform: translateX(0);
-  }
+.slate.show-left {
+  animation: slate-enter-left var(--slate-duration) var(--slate-ease) forwards;
 }
 
-@keyframes slate-wipe-to-right {
-  0% {
-    opacity: 1;
-    transform: translateX(0);
-  }
+.slate.hide-left {
+  animation: slate-exit-left var(--slate-duration) var(--slate-ease) forwards;
+}
 
-  99% {
-    opacity: 1;
-    transform: translateX(100%);
-  }
+@keyframes slate-enter-right {
+  0% { opacity: 1; transform: translateX(100%); }
+  100% { opacity: 1; transform: translateX(0); }
+}
 
-  100% {
-    opacity: 0;
-    transform: translateX(100%);
-  }
+@keyframes slate-enter-left {
+  0% { opacity: 1; transform: translateX(-100%); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slate-exit-left {
+  0% { opacity: 1; transform: translateX(0); }
+  99% { opacity: 1; transform: translateX(-100%); }
+  100% { opacity: 0; transform: translateX(-100%); }
 }
