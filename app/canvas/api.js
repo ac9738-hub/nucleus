@@ -378,6 +378,10 @@ function makeCanvasTaskLookup(rootDir) {
   }
 }
 
+function normalizeTaskName(value) {
+  return String(value || '').trim().toLowerCase().replace(/\s+/g, ' ')
+}
+
 function getCourseTaskName(lookup, courseid) {
   return lookup.courseNameById.get(String(courseid || '')) || `Canvas ${courseid || 'course'}`
 }
@@ -753,6 +757,15 @@ function make_canvas_tasks(rootDir) {
         ])
       }
       const learningBlocks = (allCanvasNodes.learningBlocks && allCanvasNodes.learningBlocks[courseid]) || []
+      const gradescopeMappings = (
+        allCanvasNodes.external_platforms &&
+        allCanvasNodes.external_platforms.gradescope &&
+        allCanvasNodes.external_platforms.gradescope.mappings
+      ) || []
+      const gradescopeMatch = gradescopeMappings.find(mapping => {
+        return String(mapping.canvasAssignmentId || '') === String(canvasAssignment && canvasAssignment.id || '')
+          || normalizeTaskName(mapping.canvasAssignmentName || '') === normalizeTaskName(assignment.name || title)
+      })
       tasks.push({
         id: `canvas-assignment-${courseid}-${assignmentId}`,
         workspaceId: '',
@@ -780,7 +793,8 @@ function make_canvas_tasks(rootDir) {
         submissionDependencies: Array.isArray(assignment.submissionDependencies) ? assignment.submissionDependencies : [],
         conceptRequirements: Array.isArray(assignment.conceptRequirements) ? assignment.conceptRequirements : [],
         lookingforUnresolved: Array.isArray(assignment.lookingfor) ? assignment.lookingfor : [],
-        learningBlocks
+        learningBlocks,
+        submissionStatus: gradescopeMatch && gradescopeMatch.submissionStatus || ''
       })
     })
   })
@@ -797,6 +811,12 @@ function make_canvas_tasks(rootDir) {
     if (!studyUrls.length) {
       studyUrls = uniqueUrls([getCourseHomeUrl(canvasLookup, courseid)])
     }
+    const courseLearningBlocks = (allCanvasNodes.learningBlocks && allCanvasNodes.learningBlocks[courseid]) || []
+    const relevantBlocks = courseLearningBlocks.filter(block => {
+      const conceptId = String(block.conceptId || '')
+      return coveredConcepts.some(concept => String(concept.conceptid || concept.id || '') === conceptId)
+    })
+
     tasks.push({
       id: `canvas-study-${courseid}-${eventId}`,
       workspaceId: '',
@@ -817,7 +837,8 @@ function make_canvas_tasks(rootDir) {
       urls: studyUrls,
       priority_weight: canvasStudyTaskImportance(event, coveredConcepts),
       coveredConcepts,
-      studyFiles
+      studyFiles,
+      learningBlocks: relevantBlocks
     })
   })
 
@@ -1556,9 +1577,61 @@ ${html}
       const gradescopeResult = await syncGradescopeState(data1)
       if (gradescopeResult.synced) {
         data1.gradescope = gradescopeResult.state
+        const parsingExternalSubmissions = []
+        ;(gradescopeResult.state.mappings || []).forEach(mapping => {
+          parsingExternalSubmissions.push({
+            id: `gradescope-${mapping.courseId}-${mapping.canvasAssignmentId}`,
+            courseid: mapping.courseId,
+            name: mapping.canvasAssignmentName || mapping.gradescopeAssignmentTitle || 'Gradescope assignment',
+            url: mapping.gradescopeUrl || '',
+            previewurl: mapping.gradescopeUrl || '',
+            content: JSON.stringify({
+              documenttype: 'external_submission',
+              platform: 'gradescope',
+              courseId: mapping.courseId,
+              canvasAssignmentId: mapping.canvasAssignmentId,
+              canvasAssignmentName: mapping.canvasAssignmentName,
+              gradescopeAssignmentId: mapping.gradescopeAssignmentId,
+              gradescopeUrl: mapping.gradescopeUrl,
+              gradescopeAssignmentTitle: mapping.gradescopeAssignmentTitle,
+              submissionStatus: mapping.submissionStatus,
+              dueText: mapping.dueText
+            }, null, 2)
+          })
+        })
+        if (parsingExternalSubmissions.length) {
+          writeParserLine({ type: 'external_submission', content: parsingExternalSubmissions })
+        }
       }
     } catch (error) {
       console.warn('Gradescope sync skipped:', error.message || error)
+    }
+
+    const homepagesRoot = path.join(__dirname, 'canvas_homepages')
+    if (fs.existsSync(homepagesRoot)) {
+      course.forEach(courseItem => {
+        const homepagePath = path.join(homepagesRoot, `${courseItem.id}.html`)
+        if (!fs.existsSync(homepagePath)) return
+        const bodyHtml = fs.readFileSync(homepagePath, 'utf8')
+        const frontPage = data1.front_pages && data1.front_pages[courseItem.id]
+        writeParserLine({
+          type: 'page',
+          content: [{
+            id: `homepage-${courseItem.id}`,
+            url: frontPage && frontPage.html_url || `${canvasBaseUrl}/courses/${courseItem.id}`,
+            previewurl: frontPage && frontPage.html_url || `${canvasBaseUrl}/courses/${courseItem.id}`,
+            courseid: courseItem.id,
+            name: `${courseItem.name || 'Course'} homepage`,
+            content: JSON.stringify({
+              documenttype: 'page',
+              title: `${courseItem.name || 'Course'} homepage`,
+              body_html: bodyHtml,
+              body_text: stripHtmlToText(bodyHtml),
+              html_url: frontPage && frontPage.html_url || ''
+            }, null, 2)
+          }]
+        })
+      })
     }
     fs.writeFileSync(canvasDataPath, JSON.stringify(data1, null, 2))
     if (!writeParserLine('None')) {

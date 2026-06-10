@@ -213,6 +213,7 @@ const BROWSER_POOL_LIMITS = {
   web: { activeMax: 4, backupCount: 2, maxSize: 6 },
   canvas: { activeMax: 4, backupCount: 2, maxSize: 6 }
 }
+const BROWSER_POOL_PROTECTED_RECENT = 2
 const CANVAS_PREDICTIVE_LINK_COUNT = 2
 const canvasPredictiveByTab = new Map()
 
@@ -289,9 +290,48 @@ class BrowserPool {
         role: cache.role || "predicted",
         tabId: cache.tabId ? String(cache.tabId) : "",
         url: this.normalizeBackupUrl(cache.url),
-        label: cache.label || ""
+        label: cache.label || "",
+        workspaceId: cache.workspaceId ? String(cache.workspaceId) : "",
+        lastAccessedAt: Number(cache.lastAccessedAt) || Date.now(),
+        tier: cache.tier || (cache.role === "stashed" ? "stashed" : "predicted")
       }
     }
+  }
+
+  touchBackupEntry(entry) {
+    if (entry && entry.cache) {
+      entry.cache.lastAccessedAt = Date.now()
+    }
+  }
+
+  selectBackupEvictionEntry(type, activeWorkspaceId = "") {
+    const entries = this.backupDeque(type).toArray()
+    const stashed = entries.filter(entry => entry.cache.role === "stashed")
+    if (!stashed.length) {
+      return entries.find(entry => entry.cache.role === "predicted") || null
+    }
+
+    const normalizedWorkspaceId = String(activeWorkspaceId || "")
+    const activeWorkspaceEntries = stashed
+      .filter(entry => normalizedWorkspaceId && entry.cache.workspaceId === normalizedWorkspaceId)
+      .sort((left, right) => (Number(right.cache.lastAccessedAt) || 0) - (Number(left.cache.lastAccessedAt) || 0))
+    const protectedTabIds = new Set(
+      activeWorkspaceEntries
+        .slice(0, BROWSER_POOL_PROTECTED_RECENT)
+        .map(entry => entry.cache.tabId)
+        .filter(Boolean)
+    )
+
+    const candidates = stashed
+      .filter(entry => !protectedTabIds.has(entry.cache.tabId))
+      .sort((left, right) => {
+        const leftActive = normalizedWorkspaceId && left.cache.workspaceId === normalizedWorkspaceId ? 1 : 0
+        const rightActive = normalizedWorkspaceId && right.cache.workspaceId === normalizedWorkspaceId ? 1 : 0
+        if (leftActive !== rightActive) return leftActive - rightActive
+        return (Number(left.cache.lastAccessedAt) || 0) - (Number(right.cache.lastAccessedAt) || 0)
+      })
+
+    return candidates[0] || null
   }
 
   removeBackupEntry(type, entry) {
@@ -311,7 +351,10 @@ class BrowserPool {
       entry.cache.tabId &&
       entry.cache.tabId === normalizedTabId
     ))
-    if (match) return match
+    if (match) {
+      this.touchBackupEntry(match)
+      return match
+    }
 
     if (normalizedUrl) {
       match = entries.find(entry => (
@@ -319,7 +362,10 @@ class BrowserPool {
         (!normalizedTabId || entry.cache.tabId === normalizedTabId) &&
         this.urlsLikelyMatch(entry.cache.url, normalizedUrl)
       ))
-      if (match) return match
+      if (match) {
+        this.touchBackupEntry(match)
+        return match
+      }
     }
 
     if (type === "web") {
@@ -426,15 +472,18 @@ class BrowserPool {
       role: "stashed",
       tabId: cache.tabId,
       url: liveUrl && liveUrl !== canvasBlankWarmUrl ? liveUrl : cache.url,
-      label: cache.label
+      label: cache.label,
+      workspaceId: cache.workspaceId,
+      lastAccessedAt: Date.now(),
+      tier: "stashed"
     })
 
     const deque = this.backupDeque(type)
     while (deque.length >= this.backupCount(type)) {
-      const evicted = deque.popFront()
-      if (evicted && evicted.view) {
-        await this.releaseView(window, type, evicted.view, false)
-      }
+      const evicted = this.selectBackupEvictionEntry(type, cache.activeWorkspaceId)
+      if (!evicted) break
+      this.removeBackupEntry(type, evicted)
+      await discardBackupEntry(window, type, evicted)
     }
 
     if (window && !window.isDestroyed()) {
@@ -2057,7 +2106,46 @@ function buildLightweightCanvasIndex(graph) {
 
   const problems = (graph.problems || []).map(pruneCanvasGraphChild)
 
-  return { files, concepts, problems }
+  const learningBlocks = {}
+  Object.entries(graph.learningBlocks || {}).forEach(([courseId, blocks]) => {
+    learningBlocks[courseId] = (Array.isArray(blocks) ? blocks : []).map(block => ({
+      blockId: block.blockId,
+      courseid: block.courseid || courseId,
+      order: block.order,
+      conceptId: block.conceptId,
+      explanation: compactText(block.explanation || '', 320),
+      detailRefs: block.detailRefs || [],
+      examples: block.examples || [],
+      practiceProblems: block.practiceProblems || [],
+      orderSource: block.orderSource || 'merged'
+    }))
+  })
+
+  const assignments = []
+  Object.entries(graph.syllabi || {}).forEach(([courseId, syllabus]) => {
+    ;(syllabus.assignments || []).forEach(assignment => {
+      assignments.push({
+        courseid: syllabus.courseid || courseId,
+        assignmentid: assignment.assignmentid,
+        name: assignment.name,
+        submissionTypes: assignment.submissionTypes || [],
+        submissionLinks: assignment.submissionLinks || [],
+        submissionDependencies: assignment.submissionDependencies || [],
+        conceptRequirements: assignment.conceptRequirements || [],
+        lookingfor: assignment.lookingfor || []
+      })
+    })
+  })
+
+  return {
+    files,
+    concepts,
+    problems,
+    edges: graph.edges || [],
+    learningBlocks,
+    assignments,
+    externalPlatforms: graph.external_platforms || {}
+  }
 }
 
 // Returns the cached lightweight graph index, re-parsing canvas_graph.json only
@@ -2223,6 +2311,21 @@ function buildVisibleGraphIndexes(graph) {
   const details = new Map()
   const examples = new Map()
   const problems = new Map()
+  const learningBlocks = new Map()
+  const assignments = new Map()
+
+  ;(graph.learningBlocks ? Object.entries(graph.learningBlocks) : []).forEach(([courseId, blocks]) => {
+    ;(blocks || []).forEach(block => {
+      const blockId = String(block.blockId || '')
+      if (blockId) learningBlocks.set(blockId, { ...block, courseid: block.courseid || courseId })
+    })
+  })
+
+  ;(graph.assignments || []).forEach(assignment => {
+    const assignmentId = String(assignment.assignmentid || '')
+    if (assignmentId) assignments.set(assignmentId, assignment)
+    if (assignment.name) assignments.set(String(assignment.name), assignment)
+  })
 
   ;(graph.concepts || []).forEach(concept => {
     const conceptKey = getNodeId(concept)
@@ -2250,7 +2353,7 @@ function buildVisibleGraphIndexes(graph) {
     if (problem.name) problems.set(String(problem.name), problem)
   })
 
-  return { concepts, details, examples, problems }
+  return { concepts, details, examples, problems, learningBlocks, assignments }
 }
 
 function addVisibleNode(target, type, node, fallback = {}) {
@@ -3679,8 +3782,12 @@ function syncActiveSurfaceFromMainTab(window, mainTab) {
     scheduleCanvasVisibleContextUpdate()
     return
   }
-  if (isWebContentTab(mainTab) && mainTab.view) {
-    renderTab(mainTab.view, window, mainTab)
+  if (isWebContentTab(mainTab)) {
+    if (mainTab.view) {
+      renderTab(mainTab.view, window, mainTab)
+    } else {
+      renderTab("None", window)
+    }
     activetab = mainTab
     refreshContextForActiveSurface()
     scheduleCanvasVisibleContextUpdate()
@@ -3734,6 +3841,222 @@ function mergeIncomingTab(target, incoming) {
   target.yindex = incoming.yindex
 }
 
+let activeWorkspaceIdForPool = null
+const tabSnapshots = new Map()
+const tabSnapshotCaptureTimers = new Map()
+
+function logPoolTierCounts(reason) {
+  console.log("[BrowserPool]", {
+    reason,
+    web: {
+      inUse: browserpool.inUseLength("web"),
+      backup: browserpool.backupLength("web"),
+      available: browserpool.availableLength("web")
+    },
+    canvas: {
+      inUse: browserpool.inUseLength("canvas"),
+      backup: browserpool.backupLength("canvas"),
+      available: browserpool.availableLength("canvas")
+    }
+  })
+}
+
+function broadcastTabViewState(tab, tier, snapshotDataUrl = "") {
+  if (!tab || !mainwindow || mainwindow.isDestroyed()) return
+  mainwindow.webContents.send("tabs:view_state", {
+    id: tab.id,
+    tier,
+    discarded: Boolean(tab.discarded),
+    snapshotDataUrl: snapshotDataUrl || tab.snapshotDataUrl || ""
+  })
+}
+
+async function captureTabSnapshotFromView(view) {
+  if (!view || view.webContents.isDestroyed()) return ""
+  try {
+    const image = await view.webContents.capturePage()
+    return `data:image/png;base64,${image.toPNG().toString("base64")}`
+  } catch (error) {
+    console.error("Unable to capture tab snapshot:", error)
+    return ""
+  }
+}
+
+function captureTabSnapshotDebounced(tab, view, delayMs = 300) {
+  const tabId = String(tab && tab.id ? tab.id : "")
+  if (!tabId) return Promise.resolve("")
+  if (tabSnapshotCaptureTimers.has(tabId)) {
+    clearTimeout(tabSnapshotCaptureTimers.get(tabId))
+  }
+  return new Promise(resolve => {
+    const timer = setTimeout(async () => {
+      tabSnapshotCaptureTimers.delete(tabId)
+      const snapshotDataUrl = await captureTabSnapshotFromView(view)
+      if (snapshotDataUrl) {
+        tab.snapshotDataUrl = snapshotDataUrl
+        tabSnapshots.set(tabId, snapshotDataUrl)
+        broadcastTabViewState(tab, tab.discarded ? "discarded" : "stashed", snapshotDataUrl)
+      }
+      resolve(snapshotDataUrl)
+    }, delayMs)
+    tabSnapshotCaptureTimers.set(tabId, timer)
+  })
+}
+
+async function discardBackupEntry(window, type, entry) {
+  if (!entry || !entry.view || entry.view.webContents.isDestroyed()) return
+  const tab = currtabs.find(localtab => sameTabId(localtab.id, entry.cache.tabId))
+  let snapshotDataUrl = tab && tab.snapshotDataUrl ? tab.snapshotDataUrl : ""
+  if (!snapshotDataUrl) {
+    snapshotDataUrl = await captureTabSnapshotFromView(entry.view)
+  }
+  if (tab) {
+    tab.discarded = true
+    tab.snapshotDataUrl = snapshotDataUrl
+    tab.view = null
+    tab.poolType = null
+    if (snapshotDataUrl) {
+      tabSnapshots.set(String(tab.id), snapshotDataUrl)
+    }
+    broadcastTabViewState(tab, "discarded", snapshotDataUrl)
+  }
+  await browserpool.releaseView(window, type, entry.view, false)
+}
+
+async function restoreStashedTabView(tab, window = mainwindow) {
+  if (!tab || !isWebContentTab(tab) || tab.view || tab.discarded) return false
+  const poolType = tab.type === "canvastab" ? "canvas" : "web"
+  if (!browserpool.findBackupEntry(poolType, tab.id, tab.url)) {
+    return false
+  }
+
+  const acquired = browserpool.acquireForTab(poolType, tab.id, tab.url)
+  if (!acquired.view) {
+    return false
+  }
+
+  tab.view = acquired.view
+  tab.poolType = poolType
+  tab.view._nucleusPoolType = poolType
+  tab.discarded = false
+
+  if (acquired.fromBackup) {
+    if (tab.type === "canvastab") {
+      revealCanvasView(tab.view)
+      refreshCanvasPredictiveViews(window, tab).catch(error => {
+        console.error("Unable to refresh canvas predictive views after restore:", error)
+      })
+    } else {
+      tab.url = tab.url || tab.view.webContents.getURL()
+      pushTabTitleFromView(window, tab.view, tab)
+    }
+    broadcastTabViewState(tab, "active")
+    return true
+  }
+
+  tab.view = null
+  tab.poolType = null
+  await browserpool.releaseView(window, poolType, acquired.view, false)
+  return false
+}
+
+async function restoreDiscardedTabView(tab, window = mainwindow) {
+  if (!tab || !isWebContentTab(tab) || tab.view || !tab.discarded) return false
+  const poolType = tab.type === "canvastab" ? "canvas" : "web"
+  const snapshotDataUrl = tab.snapshotDataUrl || tabSnapshots.get(String(tab.id)) || ""
+  if (snapshotDataUrl && window && !window.isDestroyed()) {
+    window.webContents.send("tabs:snapshot_overlay", {
+      tabId: tab.id,
+      snapshotDataUrl,
+      visible: true
+    })
+  }
+
+  const acquired = browserpool.acquireForTab(poolType, tab.id, tab.url)
+  if (!acquired.view) {
+    return false
+  }
+
+  tab.view = acquired.view
+  tab.poolType = poolType
+  tab.view._nucleusPoolType = poolType
+  tab.view._nucleusRestorePending = true
+  tab.discarded = false
+
+  const initialUrl = tab.url || (tab.type === "canvastab" ? canvasBlankWarmUrl : "https://www.google.com")
+  const hideOverlay = () => {
+    if (tab.view) {
+      tab.view._nucleusRestorePending = false
+    }
+    if (!window || window.isDestroyed()) return
+    window.webContents.send("tabs:snapshot_overlay", {
+      tabId: tab.id,
+      visible: false
+    })
+    broadcastTabViewState(tab, "active")
+    if (tab.view && !tab.view.webContents.isDestroyed()) {
+      tab.view.setVisible(true)
+      if (tab.type === "canvastab") {
+        revealCanvasView(tab.view)
+      }
+    }
+  }
+
+  if (tab.type === "canvastab") {
+    const hasAuth = await ensureCanvasAuthForNavigation(tab.view.webContents.session)
+    if (!hasAuth) {
+      mainwindow.webContents.send("canvas:navigation-finished", "auth")
+      revealCanvasView(tab.view)
+      hideOverlay()
+      return true
+    }
+    tab.view._nucleusSuppressNextCanvasSlate = true
+    tab.view.webContents.once("did-finish-load", hideOverlay)
+    await loadCanvasTabURL(tab.view, initialUrl, status => {
+      mainwindow.webContents.send("canvas:navigation-finished", status)
+    })
+  } else {
+    tab.view.webContents.once("did-finish-load", hideOverlay)
+    await tab.view.webContents.loadURL(initialUrl)
+    tab.url = initialUrl
+    mainwindow.webContents.send("tabs:url_update", { id: tab.id, url: tab.url })
+  }
+  return true
+}
+
+async function ensureActiveWebContentTabView(tab, window = mainwindow) {
+  if (!tab || !isWebContentTab(tab) || tab.view) return true
+  if (tab.discarded) {
+    return restoreDiscardedTabView(tab, window)
+  }
+  return restoreStashedTabView(tab, window)
+}
+
+const tabViewLifecycle = {
+  async onTabDeactivated(tab, window = mainwindow) {
+    if (!tab || tab === "None" || !isWebContentTab(tab) || !tab.view) return
+    await stashTabViewToBackup(tab, window)
+    logPoolTierCounts("tab-deactivated")
+  },
+
+  async onTabActivated(tab, window = mainwindow) {
+    if (!tab || !isWebContentTab(tab)) return
+    await ensureActiveWebContentTabView(tab, window)
+    logPoolTierCounts("tab-activated")
+  },
+
+  async deactivateTabsOutsideWorkspace(activeWorkspaceId, keepTabId = null, window = mainwindow) {
+    if (!activeWorkspaceId) return
+    for (const tab of currtabs) {
+      if (!isWebContentTab(tab) || !tab.view) continue
+      if (keepTabId && sameTabId(tab.id, keepTabId)) continue
+      if (String(tab.workspaceId) === String(activeWorkspaceId)) continue
+      await stashTabViewToBackup(tab, window)
+    }
+    logPoolTierCounts("workspace-deactivated")
+  }
+}
+
 async function stashTabViewToBackup(tab, window = mainwindow) {
   if (!tab || !tab.view) return "closed"
   const poolType = getTabPoolType(tab)
@@ -3745,11 +4068,18 @@ async function stashTabViewToBackup(tab, window = mainwindow) {
   const cache = {
     tabId: tab.id,
     url: tab.url,
-    label: tab.label
+    label: tab.label,
+    workspaceId: tab.workspaceId,
+    activeWorkspaceId: activeWorkspaceIdForPool || tab.workspaceId
   }
   tab.view = null
   tab.poolType = null
-  return browserpool.stashToBackup(window, poolType, view, cache)
+  const result = await browserpool.stashToBackup(window, poolType, view, cache)
+  captureTabSnapshotDebounced(tab, view).catch(error => {
+    console.error("Unable to capture tab snapshot on stash:", error)
+  })
+  broadcastTabViewState(tab, "stashed")
+  return result
 }
 
 async function releaseTabView(tab, window = mainwindow) {
@@ -4065,9 +4395,11 @@ function renderTab(view, window, tab = null) {
     }
   }
   attachWebContentView(window, view, tab)
-  if (!view._nucleusBlankedForCanvasWipe) {
-    view.setVisible(true)
+  if (view._nucleusBlankedForCanvasWipe || view._nucleusRestorePending) {
+    view.setVisible(false)
+    return
   }
+  view.setVisible(true)
 }
 
 // get auth values from files
@@ -4591,6 +4923,24 @@ app.whenReady().then(() => {
     }
   })
 
+  ipcMain.handle('gradescope:ensure_auth', async () => {
+    try {
+      await new Promise((resolve, reject) => {
+        openGradescopeAuthWindow(
+          mainwindow,
+          () => resolve(),
+          view => { authview = view },
+        )
+      })
+      return { ok: true }
+    } catch (error) {
+      return {
+        ok: false,
+        error: error && error.message ? error.message : String(error)
+      }
+    }
+  })
+
   ipcMain.handle('mail:get_inbox', async () => {
     try {
       const html = await getInboxHtml({ embedStyles: false })
@@ -4838,16 +5188,35 @@ app.whenReady().then(() => {
   // tabs:new_active — Switches the active rendered tab view.
   // in:  tab ({ view: WebContentsView, ... } | 'None')
   // out: undefined
-  ipcMain.handle('tabs:new_active', (_, tab) => {
+  ipcMain.handle('tabs:new_active', async (_, tab) => {
+    const previousActive = activetab !== "None" ? activetab : null
+
     if (tab === 'None') {
+      if (previousActive) {
+        await tabViewLifecycle.onTabDeactivated(previousActive, mainwindow)
+      }
       syncActiveSurfaceFromMainTab(mainwindow, null)
       return
     }
     const foundtab = currtabs.find(localtab => sameTabId(localtab.id, tab.id))
     if (!foundtab) {
+      if (previousActive) {
+        await tabViewLifecycle.onTabDeactivated(previousActive, mainwindow)
+      }
       syncActiveSurfaceFromMainTab(mainwindow, null)
       return
     }
+
+    activeWorkspaceIdForPool = foundtab.workspaceId || activeWorkspaceIdForPool
+    if (previousActive && !sameTabId(previousActive.id, foundtab.id)) {
+      await tabViewLifecycle.onTabDeactivated(previousActive, mainwindow)
+    }
+    await tabViewLifecycle.deactivateTabsOutsideWorkspace(
+      foundtab.workspaceId,
+      foundtab.id,
+      mainwindow
+    )
+    await tabViewLifecycle.onTabActivated(foundtab, mainwindow)
     syncActiveSurfaceFromMainTab(mainwindow, foundtab)
     if (isWebContentTab(foundtab) && foundtab.view) {
       if (foundtab.type === "canvastab") {
@@ -5097,6 +5466,11 @@ app.whenReady().then(() => {
         closedTabCleanup.push(
           browserpool.clearBackupForTab(mainwindow, getTabPoolType(localtab), localtab.id)
         )
+        tabSnapshots.delete(String(localtab.id))
+        if (tabSnapshotCaptureTimers.has(String(localtab.id))) {
+          clearTimeout(tabSnapshotCaptureTimers.get(String(localtab.id)))
+          tabSnapshotCaptureTimers.delete(String(localtab.id))
+        }
         if (localtab.type === "canvastab") {
           closedTabCleanup.push(clearCanvasPredictiveViews(localtab.id, mainwindow))
         }
@@ -5126,6 +5500,12 @@ app.whenReady().then(() => {
 
       if (mainTab && isWebContentTab(mainTab) && !mainTab.view) {
           const tab = mainTab
+          if (await restoreDiscardedTabView(tab, mainwindow)) {
+            continue
+          }
+          if (await restoreStashedTabView(tab, mainwindow)) {
+            continue
+          }
           const poolType = tab.type === "canvastab" ? "canvas" : "web"
 
           const acquired = browserpool.acquireForTab(poolType, tab.id, tab.url)
@@ -5528,6 +5908,17 @@ app.whenReady().then(() => {
     const activeMainTab = activeTabId
       ? currtabs.find(localtab => sameTabId(localtab.id, activeTabId))
       : (activetab !== "None" ? activetab : null)
+    if (activeMainTab && activeMainTab.workspaceId) {
+      activeWorkspaceIdForPool = activeMainTab.workspaceId
+      await tabViewLifecycle.deactivateTabsOutsideWorkspace(
+        activeMainTab.workspaceId,
+        activeMainTab.id,
+        mainwindow
+      )
+    }
+    if (activeMainTab && isWebContentTab(activeMainTab) && !activeMainTab.view) {
+      await ensureActiveWebContentTabView(activeMainTab, mainwindow)
+    }
     syncActiveSurfaceFromMainTab(mainwindow, activeMainTab)
 
     if (activeMainTab && isWebContentTab(activeMainTab) && activeMainTab.view) {

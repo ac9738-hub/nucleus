@@ -457,6 +457,8 @@ def reconstruct_nodes(path=CANVAS_GRAPH_PATH):
         "events": events,
         "syllabi": syllabi,
         "files": files,
+        "learningBlocks": data.get("learningBlocks", {}) or {},
+        "edges": data.get("edges", []) or [],
         "logged_details": data.get("logged_details", {}),
         "logged_examples": data.get("logged_examples", {}),
         "logged_problems": data.get("logged_problems", {}),
@@ -711,6 +713,10 @@ def node_neighbors(nodetype, node):
         for other in allnodes["concepts"]:
             if conceptid and conceptid in (getattr(other, "prerequisiteConceptIds", []) or []):
                 neighbors.append(("concept", other))
+        for blocks in (allnodes.get("learningBlocks", {}) or {}).values():
+            for block in blocks or []:
+                if str(block.get("conceptId", "")) == str(conceptid):
+                    neighbors.append(("learningBlock", block))
         return neighbors
 
     if nodetype == "problem":

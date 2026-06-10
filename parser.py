@@ -29,10 +29,15 @@ import hashlib
 import threading
 
 from canvas_parser.graph import GraphEdgeStore, GRAPH_VERSION, make_stable_id, upgrade_graph_state
+from canvas_parser.graph.persist import build_graph_state
+from canvas_parser.graph.merge import merge_duplicate_concepts, apply_concept_id_remap
 from canvas_parser.content.links import extract_canvas_file_ids_from_html, extract_links_from_html
 from canvas_parser.content.extractors import detect_extractor, extract_text_from_file
+from canvas_parser.content.normalize import normalize_external_submission_item
 from canvas_parser.extract.orphan_resolver import resolve_logged_orphans
+from canvas_parser.extract.validate import validate_graph_state
 from canvas_parser.schedule.learning_blocks import build_hybrid_learning_blocks
+from canvas_parser.schedule.submission_deps import apply_external_submission_mapping, build_external_platform_state
 
 try:
     import numpy as np
@@ -102,6 +107,7 @@ parsed_items = {
     'external': [],
     'page': [],
     'module_item': [],
+    'external_submission': [],
 }
 parsed_item_keys = {
     'assignment': set(),
@@ -109,6 +115,7 @@ parsed_item_keys = {
     'external': set(),
     'page': set(),
     'module_item': set(),
+    'external_submission': set(),
 }
 eventNodes = {}
 assignment_description_summary_cache = {}
@@ -2568,6 +2575,12 @@ def resolve_assignment_looking_for(courseid, assignment):
         for target in targets:
             append_unique(assignment.lookingfor, target)
 
+    for dependency in assignment.submissionDependencies or []:
+        if dependency.get('type') == 'file' and dependency.get('fileId'):
+            file_node = (fileNodes.get(courseid, {}) or {}).get(str(dependency.get('fileId')))
+            if file_node:
+                link_assignment_file(assignment, file_node, file_node.name or dependency.get('fileId'))
+
     for target in assignment.lookingfor:
         matched = False
         for file_node in (fileNodes.get(courseid, {}) or {}).values():
@@ -4686,6 +4699,13 @@ async def parseclass(course):
             write_state()
             continue
 
+        if batch_type == 'external_submission':
+            if is_item_parsed('external_submission', courseid, fileid):
+                continue
+            process_external_submission(fileid, courseid, file)
+            write_state()
+            continue
+
         if batch_type == 'module_item':
             content = file.get('content', {})
             if isinstance(content, str):
@@ -5008,6 +5028,7 @@ def load_state_from_disk():
     parsed_items.setdefault('external', [])
     parsed_items.setdefault('page', [])
     parsed_items.setdefault('module_item', [])
+    parsed_items.setdefault('external_submission', [])
     for item in completed_model_calls.get('deepseek_file_passes', []) or []:
         courseid = item.get('courseid')
         fileid = item.get('fileid')
@@ -5030,6 +5051,7 @@ def load_state_from_disk():
     parsed_item_keys.setdefault('external', set())
     parsed_item_keys.setdefault('page', set())
     parsed_item_keys.setdefault('module_item', set())
+    parsed_item_keys.setdefault('external_submission', set())
 
     print(
         f"parser debug resume: loaded {sum(len(nodes) for nodes in conceptNodes.values())} concepts, "
@@ -5085,9 +5107,53 @@ def finalize_graph_processing():
             add_example_node,
             add_problem_node,
         )
+        merged, id_remap = merge_duplicate_concepts(conceptNodes.get(courseid, []))
+        if merged:
+            conceptNodes[courseid] = merged
+            apply_concept_id_remap(courseid, conceptNodes, problems, graphEdges, id_remap)
         generated_blocks = build_learning_blocks_for_course(courseid)
         if generated_blocks:
             learningBlocks[courseid] = [reconstruct_learning_block(block) for block in generated_blocks]
+
+
+def process_external_submission(fileid, courseid, file_item):
+    payload = normalize_external_submission_item(file_item)
+    assignment = find_assignment_node(
+        courseid,
+        assignmentname=payload.get('canvasAssignmentName') or payload.get('gradescopeAssignmentTitle')
+    )
+    if not assignment:
+        for syllabus in syllabusNodes.values():
+            for candidate in syllabus.assignments:
+                if str(payload.get('canvasAssignmentId', '')) in candidate.name:
+                    assignment = candidate
+                    break
+            if assignment:
+                break
+    if not assignment:
+        print(
+            f"parser debug external_submission: no assignment match course={courseid} canvasId={payload.get('canvasAssignmentId')}",
+            flush=True
+        )
+        return None
+
+    dependency = apply_external_submission_mapping(assignment, payload)
+    graphEdges.add_edge(
+        'assignment',
+        assignment.assignmentid,
+        'external_platform',
+        payload.get('gradescopeUrl', ''),
+        'requires_submission',
+        source='gradescope-sync',
+        metadata=dependency,
+    )
+    externalPlatforms.update(build_external_platform_state({
+        'synced_at': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
+        'mappings': [payload],
+        'courses': [],
+    }))
+    mark_item_parsed('external_submission', courseid, fileid, assignment.name)
+    return assignment.assignmentid
 
 
 def write_state(embed=False):
@@ -5127,28 +5193,30 @@ def write_state(embed=False):
     for courseid, blocks in learningBlocks.items():
         serialized_learning_blocks[courseid] = [block.to_dict() for block in blocks]
 
-    state = upgrade_graph_state({
-        'graph_version': GRAPH_VERSION,
-        'concepts': concepts,
-        'problems': problem_nodes,
-        'events': event_nodes,
-        'syllabi': syllabi,
-        'files': files,
-        'edges': graphEdges.to_list(),
-        'learningBlocks': serialized_learning_blocks,
-        'moduleOrderHints': moduleOrderHints,
-        'external_platforms': externalPlatforms,
-        'logged_details': logged_details,
-        'logged_examples': logged_examples,
-        'logged_problems': logged_problems,
-        'logged_assignments': logged_assignments,
-        'logged_events': logged_events,
-        'looking_for_files': looking_for_files,
-        'external_resources': externalResources,
-        'external_crawl_state': external_crawl_state,
-        'completed_model_calls': completed_model_calls,
-        'parsed_items': parsed_items
-    })
+    state = build_graph_state(
+        concepts,
+        problem_nodes,
+        event_nodes,
+        syllabi,
+        files,
+        graphEdges.to_list(),
+        serialized_learning_blocks,
+        moduleOrderHints,
+        externalPlatforms,
+        logged_details,
+        logged_examples,
+        logged_problems,
+        logged_assignments,
+        logged_events,
+        looking_for_files,
+        externalResources,
+        external_crawl_state,
+        completed_model_calls,
+        parsed_items,
+    )
+    warnings = validate_graph_state(state, graphEdges)
+    for warning in warnings[:20]:
+        print(f"parser warning graph: {warning}", flush=True)
 
     atomic_write_json(CANVAS_GRAPH_PATH, state)
 
@@ -5189,7 +5257,7 @@ async def main():
             syllabus_parse_batches.append(line)
         elif batch_type == 'assignment':
             assignment_parse_batches.append(line)
-        elif batch_type in {'page', 'module_item'}:
+        elif batch_type in {'page', 'module_item', 'external_submission'}:
             deferred_parse_batches.append(line)
         else:
             deferred_parse_batches.append(line)
