@@ -737,24 +737,61 @@ async function creategmailauthview() {
     return token
 }
 
-async function startCallbackServer(authview) {
-    return new Promise((resolve) => {
-        const server = http.createServer(async (req, res) => {
-            const url = new URL(req.url, 'http://localhost:3000/')
-            const code = url.searchParams.get('code')
-            if (!code) return
+async function startCallbackServer(authview, options = {}) {
+    const port = options.port || 3000
+    return new Promise((resolve, reject) => {
+        let settled = false
+        let server = null
 
-            const { tokens } = await oauth2Client.getToken(code)
-            setMailAuthTokens(tokens)
-            saveMailAuth(tokens)
+        function settle(callback, value) {
+            if (settled) return
+            settled = true
+            if (server && server.listening) {
+                server.close(() => {})
+            }
+            callback(value)
+        }
 
-            res.end('Auth complete, you can close this window.')
-            server.close()
-            authview.close()
-            resolve(tokens)
+        function rejectAuth(error) {
+            settle(reject, error)
+        }
+
+        server = http.createServer(async (req, res) => {
+            try {
+                const url = new URL(req.url, `http://localhost:${port}/`)
+                const code = url.searchParams.get('code')
+                if (!code) {
+                    res.statusCode = 400
+                    res.end('Missing OAuth code.')
+                    return
+                }
+
+                const { tokens } = await oauth2Client.getToken(code)
+                setMailAuthTokens(tokens)
+                saveMailAuth(tokens)
+
+                res.end('Auth complete, you can close this window.')
+                settle(resolve, tokens)
+                if (authview && !authview.isDestroyed?.()) {
+                    authview.close()
+                }
+            } catch (error) {
+                if (!res.headersSent) {
+                    res.statusCode = 500
+                }
+                res.end('Auth failed.')
+                rejectAuth(error)
+            }
         })
 
-        server.listen(3000)
+        server.on('error', rejectAuth)
+        if (authview && typeof authview.once === 'function') {
+            authview.once('closed', () => {
+                rejectAuth(new Error('Gmail authentication window was closed before sign-in completed.'))
+            })
+        }
+
+        server.listen(port)
     })
 }
 
@@ -973,5 +1010,8 @@ module.exports = {
     getmailmeta,
     extractEmail,
     MAIL_FOLDERS,
-    FOLDER_LABELS
+    FOLDER_LABELS,
+    _test: {
+        startCallbackServer
+    }
 }

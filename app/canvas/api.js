@@ -316,6 +316,19 @@ function readCanvasDataFromRoot(rootDir) {
   }
 }
 
+function writeJsonFileAtomic(targetPath, data) {
+  const tempPath = `${targetPath}.${process.pid}.${Date.now()}.tmp`
+  try {
+    fs.writeFileSync(tempPath, JSON.stringify(data, null, 2), 'utf8')
+    fs.renameSync(tempPath, targetPath)
+  } catch (error) {
+    try {
+      if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath)
+    } catch (_) {}
+    throw error
+  }
+}
+
 function findCanvasBaseUrl(canvasData) {
   const serialized = JSON.stringify(canvasData || {})
   const match = serialized.match(/https?:\/\/[^/"']+(?=\/(?:api\/v1\/)?courses\/)/)
@@ -1285,11 +1298,9 @@ ${html}
     if (!Array.isArray(course)) {
       throw new Error("Canvas courses response was not an array: " + JSON.stringify(course).slice(0, 500))
     }
-    const alldata = JSON.stringify({ profile: prof, courses: course }, null, 2)
-    fs.writeFileSync(canvasDataPath, alldata)
     const canvasErrors = []
     let filecount = 0
-    const data1 = JSON.parse(fs.readFileSync(canvasDataPath, 'utf8'))
+    const data1 = { profile: prof, courses: course }
     data1.front_pages = await fetchCanvasFrontPages(course, canvasErrors)
     data1.syllabi = await fetchCanvasCourseSyllabi(course, canvasErrors)
     saveCanvasHomepages(course, data1.front_pages)
@@ -1377,7 +1388,7 @@ ${html}
       delete data1.errors
     }
     data1.weekly_schedule = buildWeeklySchedule(data1, canvasRootDir)
-    fs.writeFileSync(canvasDataPath, JSON.stringify(data1, null, 2))
+    writeJsonFileAtomic(canvasDataPath, data1)
     if (!writeParserLine('None')) {
       console.warn('Canvas parser did not receive completion signal; parsing may not start.')
     }

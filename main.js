@@ -2864,7 +2864,13 @@ function getauth() {
 }
 
 async function setup() {
-  return canvasApi.setupCanvasData()
+  if (!canvasSetupPromise) {
+    canvasSetupPromise = canvasApi.setupCanvasData()
+      .finally(() => {
+        canvasSetupPromise = null
+      })
+  }
+  return canvasSetupPromise
 }
 
 function getauthview(view) {
