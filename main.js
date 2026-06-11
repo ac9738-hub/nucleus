@@ -8,7 +8,7 @@
 // Dependencies: renderer/preload.js IPC contract, app/canvas/api.js data sync,
 // app/canvas/auth.js auth capture view, engine.js search renderer, sidekick.py
 // and vector_retreival.py child processes.
-const { app, BrowserWindow, ipcMain, WebContentsView, session, webFrameMain, globalShortcut } = require('electron');
+const { app, BrowserWindow, ipcMain, WebContentsView, session, webFrameMain, globalShortcut, protocol } = require('electron');
 const path = require('path');
 const fs = require('fs')
 const { spawn } = require('child_process')
@@ -1661,6 +1661,46 @@ function openEngineAppInTab(tab, appName) {
     app: appName
   })
   return true
+}
+
+function findTabForWebContents(webContents) {
+  if (!webContents || webContents.isDestroyed()) return null
+  return currtabs.find(tab => tab.view && !tab.view.webContents.isDestroyed() && tab.view.webContents.id === webContents.id) || null
+}
+
+function handleEngineInternalNavigation(tab, url) {
+  if (!tab || !url) return false
+
+  if (isEngineHomeUrl(url)) {
+    tab.url = 'nucleus://engine'
+    if (tab.view && !tab.view.webContents.isDestroyed()) {
+      tab.view.webContents.loadURL(getEngineUrl())
+    }
+    mainwindow.webContents.send('tabs:url_update', { id: tab.id, url: tab.url })
+    return true
+  }
+
+  const searchQuery = getEngineSearchQuery(url)
+  if (searchQuery !== null) {
+    openEngineSearchInTab(tab, searchQuery.query, searchQuery.type).catch(error => {
+      console.error('Unable to load engine search navigation:', error)
+    })
+    return true
+  }
+
+  const canvasRoute = getEngineCanvasRoute(url)
+  if (canvasRoute !== null) {
+    openEngineCanvasRoute(tab, canvasRoute)
+    return true
+  }
+
+  const appRoute = getEngineAppRoute(url)
+  if (appRoute) {
+    openEngineAppInTab(tab, appRoute)
+    return true
+  }
+
+  return false
 }
 
 function openEngineCanvasRoute(tab, canvasRoute) {
@@ -4823,7 +4863,23 @@ async function loadbrowserpool(window) {
 // APP LIFECYCLE
 // ─────────────────────────────────────────────────────────────────────────────
 
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'nucleus',
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      corsEnabled: true,
+      bypassCSP: true
+    }
+  }
+])
+
 app.whenReady().then(() => {
+  protocol.registerStringProtocol('nucleus', (_request, callback) => {
+    callback({ mimeType: 'text/html', data: '<!doctype html><html><body></body></html>' })
+  })
   mainwindow = createWindow();
   // Global shortcut fallback when before-input-event does not run (e.g. some focus edge cases).
   try {
@@ -4921,6 +4977,12 @@ app.whenReady().then(() => {
         error: error && error.message ? error.message : String(error)
       }
     }
+  })
+
+  ipcMain.on('engine:internal-navigate', (event, url) => {
+    const tab = findTabForWebContents(event.sender)
+    if (!tab) return
+    handleEngineInternalNavigation(tab, url)
   })
 
   ipcMain.handle('gradescope:ensure_auth', async () => {
@@ -5711,30 +5773,7 @@ app.whenReady().then(() => {
             await injectCanvasPreviewRedirector(frame)
           })
           view.webContents.setWindowOpenHandler(({ url }) => {
-            if (isEngineHomeUrl(url)) {
-              tab.url = 'nucleus://engine'
-              view.webContents.loadURL(getEngineUrl())
-              mainwindow.webContents.send('tabs:url_update', { id: tab.id, url: tab.url })
-              return { action: 'deny' }
-            }
-
-            const searchQuery = getEngineSearchQuery(url)
-            if (searchQuery !== null) {
-              openEngineSearchInTab(tab, searchQuery.query, searchQuery.type).catch(error => {
-                console.error("Unable to load engine search popup URL:", error)
-              })
-              return { action: 'deny' }
-            }
-
-            const canvasRoute = getEngineCanvasRoute(url)
-            if (canvasRoute !== null) {
-              openEngineCanvasRoute(tab, canvasRoute)
-              return { action: 'deny' }
-            }
-
-            const appRoute = getEngineAppRoute(url)
-            if (appRoute) {
-              openEngineAppInTab(tab, appRoute)
+            if (handleEngineInternalNavigation(tab, url)) {
               return { action: 'deny' }
             }
 
@@ -5775,35 +5814,9 @@ app.whenReady().then(() => {
           view.webContents.on('will-navigate', event => {
             const ownerTab = resolveTabForView(view, tab)
             if (!ownerTab) return
-            const url = event.url
-            if (isEngineHomeUrl(url)) {
+            if (handleEngineInternalNavigation(ownerTab, event.url)) {
               event.preventDefault()
-              ownerTab.url = 'nucleus://engine'
-              view.webContents.loadURL(getEngineUrl())
-              mainwindow.webContents.send('tabs:url_update', { id: ownerTab.id, url: ownerTab.url })
-              return
             }
-
-            const searchQuery = getEngineSearchQuery(url)
-            if (searchQuery !== null) {
-              event.preventDefault()
-              openEngineSearchInTab(ownerTab, searchQuery.query, searchQuery.type).catch(error => {
-                console.error("Unable to load engine search navigation:", error)
-              })
-              return
-            }
-
-            const canvasRoute = getEngineCanvasRoute(url)
-            if (canvasRoute !== null) {
-              event.preventDefault()
-              openEngineCanvasRoute(ownerTab, canvasRoute)
-              return
-            }
-
-            const appRoute = getEngineAppRoute(url)
-            if (!appRoute) return
-            event.preventDefault()
-            openEngineAppInTab(ownerTab, appRoute)
           })
           let canvasNavigationLoadPromise = null
           view.webContents.on('did-start-navigation', (_event, _url, isInPlace, isMainFrame) => {
