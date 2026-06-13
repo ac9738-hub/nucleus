@@ -6,19 +6,44 @@
 const fs = require('fs')
 const { spawn } = require('child_process')
 const path = require('path')
-const { startOfWeek, addWeeks, isSameWeek, differenceInCalendarWeeks } = require('date-fns')
 const { getThemePalette, getThemeColorScheme } = require('../../theme-manager')
+const {
+  startOfWeekMs,
+  resolveSchedulingDate,
+  resolveWeekStartMs,
+  resolveModuleAnchorWeekMs,
+  buildWeeklyScheduleFromCanvasData
+} = require('./weekly-schedule')
 
 // Project root, used to resolve the active theme palette for saved homepages.
 const THEME_ROOT = path.join(__dirname, '..', '..')
 
-// Monday-based weeks throughout the weekly schedule.
-const WEEK_OPTIONS = { weekStartsOn: 1 }
-
 const canvasCourseColors = ["#1d9e75", "#378add", "#7f77dd", "#d85a30", "#d4537e", "#c58d35"]
+
+function sleepSync(ms) {
+  const end = Date.now() + ms
+  while (Date.now() < end) {}
+}
+
+function readJsonFileWithRetry(filePath, attempts = 3, delayMs = 100) {
+  let lastError = null
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      const raw = fs.readFileSync(filePath, 'utf8')
+      return raw.trim() ? JSON.parse(raw) : null
+    } catch (error) {
+      lastError = error
+      if (attempt < attempts - 1) {
+        sleepSync(delayMs)
+      }
+    }
+  }
+  throw lastError
+}
 
 let parserProc = null
 let parserAuthSignature = null
+let canvasSetupInProgress = null
 
 function decodeHtmlEntities(text) {
   const entities = {
@@ -422,39 +447,6 @@ function readCanvasGraphFromRoot(rootDir) {
   }
 }
 
-// Snaps a date to the Monday 00:00 that starts its calendar week. Returns the
-// epoch ms of that Monday, or null when the date is missing/unparseable. Weekly
-// buckets are keyed purely on this value so grouping is date-driven only.
-function startOfWeekMs(dateStr) {
-  if (!dateStr) return null
-
-  const date = new Date(dateStr)
-  if (Number.isNaN(date.getTime())) return null
-
-  return startOfWeek(date, WEEK_OPTIONS).getTime()
-}
-
-// Earliest week-start among a list of date strings (skips undated entries).
-function earliestWeekStartMs(dateStrings) {
-  let earliest = null
-  dateStrings.forEach(dateStr => {
-    const ms = startOfWeekMs(dateStr)
-    if (ms != null && (earliest == null || ms < earliest)) earliest = ms
-  })
-  return earliest
-}
-
-// Universal "Mon D – Mon D, YYYY" range for a week-start ms.
-function formatWeekDateRange(weekStartMs) {
-  if (weekStartMs == null) return ''
-
-  const start = new Date(weekStartMs)
-  const end = new Date(weekStartMs + 6 * 24 * 60 * 60 * 1000)
-  const startLabel = start.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-  const endLabel = end.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
-  return `${startLabel} – ${endLabel}`
-}
-
 function getCourseArrayBucket(canvasData, bucketName, courseId) {
   const bucket = canvasData && canvasData[bucketName]
   if (!bucket) return []
@@ -516,11 +508,12 @@ function matchLoggedAssignment(loggedAssignments, moduleItem, canvasAssignment) 
 }
 
 function compactWeeklyAssignment(assignment, canvasAssignment) {
+  const schedulingDate = resolveSchedulingDate(assignment, canvasAssignment)
   return {
     assignmentid: assignment.assignmentid || '',
     name: assignment.name || 'Untitled assignment',
     description: stripHtmlToText(assignment.description || ''),
-    duedate: assignment.duedate || '',
+    duedate: schedulingDate || assignment.duedate || '',
     unlockdate: assignment.unlockdate || '',
     url: (canvasAssignment && canvasAssignment.html_url)
       || assignment.canvaspreviewurl
@@ -531,185 +524,22 @@ function compactWeeklyAssignment(assignment, canvasAssignment) {
   }
 }
 
-function createWeeklyBucket(weekStartMs) {
-  return {
-    weekStartMs: weekStartMs == null ? null : weekStartMs,
-    sortKey: weekStartMs == null ? Number.MAX_SAFE_INTEGER : weekStartMs,
-    files: [],
-    assignments: [],
-    seenFileIds: new Set(),
-    seenAssignmentIds: new Set()
-  }
-}
-
-function addWeeklyFile(bucket, file) {
-  if (!file) return
-  const fileId = String(file.id || file.name || '').trim()
-  if (!fileId || bucket.seenFileIds.has(fileId)) return
-  bucket.seenFileIds.add(fileId)
-  bucket.files.push(file)
-}
-
-function addWeeklyAssignment(bucket, assignment) {
-  if (!assignment) return
-  const assignmentId = String(assignment.assignmentid || assignment.name || '').trim()
-  if (!assignmentId || bucket.seenAssignmentIds.has(assignmentId)) return
-  bucket.seenAssignmentIds.add(assignmentId)
-  bucket.assignments.push(assignment)
-}
-
-function finalizeWeeklyBucket(bucket, weekNumber) {
-  const scheduled = bucket.weekStartMs != null
-  return {
-    weekNumber: scheduled ? weekNumber : null,
-    weekLabel: scheduled ? `Week ${weekNumber}` : 'Unscheduled',
-    dateRange: formatWeekDateRange(bucket.weekStartMs),
-    weekStart: scheduled ? new Date(bucket.weekStartMs).toISOString() : '',
-    weekEnd: scheduled ? new Date(bucket.weekStartMs + 6 * 24 * 60 * 60 * 1000).toISOString() : '',
-    isCurrentWeek: scheduled && isSameWeek(bucket.weekStartMs, Date.now(), WEEK_OPTIONS),
-    sortKey: bucket.sortKey,
-    files: bucket.files,
-    assignments: bucket.assignments
-  }
-}
-
 function buildWeeklySchedule(canvasData, rootDir) {
   const graph = readCanvasGraphFromRoot(rootDir)
   const graphFiles = graph.files || {}
-  const syllabi = graph.syllabi || {}
   const lookup = makeCanvasTaskLookup(rootDir)
-  const schedule = {}
-  const courses = Array.isArray(canvasData && canvasData.courses) ? canvasData.courses : []
-
-  courses.forEach(course => {
-    if (!course || !course.id) return
-
-    const courseId = String(course.id)
-    const syllabus = syllabi[courseId] || syllabi[course.id]
-    const loggedAssignments = syllabus && Array.isArray(syllabus.assignments) ? syllabus.assignments : []
-    const modules = getCourseArrayBucket(canvasData, 'modules', courseId)
-      .slice()
-      .sort((left, right) => (left.position || 0) - (right.position || 0))
-    const moduleItems = getCourseObjectBucket(canvasData, 'module_items', courseId)
-    const canvasFiles = getCourseArrayBucket(canvasData, 'file', courseId)
-
-    // All weekly grouping is keyed on the Monday that starts a calendar week.
-    // null keys an "Unscheduled" bucket for objects that carry no usable date.
-    const weekBuckets = new Map()
-    const placedAssignmentIds = new Set()
-
-    const getWeekBucket = weekStartMs => {
-      const key = weekStartMs == null ? 'unscheduled' : String(weekStartMs)
-      if (!weekBuckets.has(key)) {
-        weekBuckets.set(key, createWeeklyBucket(weekStartMs))
-      }
-      return weekBuckets.get(key)
-    }
-
-    // Module pass: keep a module's materials together. Its files inherit the
-    // earliest dated assignment in the module (files have no date of their own),
-    // while each assignment lands in the week of its own due/unlock date.
-    modules.forEach(module => {
-      const items = (moduleItems[module.id] || moduleItems[String(module.id)] || [])
-        .slice()
-        .sort((left, right) => (left.position || 0) - (right.position || 0))
-      const fileItems = items.filter(item => String(item.type || '').toLowerCase() === 'file')
-      const assignmentItems = items.filter(item => {
-        const type = String(item.type || '').toLowerCase()
-        return type === 'assignment' || type === 'quiz' || type === 'discussion'
-      })
-
-      const resolvedAssignments = []
-      assignmentItems.forEach(item => {
-        const canvasAssignment = lookup.assignmentByCourseAndId.get(`${courseId}:${String(item.content_id || '')}`)
-        const loggedAssignment = matchLoggedAssignment(loggedAssignments, item, canvasAssignment)
-        if (!loggedAssignment) return
-        resolvedAssignments.push({ loggedAssignment, canvasAssignment })
-      })
-
-      const moduleWeekMs = earliestWeekStartMs(
-        resolvedAssignments.map(entry => entry.loggedAssignment.duedate || entry.loggedAssignment.unlockdate)
-      )
-
-      // Date-only: a module with no datable assignment has nowhere to anchor its
-      // (dateless) files, so it is skipped rather than dumped into a week.
-      if (moduleWeekMs != null) {
-        const fileBucket = getWeekBucket(moduleWeekMs)
-        fileItems.forEach(item => {
-          const file = resolveWeeklyFile(graphFiles, courseId, item.content_id, canvasFiles)
-          if (file) {
-            addWeeklyFile(fileBucket, file)
-            return
-          }
-
-          addWeeklyFile(fileBucket, {
-            id: String(item.id || item.content_id || item.title || ''),
-            name: item.title || 'Untitled file',
-            courseid: courseId,
-            description: item.type || 'File',
-            url: item.html_url || item.url || '',
-            downloadurl: item.url || '',
-            canvaspreviewurl: item.html_url || ''
-          })
-        })
-      }
-
-      resolvedAssignments.forEach(({ loggedAssignment, canvasAssignment }) => {
-        const weekStartMs = startOfWeekMs(loggedAssignment.duedate || loggedAssignment.unlockdate) ?? moduleWeekMs
-        const bucket = getWeekBucket(weekStartMs)
-        const compactAssignment = compactWeeklyAssignment(loggedAssignment, canvasAssignment)
-        compactAssignment.filechildren.forEach(fileId => {
-          addWeeklyFile(bucket, resolveWeeklyFile(graphFiles, courseId, fileId, canvasFiles))
-        })
-        addWeeklyAssignment(bucket, compactAssignment)
-        placedAssignmentIds.add(String(loggedAssignment.assignmentid || loggedAssignment.name || ''))
-      })
-    })
-
-    // Remaining logged assignments (not reached through any module).
-    loggedAssignments.forEach(assignment => {
-      const assignmentKey = String(assignment.assignmentid || assignment.name || '').trim()
-      if (!assignmentKey || placedAssignmentIds.has(assignmentKey)) return
-
-      const bucket = getWeekBucket(startOfWeekMs(assignment.duedate || assignment.unlockdate))
-      const canvasAssignment = findCanvasAssignment(lookup, courseId, assignment)
-      const compactAssignment = compactWeeklyAssignment(assignment, canvasAssignment)
-      compactAssignment.filechildren.forEach(fileId => {
-        addWeeklyFile(bucket, resolveWeeklyFile(graphFiles, courseId, fileId, canvasFiles))
-      })
-      addWeeklyAssignment(bucket, compactAssignment)
-      placedAssignmentIds.add(assignmentKey)
-    })
-
-    const unscheduledBucket = weekBuckets.get('unscheduled') || null
-    const scheduledStarts = Array.from(weekBuckets.values())
-      .filter(bucket => bucket.weekStartMs != null)
-      .map(bucket => bucket.weekStartMs)
-
-    const courseWeeks = []
-    if (scheduledStarts.length) {
-      // Build a contiguous run of calendar weeks from the earliest object's week
-      // through the latest, materializing empty weeks so none are skipped.
-      const firstWeek = startOfWeek(Math.min(...scheduledStarts), WEEK_OPTIONS)
-      const lastWeek = startOfWeek(Math.max(...scheduledStarts), WEEK_OPTIONS)
-      const totalWeeks = differenceInCalendarWeeks(lastWeek, firstWeek, WEEK_OPTIONS) + 1
-
-      for (let index = 0; index < totalWeeks; index += 1) {
-        const weekStartMs = startOfWeek(addWeeks(firstWeek, index), WEEK_OPTIONS).getTime()
-        const bucket = weekBuckets.get(String(weekStartMs)) || createWeeklyBucket(weekStartMs)
-        courseWeeks.push(finalizeWeeklyBucket(bucket, index + 1))
-      }
-    }
-
-    // "Unscheduled" (dateless objects) always sorts last and stays unnumbered.
-    if (unscheduledBucket) {
-      courseWeeks.push(finalizeWeeklyBucket(unscheduledBucket, null))
-    }
-
-    schedule[courseId] = courseWeeks
+  return buildWeeklyScheduleFromCanvasData(canvasData, {
+    readCanvasGraph: () => graph,
+    lookup,
+    getCourseArrayBucket,
+    getCourseObjectBucket,
+    matchLoggedAssignment,
+    findCanvasAssignment,
+    compactWeeklyAssignment,
+    resolveWeeklyFile: (courseId, fileId, canvasFiles) => (
+      resolveWeeklyFile(graphFiles, courseId, fileId, canvasFiles)
+    )
   })
-
-  return schedule
 }
 
 function make_canvas_tasks(rootDir) {
@@ -720,8 +550,7 @@ function make_canvas_tasks(rootDir) {
 
   let allCanvasNodes = {}
   try {
-    const raw = fs.readFileSync(parsedStatePath, 'utf8')
-    allCanvasNodes = raw.trim() ? JSON.parse(raw) : {}
+    allCanvasNodes = readJsonFileWithRetry(parsedStatePath) || {}
   } catch (error) {
     console.error("Unable to read parsed Canvas task state:", error)
     return []
@@ -883,26 +712,27 @@ function getParserProcess(authState, rootDir, onCanvasTasks) {
     }
   })
   parserProc.stdout.on('data', chunk => {
-    const text = chunk.toString()
+    const text = chunk.toString('utf8')
     console.log(text)
     stdoutBuffer += text
     const lines = stdoutBuffer.split(/\r?\n/)
     stdoutBuffer = lines.pop() || ''
     for (const line of lines) {
-      if (line.trim().startsWith("parser task update assignment")) {
-        onCanvasTasks(make_canvas_tasks(rootDir))
+      const trimmed = line.trim()
+      if (trimmed.startsWith("parser task update assignment")) {
+        onCanvasTasks(make_canvas_tasks(rootDir), { restartVector: false })
       }
-      if (line.trim() === "parser completed__________________________________________________" && !handledCompletion) {
+      if (trimmed === "parser local summaries completed__________________________________________________") {
+        onCanvasTasks(make_canvas_tasks(rootDir), { restartVector: false })
+      }
+      if (trimmed === "parser all passes completed__________________________________________________" && !handledCompletion) {
         handledCompletion = true
-        onCanvasTasks(make_canvas_tasks(rootDir))
-      }
-      if (line.trim() === "parser local summaries completed__________________________________________________") {
-        onCanvasTasks(make_canvas_tasks(rootDir))
+        onCanvasTasks(make_canvas_tasks(rootDir), { restartVector: true })
       }
     }
   })
   parserProc.stderr.on('data', chunk => {
-    console.error('parser:', chunk.toString())
+    console.error('parser:', chunk.toString('utf8'))
   })
   parserProc.on('close', () => {
     parserProc = null
@@ -980,7 +810,7 @@ function createCanvasApi({ canvasDataPath, getAuthState, sendCanvasDataUpdate, r
     }]
   }
 
-  const CANVAS_MAX_CONCURRENT = 4
+  const CANVAS_MAX_CONCURRENT = 8
   let canvasInFlight = 0
   const canvasWaitQueue = []
 
@@ -1397,6 +1227,11 @@ ${html}
   }
 
   async function setupCanvasData() {
+    if (canvasSetupInProgress) {
+      return canvasSetupInProgress
+    }
+
+    canvasSetupInProgress = (async () => {
     const authState = getAuthState()
     const { canvasAuthCookie, canvasBaseUrl } = authState
     if (!fs.existsSync(canvasDataPath)) {
@@ -1449,14 +1284,28 @@ ${html}
         return false
       }
       const line = payload === 'None' ? 'None' : JSON.stringify(payload)
-      proc.stdin.write(`${line}\n`, 'utf8')
-      return true
+      try {
+        proc.stdin.write(`${line}\n`, 'utf8', error => {
+          if (error) {
+            console.error('parser stdin write failed:', error)
+          }
+        })
+        return true
+      } catch (error) {
+        console.error('parser stdin write threw:', error)
+        return false
+      }
     }
 
-    if (parsingSyllabi.length) {
-      writeParserLine({ type: "syllabus", content: parsingSyllabi })
-    }
-    data1.assignments = await fetchCanvasCourseBuckets(course, 'assignments', canvasErrors)
+    const [assignmentsByCourse, filesByCourse, pagesByCourse] = await Promise.all([
+      fetchCanvasCourseBuckets(course, 'assignments', canvasErrors),
+      fetchCanvasCourseBuckets(course, 'files', canvasErrors),
+      fetchCanvasPages(course, canvasErrors)
+    ])
+    data1.assignments = assignmentsByCourse
+    data1.file = filesByCourse
+    data1.pages = pagesByCourse
+
     for (const [courseid, assignments] of Object.entries(data1.assignments)) {
       if (!Array.isArray(assignments)) continue
       const parsingAssignments = []
@@ -1489,7 +1338,9 @@ ${html}
         writeParserLine({ type: "assignment", content: parsingAssignments })
       }
     }
-    data1.file = await fetchCanvasCourseBuckets(course, 'files', canvasErrors)
+    if (parsingSyllabi.length) {
+      writeParserLine({ type: "syllabus", content: parsingSyllabi })
+    }
     Object.keys(data1.file).forEach(courseid => {
       let parseingfiles = []
       data1.file[courseid].forEach(file => {
@@ -1512,7 +1363,6 @@ ${html}
       writeParserLine({ type: "file", content: parseingfiles })
     })
 
-    data1.pages = await fetchCanvasPages(course, canvasErrors)
     for (const [courseid, pages] of Object.entries(data1.pages)) {
       if (!Array.isArray(pages) || !pages.length) continue
       const parsingPages = pages.map(page => ({
@@ -1536,6 +1386,10 @@ ${html}
     data1.modules = await fetchCanvasCourseBuckets(course, 'modules', canvasErrors)
     data1.module_items = await fetchCanvasModuleItemBuckets(data1.modules, canvasErrors)
     for (const [courseid, modules] of Object.entries(data1.module_items || {})) {
+      const moduleNameById = {}
+      ;(data1.modules[courseid] || []).forEach(module => {
+        moduleNameById[String(module.id)] = module.name || ''
+      })
       const parsingModuleItems = []
       Object.entries(modules || {}).forEach(([moduleId, items]) => {
         if (!Array.isArray(items)) return
@@ -1550,6 +1404,7 @@ ${html}
             content: JSON.stringify({
               documenttype: 'module_item',
               moduleId,
+              moduleName: moduleNameById[String(moduleId)] || '',
               position: item.position || 0,
               itemType: item.type || '',
               title: item.title || '',
@@ -1638,8 +1493,14 @@ ${html}
       console.warn('Canvas parser did not receive completion signal; parsing may not start.')
     }
     sendCanvasDataUpdate()
-  }
+    })()
 
+    try {
+      return await canvasSetupInProgress
+    } finally {
+      canvasSetupInProgress = null
+    }
+  }
 
   return {
     getCanvasTasksFromDisk: () => make_canvas_tasks(canvasRootDir),
@@ -1650,5 +1511,10 @@ ${html}
 }
 
 module.exports = {
-  createCanvasApi
+  createCanvasApi,
+  resolveSchedulingDate,
+  resolveWeekStartMs,
+  resolveModuleAnchorWeekMs,
+  startOfWeekMs,
+  buildWeeklySchedule
 }

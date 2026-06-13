@@ -5,20 +5,23 @@
 // links so they stay inside the app instead of being handed to Windows.
 // Dependencies: main.js listens for the 'surface:scrolled' and
 // 'engine:internal-navigate' channels.
-const { ipcRenderer } = require('electron')
+const { contextBridge, ipcRenderer } = require('electron')
+const { attachSurfaceScrollNotify } = require('./lib/surface-scroll-notify')
 
-let scrollNotifyScheduled = false
-function notifyScroll() {
-  if (scrollNotifyScheduled) return
-  scrollNotifyScheduled = true
-  setTimeout(() => {
-    scrollNotifyScheduled = false
-    try {
-      ipcRenderer.send('surface:scrolled')
-    } catch (_error) {
-      // Channel may be unavailable during teardown.
-    }
-  }, 120)
+function sendEngineOpenApp(app) {
+  ipcRenderer.send('engine:open-app', app)
+}
+
+const engineBridge = {
+  openApp(app) {
+    sendEngineOpenApp(app)
+  }
+}
+
+try {
+  contextBridge.exposeInMainWorld('__nucleusEngine', engineBridge)
+} catch (_error) {
+  window.__nucleusEngine = engineBridge
 }
 
 function navigateInternal(url) {
@@ -30,16 +33,73 @@ function navigateInternal(url) {
   }
 }
 
+function isEngineAppUrl(value) {
+  if (!value) return false
+  try {
+    const url = new URL(value)
+    return url.protocol === 'nucleus:' && url.hostname === 'app'
+  } catch (_error) {
+    return false
+  }
+}
+
+function parseEngineAppName(value) {
+  if (!value) return ''
+  try {
+    const url = new URL(value)
+    if (url.protocol !== 'nucleus:' || url.hostname !== 'app') return ''
+    return url.pathname.replace(/^\/+/, '').split('/')[0] || ''
+  } catch (_error) {
+    return ''
+  }
+}
+
 document.addEventListener('click', event => {
-  const link = event.target.closest && event.target.closest('a[href^="nucleus://"]')
-  if (!link) return
+  const link = event.target.closest && event.target.closest('a[href^="nucleus://app/"]')
+  if (link) {
+    event.preventDefault()
+    event.stopPropagation()
+    const href = link.getAttribute('href') || link.href
+    const app = parseEngineAppName(href)
+    if (!app) return
+    try {
+      sendEngineOpenApp(app)
+    } catch (_error) {
+      window.location.href = href
+    }
+    return
+  }
+
+  const otherLink = event.target.closest && event.target.closest('a[href^="nucleus://"]')
+  if (!otherLink) return
+  const href = otherLink.getAttribute('href')
+  if (!href || isEngineAppUrl(href)) return
   event.preventDefault()
   event.stopPropagation()
-  const href = link.getAttribute('href')
-  if (!href) return
   navigateInternal(href)
 }, true)
 
-// Capture phase catches scrolling inside nested scroll containers, not just the window.
-window.addEventListener('scroll', notifyScroll, true)
-window.addEventListener('load', () => notifyScroll(), { once: true })
+function normalizeEngineSearchUrl(value) {
+  const text = String(value || '').trim()
+  if (!text) return ''
+  if (/^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(text)) return text
+  if (text.includes('.') && !text.includes(' ')) return 'https://' + text
+  return 'nucleus://search?q=' + encodeURIComponent(text)
+}
+
+document.addEventListener('submit', event => {
+  const form = event.target
+  if (!form || form.id !== 'engine-search-form') return
+  event.preventDefault()
+  event.stopImmediatePropagation()
+  const input = document.getElementById('engine-search-input')
+  const text = input ? String(input.value || '').trim() : ''
+  const url = normalizeEngineSearchUrl(text)
+  if (url) navigateInternal(url)
+}, true)
+
+attachSurfaceScrollNotify(window)
+
+try {
+  ipcRenderer.send('engine:preload-ready')
+} catch (_error) {}

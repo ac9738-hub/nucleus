@@ -1,0 +1,355 @@
+{
+  "version": "1.0",
+  "generated": "2026-06-11",
+  "description": "Nucleus process and dependency map for refactor passes. Machine-readable graph of subsystems, files, IPC, and known risk areas.",
+
+  "runtime_topology": {
+    "electron_main": "main.js",
+    "electron_renderer": "index.html → renderer/*.js + app/*/*.js",
+    "python_children": ["parser.py", "sidekick.py", "vector_retreival.py"],
+    "disk_artifacts": [
+      "canvas_data.json",
+      "canvas_graph.json",
+      "canvasfiles/",
+      "outside_sources/",
+      "mail_contacts.json",
+      "mail_classification_log.json"
+    ]
+  },
+
+  "processes": [
+    {
+      "id": "shell-ui",
+      "name": "Shell & Workspace UI",
+      "layer": "renderer",
+      "entry": ["index.html", "renderer/render.js", "renderer/app.js", "renderer/workspace-page-tabs.js"],
+      "owns": ["state", "tasks (local copy)", "workspaces (local copy)", "canvasData (local copy)", "tab list (renderer-side)"],
+      "depends_on": ["preload.js", "taskoptimizer.js", "data-store.js (via IPC)"],
+      "emits_ipc": ["tabs:push", "tabs:new_active", "context:ui_state", "context:screen_text", "tasks:start", "prompt:send"],
+      "receives_ipc": ["tasks:update", "workspaces:update", "canvas:update", "tabs:url_update", "tabs:title_update", "tabs:view_state", "prompt:response-chunk", "prompt:response-done"],
+      "notes": "render.js is the controller; app.js is view templates (inverted naming). Global script load order in index.html is fragile."
+    },
+    {
+      "id": "tab-engine",
+      "name": "Tab / Browser Engine",
+      "layer": "main",
+      "entry": ["main.js (tab section)", "tab-utils.js", "view-layout.js", "web-preload.js", "app/canvas/preload.js"],
+      "owns": ["currtabs", "activetab", "WebContentsView pool", "tab snapshots", "browserpool"],
+      "depends_on": ["theme-manager.js", "engine.js", "context-store.js"],
+      "emits_ipc": ["tabs:url_update", "tabs:title_update", "tabs:view_state", "tabs:snapshot_overlay", "canvas:visible_context", "canvas:navigation-finished"],
+      "receives_ipc": ["tabs:push", "tabs:new_active", "tabs:navigate", "tabs:back", "surface:scrolled", "engine:internal-navigate"],
+      "serialization": "tabsPushChain Promise queue serializes tabs:push handlers",
+      "risk_areas": ["Large tabs:push handler (~400+ lines)", "Canvas predictive view lifecycle", "Stash/restore/discard race with active tab switches"]
+    },
+    {
+      "id": "data-store",
+      "name": "Application Data Store",
+      "layer": "main",
+      "entry": ["data-store.js"],
+      "owns": ["workspaces", "tasks", "projectGroups (static + Canvas merge)"],
+      "depends_on": ["app/canvas/api.js (Canvas project groups, canvas data reader)"],
+      "emits_ipc": ["tasks:update", "workspaces:update", "canvas:update"],
+      "receives_ipc": ["tasks:new", "workspaces:new", "workspaces:delete", "data:get"]
+    },
+    {
+      "id": "canvas-sync",
+      "name": "Canvas Sync & REST",
+      "layer": "main",
+      "entry": ["app/canvas/api.js", "app/canvas/auth.js"],
+      "owns": ["canvas_data.json writes", "parser stdin stream", "Canvas credentials"],
+      "depends_on": ["parser.py", "weekly-schedule.js", "theme-manager.js", "data-store.js"],
+      "emits_ipc": ["canvas:update (via data-store)", "canvas:open_app", "canvas:ensure_auth"],
+      "receives_ipc": ["canvas:ensure_auth", "canvas:clear_sync_data", "canvas:open_app"],
+      "risk_areas": ["canvasSetupPromise may overlap with re-sync", "Parser process restart during active sync"]
+    },
+    {
+      "id": "canvas-parse",
+      "name": "Canvas Parse Pipeline",
+      "layer": "python",
+      "entry": ["parser.py"],
+      "package": "canvas_parser/",
+      "owns": ["canvas_graph.json", "outside_sources/", "canvasfiles/ downloads", "embeddings"],
+      "depends_on": ["canvas_parser/graph/*", "canvas_parser/content/*", "canvas_parser/extract/*", "canvas_parser/schedule/*"],
+      "protocol": "newline-delimited JSON on stdin; progress markers on stdout",
+      "downstream": ["data-store (tasks from graph)", "vector_retreival.py", "engine.js (search)", "context-pipeline.js"],
+      "risk_areas": ["Monolithic parser.py (~5750 lines)", "Large graph file (hundreds of MB possible)", "LLM pass ordering"]
+    },
+    {
+      "id": "canvas-native-ui",
+      "name": "Canvas Native UI",
+      "layer": "renderer",
+      "entry": ["app/canvas/course.js", "app/canvas/dashboard.js", "app/canvas/weekly-schedule.js"],
+      "owns": ["Native course/dashboard DOM templates"],
+      "depends_on": ["canvasData global from render.js", "renderer/app.js mount points"]
+    },
+    {
+      "id": "context",
+      "name": "Screen Context Pipeline",
+      "layer": "main",
+      "entry": ["context-store.js", "context-pipeline.js", "context_format.py"],
+      "owns": ["context snapshot slices (app, layout, tabs, screen)", "screenSliceOwner mutex"],
+      "depends_on": ["WebContentsView DOM scrape", "canvas_graph.json blocks", "renderer ui_state pushes"],
+      "feeds": ["sidekick agent prompts", "region capture"],
+      "risk_areas": ["screenSliceOwner vs renderer push races", "canvasVisibleContextPollInFlight / htmlVisibleContextPollInFlight overlap"]
+    },
+    {
+      "id": "sidekick",
+      "name": "Sidekick AI (right panel)",
+      "layer": "main+python",
+      "entry": ["agent-process.js", "sidekick.py"],
+      "owns": ["Agent process lifecycle", "tool call routing"],
+      "depends_on": ["context-store.js", "vector_retreival.py", "data-store.js", "tab-engine"],
+      "emits_ipc": ["prompt:response-chunk", "prompt:response-done"],
+      "receives_ipc": ["prompt:send"],
+      "protocol": "newline JSON stdin/stdout; tool arrays round-trip through main.js runfunction()"
+    },
+    {
+      "id": "vector-search",
+      "name": "Vector Retrieval & Engine Search",
+      "layer": "main+python",
+      "entry": ["vector_retreival.py", "engine.js", "engine.html"],
+      "owns": ["Embedding search", "Brave web search mix", "nucleus://search protocol"],
+      "depends_on": ["canvas_graph.json", "parser.py node classes"],
+      "risk_areas": ["pendingQueries queue on vector process restart", "Process restart after full parse"]
+    },
+    {
+      "id": "synapse",
+      "name": "Synapse AI (native tab)",
+      "layer": "main+renderer",
+      "entry": ["app/synapse/client.js", "app/synapse/synapse.js", "app/synapse/chat.js", "app/synapse/synapse-tabs.js"],
+      "owns": ["Separate Claude chat UI", "Conversation state in renderer"],
+      "depends_on": ["Anthropic API via axios (main only)"],
+      "emits_ipc": ["synapse:response-chunk"],
+      "receives_ipc": ["synapse:send"],
+      "notes": "Independent from Sidekick; different capabilities and code paths"
+    },
+    {
+      "id": "mail",
+      "name": "Gmail Integration",
+      "layer": "main+renderer",
+      "entry": ["app/mail/api.js", "app/mail/mail.js", "app/mail/mail-tabs.js", "app/mail/contacts.js", "app/mail/classify.js", "app/mail/summarize.js"],
+      "owns": ["Gmail OAuth", "Inbox UI", "Classification log", "Contact routing"],
+      "depends_on": ["googleapis", "theme-manager.js"],
+      "serialization": "gmailInFlight + gmailWaitQueue in api.js; mailLoadPromise in mail-tabs.js",
+      "risk_areas": ["Watch/sync delta handlers", "Duplicate folder constants (fixed in pass 2)"]
+    },
+    {
+      "id": "theming",
+      "name": "Theming",
+      "layer": "main",
+      "entry": ["theme-manager.js", "themes/*/manifest.json"],
+      "owns": ["Palette tokens", "Per-surface CSS paths", "Canvas/mail/engine injection CSS"],
+      "consumers": ["index.html", "engine.js", "app/canvas/preload.js", "app/mail/api.js", "slate.html"]
+    },
+    {
+      "id": "gradescope",
+      "name": "Gradescope (emerging)",
+      "layer": "main",
+      "entry": ["app/platforms/gradescope/auth.js", "app/platforms/gradescope/client.js", "app/platforms/gradescope/sync.js", "app/platforms/auth-capture.js"],
+      "status": "IPC wired in main.js (gradescope:ensure_auth) but not exposed in preload.js yet"
+    },
+    {
+      "id": "task-optimizer",
+      "name": "Task Optimizer",
+      "layer": "renderer",
+      "entry": ["taskoptimizer.js"],
+      "depends_on": ["tasks global from render.js"],
+      "purpose": "Scores/ranks tasks by urgency, grade weight, effort"
+    }
+  ],
+
+  "dependency_edges": [
+    { "from": "index.html", "to": "preload.js", "type": "bridge" },
+    { "from": "renderer/render.js", "to": "preload.js", "type": "ipc" },
+    { "from": "renderer/render.js", "to": "renderer/app.js", "type": "calls" },
+    { "from": "renderer/render.js", "to": "renderer/workspace-page-tabs.js", "type": "calls" },
+    { "from": "renderer/workspace-page-tabs.js", "to": "main.js", "type": "ipc:tabs:push" },
+    { "from": "main.js", "to": "data-store.js", "type": "requires" },
+    { "from": "main.js", "to": "context-store.js", "type": "requires" },
+    { "from": "main.js", "to": "agent-process.js", "type": "requires" },
+    { "from": "main.js", "to": "engine.js", "type": "requires" },
+    { "from": "main.js", "to": "app/canvas/api.js", "type": "requires" },
+    { "from": "main.js", "to": "app/mail/api.js", "type": "requires" },
+    { "from": "main.js", "to": "app/synapse/client.js", "type": "requires" },
+    { "from": "agent-process.js", "to": "sidekick.py", "type": "spawn" },
+    { "from": "app/canvas/api.js", "to": "parser.py", "type": "spawn+stdin" },
+    { "from": "main.js", "to": "vector_retreival.py", "type": "spawn+stdin" },
+    { "from": "parser.py", "to": "canvas_parser/", "type": "imports" },
+    { "from": "parser.py", "to": "canvas_graph.json", "type": "writes" },
+    { "from": "app/canvas/api.js", "to": "canvas_data.json", "type": "writes" },
+    { "from": "app/canvas/api.js", "to": "canvas_graph.json", "type": "reads" },
+    { "from": "data-store.js", "to": "app/canvas/api.js", "type": "reads" },
+    { "from": "engine.js", "to": "vector_retreival.py", "type": "query" },
+    { "from": "sidekick.py", "to": "vector_retreival.py", "type": "query via main" },
+    { "from": "context-store.js", "to": "context-pipeline.js", "type": "reads" },
+    { "from": "web-preload.js", "to": "main.js", "type": "ipc:surface:scrolled" },
+    { "from": "app/canvas/preload.js", "to": "main.js", "type": "ipc:surface:scrolled" },
+    { "from": "theme-manager.js", "to": "themes/*", "type": "reads" }
+  ],
+
+  "ipc_contract": {
+    "invoke_channels": [
+      "theme:list", "theme:set", "tasks:start", "tabs:push", "tabs:new_active",
+      "tabs:navigate", "tabs:back", "layout:workspace_sidebar_collapsed", "layout:right_panel_width",
+      "data:get", "engine:url", "tasks:new", "workspaces:new", "workspaces:delete",
+      "prompt:send", "synapse:send", "canvas:ensure_auth", "canvas:clear_sync_data", "canvas:open_app",
+      "mail:ensure_auth", "mail:get_inbox", "mail:get_view", "mail:get_message", "mail:get_thread",
+      "mail:send", "mail:modify", "mail:trash", "mail:untrash", "mail:delete",
+      "mail:start_watch", "mail:stop_watch", "mail:get_contacts", "mail:add_contact", "mail:sync_contacts",
+      "injection:get", "tabs:write_active_html", "tabs:write_active_frames_html",
+      "region:text_context", "region:capture_shortcut", "gradescope:ensure_auth"
+    ],
+    "send_channels_renderer_to_main": [
+      "context:ui_state", "context:screen_text"
+    ],
+    "send_channels_preload_to_main": [
+      "surface:scrolled", "engine:internal-navigate"
+    ],
+    "push_channels_main_to_renderer": [
+      "tasks:update", "workspaces:update", "canvas:update",
+      "tabs:url_update", "tabs:title_update", "tabs:view_state", "tabs:snapshot_overlay",
+      "canvas:visible_context", "canvas:navigation-finished", "canvas:view-ready",
+      "tabs:open_*_window", "tabs:tool_*", "engine:open-app-in-tab",
+      "prompt:response-chunk", "prompt:response-done", "synapse:response-chunk",
+      "shortcut:region_capture*"
+    ],
+    "sync_channels": ["theme:get_config"]
+  },
+
+  "race_condition_hotspots": [
+    {
+      "id": "tabs-push-overlap",
+      "location": "renderer/workspace-page-tabs.js syncTabs + main.js tabsPushChain",
+      "status": "mitigated",
+      "detail": "Main serializes via tabsPushChain; renderer may fire syncTabs without await but main orders pushes"
+    },
+    {
+      "id": "screen-slice-owner",
+      "location": "main.js screenSliceOwner",
+      "status": "active-risk",
+      "detail": "Main pulls and renderer pushes can race for screen context slice ownership"
+    },
+    {
+      "id": "canvas-visible-context-poll",
+      "location": "main.js canvasVisibleContextPollInFlight / htmlVisibleContextPollInFlight",
+      "status": "active-risk",
+      "detail": "Concurrent polls for large graph visible context without full mutex"
+    },
+    {
+      "id": "vector-query-restart",
+      "location": "main.js pendingQueries + vector process restart",
+      "status": "partially-mitigated",
+      "detail": "Restart rejects pending queries; in-flight queries during restart may get empty results"
+    },
+    {
+      "id": "canvas-setup-promise",
+      "location": "main.js canvasSetupPromise",
+      "status": "active-risk",
+      "detail": "Overlapping Canvas auth/sync operations"
+    },
+    {
+      "id": "mail-load-promise",
+      "location": "app/mail/mail-tabs.js mailLoadPromise",
+      "status": "mitigated",
+      "detail": "Dedupes concurrent mail view loads"
+    },
+    {
+      "id": "gmail-concurrency",
+      "location": "app/mail/api.js gmailInFlight + gmailWaitQueue",
+      "status": "mitigated",
+      "detail": "Limits parallel Gmail API calls to 6"
+    },
+    {
+      "id": "sidekick-in-flight",
+      "location": "renderer/render.js sidekickResponseInFlight",
+      "status": "mitigated",
+      "detail": "Blocks duplicate prompt sends from UI"
+    },
+    {
+      "id": "escape-html-load-order",
+      "location": "renderer/render.js uses escapeHtml before app.js defines it",
+      "status": "fixed-pass-2",
+      "detail": "Was fragile; now loaded from lib/dom-utils.js first in index.html"
+    },
+    {
+      "id": "settings-under-webcontentsview",
+      "location": "settings-overlay vs WebContentsView stacking",
+      "status": "fixed-pass-3",
+      "detail": "Renderer overlay IPC hides native views while settings modal is open (lib/renderer-overlay.js + overlay:set_open)"
+    },
+    {
+      "id": "section-switch-before-tab-hide",
+      "location": "renderer/render.js setActiveSection without await syncActiveTab",
+      "status": "fixed-pass-3",
+      "detail": "Home/Tasks/Calendar could paint before browser view detached; now awaits syncActiveTab"
+    },
+    {
+      "id": "canvas-tab-switch-flash",
+      "location": "canvas tab restore + revealCanvasView 100ms delay",
+      "status": "mitigated-pass-3",
+      "detail": "Snapshot placeholder during switch, immediate reveal when content ready, optional slate on user tab click"
+    }
+  ],
+
+  "refactor_candidates": [
+    {
+      "priority": "high",
+      "target": "main.js",
+      "action": "Extract tab pool, IPC handlers, agent tools into modules",
+      "risk": "high — needs careful regression testing"
+    },
+    {
+      "priority": "high",
+      "target": "parser.py",
+      "action": "Continue migration into canvas_parser/ package",
+      "risk": "high — parsing correctness"
+    },
+    {
+      "priority": "medium",
+      "target": "escapeHtml duplicates",
+      "action": "Consolidate to lib/dom-utils.js",
+      "status": "done-pass-2"
+    },
+    {
+      "priority": "medium",
+      "target": "surface scroll notify",
+      "action": "Consolidate web-preload.js and app/canvas/preload.js scroll handlers",
+      "status": "done-pass-2"
+    },
+    {
+      "priority": "medium",
+      "target": "mail folder constants",
+      "action": "Single source in lib/mail-folders.js",
+      "status": "done-pass-2"
+    },
+    {
+      "priority": "medium",
+      "target": "renderer naming",
+      "action": "Rename render.js ↔ app.js or add clarifying aliases",
+      "risk": "low cosmetic — many references"
+    },
+    {
+      "priority": "low",
+      "target": "root vs themes/* CSS",
+      "action": "Complete theme migration; remove root legacy CSS duplicates",
+      "risk": "medium visual regression"
+    },
+    {
+      "priority": "low",
+      "target": "Dual AI systems",
+      "action": "Document or unify Sidekick vs Synapse boundaries",
+      "risk": "product decision needed"
+    }
+  ],
+
+  "file_clusters": {
+    "core_main": ["main.js", "preload.js", "web-preload.js", "data-store.js", "context-store.js", "context-pipeline.js", "agent-process.js", "engine.js", "theme-manager.js", "tab-utils.js", "view-layout.js"],
+    "core_renderer": ["index.html", "renderer/render.js", "renderer/app.js", "renderer/workspace-page-tabs.js", "taskoptimizer.js"],
+    "canvas": ["app/canvas/api.js", "app/canvas/auth.js", "app/canvas/course.js", "app/canvas/dashboard.js", "app/canvas/weekly-schedule.js", "app/canvas/preload.js", "parser.py", "canvas_parser/"],
+    "mail": ["app/mail/api.js", "app/mail/mail.js", "app/mail/mail-tabs.js", "app/mail/contacts.js", "app/mail/classify.js", "app/mail/summarize.js"],
+    "ai": ["agent-process.js", "sidekick.py", "vector_retreival.py", "context_format.py", "app/synapse/"],
+    "platforms": ["app/platforms/gradescope/", "app/platforms/auth-capture.js"],
+    "shared_libs": ["lib/dom-utils.js", "lib/surface-scroll-notify.js", "lib/mail-folders.js"],
+    "tests": ["tests/*.test.js", "tests/test_*.py"]
+  }
+}

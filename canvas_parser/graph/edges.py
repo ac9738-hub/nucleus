@@ -56,3 +56,42 @@ class GraphEdgeStore:
                 if node_id and node_id not in bucket:
                     warnings.append(f"missing {node_type} id={node_id} for relation={edge.get('relation')}")
         return warnings
+
+
+def _block_id(block):
+    if isinstance(block, dict):
+        return str(block.get('blockId') or '').strip()
+    return str(getattr(block, 'blockId', '') or '').strip()
+
+
+def sync_learning_block_next_edges(graph_edges, blocks, source='heuristic'):
+    prior_id = ''
+    added = 0
+    for block in blocks or []:
+        block_id = _block_id(block)
+        if prior_id and block_id:
+            if graph_edges.add_edge('learningBlock', prior_id, 'learningBlock', block_id, 'next', source=source):
+                added += 1
+        if block_id:
+            prior_id = block_id
+    return added
+
+
+def sync_concept_prerequisite_edges(graph_edges, concepts, source='heuristic'):
+    added = 0
+    for concept in concepts or []:
+        if isinstance(concept, dict):
+            concept_id = str(concept.get('conceptid') or '').strip()
+            prereq_ids = concept.get('prerequisiteConceptIds', []) or []
+        else:
+            concept_id = str(getattr(concept, 'conceptid', '') or '').strip()
+            prereq_ids = getattr(concept, 'prerequisiteConceptIds', []) or []
+        if not concept_id:
+            continue
+        for prereq_id in prereq_ids:
+            prereq_id = str(prereq_id or '').strip()
+            if prereq_id and graph_edges.add_edge(
+                'concept', prereq_id, 'concept', concept_id, 'prerequisite', source=source
+            ):
+                added += 1
+    return added

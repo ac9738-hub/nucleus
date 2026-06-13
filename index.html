@@ -155,10 +155,18 @@
           <p class="settings-section-desc">Choose how Nucleus looks. Changes apply instantly.</p>
           <div class="theme-options" id="theme-options"></div>
         </section>
+        <section class="settings-section">
+          <h3>Canvas data</h3>
+          <p class="settings-section-desc">Remove synced course files, parsed graph, and homepage caches from disk. Canvas login is kept. Sync again to rebuild.</p>
+          <button type="button" class="settings-clear-canvas-button" id="clear-canvas-sync-button">Clear Canvas sync data</button>
+        </section>
       </div>
     </div>
   </div>
 
+  <script src="lib/dom-utils.js"></script>
+  <script src="lib/renderer-overlay.js"></script>
+  <script src="lib/mail-folders.js"></script>
   <script src="app/canvas/course.js"></script>
   <script src="app/canvas/dashboard.js"></script>
   <script src="app/synapse/chat.js"></script>

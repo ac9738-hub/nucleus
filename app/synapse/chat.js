@@ -16,15 +16,6 @@
   ];
   var DEFAULT_MODEL = "claude-sonnet-4-6";
 
-  function escapeHtml(value) {
-    return String(value == null ? "" : value)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#39;");
-  }
-
   function formatTime(value) {
     if (!value) return "";
     var date = new Date(value);

@@ -6,6 +6,7 @@
 const fs = require('fs')
 const path = require('path')
 const { pathToFileURL } = require('url')
+const { escapeHtml } = require('./lib/dom-utils')
 const assetCache = new Map()
 
 function parseEnvValue(value) {
@@ -159,15 +160,6 @@ async function searchweb(query) {
       videoResult.status === "rejected" ? videoResult.reason.message : ""
     ].filter(Boolean)
   }
-}
-
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;")
 }
 
 function getSearchResults(result) {

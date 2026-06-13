@@ -31,6 +31,50 @@ let state = {
 const AI_PANEL_MIN_WIDTH = 340;
 const AI_PANEL_DEFAULT_WIDTH = 340;
 const AI_PANEL_MAX_WIDTH = 680;
+let tabSnapshotOverlay = {
+  visible: false,
+  tabId: null,
+  snapshotDataUrl: ""
+};
+
+window.__nucleusTabSnapshot = {
+  get() {
+    return tabSnapshotOverlay;
+  },
+  clear() {
+    tabSnapshotOverlay = { visible: false, tabId: null, snapshotDataUrl: "" };
+  }
+};
+
+function applyTabViewState(payload) {
+  if (!payload || !payload.id) return;
+  const tab = state.tabs.find(item => sameTabId(item.id, payload.id));
+  if (!tab) return;
+  tab.discarded = Boolean(payload.discarded);
+  if (payload.snapshotDataUrl) {
+    tab.snapshotDataUrl = payload.snapshotDataUrl;
+  }
+  if (payload.tier === "active") {
+    tab.discarded = false;
+    tab.loading = false;
+    if (sameTabId(payload.id, state.activeTabId)) {
+      tab.viewTier = "active";
+      tabSnapshotOverlay = { visible: false, tabId: null, snapshotDataUrl: "" };
+    }
+  } else if (payload.tier) {
+    tab.viewTier = payload.tier;
+  }
+  const inactiveSnapshotUpdate = payload.tier === "stashed"
+    && !sameTabId(payload.id, state.activeTabId);
+  if (inactiveSnapshotUpdate) {
+    return;
+  }
+  if (typeof scheduleRenderWorkspacePageTabs === "function") {
+    scheduleRenderWorkspacePageTabs(sameTabId(payload.id, state.activeTabId) ? "full" : "patch");
+  } else {
+    renderWorkspacePageTabs();
+  }
+}
 
 // TEST FUNCTION, write current pages HTML to assignmenthtml.json for inspection
 async function writeActiveBrowserTabHtml() {
@@ -335,24 +379,24 @@ function scheduleRendererScreenTextSync() {
 
 // ─── Navigation ───────────────────────────────────────────────────────────────
 
-function setActiveSection(section) {
+async function setActiveSection(section) {
   rememberActiveWorkspaceTab();
   state.activeSection = section;
   state.activeTabId = null;
   state.activeCourseId = null;
   state.top = 'section';
-  syncActiveTab();
+  await syncActiveTab();
   render();
 }
 
-function setActiveWorkspace(workspaceId) {
+async function setActiveWorkspace(workspaceId) {
   rememberActiveWorkspaceTab();
   state.top = 'workspace';
   state.activeCourseId = null;
   state.activeWorkspaceId = workspaceId;
   state.activeTabId = getRememberedWorkspaceTabId(workspaceId);
-  syncTabs();
-  syncActiveTab();
+  await syncTabs();
+  await syncActiveTab();
   render();
 }
 
@@ -1083,17 +1127,59 @@ async function renderThemeOptions() {
   });
 }
 
-function openSettings() {
+async function openSettings() {
   const overlay = document.getElementById("settings-overlay");
-  if (!overlay) return;
+  if (!overlay || !overlay.classList.contains("is-hidden")) return;
+  if (window.NucleusRendererOverlay) {
+    await window.NucleusRendererOverlay.open();
+  }
   overlay.classList.remove("is-hidden");
   renderThemeOptions();
 }
 
-function closeSettings() {
+async function closeSettings() {
   const overlay = document.getElementById("settings-overlay");
-  if (!overlay) return;
+  if (!overlay || overlay.classList.contains("is-hidden")) return;
   overlay.classList.add("is-hidden");
+  if (window.NucleusRendererOverlay) {
+    await window.NucleusRendererOverlay.close();
+  }
+}
+
+async function clearCanvasSyncData() {
+  const confirmed = window.confirm(
+    "Clear all Canvas sync data from disk?\n\n" +
+    "This removes course snapshots, downloaded files, parsed graph, and homepage caches. " +
+    "Canvas login is not affected. You can sync again later to rebuild."
+  );
+  if (!confirmed) return;
+
+  const button = document.getElementById("clear-canvas-sync-button");
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Clearing…";
+  }
+
+  try {
+    const result = await window.nucleus.clearCanvasSyncData();
+    if (!result || !result.ok) {
+      throw new Error(result && result.error ? result.error : "Clear failed.");
+    }
+    const removedCount = Array.isArray(result.removed) ? result.removed.length : 0;
+    const taskCount = Number(result.removedTasks) || 0;
+    window.alert(
+      `Canvas sync data cleared.${removedCount ? ` Removed ${removedCount} path(s).` : ""}` +
+      `${taskCount ? ` Removed ${taskCount} Canvas task(s).` : ""}`
+    );
+  } catch (error) {
+    console.error("Unable to clear Canvas sync data:", error);
+    window.alert(error && error.message ? error.message : "Unable to clear Canvas sync data.");
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = "Clear Canvas sync data";
+    }
+  }
 }
 
 // ─── Startup ──────────────────────────────────────────────────────────────────
@@ -1111,6 +1197,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (profileCard) profileCard.addEventListener("click", openSettings);
   const closeSettingsButton = document.getElementById("close-settings-button");
   if (closeSettingsButton) closeSettingsButton.addEventListener("click", closeSettings);
+  const clearCanvasSyncButton = document.getElementById("clear-canvas-sync-button");
+  if (clearCanvasSyncButton) clearCanvasSyncButton.addEventListener("click", clearCanvasSyncData);
   const settingsOverlay = document.getElementById("settings-overlay");
   if (settingsOverlay) {
     settingsOverlay.addEventListener("click", event => {
@@ -1118,7 +1206,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
   document.addEventListener("keydown", event => {
-    if (event.key === "Escape") closeSettings();
+    if (event.key !== "Escape") return;
+    const overlay = document.getElementById("settings-overlay");
+    if (overlay && !overlay.classList.contains("is-hidden")) {
+      closeSettings();
+    }
   });
   document.getElementById("cancel-new-workspace").addEventListener("click", hideNewWorkspaceForm);
   document.getElementById("new-workspace-form").addEventListener("submit", event => {
@@ -1190,7 +1282,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     const tab = state.tabs.find(item => sameTabId(item.id, payload.id));
     if (!tab) return;
     tab.url = payload.url;
-    if (isWebPageTab(tab)) {
+    if (isWebPageTab(tab) && typeof scheduleRenderWorkspacePageTabs === "function") {
+      scheduleRenderWorkspacePageTabs(sameTabId(tab.id, state.activeTabId) ? "full" : "patch");
+    } else if (isWebPageTab(tab)) {
       renderWorkspacePageTabs();
     }
     if (sameTabId(tab.id, state.activeTabId)) {
@@ -1202,7 +1296,30 @@ document.addEventListener("DOMContentLoaded", async () => {
     const tab = state.tabs.find(item => sameTabId(item.id, payload.id));
     if (!tab || !isWebPageTab(tab)) return;
     tab.pageTitle = String(payload.title || "").trim();
-    renderWorkspacePageTabs();
+    if (typeof scheduleRenderWorkspacePageTabs === "function") {
+      scheduleRenderWorkspacePageTabs(sameTabId(tab.id, state.activeTabId) ? "full" : "patch");
+    } else {
+      renderWorkspacePageTabs();
+    }
+  });
+
+  window.nucleus.on("tabs:view_state", payload => {
+    applyTabViewState(payload);
+  });
+
+  window.nucleus.on("tabs:snapshot_overlay", payload => {
+    if (!payload || !payload.tabId) return;
+    tabSnapshotOverlay = {
+      visible: Boolean(payload.visible),
+      tabId: payload.tabId,
+      snapshotDataUrl: payload.snapshotDataUrl || tabSnapshotOverlay.snapshotDataUrl || ""
+    };
+    if (payload.snapshotDataUrl) {
+      tabSnapshotOverlay.snapshotDataUrl = payload.snapshotDataUrl;
+    }
+    if (sameTabId(payload.tabId, state.activeTabId)) {
+      renderView();
+    }
   });
 
   window.nucleus.on('canvas:visible_context', payload => {
@@ -1247,14 +1364,22 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!payload || !payload.tabId) return;
     closeTab(payload.tabId);
   });
-  window.nucleus.on('engine:open-app-in-tab', payload => {
-    if (!payload || !payload.tabId) return;
+  window.nucleus.on('engine:open-app-in-tab', async payload => {
+    if (!payload || !payload.app) return;
+    const sourceTab = payload.tabId
+      ? state.tabs.find(item => sameTabId(item.id, payload.tabId))
+      : null;
+    const workspaceId = payload.workspaceId
+      || (sourceTab && sourceTab.workspaceId)
+      || getBrowserWorkspaceId();
+
     if (payload.app === "canvas") {
-      openCanvasAppInExistingTab(payload.tabId);
+      const result = await openCanvasAppTab(workspaceId);
+      if (result && result.ok === false) return;
     } else if (payload.app === "synapse") {
-      openSynapseAppInExistingTab(payload.tabId);
+      await openSynapseAppTab(workspaceId);
     } else if (payload.app === "mail") {
-      openMailAppInExistingTab(payload.tabId);
+      await openMailAppTab(workspaceId);
     }
   });
   window.nucleus.on("canvas:view-ready", payload => {
@@ -1262,6 +1387,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       const tab = state.tabs.find(item => sameTabId(item.id, payload.id));
       if (tab) {
         tab.loading = false;
+        if (sameTabId(tab.id, state.activeTabId)) {
+          renderView();
+        }
       }
     }
   });

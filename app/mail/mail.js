@@ -4,28 +4,16 @@
 (function () {
   "use strict";
 
-  const FOLDERS = [
-    { id: "inbox", label: "Inbox", icon: "IN" },
-    { id: "secondary", label: "Secondary Inbox", icon: "2°" },
-    { id: "starred", label: "Starred", icon: "★" },
-    { id: "sent", label: "Sent", icon: "→" },
-    { id: "drafts", label: "Drafts", icon: "✎" },
-    { id: "spam", label: "Spam", icon: "!" },
-    { id: "trash", label: "Trash", icon: "⌫" }
-  ];
-
-  function escapeHtml(value) {
-    return String(value == null ? "" : value)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#39;");
+  function getMailFolders(state) {
+    if (state.view && Array.isArray(state.view.folders) && state.view.folders.length) {
+      return state.view.folders;
+    }
+    return (window.NucleusMailFolders && window.NucleusMailFolders.MAIL_FOLDERS) || [];
   }
 
   function folderTitle(state) {
     if (state.searchQuery) return `Search: ${state.searchQuery}`;
-    const folder = FOLDERS.find(item => item.id === state.folder);
+    const folder = getMailFolders(state).find(item => item.id === state.folder);
     return folder ? folder.label : "Inbox";
   }
 
@@ -45,7 +33,7 @@
     const labelStats = state.view && state.view.labelStats ? state.view.labelStats : {};
     const inboxUnread = labelStats.INBOX ? labelStats.INBOX.messagesUnread : 0;
 
-    const items = FOLDERS.map(folder => {
+    const items = getMailFolders(state).map(folder => {
       const active = folder.id === state.folder ? " is-active" : "";
       const count = folder.id === "inbox" && inboxUnread > 0
         ? `<span class="mail-nav-count">${inboxUnread}</span>`

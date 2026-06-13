@@ -731,7 +731,7 @@
 
 .mail-chat-message.is-outgoing {
   flex-direction: row-reverse;
-  justify-content: flex-end;
+  justify-content: flex-start;
 }
 
 .mail-chat-meta {

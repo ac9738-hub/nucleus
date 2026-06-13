@@ -11,14 +11,7 @@ let appIconClickState = {
   timeout: null
 };
 
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
+let workspaceTabSwitchQueue = Promise.resolve();
 
 function activateAppIcon(card, openApp) {
   if (appIconClickState.target === card) {
@@ -163,6 +156,106 @@ function getTabDisplayTitle(tab) {
   return tab.label || "Tab";
 }
 
+function renderWorkspaceTabVisual(tab) {
+  return renderWorkspaceTabIcon(tab);
+}
+
+function demoteSiblingWebTabViewTiers(activeTabId, workspaceId) {
+  state.tabs.forEach(tab => {
+    if (!tab || tab.workspaceId !== workspaceId) return;
+    if (sameTabId(tab.id, activeTabId)) return;
+    if (typeof isWebContentTab === "function" && !isWebContentTab(tab)) return;
+    tab.viewTier = "stashed";
+  });
+}
+
+function parseTabVisualElement(visualHtml) {
+  const temp = document.createElement("div");
+  temp.innerHTML = visualHtml.trim();
+  return temp.firstElementChild;
+}
+
+function tabVisualsMatch(existingVisual, newVisual) {
+  if (!existingVisual || !newVisual) return false;
+  if (existingVisual.classList.contains("workspace-page-tab-thumb")) {
+    return newVisual.classList.contains("workspace-page-tab-thumb")
+      && existingVisual.getAttribute("src") === newVisual.getAttribute("src");
+  }
+  return existingVisual.outerHTML === newVisual.outerHTML;
+}
+
+function patchWorkspacePageTabs() {
+  const pageTabs = document.getElementById("workspace-page-tabs");
+  if (!pageTabs || state.top !== "workspace") return;
+
+  pageTabs.querySelectorAll(".workspace-page-tab").forEach(btn => {
+    const tab = state.tabs.find(item => sameTabId(item.id, btn.dataset.tabId));
+    if (!tab) return;
+
+    btn.classList.toggle("active", sameTabId(tab.id, state.activeTabId));
+    btn.classList.toggle("is-discarded", Boolean(tab.discarded));
+
+    const displayTitle = getTabDisplayTitle(tab);
+    const label = btn.querySelector(".workspace-page-tab-label");
+    if (label && label.textContent !== displayTitle) {
+      label.textContent = displayTitle;
+    }
+    if (btn.title !== displayTitle) {
+      btn.title = displayTitle;
+    }
+
+    const newVisual = parseTabVisualElement(renderWorkspaceTabVisual(tab));
+    if (!newVisual) return;
+    const existingVisual = btn.querySelector(".workspace-page-tab-thumb, .workspace-page-tab-icon");
+    if (existingVisual && tabVisualsMatch(existingVisual, newVisual)) return;
+    if (existingVisual) {
+      existingVisual.replaceWith(newVisual);
+      return;
+    }
+    if (label) {
+      btn.insertBefore(newVisual, label);
+    }
+  });
+}
+
+let workspacePageTabsRenderFrame = null;
+let workspacePageTabsRenderMode = "patch";
+
+function scheduleRenderWorkspacePageTabs(mode = "patch") {
+  workspacePageTabsRenderMode = mode === "full" ? "full" : workspacePageTabsRenderMode;
+  if (workspacePageTabsRenderFrame) return;
+  workspacePageTabsRenderFrame = requestAnimationFrame(() => {
+    workspacePageTabsRenderFrame = null;
+    const useFullRebuild = workspacePageTabsRenderMode === "full";
+    workspacePageTabsRenderMode = "patch";
+    updateWorkspacePageTabs({ tabBar: useFullRebuild ? "full" : "patch" });
+  });
+}
+
+let lastWorkspaceTabBarSignature = "";
+
+function getWorkspaceTabBarSignature() {
+  return getVisibleTabs().map(tab => `${tab.id}:${tab.discarded ? 1 : 0}`).join("|");
+}
+
+function updateWorkspacePageTabs(options = {}) {
+  const pageTabs = document.getElementById("workspace-page-tabs");
+  const signature = getWorkspaceTabBarSignature();
+  const needsFullRebuild = options.tabBar === "full"
+    || signature !== lastWorkspaceTabBarSignature
+    || !pageTabs
+    || !pageTabs.querySelector(".workspace-page-tab");
+
+  if (options.tabBar !== "skip") {
+    if (needsFullRebuild) {
+      renderWorkspacePageTabs();
+      lastWorkspaceTabBarSignature = signature;
+    } else {
+      patchWorkspacePageTabs();
+    }
+  }
+}
+
 // render the workspacepagetabs under the primary tabs ** no container
 function renderWorkspacePageTabs() {
   const pageTabs = document.getElementById("workspace-page-tabs");
@@ -174,8 +267,8 @@ function renderWorkspacePageTabs() {
   pageTabs.innerHTML = state.top === "workspace" ? visibleTabs.map(tab => {
     const displayTitle = getTabDisplayTitle(tab);
     return `
-    <button type="button" class="workspace-page-tab ${sameTabId(tab.id, state.activeTabId) ? "active" : ""}" data-tab-id="${escapeHtml(tab.id)}" title="${escapeHtml(displayTitle)}">
-      ${renderWorkspaceTabIcon(tab)}
+    <button type="button" class="workspace-page-tab ${sameTabId(tab.id, state.activeTabId) ? "active" : ""}${tab.discarded ? " is-discarded" : ""}" data-tab-id="${escapeHtml(tab.id)}" title="${escapeHtml(displayTitle)}">
+      ${renderWorkspaceTabVisual(tab)}
       <span class="workspace-page-tab-label">${escapeHtml(displayTitle)}</span>
       ${tab.type !== "center" ? `<span class="close-tab" data-close-tab="${escapeHtml(tab.id)}">x</span>` : ""}
     </button>
@@ -198,19 +291,35 @@ function renderWorkspacePageTabs() {
 
   // add tab click listeners
   pageTabs.querySelectorAll(".workspace-page-tab").forEach(tabButton => {
-    tabButton.addEventListener("click", async event => {
+    tabButton.addEventListener("click", event => {
       const closeTarget = event.target.closest("[data-close-tab]");
       if (closeTarget) {
         closeTab(closeTarget.dataset.closeTab);
         return;
       }
-      rememberActiveCanvasYIndex();
-      state.activeTabId = tabButton.dataset.tabId;
-      state.activeTabByWorkspace[state.activeWorkspaceId] = state.activeTabId;
-      await syncActiveTab();
-      render();
+      workspaceTabSwitchQueue = workspaceTabSwitchQueue.then(async () => {
+        rememberActiveCanvasYIndex();
+        const nextTab = state.tabs.find(item => sameTabId(item.id, tabButton.dataset.tabId));
+        state.activeTabId = tabButton.dataset.tabId;
+        state.activeTabByWorkspace[state.activeWorkspaceId] = state.activeTabId;
+        demoteSiblingWebTabViewTiers(state.activeTabId, state.activeWorkspaceId);
+        if (nextTab) {
+          nextTab.loading = false;
+          nextTab.pendingSwitchSlate = false;
+          nextTab.viewTier = "active";
+        }
+        if (window.__nucleusTabSnapshot) {
+          window.__nucleusTabSnapshot.clear();
+        }
+        render();
+        await syncActiveTab();
+        render();
+      }).catch(error => {
+        console.error("Unable to switch workspace tab:", error);
+      });
     });
   });
+  lastWorkspaceTabBarSignature = getWorkspaceTabBarSignature();
 }
 
 // renders the toolbar for browsertabs
@@ -842,7 +951,24 @@ function renderView() {
       ? window.nucleusMailApp.renderMailApp(activeTab, mailState)
       : `<section class="workspace-panel"><div><h2>Mail</h2><p>The Mail app script did not load.</p></div></section>`;
   } else if (isWebContentTab(activeTab)) {
-    view.innerHTML = "";
+    const overlay = window.__nucleusTabSnapshot ? window.__nucleusTabSnapshot.get() : null;
+    const restoreSnapshot =
+      overlay &&
+      overlay.visible &&
+      sameTabId(activeTab.id, overlay.tabId) &&
+      overlay.snapshotDataUrl
+        ? overlay.snapshotDataUrl
+        : "";
+    const transitionSnapshot =
+      activeTab.loading && activeTab.snapshotDataUrl
+        ? activeTab.snapshotDataUrl
+        : "";
+    const placeholderSnapshot = restoreSnapshot || transitionSnapshot;
+    if (placeholderSnapshot) {
+      view.innerHTML = `<img class="tab-restore-snapshot" src="${escapeHtml(placeholderSnapshot)}" alt="">`;
+    } else {
+      view.innerHTML = "";
+    }
   } else {
     view.innerHTML = renderProjectCenter(getWorkspace(state.activeWorkspaceId));
   }
@@ -930,12 +1056,13 @@ function renderView() {
 
   view.querySelectorAll("[data-canvas-course-id]").forEach(card => {
     const openCourse = () => {
+      const targetCourseId = card.dataset.canvasCourseId;
       if (state.top === "workspace") {
         const activeTab = getActiveTab();
         if (activeTab && activeTab.type === "canvastab" && activeTab.canvasMode !== "browser") {
           pushCanvasNativeHistory(activeTab);
           activeTab.canvasNativePage = "course";
-          activeTab.courseId = card.dataset.canvasCourseId;
+          activeTab.courseId = targetCourseId;
           activeTab.courseSection = "homepage";
           activeTab.yindex = 0;
           syncTabs();
@@ -943,7 +1070,7 @@ function renderView() {
           return;
         }
       }
-      openCanvasAppTab(getBrowserWorkspaceId(), card.dataset.canvasCourseId);
+      openCanvasAppTab(getBrowserWorkspaceId(), targetCourseId);
     };
     card.addEventListener("click", openCourse);
     card.addEventListener("keydown", event => {
@@ -1035,11 +1162,11 @@ function renderView() {
 }
 
 // renders whole page
-function render() {
+function render(options = {}) {
   renderWorkspaceSidebarCollapseState();
   renderPrimaryTabs();
   renderWorkspaceTabs();
-  renderWorkspacePageTabs();
+  updateWorkspacePageTabs(options);
   renderBrowserToolbar();
   renderCanvasToolbar();
   renderView();

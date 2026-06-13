@@ -13,17 +13,6 @@
     return (typeof window !== "undefined" && window.nucleusSynapseTemplates) || null;
   }
 
-  function escapeHtml(value) {
-    var t = templates();
-    if (t) return t.escapeHtml(value);
-    return String(value == null ? "" : value)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#39;");
-  }
-
   function getConversations(state) {
     var convos = state && Array.isArray(state.conversations) ? state.conversations : [];
     return convos.filter(function (c) { return c && c.id; });

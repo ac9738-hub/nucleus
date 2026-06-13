@@ -28,7 +28,13 @@ def topological_sort_concepts(concepts, prerequisite_map):
     return ordered
 
 
-def build_hybrid_learning_blocks(courseid, concepts, module_order_hints, prerequisite_map, problems_by_concept):
+def build_hybrid_learning_blocks(
+    courseid,
+    concepts,
+    module_order_hints,
+    prerequisite_map,
+    problems_by_concept,
+):
     concepts_by_id = {concept.get('conceptid'): concept for concept in concepts if concept.get('conceptid')}
     module_buckets = {}
     for concept_id, concept in concepts_by_id.items():
@@ -43,14 +49,17 @@ def build_hybrid_learning_blocks(courseid, concepts, module_order_hints, prerequ
                 'position': int(hint.get('position', 0) or 0),
             })
 
-    sorted_module_ids = sorted(
-        module_buckets.keys(),
-        key=lambda module_id: (
-            1 if module_id == 'unscheduled' else 0,
-            min(item.get('position', 0) for item in module_buckets[module_id]) if module_buckets[module_id] and isinstance(module_buckets[module_id][0], dict) else 0,
-            module_id,
-        ),
-    )
+    def module_sort_key(module_id):
+        if module_id == 'unscheduled':
+            return (1, 0, module_id)
+        entries = module_buckets.get(module_id) or []
+        if entries and isinstance(entries[0], dict):
+            min_position = min(item.get('position', 0) for item in entries)
+        else:
+            min_position = 0
+        return (0, min_position, module_id)
+
+    sorted_module_ids = sorted(module_buckets.keys(), key=module_sort_key)
 
     ordered_concept_ids = []
     for module_id in sorted_module_ids:

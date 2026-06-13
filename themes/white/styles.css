@@ -1491,6 +1491,76 @@ button.home-list-item {
   vertical-align: middle;
 }
 
+.course-week--event {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+}
+
+.course-week-event-badge {
+  background: color-mix(in srgb, var(--accent) 18%, var(--surface-2));
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+  border-radius: 999px;
+  color: var(--text-dim);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  margin-left: 8px;
+  padding: 2px 8px;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+.course-week-event-copy {
+  color: var(--text-dim);
+  font-size: 13px;
+  line-height: 1.45;
+  margin: 8px 0 0;
+}
+
+.course-week-concept-item {
+  cursor: default;
+}
+
+.course-week-events {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.course-week-event-card {
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border));
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+
+.course-week-event-head {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.course-week-event-title {
+  font-weight: 600;
+}
+
+.course-week-module-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.course-week-module-group {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+
+.course-week-module-group-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+
 .course-week--empty {
   opacity: 0.62;
 }
@@ -2346,6 +2416,34 @@ body.workspace-sidebar-collapsed .profile-meta {
   color: var(--text-mute);
   font-size: 12px;
   margin: 0 0 14px;
+}
+
+.settings-section + .settings-section {
+  border-top: 1px solid var(--border);
+  margin-top: 22px;
+  padding-top: 22px;
+}
+
+.settings-clear-canvas-button {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: var(--radius);
+  color: #f0a8a8;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  padding: 10px 14px;
+  width: 100%;
+}
+
+.settings-clear-canvas-button:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.55);
+}
+
+.settings-clear-canvas-button:disabled {
+  cursor: wait;
+  opacity: 0.7;
 }
 
 .theme-options {

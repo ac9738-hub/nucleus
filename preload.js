@@ -25,6 +25,7 @@ contextBridge.exposeInMainWorld('nucleus', {
   sendprompt:   (payload) => ipcRenderer.invoke('prompt:send', { message: payload }),
   synapseSend:  (payload) => ipcRenderer.invoke('synapse:send', payload),
   ensureCanvasAuth: () => ipcRenderer.invoke('canvas:ensure_auth'),
+  clearCanvasSyncData: () => ipcRenderer.invoke('canvas:clear_sync_data'),
   openCanvasApp: () => ipcRenderer.invoke('canvas:open_app'),
   ensureMailAuth: () => ipcRenderer.invoke('mail:ensure_auth'),
   getMailInbox: () => ipcRenderer.invoke('mail:get_inbox'),
@@ -46,6 +47,7 @@ contextBridge.exposeInMainWorld('nucleus', {
   writeActiveTabFramesHtml: () => ipcRenderer.invoke('tabs:write_active_frames_html'),
   captureRegionContext: (payload) => ipcRenderer.invoke('region:text_context', payload),
   captureRegionShortcut: (payload) => ipcRenderer.invoke('region:capture_shortcut', payload),
+  setRendererOverlay: (payload) => ipcRenderer.invoke('overlay:set_open', payload),
   on: (channel, cb) => {
   const listener = (_, data) => cb(data);
   ipcRenderer.on(channel, listener);

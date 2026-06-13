@@ -22,6 +22,14 @@ def detect_platform(url):
     return 'unknown'
 
 
+def is_canvas_url(url):
+    try:
+        host = (urlparse(str(url or '')).netloc or '').casefold()
+    except ValueError:
+        return False
+    return 'instructure.com' in host or host.endswith('.canvas') or host == 'canvas'
+
+
 def extract_links_from_html(html, base_url=''):
     if not html:
         return []

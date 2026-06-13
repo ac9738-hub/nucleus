@@ -3,15 +3,6 @@
 // renderer DOM and normalizes Canvas API URLs into browser-safe links.
 // Dependencies: app/canvas/dashboard.js calls the exported template helpers;
 // renderer/render.js attaches navigation handlers to generated course links.
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
 function sanitizeurl(url) {
   if (!url) {
     return '#'
@@ -222,6 +213,80 @@ function renderWeeklyLoggedAssignments(assignments) {
   `;
 }
 
+function renderWeeklyConcepts(concepts) {
+  if (!concepts.length) return "";
+
+  return `
+    <div class="course-week-group">
+      <h3 class="course-week-subheading">Concepts</h3>
+      <div class="course-module-items">
+        ${concepts.map(concept => `
+          <div class="course-module-item course-week-concept-item">
+            <span>${escapeHtml(concept.name || "Untitled concept")}</span>
+            <small>Concept</small>
+          </div>
+        `).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function renderWeeklyEvents(events) {
+  if (!events.length) return "";
+
+  return `
+    <div class="course-week-group">
+      <h3 class="course-week-subheading">Events</h3>
+      <div class="course-week-events">
+        ${events.map(entry => {
+          const event = entry.event || {};
+          const files = Array.isArray(entry.files) ? entry.files : [];
+          const assignments = Array.isArray(entry.assignments) ? entry.assignments : [];
+          const concepts = Array.isArray(entry.concepts) ? entry.concepts : [];
+          const eventTypeLabel = entry.eventType ? String(entry.eventType).replace(/_/g, " ") : "Event";
+          const dateRange = event.startdate || event.enddate
+            ? [event.startdate, event.enddate].filter(Boolean).map(value => formatDate(value)).join(" – ")
+            : "";
+          return `
+            <article class="course-week-event-card">
+              <div class="course-week-event-head">
+                <span class="course-week-event-title">${escapeHtml(event.name || "Untitled event")}</span>
+                <span class="course-week-event-badge">${escapeHtml(eventTypeLabel)}</span>
+              </div>
+              ${dateRange ? `<span class="course-week-range">${escapeHtml(dateRange)}</span>` : ""}
+              ${event.description ? `<p class="course-week-event-copy">${escapeHtml(event.description.slice(0, 220))}</p>` : ""}
+              ${concepts.length || files.length || assignments.length ? `
+                ${renderWeeklyConcepts(concepts)}
+                ${renderWeeklyFiles(files)}
+                ${renderWeeklyLoggedAssignments(assignments)}
+              ` : `<span class="course-week-empty-note">No linked materials for this event</span>`}
+            </article>
+          `;
+        }).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function renderWeeklyModuleGroups(moduleGroups) {
+  if (!moduleGroups.length) return "";
+
+  return `
+    <div class="course-week-group">
+      <h3 class="course-week-subheading">Modules</h3>
+      <div class="course-week-module-groups">
+        ${moduleGroups.map(group => `
+          <article class="course-week-module-group">
+            <h4 class="course-week-module-group-title">${escapeHtml(group.moduleName || "Module")}</h4>
+            ${renderWeeklyFiles(Array.isArray(group.files) ? group.files : [])}
+            ${renderWeeklyLoggedAssignments(Array.isArray(group.assignments) ? group.assignments : [])}
+          </article>
+        `).join("")}
+      </div>
+    </div>
+  `;
+}
+
 function renderWeeklySchedule(weeks) {
   if (!weeks.length) {
     return renderEmptyState("weekly schedule — sync Canvas and run the parser to log assignments");
@@ -230,7 +295,9 @@ function renderWeeklySchedule(weeks) {
   return weeks.map(week => {
     const files = Array.isArray(week.files) ? week.files : [];
     const assignments = Array.isArray(week.assignments) ? week.assignments : [];
-    const isEmpty = !files.length && !assignments.length;
+    const events = Array.isArray(week.events) ? week.events : [];
+    const moduleGroups = Array.isArray(week.moduleGroups) ? week.moduleGroups : [];
+    const isEmpty = !files.length && !assignments.length && !events.length && !moduleGroups.length;
     const classes = ["course-item", "course-module", "course-week"];
     if (week.isCurrentWeek) classes.push("course-week--current");
     if (isEmpty) classes.push("course-week--empty");
@@ -243,11 +310,14 @@ function renderWeeklySchedule(weeks) {
           ${week.isCurrentWeek ? `<span class="course-week-current-badge">Current</span>` : ""}
         </span>
         ${week.dateRange ? `<span class="course-week-range">${escapeHtml(week.dateRange)}</span>` : ""}
+        ${renderWeeklyEvents(events)}
+        ${renderWeeklyModuleGroups(moduleGroups)}
         ${renderWeeklyFiles(files)}
         ${renderWeeklyLoggedAssignments(assignments)}
         ${isEmpty ? `<span class="course-week-empty-note">No files or assignments this week</span>` : ""}
       </div>
       <div class="course-item-meta">
+        <span>${events.length} events</span>
         <span>${files.length} files</span>
         <span>${assignments.length} assignments</span>
       </div>

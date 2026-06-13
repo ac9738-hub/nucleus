@@ -1,0 +1,1037 @@
+{
+  "startedAt": "2026-06-10T21:24:42.079464+00:00",
+  "dryRun": false,
+  "graphPath": "C:\\Allen\\nucleus\\canvas_graph.json",
+  "canvasfilesDir": "C:\\Allen\\nucleus\\canvasfiles",
+  "filesSeen": 162,
+  "filesWithLocalPdf": 161,
+  "filesUpdated": 145,
+  "pagesUpdated": 3877,
+  "blocksAdded": 56648,
+  "missingLocalPdf": [
+    {
+      "courseId": "17581",
+      "fileId": "external-pdf-907392ca3ddf6a13",
+      "name": "Outside PDF: a507b2c70a266c35-BayesFactor-R-package-for-computation-of-Bayes-factors-for-common-designs-Morey-.pdf"
+    }
+  ],
+  "updatedFiles": [
+    {
+      "courseId": "15237",
+      "fileId": "3228224",
+      "name": "NEU201 syllabus.pdf",
+      "pagesUpdated": 8,
+      "blocksAdded": 30
+    },
+    {
+      "courseId": "15237",
+      "fileId": "3487953",
+      "name": "2024 Quiz 2.pdf",
+      "pagesUpdated": 7,
+      "blocksAdded": 121
+    },
+    {
+      "courseId": "15237",
+      "fileId": "3457518",
+      "name": "A brief history of unit 3.pdf",
+      "pagesUpdated": 31,
+      "blocksAdded": 154
+    },
+    {
+      "courseId": "15237",
+      "fileId": "3380695",
+      "name": "Copy of MMC Precept 8 Nov 4 - 8_ Student-1.pdf",
+      "pagesUpdated": 26,
+      "blocksAdded": 108
+    },
+    {
+      "courseId": "15237",
+      "fileId": "3380687",
+      "name": "Copy of MMC Precept 8 Nov 4 - 8_ Student.pdf",
+      "pagesUpdated": 26,
+      "blocksAdded": 108
+    },
+    {
+      "courseId": "15237",
+      "fileId": "3523292",
+      "name": "final grade curves.pdf",
+      "pagesUpdated": 1,
+      "blocksAdded": 2
+    },
+    {
+      "courseId": "15237",
+      "fileId": "3176580",
+      "name": "How to do well in NEU201-PSY258",
+      "pagesUpdated": 2,
+      "blocksAdded": 2
+    },
+    {
+      "courseId": "15237",
+      "fileId": "3203750",
+      "name": "Lecture 0_intro logistics_slides.pdf",
+      "pagesUpdated": 82,
+      "blocksAdded": 314
+    },
+    {
+      "courseId": "15237",
+      "fileId": "3210541",
+      "name": "Lecture 1_cellular neuroanatomy neurons and glia_slides.pdf",
+      "pagesUpdated": 81,
+      "blocksAdded": 253
+    },
+    {
+      "courseId": "15237",
+      "fileId": "3222528",
+      "name": "Lecture 2_electrical properties I Nernst_slides.pdf",
+      "pagesUpdated": 84,
+      "blocksAdded": 571
+    },
+    {
+      "courseId": "15237",
+      "fileId": "3228483",
+      "name": "Lecture 3_electrical properties II action potentials_slides.pdf",
+      "pagesUpdated": 71,
+      "blocksAdded": 419
+    },
+    {
+      "courseId": "15237",
+      "fileId": "3243322",
+      "name": "Lecture 4_synaptic transmission I presynaptic electrical chemical_slides",
+      "pagesUpdated": 82,
+      "blocksAdded": 256
+    },
+    {
+      "courseId": "15237",
+      "fileId": "3250423",
+      "name": "Lecture 5_synaptic transmission II postsynaptic neurotransmitters_slides.pdf",
+      "pagesUpdated": 74,
+      "blocksAdded": 358
+    },
+    {
+      "courseId": "15237",
+      "fileId": "3266122",
+      "name": "Lecture 6_dendritic integration_structure of the nervous system_slides.pdf",
+      "pagesUpdated": 90,
+      "blocksAdded": 385
+    },
+    {
+      "courseId": "15237",
+      "fileId": "3273406",
+      "name": "Lecture 7_wiring the brain_slides.pdf",
+      "pagesUpdated": 71,
+      "blocksAdded": 303
+    },
+    {
+      "courseId": "15237",
+      "fileId": "3295914",
+      "name": "Lecture 8_ visual system I the eye_slides .pdf",
+      "pagesUpdated": 74,
+      "blocksAdded": 360
+    },
+    {
+      "courseId": "15237",
+      "fileId": "3310929",
+      "name": "Lecture 9_ visual system II central processing and faces_slides.pdf",
+      "pagesUpdated": 89,
+      "blocksAdded": 333
+    },
+    {
+      "courseId": "15237",
+      "fileId": "3316823",
+      "name": "Lecture 10_chemosensory_slides.pdf",
+      "pagesUpdated": 79,
+      "blocksAdded": 387
+    },
+    {
+      "courseId": "15237",
+      "fileId": "3342304",
+      "name": "Lecture 11_auditory and vestibular systems and language_slides.pdf",
+      "pagesUpdated": 86,
+      "blocksAdded": 479
+    },
+    {
+      "courseId": "15237",
+      "fileId": "3347895",
+      "name": "Lecture 12_motor systems_slides.pdf",
+      "pagesUpdated": 76,
+      "blocksAdded": 347
+    },
+    {
+      "courseId": "15237",
+      "fileId": "3369200",
+      "name": "Lecture 13_chemical control of brain_behavior_slides.pdf",
+      "pagesUpdated": 71,
+      "blocksAdded": 320
+    },
+    {
+      "courseId": "15237",
+      "fileId": "3383035",
+      "name": "Lecture 14_motivation addiction slides.pdf",
+      "pagesUpdated": 72,
+      "blocksAdded": 317
+    },
+    {
+      "courseId": "15237",
+      "fileId": "3390355",
+      "name": "Lecture 15_emotion and sleep_EEG_epilepsy_slides.pdf",
+      "pagesUpdated": 70,
+      "blocksAdded": 315
+    },
+    {
+      "courseId": "15237",
+      "fileId": "3404513",
+      "name": "Lecture 16_habituation learning memory_slides.pdf",
+      "pagesUpdated": 66,
+      "blocksAdded": 316
+    },
+    {
+      "courseId": "15237",
+      "fileId": "3411369",
+      "name": "Lecture 17_cellular substrates of plasticity_slides.pdf",
+      "pagesUpdated": 71,
+      "blocksAdded": 355
+    },
+    {
+      "courseId": "15237",
+      "fileId": "3426198",
+      "name": "Lecture 18_developmental disorders_slides.pdf",
+      "pagesUpdated": 61,
+      "blocksAdded": 286
+    },
+    {
+      "courseId": "15237",
+      "fileId": "3431743",
+      "name": "Lecture 19_affective anxiety and mood disorders schizophrenia depression_slides.pdf",
+      "pagesUpdated": 61,
+      "blocksAdded": 281
+    },
+    {
+      "courseId": "15237",
+      "fileId": "3457733",
+      "name": "Lecture 20_degeneration and regeneration.pdf",
+      "pagesUpdated": 74,
+      "blocksAdded": 285
+    },
+    {
+      "courseId": "15237",
+      "fileId": "3309275",
+      "name": "Mach Bands explained.pdf",
+      "pagesUpdated": 2,
+      "blocksAdded": 5
+    },
+    {
+      "courseId": "15237",
+      "fileId": "3402104",
+      "name": "MMC copy of Precept 9_StudentVersion.pdf",
+      "pagesUpdated": 18,
+      "blocksAdded": 57
+    },
+    {
+      "courseId": "15237",
+      "fileId": "3477977",
+      "name": "NEU201_FinalPractice.pdf",
+      "pagesUpdated": 19,
+      "blocksAdded": 270
+    },
+    {
+      "courseId": "15237",
+      "fileId": "3344581",
+      "name": "NEU201_Vision.pdf",
+      "pagesUpdated": 11,
+      "blocksAdded": 136
+    },
+    {
+      "courseId": "15237",
+      "fileId": "3361146",
+      "name": "NEU201- Quiz 2 Review Session Jeopardy Game .pdf",
+      "pagesUpdated": 55,
+      "blocksAdded": 235
+    },
+    {
+      "courseId": "15237",
+      "fileId": "3276197",
+      "name": "Precept 3_problem set 2.pdf",
+      "pagesUpdated": 21,
+      "blocksAdded": 114
+    },
+    {
+      "courseId": "15237",
+      "fileId": "3309025",
+      "name": "Precept 5.pdf",
+      "pagesUpdated": 25,
+      "blocksAdded": 81
+    },
+    {
+      "courseId": "15237",
+      "fileId": "3350704",
+      "name": "Precept 6_IG.pdf",
+      "pagesUpdated": 38,
+      "blocksAdded": 102
+    },
+    {
+      "courseId": "15237",
+      "fileId": "3341083",
+      "name": "Precept 6-MC.pdf",
+      "pagesUpdated": 34,
+      "blocksAdded": 114
+    },
+    {
+      "courseId": "15237",
+      "fileId": "3356264",
+      "name": "Precept 7 Oct 28 - Nov 1.pdf",
+      "pagesUpdated": 9,
+      "blocksAdded": 67
+    },
+    {
+      "courseId": "15237",
+      "fileId": "3414670",
+      "name": "Precept 9_IG_DD.pdf",
+      "pagesUpdated": 27,
+      "blocksAdded": 89
+    },
+    {
+      "courseId": "15237",
+      "fileId": "3222603",
+      "name": "Precept I_ Lecture 0 & Lecture I.pdf",
+      "pagesUpdated": 24,
+      "blocksAdded": 88
+    },
+    {
+      "courseId": "15237",
+      "fileId": "3226328",
+      "name": "Precepts_1_Lecture 0 and 1.pdf",
+      "pagesUpdated": 19,
+      "blocksAdded": 52
+    },
+    {
+      "courseId": "15237",
+      "fileId": "3251655",
+      "name": "Problem Set 1_RMP APs KEY.pdf",
+      "pagesUpdated": 5,
+      "blocksAdded": 11
+    },
+    {
+      "courseId": "15237",
+      "fileId": "3274370",
+      "name": "Problem Set 2_syn trans I and II KEY.pdf",
+      "pagesUpdated": 2,
+      "blocksAdded": 5
+    },
+    {
+      "courseId": "15237",
+      "fileId": "3326293",
+      "name": "Problem Set 3_structure wiring vis I KEY.pdf",
+      "pagesUpdated": 2,
+      "blocksAdded": 4
+    },
+    {
+      "courseId": "15237",
+      "fileId": "3350334",
+      "name": "Problem Set 4_vis II chem KEY.pdf",
+      "pagesUpdated": 2,
+      "blocksAdded": 12
+    },
+    {
+      "courseId": "15237",
+      "fileId": "3391093",
+      "name": "Problem Set 5_aud vest movement chemical motivation KEY.pdf",
+      "pagesUpdated": 2,
+      "blocksAdded": 2
+    },
+    {
+      "courseId": "15237",
+      "fileId": "3412119",
+      "name": "Problem Set 6_addiction motivation_emotion sleep KEY.pdf",
+      "pagesUpdated": 2,
+      "blocksAdded": 6
+    },
+    {
+      "courseId": "15237",
+      "fileId": "3487954",
+      "name": "Q1 2024.pdf",
+      "pagesUpdated": 7,
+      "blocksAdded": 121
+    },
+    {
+      "courseId": "15237",
+      "fileId": "3487955",
+      "name": "Quiz 3 2024.pdf",
+      "pagesUpdated": 7,
+      "blocksAdded": 116
+    },
+    {
+      "courseId": "15237",
+      "fileId": "3457517",
+      "name": "Quiz 3 Review Session Jeopardy.pdf",
+      "pagesUpdated": 52,
+      "blocksAdded": 202
+    },
+    {
+      "courseId": "15237",
+      "fileId": "3176578",
+      "name": "What can you do with a neuroscience degree?",
+      "pagesUpdated": 3,
+      "blocksAdded": 14
+    },
+    {
+      "courseId": "19097",
+      "fileId": "4000085",
+      "name": "Course Schedule_MAT202_F2025.pdf",
+      "pagesUpdated": 1,
+      "blocksAdded": 39
+    },
+    {
+      "courseId": "19097",
+      "fileId": "4317360",
+      "name": "Final Exam_Version A.pdf",
+      "pagesUpdated": 20,
+      "blocksAdded": 160
+    },
+    {
+      "courseId": "19097",
+      "fileId": "4317359",
+      "name": "Final Exam_Version B.pdf",
+      "pagesUpdated": 20,
+      "blocksAdded": 160
+    },
+    {
+      "courseId": "19097",
+      "fileId": "4298794",
+      "name": "Final_2018_Spring_Sol.pdf",
+      "pagesUpdated": 7,
+      "blocksAdded": 625
+    },
+    {
+      "courseId": "19097",
+      "fileId": "4298793",
+      "name": "Final_2018_Spring.pdf",
+      "pagesUpdated": 8,
+      "blocksAdded": 112
+    },
+    {
+      "courseId": "19097",
+      "fileId": "4317363",
+      "name": "Final_B_solutions.pdf",
+      "pagesUpdated": 20,
+      "blocksAdded": 160
+    },
+    {
+      "courseId": "19097",
+      "fileId": "4298803",
+      "name": "Final_S2025_D.pdf",
+      "pagesUpdated": 18,
+      "blocksAdded": 131
+    },
+    {
+      "courseId": "19097",
+      "fileId": "4088067",
+      "name": "MAT202_Quiz1_Fall2025.pdf",
+      "pagesUpdated": 6,
+      "blocksAdded": 101
+    },
+    {
+      "courseId": "19097",
+      "fileId": "4054643",
+      "name": "MAT202F2025_PSET2_Solution.pdf",
+      "pagesUpdated": 11,
+      "blocksAdded": 207
+    },
+    {
+      "courseId": "19097",
+      "fileId": "4067213",
+      "name": "MAT202F2025_PSET2_Solution.pdf",
+      "pagesUpdated": 11,
+      "blocksAdded": 207
+    },
+    {
+      "courseId": "19097",
+      "fileId": "4116242",
+      "name": "MAT202F2025_PSET4_Solutions.pdf",
+      "pagesUpdated": 18,
+      "blocksAdded": 366
+    },
+    {
+      "courseId": "19097",
+      "fileId": "4165531",
+      "name": "MAT202F2025_PSET5_Solutions.pdf",
+      "pagesUpdated": 26,
+      "blocksAdded": 269
+    },
+    {
+      "courseId": "19097",
+      "fileId": "4188801",
+      "name": "MAT202F2025_PSET6_Solutions.pdf",
+      "pagesUpdated": 14,
+      "blocksAdded": 285
+    },
+    {
+      "courseId": "19097",
+      "fileId": "4232394",
+      "name": "MAT202F2025_PSET8_Solutions.pdf",
+      "pagesUpdated": 21,
+      "blocksAdded": 487
+    },
+    {
+      "courseId": "19097",
+      "fileId": "4274385",
+      "name": "MAT202F2025_PSET10_Solutions.pdf",
+      "pagesUpdated": 24,
+      "blocksAdded": 597
+    },
+    {
+      "courseId": "19097",
+      "fileId": "4274386",
+      "name": "MAT202F2025_PSET11_Solutions.PDF",
+      "pagesUpdated": 13,
+      "blocksAdded": 126
+    },
+    {
+      "courseId": "19097",
+      "fileId": "4293714",
+      "name": "MAT202F2025_PSET12_Solutions.pdf",
+      "pagesUpdated": 12,
+      "blocksAdded": 335
+    },
+    {
+      "courseId": "19097",
+      "fileId": "4129705",
+      "name": "MAT202Midterm.pdf",
+      "pagesUpdated": 11,
+      "blocksAdded": 91
+    },
+    {
+      "courseId": "19097",
+      "fileId": "4102770",
+      "name": "Midterm_F2011.pdf",
+      "pagesUpdated": 6,
+      "blocksAdded": 93
+    },
+    {
+      "courseId": "19097",
+      "fileId": "4102772",
+      "name": "Midterm_F2012.pdf",
+      "pagesUpdated": 6,
+      "blocksAdded": 94
+    },
+    {
+      "courseId": "19097",
+      "fileId": "4102779",
+      "name": "Midterm_S2012.pdf",
+      "pagesUpdated": 9,
+      "blocksAdded": 92
+    },
+    {
+      "courseId": "19097",
+      "fileId": "4102783",
+      "name": "Midterm_S2013.pdf",
+      "pagesUpdated": 6,
+      "blocksAdded": 158
+    },
+    {
+      "courseId": "19097",
+      "fileId": "4102771",
+      "name": "MidtermF2011_Sol.pdf",
+      "pagesUpdated": 6,
+      "blocksAdded": 296
+    },
+    {
+      "courseId": "19097",
+      "fileId": "4102777",
+      "name": "MidtermF2012_Sol.pdf",
+      "pagesUpdated": 8,
+      "blocksAdded": 456
+    },
+    {
+      "courseId": "19097",
+      "fileId": "4122913",
+      "name": "MidtermReviewSessionQuestions-Fall2025.pdf",
+      "pagesUpdated": 9,
+      "blocksAdded": 248
+    },
+    {
+      "courseId": "19097",
+      "fileId": "4102780",
+      "name": "MidtermS2012_Sol.pdf",
+      "pagesUpdated": 9,
+      "blocksAdded": 291
+    },
+    {
+      "courseId": "19097",
+      "fileId": "4102785",
+      "name": "MidtermS2013_Sol.pdf",
+      "pagesUpdated": 5,
+      "blocksAdded": 344
+    },
+    {
+      "courseId": "19097",
+      "fileId": "3991306",
+      "name": "Notes_Villalobos_PrintingVersion.pdf",
+      "pagesUpdated": 314,
+      "blocksAdded": 11754
+    },
+    {
+      "courseId": "19097",
+      "fileId": "3991309",
+      "name": "Notes_Villalobos.pdf",
+      "pagesUpdated": 314,
+      "blocksAdded": 11754
+    },
+    {
+      "courseId": "19097",
+      "fileId": "4153382",
+      "name": "PSET5.pdf",
+      "pagesUpdated": 2,
+      "blocksAdded": 43
+    },
+    {
+      "courseId": "19097",
+      "fileId": "4232403",
+      "name": "Quiz2_VersionA.pdf",
+      "pagesUpdated": 7,
+      "blocksAdded": 60
+    },
+    {
+      "courseId": "19097",
+      "fileId": "4232400",
+      "name": "Quiz2_VersionB_Solutions.pdf",
+      "pagesUpdated": 8,
+      "blocksAdded": 225
+    },
+    {
+      "courseId": "19097",
+      "fileId": "4232402",
+      "name": "Quiz2_VersionB.pdf",
+      "pagesUpdated": 7,
+      "blocksAdded": 60
+    },
+    {
+      "courseId": "19097",
+      "fileId": "4013608",
+      "name": "Sec1.1_exercises.pdf",
+      "pagesUpdated": 4,
+      "blocksAdded": 273
+    },
+    {
+      "courseId": "19097",
+      "fileId": "4017574",
+      "name": "Sec2.3_exercises.pdf",
+      "pagesUpdated": 4,
+      "blocksAdded": 541
+    },
+    {
+      "courseId": "19097",
+      "fileId": "4017575",
+      "name": "Sec2.4_exercises.pdf",
+      "pagesUpdated": 11,
+      "blocksAdded": 1106
+    },
+    {
+      "courseId": "19097",
+      "fileId": "4017576",
+      "name": "Sec3.1_exercises.pdf",
+      "pagesUpdated": 4,
+      "blocksAdded": 343
+    },
+    {
+      "courseId": "19097",
+      "fileId": "4017577",
+      "name": "Sec3.2_exercises.pdf",
+      "pagesUpdated": 3,
+      "blocksAdded": 456
+    },
+    {
+      "courseId": "19097",
+      "fileId": "4017578",
+      "name": "Sec3.3_exercises.pdf",
+      "pagesUpdated": 5,
+      "blocksAdded": 493
+    },
+    {
+      "courseId": "19097",
+      "fileId": "4017579",
+      "name": "Sec3.4_exercises.pdf",
+      "pagesUpdated": 5,
+      "blocksAdded": 1037
+    },
+    {
+      "courseId": "19097",
+      "fileId": "4017591",
+      "name": "Sec5.1_exercises.pdf",
+      "pagesUpdated": 4,
+      "blocksAdded": 383
+    },
+    {
+      "courseId": "19097",
+      "fileId": "4017592",
+      "name": "Sec5.2_exercises.pdf",
+      "pagesUpdated": 2,
+      "blocksAdded": 410
+    },
+    {
+      "courseId": "19097",
+      "fileId": "4017593",
+      "name": "Sec5.3_exercises.pdf",
+      "pagesUpdated": 4,
+      "blocksAdded": 456
+    },
+    {
+      "courseId": "19097",
+      "fileId": "4017594",
+      "name": "Sec5.4_exercises.pdf",
+      "pagesUpdated": 5,
+      "blocksAdded": 491
+    },
+    {
+      "courseId": "19097",
+      "fileId": "4017595",
+      "name": "Sec6.1_exercises.pdf",
+      "pagesUpdated": 3,
+      "blocksAdded": 402
+    },
+    {
+      "courseId": "19097",
+      "fileId": "4017596",
+      "name": "Sec6.2_exercises.pdf",
+      "pagesUpdated": 6,
+      "blocksAdded": 685
+    },
+    {
+      "courseId": "19097",
+      "fileId": "4017597",
+      "name": "Sec6.3_exercises.pdf",
+      "pagesUpdated": 4,
+      "blocksAdded": 405
+    },
+    {
+      "courseId": "19097",
+      "fileId": "4017598",
+      "name": "Sec7.1_exercises.pdf",
+      "pagesUpdated": 4,
+      "blocksAdded": 392
+    },
+    {
+      "courseId": "19097",
+      "fileId": "4017599",
+      "name": "Sec7.2_exercises.pdf",
+      "pagesUpdated": 3,
+      "blocksAdded": 324
+    },
+    {
+      "courseId": "19097",
+      "fileId": "4017600",
+      "name": "Sec7.3_exercises.pdf",
+      "pagesUpdated": 3,
+      "blocksAdded": 321
+    },
+    {
+      "courseId": "19097",
+      "fileId": "4017601",
+      "name": "Sec7.5_exercises.pdf",
+      "pagesUpdated": 5,
+      "blocksAdded": 375
+    },
+    {
+      "courseId": "19097",
+      "fileId": "4017602",
+      "name": "Sec7.6_exercises.pdf",
+      "pagesUpdated": 3,
+      "blocksAdded": 235
+    },
+    {
+      "courseId": "19097",
+      "fileId": "4017606",
+      "name": "Sec8.1_exercises.pdf",
+      "pagesUpdated": 4,
+      "blocksAdded": 317
+    },
+    {
+      "courseId": "19097",
+      "fileId": "4017607",
+      "name": "Sec8.2_exercises.pdf",
+      "pagesUpdated": 4,
+      "blocksAdded": 351
+    },
+    {
+      "courseId": "19097",
+      "fileId": "4017608",
+      "name": "Sec8.3_exercises.pdf",
+      "pagesUpdated": 3,
+      "blocksAdded": 257
+    },
+    {
+      "courseId": "19097",
+      "fileId": "4017609",
+      "name": "Sec9.1_exercises.pdf",
+      "pagesUpdated": 5,
+      "blocksAdded": 357
+    },
+    {
+      "courseId": "19097",
+      "fileId": "4017610",
+      "name": "Sec9.2_exercises.pdf",
+      "pagesUpdated": 6,
+      "blocksAdded": 417
+    },
+    {
+      "courseId": "17581",
+      "fileId": "3663490",
+      "name": "Baldauf_2014.pdf",
+      "pagesUpdated": 5,
+      "blocksAdded": 125
+    },
+    {
+      "courseId": "17581",
+      "fileId": "3703181",
+      "name": "Choi_2020.pdf",
+      "pagesUpdated": 12,
+      "blocksAdded": 99
+    },
+    {
+      "courseId": "17581",
+      "fileId": "3703244",
+      "name": "example_exam_questions_2025.pdf",
+      "pagesUpdated": 9,
+      "blocksAdded": 41
+    },
+    {
+      "courseId": "17581",
+      "fileId": "3646953",
+      "name": "Gomez_2019.pdf",
+      "pagesUpdated": 18,
+      "blocksAdded": 407
+    },
+    {
+      "courseId": "17581",
+      "fileId": "3622081",
+      "name": "Harvey_2013.pdf",
+      "pagesUpdated": 5,
+      "blocksAdded": 98
+    },
+    {
+      "courseId": "17581",
+      "fileId": "3771758",
+      "name": "Lerner_2011.pdf",
+      "pagesUpdated": 10,
+      "blocksAdded": 60
+    },
+    {
+      "courseId": "17581",
+      "fileId": "3722750",
+      "name": "memory1_Maguire_2000.pdf",
+      "pagesUpdated": 6,
+      "blocksAdded": 51
+    },
+    {
+      "courseId": "17581",
+      "fileId": "3722751",
+      "name": "memory2_Ellis_2021.pdf",
+      "pagesUpdated": 12,
+      "blocksAdded": 192
+    },
+    {
+      "courseId": "17581",
+      "fileId": "3722752",
+      "name": "neu202_syllabus_Spring2025.pdf",
+      "pagesUpdated": 7,
+      "blocksAdded": 48
+    },
+    {
+      "courseId": "17581",
+      "fileId": "3555446",
+      "name": "Parker_2023.pdf",
+      "pagesUpdated": 9,
+      "blocksAdded": 75
+    },
+    {
+      "courseId": "17581",
+      "fileId": "3786974",
+      "name": "Parkinson_2018.pdf",
+      "pagesUpdated": 14,
+      "blocksAdded": 272
+    },
+    {
+      "courseId": "17581",
+      "fileId": "3598920",
+      "name": "Parvizi_2012.pdf",
+      "pagesUpdated": 6,
+      "blocksAdded": 36
+    },
+    {
+      "courseId": "17581",
+      "fileId": "3580288",
+      "name": "Week1_part1_Intro_StructureFunction.pdf",
+      "pagesUpdated": 27,
+      "blocksAdded": 177
+    },
+    {
+      "courseId": "17581",
+      "fileId": "3580289",
+      "name": "Week1_part2_Intro_StructureFunction.pdf",
+      "pagesUpdated": 21,
+      "blocksAdded": 216
+    },
+    {
+      "courseId": "17581",
+      "fileId": "3588155",
+      "name": "Week2_part1_Methods.pdf",
+      "pagesUpdated": 25,
+      "blocksAdded": 140
+    },
+    {
+      "courseId": "17581",
+      "fileId": "3599533",
+      "name": "Week2_part2_Methods.pdf",
+      "pagesUpdated": 29,
+      "blocksAdded": 157
+    },
+    {
+      "courseId": "17581",
+      "fileId": "3611630",
+      "name": "Week3_part1_Sensation.pdf",
+      "pagesUpdated": 17,
+      "blocksAdded": 145
+    },
+    {
+      "courseId": "17581",
+      "fileId": "3617538",
+      "name": "Week3_part2_Sensation.pdf",
+      "pagesUpdated": 29,
+      "blocksAdded": 171
+    },
+    {
+      "courseId": "17581",
+      "fileId": "3635424",
+      "name": "Week4_part1_ObjectRecognition.pdf",
+      "pagesUpdated": 34,
+      "blocksAdded": 226
+    },
+    {
+      "courseId": "17581",
+      "fileId": "3643501",
+      "name": "Week4_part2_ObjectRecognition.pdf",
+      "pagesUpdated": 33,
+      "blocksAdded": 207
+    },
+    {
+      "courseId": "17581",
+      "fileId": "3657424",
+      "name": "Week5_part1_Attention.pdf",
+      "pagesUpdated": 33,
+      "blocksAdded": 177
+    },
+    {
+      "courseId": "17581",
+      "fileId": "3663556",
+      "name": "Week5_part2_Attention.pdf",
+      "pagesUpdated": 28,
+      "blocksAdded": 327
+    },
+    {
+      "courseId": "17581",
+      "fileId": "3704800",
+      "name": "Week6_part1_Action.pdf",
+      "pagesUpdated": 27,
+      "blocksAdded": 171
+    },
+    {
+      "courseId": "17581",
+      "fileId": "3710468",
+      "name": "Week6_part2_Action.pdf",
+      "pagesUpdated": 26,
+      "blocksAdded": 116
+    },
+    {
+      "courseId": "17581",
+      "fileId": "3722719",
+      "name": "Week7_part1_Memory.pdf",
+      "pagesUpdated": 38,
+      "blocksAdded": 330
+    },
+    {
+      "courseId": "17581",
+      "fileId": "3740341",
+      "name": "Week7_part2_Memory.pdf",
+      "pagesUpdated": 36,
+      "blocksAdded": 237
+    },
+    {
+      "courseId": "17581",
+      "fileId": "3740337",
+      "name": "Week8_part1_Emotion.pdf",
+      "pagesUpdated": 25,
+      "blocksAdded": 149
+    },
+    {
+      "courseId": "17581",
+      "fileId": "3747033",
+      "name": "Week8_part2_Emotion.pdf",
+      "pagesUpdated": 26,
+      "blocksAdded": 161
+    },
+    {
+      "courseId": "17581",
+      "fileId": "3760186",
+      "name": "Week9_part1_Language.pdf",
+      "pagesUpdated": 24,
+      "blocksAdded": 171
+    },
+    {
+      "courseId": "17581",
+      "fileId": "3768618",
+      "name": "Week9_part2_Language.pdf",
+      "pagesUpdated": 29,
+      "blocksAdded": 164
+    },
+    {
+      "courseId": "17581",
+      "fileId": "3779422",
+      "name": "Week10_part1_SocialCognition.pdf",
+      "pagesUpdated": 20,
+      "blocksAdded": 152
+    },
+    {
+      "courseId": "17581",
+      "fileId": "3785874",
+      "name": "Week10_part2_SocialCognition.pdf",
+      "pagesUpdated": 19,
+      "blocksAdded": 108
+    },
+    {
+      "courseId": "17581",
+      "fileId": "3803396",
+      "name": "Week11_part1_BrainDev-1.pdf",
+      "pagesUpdated": 19,
+      "blocksAdded": 135
+    },
+    {
+      "courseId": "17581",
+      "fileId": "3805311",
+      "name": "Week11_part2_BrainDev-1.pdf",
+      "pagesUpdated": 22,
+      "blocksAdded": 149
+    },
+    {
+      "courseId": "17581",
+      "fileId": "3740407",
+      "name": "Wicker_2003.pdf",
+      "pagesUpdated": 10,
+      "blocksAdded": 77
+    },
+    {
+      "courseId": "20690",
+      "fileId": "4364888",
+      "name": "Kernighan_CProgramming8.7.pdf",
+      "pagesUpdated": 6,
+      "blocksAdded": 60
+    },
+    {
+      "courseId": "20690",
+      "fileId": "4453633",
+      "name": "precept7_key_for_students.pdf",
+      "pagesUpdated": 8,
+      "blocksAdded": 100
+    }
+  ],
+  "errors": [],
+  "finishedAt": "2026-06-10T21:33:11.275710+00:00"
+}

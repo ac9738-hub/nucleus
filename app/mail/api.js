@@ -5,31 +5,13 @@ const { google } = require('googleapis')
 const { BrowserWindow } = require('electron')
 const { classifyInboxMessage, NON_ACADEMIC } = require('./classify')
 const { getThemeRuntime, readThemeCss } = require('../../theme-manager')
+const { escapeHtml } = require('../../lib/dom-utils')
+const { FOLDER_LABELS, MAIL_FOLDERS } = require('../../lib/mail-folders')
 
 // Project root for resolving the active theme's mail stylesheet.
 const MAIL_THEME_ROOT = path.join(__dirname, '..', '..')
 
 const GMAIL_BASE = 'https://www.googleapis.com/gmail/v1/users/me'
-
-const FOLDER_LABELS = {
-    inbox: 'INBOX',
-    secondary: 'INBOX',
-    starred: 'STARRED',
-    sent: 'SENT',
-    drafts: 'DRAFT',
-    spam: 'SPAM',
-    trash: 'TRASH'
-}
-
-const MAIL_FOLDERS = [
-    { id: 'inbox', label: 'Inbox', icon: 'IN' },
-    { id: 'secondary', label: 'Secondary Inbox', icon: '2°' },
-    { id: 'starred', label: 'Starred', icon: '★' },
-    { id: 'sent', label: 'Sent', icon: '→' },
-    { id: 'drafts', label: 'Drafts', icon: '✎' },
-    { id: 'spam', label: 'Spam', icon: '!' },
-    { id: 'trash', label: 'Trash', icon: '⌫' }
-]
 
 let token = null
 let cachedMailCss = null
@@ -250,15 +232,6 @@ function getMailCss() {
     const varsCss = runtime && runtime.varsCss ? runtime.varsCss + '\n' : ''
     cachedMailCss = { theme: themeName, css: varsCss + baseCss }
     return cachedMailCss.css
-}
-
-function escapeHtml(value) {
-    return String(value == null ? '' : value)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;')
 }
 
 function get_token() {

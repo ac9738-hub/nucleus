@@ -3,8 +3,9 @@
 // iframe previews so WebContentsView Canvas tabs match the app shell.
 // Dependencies: main.js configures this preload for canvastab WebContentsViews.
 const path = require('path')
-const { webFrame, ipcRenderer } = require('electron')
+const { webFrame } = require('electron')
 const { getCanvasThemeConfig, readThemeCss } = require('../../theme-manager')
+const { attachSurfaceScrollNotify } = require('../../lib/surface-scroll-notify')
 
 // Match the slate overlay (slate.css) exactly so the page reveals on top of the
 // slide with no color jump. background-attachment: fixed anchors the gradient to
@@ -52,24 +53,5 @@ const injection = readThemeCss(
 
 webFrame.insertCSS(injection)
 
-// Notify the main process when the visible region changes so it can refresh the
-// render-context "screen" slice. This replaces a fixed 200ms main-process poll:
-// the main process only does work when the user actually scrolls. Capture phase
-// catches scrolling inside nested scroll containers, not just the window. The
-// unified 'surface:scrolled' channel is shared with plain web views (web-preload.js).
-let canvasScrollNotifyScheduled = false
-function notifyCanvasScroll() {
-  if (canvasScrollNotifyScheduled) return
-  canvasScrollNotifyScheduled = true
-  setTimeout(() => {
-    canvasScrollNotifyScheduled = false
-    try {
-      ipcRenderer.send('surface:scrolled')
-    } catch (_error) {
-      // Channel may be unavailable during teardown.
-    }
-  }, 120)
-}
-
-window.addEventListener('scroll', notifyCanvasScroll, true)
-window.addEventListener('load', notifyCanvasScroll, { once: true })
+// Notify the main process when the visible region changes (shared with web-preload.js).
+attachSurfaceScrollNotify(window)

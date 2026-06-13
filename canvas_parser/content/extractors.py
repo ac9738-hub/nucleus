@@ -30,13 +30,13 @@ def detect_extractor(content_type='', filename=''):
     return mapping.get(suffix, '')
 
 
-def extract_text_from_file(path, extractor_kind, build_pdf_pages=None):
+def extract_text_from_file(path, extractor_kind, build_pdf_pages=None, fileid=None):
     path = Path(path)
     if not path.exists():
         return {'text': '', 'pages': []}
 
     if extractor_kind == 'pdf' and build_pdf_pages:
-        pages = build_pdf_pages(str(path))
+        pages = build_pdf_pages(str(path), str(fileid or path.name))
         text = '\n\n'.join(page.get('text', '') for page in pages if page.get('text'))
         return {'text': text, 'pages': pages}
 

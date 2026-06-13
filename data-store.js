@@ -175,6 +175,21 @@ function createDataStore({ sendToRenderer, getCanvasProjectGroups, readCanvasDat
     return "task successfully removed"
   }
 
+  function removeCanvasTasks() {
+    const before = tasks.length
+    for (let index = tasks.length - 1; index >= 0; index -= 1) {
+      if (tasks[index].source === 'canvas') {
+        tasks.splice(index, 1)
+      }
+    }
+    const removed = before - tasks.length
+    if (removed) {
+      sortTasksSequentially()
+      sendToRenderer('tasks:update', tasks)
+    }
+    return removed
+  }
+
   function getProjectColor(projectid) {
     for (const group of projectGroups) {
       if (group.items.some(item => item.id === projectid)) {
@@ -194,6 +209,7 @@ function createDataStore({ sendToRenderer, getCanvasProjectGroups, readCanvasDat
     hasWorkspaceId: id => workspaceids.has(id),
     newTask,
     newWorkspace,
+    removeCanvasTasks,
     sendCanvasDataUpdate
   }
 }

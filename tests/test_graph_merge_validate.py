@@ -53,3 +53,23 @@ def test_edge_store_validate_missing_node():
     }])
     warnings = store.validate({'concept': {'known'}})
     assert len(warnings) == 2
+
+
+def test_validate_graph_state_accepts_learning_block_next_edges():
+    store = GraphEdgeStore([{
+        'fromType': 'learningBlock',
+        'fromId': '20812-abc-block',
+        'toType': 'learningBlock',
+        'toId': '20812-def-block',
+        'relation': 'next',
+    }])
+    warnings = validate_graph_state({
+        'concepts': [{'conceptid': 'abc'}, {'conceptid': 'def'}],
+        'learningBlocks': {
+            '20812': [
+                {'blockId': '20812-abc-block', 'conceptId': 'abc', 'explanation': 'a'},
+                {'blockId': '20812-def-block', 'conceptId': 'def', 'explanation': 'b'},
+            ]
+        },
+    }, store)
+    assert not any('missing learningBlock' in warning for warning in warnings)
