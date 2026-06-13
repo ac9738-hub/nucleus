@@ -1,0 +1,420 @@
+{
+  "assignments": [
+    { "name": "Midterm", "due_at": "10/9/2025" },
+    { "name": "Extra Credit: \"Manila Bayou\" - Michael Salgarolo Lecture" },
+    { "name": "Extra Credit: \"Silent Spikes\" by Kenneth Tam" },
+    { "name": "Final Presentations Upload (Non-Field Trip Students Only)", "due_at": "12/17/2025" },
+    { "name": "Final Essay", "due_at": "12/18/2025" }
+  ],
+  "discussions": [
+    { "name": "The Intimacies of Four Continents", "due_at": "9/8/2025" },
+    { "name": "The Mushroom at the End of the World", "due_at": "9/15/2025" },
+    { "name": "Collateral Damage", "due_at": "9/22/2025" },
+    { "name": "Flavors of Empire", "due_at": "9/29/2025" },
+    { "name": "Nothing Ever Dies", "due_at": "10/6/2025" },
+    { "name": "Alien Capital", "due_at": "10/20/2025" },
+    { "name": "Stranger Intimacy", "due_at": "10/27/2025" },
+    { "name": "Turbulent Circulation", "due_at": "11/3/2025" },
+    { "name": "Trespassers?", "due_at": "11/10/2025" }
+  ],
+  "modules": [
+    {
+      "module_name": "Zoom Room",
+      "module_contents": [
+        { "name": "Zoom Room" }
+      ]
+    },
+    {
+      "module_name": "Syllabus - Tentative/Subject to Change",
+      "module_contents": [
+        { "name": "Google Doc - Live Updated" }
+      ]
+    },
+    {
+      "module_name": "Events",
+      "module_contents": [
+        { "name": "Kenneth Tam, Silent Spikes (November 10, Princeton Art Museum)" }
+      ]
+    },
+    {
+      "module_name": "Introduction Questionnaire - Please fill out",
+      "module_contents": [
+        { "name": "Questionnaire" }
+      ]
+    },
+    {
+      "module_name": "Presentation Sign Ups",
+      "module_contents": [
+        { "name": "Google Doc Sign Ups" }
+      ]
+    },
+    {
+      "module_name": "Gen AI Resources and Readings",
+      "module_contents": [
+        { "name": "Collaborative AI Policy" }
+      ]
+    },
+    {
+      "module_name": "Tuesday, September 2",
+      "module_contents": [
+        { "name": "The Professors Are Using ChatGPT, and Some Students Aren't Happy About It" }
+      ]
+    },
+    {
+      "module_name": "Thursday, September 4",
+      "module_contents": [
+        { "name": "Gupta and Ferguson, Beyond Culture.pdf" }
+      ]
+    },
+    {
+      "module_name": "Tuesday, September 9",
+      "module_contents": [
+        { "name": "Lowe, Intimities of Four Continents" },
+        { "name": "Andrea Chung, Sink & Swim" },
+        { "name": "Andrea Chung: Dematerialization to Subvert Commodification" }
+      ]
+    },
+    {
+      "module_name": "Thursday, September 11",
+      "module_contents": [
+        { "name": "Cheng, The Changs Next Door to the Díazes - Ch 5.pdf" },
+        { "name": "Fung Bros, The 626 (YouTube)" }
+      ]
+    },
+    {
+      "module_name": "Tuesday, September 16",
+      "module_contents": [
+        { "name": "Tsing, Mushroom at the End of the World (Excerpt).pdf" },
+        { "name": "LOGISTICS (2012)" }
+      ]
+    },
+    {
+      "module_name": "Thursday, September 18",
+      "module_contents": [
+        { "name": "Manu Karuka, Empire's Tracks (Ch 5. \"Chinese\")" },
+        { "name": "Corky Lee, Photographic Justice" }
+      ]
+    },
+    {
+      "module_name": "Tuesday, September 23",
+      "module_contents": [
+        { "name": "Eric Tang, Collateral Damage" },
+        { "name": "Pete Pin, Migrations of Memory I (2010) [click on photos to progress]" }
+      ]
+    },
+    {
+      "module_name": "Thursday, September 25",
+      "module_contents": [
+        { "name": "Jacinda Tran, Southeast Asian Refugee Resettlement in Philadelphia Through the Shifting Frames of Racialization" },
+        { "name": "Stephanie Syjuco, Block Out the Sun (2019)" },
+        { "name": "Stephanie Syjuco, Shutter Release (2021)" }
+      ]
+    },
+    {
+      "module_name": "Tuesday, September 30",
+      "module_contents": [
+        { "name": "Padoongpatt, Flavors of Empire Ch.1.pdf" }
+      ]
+    },
+    {
+      "module_name": "Tuesday, October 7",
+      "module_contents": [
+        { "name": "Nguyen - Nothing Ever Dies, \"On Remembering One's Own\".pdf" },
+        { "name": "Nguyen - Nothing Ever Dies, \"On Remembering Others\".pdf" },
+        { "name": "Tiffany Chung, reconstructing an exodus history: boat trajectories from Vietnam and flight routes from refugee camps and of ODP cases (2020)" },
+        { "name": "Tiffany Chung, Maps of Memory" }
+      ]
+    },
+    {
+      "module_name": "Thursday, October 9",
+      "module_contents": [
+        { "name": "IN-CLASS MID-TERM" },
+        { "name": "MIDTERM" }
+      ]
+    },
+    {
+      "module_name": "Tuesday, October 21",
+      "module_contents": [
+        { "name": "Day, Alien Capital, \"Ch. 2 Unnatural Landscapes\"" },
+        { "name": "Dillon, Tseng Kwon Chi, an \"Ambiguous Ambassador\" to Life in America" }
+      ]
+    },
+    {
+      "module_name": "Thursday, October 23",
+      "module_contents": [
+        { "name": "Tongson, Queer Suburban Imaginaries.pdf" },
+        { "name": "La La Land, Opening Scene (YouTube)" }
+      ]
+    },
+    {
+      "module_name": "Tuesday, October 28",
+      "module_contents": [
+        { "name": "Shah, Stranger Intimacy, Chapter 2 .pdf" },
+        { "name": "Tourist map of Greater Vancouver (1936)" },
+        { "name": "Forbidden Vancouver, \"A History of Deviant Alleys\" (just skim Shanghai and Canton Alleys section especially the map)" }
+      ]
+    },
+    {
+      "module_name": "Thursday, October 30",
+      "module_contents": [
+        { "name": "Gopinath - Chapter 1, Queer Regions.pdf" }
+      ]
+    },
+    {
+      "module_name": "Tuesday, November 4",
+      "module_contents": [
+        { "name": "Chua et al. - Turbulent Circulation" },
+        { "name": "Candace Lin, System for a Stain (2016)" }
+      ]
+    },
+    {
+      "module_name": "Thursday, November 6",
+      "module_contents": [
+        { "name": "Abel and Coleman, Dreams of Infrastructure" }
+      ]
+    },
+    {
+      "module_name": "Tuesday, November 11",
+      "module_contents": [
+        { "name": "Lung Amam - Trespassers? Chapter 1 \"New Gold Mountain\"" },
+        { "name": "Washington Post, \"What it looks like in the world's data center capital\"" },
+        { "name": "Wapo Access Signup, Princeton Library" },
+        { "name": "Bloomberg, \"The World's Data Center Capital Has Residents Surrounded\"" },
+        { "name": "RECOMMENDED: Business Insider, \"Exposing The Dark Side of America's AI Data Center Explosion\" (31:09)" }
+      ]
+    },
+    {
+      "module_name": "Thursday, November 13",
+      "module_contents": [
+        { "name": "Cowen, Following the infrastructures of empire notes on cities settler colonialism and method.pdf" }
+      ]
+    },
+    {
+      "module_name": "Tuesday, November 18",
+      "module_contents": [
+        { "name": "Haunani Kay Trask - Settlers of Color and \"Immigrant\" Hegemony.pdf" },
+        { "name": "Man - Aloha, Vietnam: Race and Empire in Hawai'i's Vietnam War" },
+        { "name": "Haunani Kay Trask speech, Jan 17, 1993 (YouTube)" }
+      ]
+    },
+    {
+      "module_name": "Thursday, November 20",
+      "module_contents": [
+        { "name": "The New Yorkers fighting to protect Chinatown (i-D magazine)" },
+        { "name": "Yue and Li, \"Abolition and Tenant Power in Chinatown\" (Spectre Journal)" },
+        { "name": "Youth Against Displacement Website" }
+      ]
+    }
+  ],
+  "weekly_schedule": [
+    {
+      "name": "Week 1",
+      "start_date": "9/1/2025",
+      "end_date": "9/7/2025",
+      "files": [
+        { "name": "The Professors Are Using ChatGPT, and Some Students Aren't Happy About It" },
+        { "name": "Gupta and Ferguson, Beyond Culture.pdf" }
+      ],
+      "assignments": [],
+      "events": []
+    },
+    {
+      "name": "Week 2",
+      "start_date": "9/8/2025",
+      "end_date": "9/14/2025",
+      "files": [
+        { "name": "Lowe, Intimacies of Four Continents" },
+        { "name": "Andrea Chung, Sink & Swim" },
+        { "name": "Andrea Chung: Dematerialization to Subvert Commodification" },
+        { "name": "Cheng, The Changs Next Door to the Díazes - Ch 5.pdf" },
+        { "name": "Fung Bros, The 626 (YouTube)" }
+      ],
+      "assignments": [
+        { "name": "The Intimacies of Four Continents", "files": [] }
+      ],
+      "events": []
+    },
+    {
+      "name": "Week 3",
+      "start_date": "9/15/2025",
+      "end_date": "9/21/2025",
+      "files": [
+        { "name": "Tsing, Mushroom at the End of the World (Excerpt).pdf" },
+        { "name": "LOGISTICS (2012)" },
+        { "name": "Manu Karuka, Empire's Tracks (Ch 5. \"Chinese\")" },
+        { "name": "Corky Lee, Photographic Justice" }
+      ],
+      "assignments": [
+        { "name": "The Mushroom at the End of the World", "files": [] }
+      ],
+      "events": []
+    },
+    {
+      "name": "Week 4",
+      "start_date": "9/22/2025",
+      "end_date": "9/28/2025",
+      "files": [
+        { "name": "Eric Tang, Collateral Damage" },
+        { "name": "Pete Pin, Migrations of Memory I (2010) [click on photos to progress]" },
+        { "name": "Jacinda Tran, Southeast Asian Refugee Resettlement in Philadelphia Through the Shifting Frames of Racialization" },
+        { "name": "Stephanie Syjuco, Block Out the Sun (2019)" },
+        { "name": "Stephanie Syjuco, Shutter Release (2021)" }
+      ],
+      "assignments": [
+        { "name": "Collateral Damage", "files": [] }
+      ],
+      "events": []
+    },
+    {
+      "name": "Week 5",
+      "start_date": "9/29/2025",
+      "end_date": "10/5/2025",
+      "files": [
+        { "name": "Padoongpatt, Flavors of Empire Ch.1.pdf" },
+        { "name": "Tao Leigh Goffe, Chop suey surplus: Chinese food, sex, and the political economy of Afro-Asia" }
+      ],
+      "assignments": [
+        { "name": "Flavors of Empire", "files": [] }
+      ],
+      "events": []
+    },
+    {
+      "name": "Week 6",
+      "start_date": "10/6/2025",
+      "end_date": "10/12/2025",
+      "files": [
+        { "name": "Nguyen - Nothing Ever Dies, \"On Remembering One's Own\".pdf" },
+        { "name": "Nguyen - Nothing Ever Dies, \"On Remembering Others\".pdf" },
+        { "name": "Tiffany Chung, reconstructing an exodus history: boat trajectories from Vietnam and flight routes from refugee camps and of ODP cases (2020)" },
+        { "name": "Tiffany Chung, Maps of Memory" }
+      ],
+      "assignments": [
+        { "name": "Nothing Ever Dies", "files": [] }
+      ],
+      "events": [{ "name": "Midterm", "files": [] }]
+    },
+    {
+      "name": "Week 7",
+      "start_date": "10/13/2025",
+      "end_date": "10/19/2025",
+      "files": [],
+      "assignments": [],
+      "events": []
+    },
+    {
+      "name": "Week 8",
+      "start_date": "10/20/2025",
+      "end_date": "10/26/2025",
+      "files": [
+        { "name": "Day, Alien Capital, \"Ch. 2 Unnatural Landscapes\"" },
+        { "name": "Dillon, Tseng Kwon Chi, an \"Ambiguous Ambassador\" to Life in America" },
+        { "name": "Tongson, Queer Suburban Imaginaries.pdf" },
+        { "name": "La La Land, Opening Scene (YouTube)" }
+      ],
+      "assignments": [
+        { "name": "Alien Capital", "files": [] }
+      ],
+      "events": []
+    },
+    {
+      "name": "Week 9",
+      "start_date": "10/27/2025",
+      "end_date": "11/2/2025",
+      "files": [
+        { "name": "Shah, Stranger Intimacy, Chapter 2 .pdf" },
+        { "name": "Tourist map of Greater Vancouver (1936)" },
+        { "name": "Forbidden Vancouver, \"A History of Deviant Alleys\" (just skim Shanghai and Canton Alleys section especially the map)" },
+        { "name": "Gopinath - Chapter 1, Queer Regions.pdf" }
+      ],
+      "assignments": [
+        { "name": "Stranger Intimacy", "files": [] }
+      ],
+      "events": []
+    },
+    {
+      "name": "Week 10",
+      "start_date": "11/3/2025",
+      "end_date": "11/9/2025",
+      "files": [
+        { "name": "Chua et al. - Turbulent Circulation" },
+        { "name": "Candace Lin, System for a Stain (2016)" },
+        { "name": "Abel and Coleman, Dreams of Infrastructure" }
+      ],
+      "assignments": [
+        { "name": "Turbulent Circulation", "files": [] }
+      ],
+      "events": []
+    },
+    {
+      "name": "Week 11",
+      "start_date": "11/10/2025",
+      "end_date": "11/16/2025",
+      "files": [
+        { "name": "Lung Amam - Trespassers? Chapter 1 \"New Gold Mountain\"" },
+        { "name": "Washington Post, \"What it looks like in the world's data center capital\"" },
+        { "name": "Wapo Access Signup, Princeton Library" },
+        { "name": "Bloomberg, \"The World's Data Center Capital Has Residents Surrounded\"" },
+        { "name": "RECOMMENDED: Business Insider, \"Exposing The Dark Side of America's AI Data Center Explosion\" (31:09)" },
+        { "name": "Cowen, Following the infrastructures of empire notes on cities settler colonialism and method.pdf" }
+      ],
+      "assignments": [
+        { "name": "Trespassers?", "files": [] }
+      ],
+      "events": [
+        { "name": "Kenneth Tam, Silent Spikes (November 10, Princeton Art Museum)", "files": [] }
+      ]
+    },
+    {
+      "name": "Week 12",
+      "start_date": "11/17/2025",
+      "end_date": "11/23/2025",
+      "files": [
+        { "name": "Haunani Kay Trask - Settlers of Color and \"Immigrant\" Hegemony.pdf" },
+        { "name": "Man - Aloha, Vietnam: Race and Empire in Hawai'i's Vietnam War" },
+        { "name": "Haunani Kay Trask speech, Jan 17, 1993 (YouTube)" },
+        { "name": "The New Yorkers fighting to protect Chinatown (i-D magazine)" },
+        { "name": "Yue and Li, \"Abolition and Tenant Power in Chinatown\" (Spectre Journal)" },
+        { "name": "Youth Against Displacement Website" }
+      ],
+      "assignments": [],
+      "events": [{ "name": "New York Chinatown Fieldtrip – Tour with Youth against Displacement", "files": [] }]
+    },
+    {
+      "name": "Week 13",
+      "start_date": "11/24/2025",
+      "end_date": "11/30/2025",
+      "files": [],
+      "assignments": [],
+      "events": []
+    },
+    {
+      "name": "Week 14",
+      "start_date": "12/1/2025",
+      "end_date": "12/7/2025",
+      "files": [],
+      "assignments": [],
+      "events": [
+        { "name": "Final Presentations", "files": [] }
+      ]
+    },
+    {
+      "name": "Week 15",
+      "start_date": "12/8/2025",
+      "end_date": "12/14/2025",
+      "files": [],
+      "assignments": [],
+      "events": []
+    },
+    {
+      "name": "Week 16",
+      "start_date": "12/15/2025",
+      "end_date": "12/21/2025",
+      "files": [],
+      "assignments": [
+        { "name": "Final Presentations Upload (Non-Field Trip Students Only)", "files": [] },
+        { "name": "Final Essay", "files": [] }
+      ],
+      "events": []
+    }
+  ]
+}

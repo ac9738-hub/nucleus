@@ -1,0 +1,310 @@
+{
+  "assignments": [
+    { "name": "Lab Safety Quiz", "due_at": "9/12/2024" },
+    { "name": "Excel Prelab", "due_at": "9/13/2024" },
+    { "name": "Excel Lab Report", "due_at": "9/13/2024" },
+    { "name": "Problem Set 1", "due_at": "9/13/2024" },
+    { "name": "Problem Set 2", "due_at": "9/20/2024" },
+    { "name": "Kalinite Lab Report First Draft", "due_at": "9/27/2024" },
+    { "name": "Problem Set 3", "due_at": "9/27/2024" },
+    { "name": "Problem Set 4", "due_at": "10/4/2024" },
+    { "name": "Problem Set 5", "due_at": "10/23/2024" },
+    { "name": "Sodium Hydroxide Lab Report First Draft", "due_at": "10/25/2024" },
+    { "name": "Problem Set 6", "due_at": "10/30/2024" },
+    { "name": "Kalinite Lab Report Final Draft", "due_at": "11/1/2024" },
+    { "name": "Problem Set 7", "due_at": "11/6/2024" },
+    { "name": "Mineral Lab Report First Draft", "due_at": "11/8/2024" },
+    { "name": "Equilibrium Lab Report First Draft", "due_at": "11/15/2024" },
+    { "name": "Problem Set 8", "due_at": "11/15/2024" },
+    { "name": "Problem Set 9", "due_at": "11/22/2024" },
+    { "name": "Equilibrium Lab Report Final Draft", "due_at": "12/6/2024" },
+    { "name": "Mineral Lab Report Final Draft", "due_at": "12/6/2024" },
+    { "name": "Sodium Hydroxide Lab Report Final Draft", "due_at": "12/6/2024" },
+    { "name": "Problem Set 10", "due_at": "12/9/2024" }
+  ],
+  "participation": [
+    { "name": "Lab Participation" }
+  ],
+  "modules": [
+    {
+      "module_name": "CHM 201 General Chemistry I",
+      "module_contents": [
+        { "name": "Welcome to CHM 201" }
+      ]
+    },
+    {
+      "module_name": "Additional Resources and Support",
+      "module_contents": [
+        { "name": "Office Hours (drop-in and scheduled)" },
+        { "name": "Chemistry Resource Center (Drop-in, Room A84)" },
+        { "name": "McGraw Center (Group Drop-in Study Hall, Peer Tutoring, and Learning Skills)" },
+        { "name": "Optional Textbook Reading Guide" }
+      ]
+    },
+    {
+      "module_name": "Slides from Lectures",
+      "module_contents": [
+        { "name": "Download Lecture Slides" }
+      ]
+    },
+    {
+      "module_name": "Problem Sets and Answer Keys",
+      "module_contents": [
+        { "name": "Download Problem Sets and Answer Keys" }
+      ]
+    },
+    {
+      "module_name": "Demonstrations",
+      "module_contents": [
+        { "name": "Demonstration Information" },
+        { "name": "Demonstration Videos" }
+      ]
+    },
+    {
+      "module_name": "Practice Exams",
+      "module_contents": [
+        { "name": "Practice Exam 1.pdf" },
+        { "name": "Practice Exam 1 Answer Key.pdf" },
+        { "name": "exam_2_equation_sheet.pdf" },
+        { "name": "Practice Exam 2.pdf" },
+        { "name": "Practice Exam 2 Answer Key.pdf" },
+        { "name": "Practice Final Exam.pdf" },
+        { "name": "Practice Final Exam Key.pdf" },
+        { "name": "Review Slides" }
+      ]
+    },
+    {
+      "module_name": "General Chemistry Lab",
+      "module_contents": [
+        { "name": "Lab Information" },
+        { "name": "Lab Safety" },
+        { "name": "Experiment Pages" },
+        { "name": "Lab Bench Assignments" }
+      ]
+    },
+    {
+      "module_name": "Problem Solving Seminar",
+      "module_contents": [
+        { "name": "Worksheets" }
+      ]
+    },
+    {
+      "module_name": "Exam Answer Keys",
+      "module_contents": [
+        { "name": "CHM201(F'2024)Midterm_Answer_Key.pdf" },
+        { "name": "CHM201(F'2024)Exam_2_Answer_Key.pdf" }
+      ]
+    },
+    {
+      "module_name": "Class TA Materials",
+      "module_contents": [
+        { "name": "John Ambrose" },
+        { "name": "Marissa Abbott" },
+        { "name": "Chloe Wu" },
+        { "name": "Chuqi Zheng" },
+        { "name": "Tyler Schwarz" },
+        { "name": "Blair Dong" },
+        { "name": "Dr. Clapp" }
+      ]
+    }
+  ],
+  "weekly_schedule": [
+    {
+      "name": "Week 1",
+      "start_date": "9/2/2024",
+      "end_date": "9/8/2024",
+      "files": [
+        { "name": "CHM201,Fall'24(Lect_1,Tues,Sept,3).pdf" },
+        { "name": "Dr Francis Slides Sept 3, 2024.pdf" },
+        { "name": "CHM201,Fall'24(Lect_2,Thurs,Sept,5).pdf" }
+      ],
+      "assignments": [],
+      "events": []
+    },
+    {
+      "name": "Week 2",
+      "start_date": "9/9/2024",
+      "end_date": "9/15/2024",
+      "files": [
+        { "name": "CHM201,Fall,2024(Lecture 3,Tues,Sept.10).pdf" },
+        { "name": "CHM201,Fall'24(Lecture 4,Thurs,Sept12).pdf" }
+      ],
+      "assignments": [
+        { "name": "Lab Safety Quiz", "files": [] },
+        { "name": "Excel Prelab", "files": [] },
+        { "name": "Excel Lab Report", "files": [] },
+        { "name": "Problem Set 1", "files": [] }
+      ],
+      "events": []
+    },
+    {
+      "name": "Week 3",
+      "start_date": "9/16/2024",
+      "end_date": "9/22/2024",
+      "files": [
+        { "name": "CHM201,Fall'2024(Lecture 5,Tues,Sept,17).pdf" },
+        { "name": "CHM201,Fall'2024(Lecture 6,Thurs,Sept19).pdf" }
+      ],
+      "assignments": [
+        { "name": "Problem Set 2", "files": [] }
+      ],
+      "events": []
+    },
+    {
+      "name": "Week 4",
+      "start_date": "9/23/2024",
+      "end_date": "9/29/2024",
+      "files": [
+        { "name": "CHM201,Fall'2024(Lecture 7,Tues,Sept24).pdf" },
+        { "name": "CHM201,Fall'2024(Lecture8 Thurs,Sept,26).pdf" }
+      ],
+      "assignments": [
+        { "name": "Kalinite Lab Report First Draft", "files": [] },
+        { "name": "Problem Set 3", "files": [] }
+      ],
+      "events": []
+    },
+    {
+      "name": "Week 5",
+      "start_date": "9/30/2024",
+      "end_date": "10/6/2024",
+      "files": [
+        { "name": "CHM201 Fall'2024(Lecture 9,Tues,Oct,1).pdf" },
+        { "name": "CHM201 Fall'2024(Lecture 10,Thurs,Oct,3).pdf" }
+      ],
+      "assignments": [
+        { "name": "Problem Set 4", "files": [] }
+      ],
+      "events": []
+    },
+    {
+      "name": "Week 6",
+      "start_date": "10/7/2024",
+      "end_date": "10/13/2024",
+      "files": [
+        { "name": "CHM201,Fall'2024(Lecture 11,Tues,Oct,8).pdf" },
+        { "name": "CHM201,Fall'2024(Lecture 12,Thurs,Oct,10).pdf" }
+      ],
+      "assignments": [],
+      "events": [{ "name": "Exam 1 (Midterm)", "files": [] }]
+    },
+    {
+      "name": "Week 7",
+      "start_date": "10/14/2024",
+      "end_date": "10/20/2024",
+      "files": [],
+      "assignments": [],
+      "events": []
+    },
+    {
+      "name": "Week 8",
+      "start_date": "10/21/2024",
+      "end_date": "10/27/2024",
+      "files": [
+        { "name": "CHM201,Fall'2024(Lecture 13,Tues,Oct,22).pdf" },
+        { "name": "CHM201,Fall'2024(Lecture 14,Thurs,Oct,24).pdf" }
+      ],
+      "assignments": [
+        { "name": "Problem Set 5", "files": [] },
+        { "name": "Sodium Hydroxide Lab Report First Draft", "files": [] }
+      ],
+      "events": []
+    },
+    {
+      "name": "Week 9",
+      "start_date": "10/28/2024",
+      "end_date": "11/3/2024",
+      "files": [
+        { "name": "CHM201,Fall'2024(Lecture 15,Tues,Oct,29).pdf" },
+        { "name": "CHM201,Fall'2024(Lecture 16,Thurs,Oct,31).pdf" }
+      ],
+      "assignments": [
+        { "name": "Problem Set 6", "files": [] },
+        { "name": "Kalinite Lab Report Final Draft", "files": [] }
+      ],
+      "events": []
+    },
+    {
+      "name": "Week 10",
+      "start_date": "11/4/2024",
+      "end_date": "11/10/2024",
+      "files": [
+        { "name": "CHM201,Fall'2024(Lecture 17,Tues,Nov,5).pdf" },
+        { "name": "CHM201Fall'2024(Lecture 18,Thurs,Nov.7).pdf" }
+      ],
+      "assignments": [
+        { "name": "Problem Set 7", "files": [] },
+        { "name": "Mineral Lab Report First Draft", "files": [] }
+      ],
+      "events": []
+    },
+    {
+      "name": "Week 11",
+      "start_date": "11/11/2024",
+      "end_date": "11/17/2024",
+      "files": [
+        { "name": "CHM201Fall'2024(Lecture 19,Tues,Nov12).pdf" },
+        { "name": "CHM201,Fall'2024(Lecture 20,Thurs,Nov14).pdf" }
+      ],
+      "assignments": [
+        { "name": "Equilibrium Lab Report First Draft", "files": [] },
+        { "name": "Problem Set 8", "files": [] }
+      ],
+      "events": [{ "name": "Exam 2", "files": [] }]
+    },
+    {
+      "name": "Week 12",
+      "start_date": "11/18/2024",
+      "end_date": "11/24/2024",
+      "files": [
+        { "name": "CHM201,Fall'2024(Lecture 21,Tues,Nov,19).pdf" },
+        { "name": "CHM201,Fall'2024(Lecture 22,Thurs,Nov,21).pdf" }
+      ],
+      "assignments": [
+        { "name": "Problem Set 9", "files": [] }
+      ],
+      "events": [{ "name": "Lab Practical Exam I", "files": [] }]
+    },
+    {
+      "name": "Week 13",
+      "start_date": "11/25/2024",
+      "end_date": "12/1/2024",
+      "files": [],
+      "assignments": [],
+      "events": [{ "name": "Lab Written Exam", "files": [] }]
+    },
+    {
+      "name": "Week 14",
+      "start_date": "12/2/2024",
+      "end_date": "12/8/2024",
+      "files": [
+        { "name": "CHM201,Fall'2024(Lecture 23,Tues,Dec,3).pdf" },
+        { "name": "CHM201,Fall'2024(Lecture 24,Thurs,Dec,5).pdf" }
+      ],
+      "assignments": [
+        { "name": "Equilibrium Lab Report Final Draft", "files": [] },
+        { "name": "Mineral Lab Report Final Draft", "files": [] },
+        { "name": "Sodium Hydroxide Lab Report Final Draft", "files": [] }
+      ],
+      "events": []
+    },
+    {
+      "name": "Week 15",
+      "start_date": "12/9/2024",
+      "end_date": "12/15/2024",
+      "files": [],
+      "assignments": [
+        { "name": "Problem Set 10", "files": [] }
+      ],
+      "events": []
+    },
+    {
+      "name": "Week 16",
+      "start_date": "12/16/2024",
+      "end_date": "12/22/2024",
+      "files": [],
+      "assignments": [],
+      "events": [{ "name": "Final Exam", "files": [] }]
+    }
+  ]
+}

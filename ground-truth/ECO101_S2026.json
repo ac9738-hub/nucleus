@@ -1,0 +1,194 @@
+{
+  "modules": [
+    {
+      "module_name": "Course Resources",
+      "module_contents": [
+        { "name": "Contact_Information_and_Office_Hours_Updated.pdf" },
+        { "name": "ECO_101 Spring 2026 Syllabus.pdf" }
+      ]
+    },
+    {
+      "module_name": "ECO 101 Lecture Notes",
+      "module_contents": [
+        { "name": "ECO101_Lecture1_Notes_2026.pdf" },
+        { "name": "ECO101_Lecture2_Notes_2026.pdf" },
+        { "name": "ECO101_Lecture3_Notes_2026.pdf" },
+        { "name": "ECO101_Lecture4_Notes_2026.pdf" },
+        { "name": "ECO101_Lecture5_Notes_2026.pdf" },
+        { "name": "ECO101_Lecture6_Notes_2026.pdf" },
+        { "name": "ECO101_Lecture7_Notes_2026.pdf" },
+        { "name": "ECO101_Lecture8_Notes_2026.pdf" },
+        { "name": "ECO101_Lecture9_Notes_2026.pdf" },
+        { "name": "ECO101_Lecture10_Notes_2026.pdf" },
+        { "name": "ECO101_Lecture12_Notes_2026.pdf" },
+        { "name": "ECO101_Lecture13_Notes_2026.pdf" },
+        { "name": "ECO101_Lecture14_Notes_2026.pdf" },
+        { "name": "ECO101_Lecture16_Notes_2026.pdf" },
+        { "name": "ECO101_Lecture17_Notes_2026.pdf" },
+        { "name": "ECO101_Lecture18_Notes_2026.pdf" },
+        { "name": "ECO101_Lecture19_Notes_2026.pdf" },
+        { "name": "ECO101_Lecture20_Notes_2026.pdf" },
+        { "name": "ECO101_Lecture21_Notes_2026.pdf" },
+        { "name": "ECO101_Lecture22_Notes_2026.pdf" },
+        { "name": "ECO101_Lecture23_Notes_2026.pdf" },
+        { "name": "ECO101_Lecture24_Notes_2026.pdf" }
+      ]
+    },
+    {
+      "module_name": "ECO 101 Lecture Slides",
+      "module_contents": [
+        { "name": "ECO101_Lecture1_In_class_Slides_2026.pdf" },
+        { "name": "ECO101_Lecture2_In_class_Slides_2026.pdf" },
+        { "name": "ECO101_Lecture3_In_class_Slides_2026.pdf" },
+        { "name": "ECO101_Lecture4_In_class_Slides_2026.pdf" },
+        { "name": "ECO101_Lecture5_In_class_Slides_2026.pdf" },
+        { "name": "ECO101_Lecture6_In_class_Slides_2026.pdf" },
+        { "name": "ECO101_Lecture7_In_class_Slides_2026.pdf" },
+        { "name": "ECO101_Lecture8_In_class_Slides_2026.pdf" },
+        { "name": "ECO101_Lecture9_In_class_Slides_2026.pdf" },
+        { "name": "ECO101_Lecture10_In_class_Slides_2026.pdf" },
+        { "name": "ECO101_Lecture12_In_class_Slides_2026.pdf" },
+        { "name": "ECO101_Lecture13_In_class_Slides_2026.pdf" },
+        { "name": "ECO101_Lecture14_In_class_Slides_2026.pdf" },
+        { "name": "Mester_Princeton_Econ 101 class_Fed Res System Overview-Independence_FINAL_LJM_3-23-2026.pdf" },
+        { "name": "ECO101_Lecture16_In_class_Slides_2026.pdf" },
+        { "name": "ECO101_Lecture17_In_class_Slides_2026.pdf" },
+        { "name": "ECO101_Lecture18_In-class_Slides_2026.pdf" },
+        { "name": "ECO101_Lecture19_In-class_Slides_2026.pdf" },
+        { "name": "ECO101_Lecture20_In-class_Slides_2026.pdf" },
+        { "name": "ECO101_Lecture21_In-class_Slides_2026.pdf" },
+        { "name": "ECO101_Lecture22_In-class_Slides_2026.pdf" },
+        { "name": "ECO101_Lecture23_In-class_Slides_2026.pdf" },
+        { "name": "ECO101_Lecture24_In-class_Slides_2026.pdf" }
+      ]
+    },
+    {
+      "module_name": "Assignments (Submit to Gradescope)",
+      "module_contents": [
+        { "name": "ECO101_Pset1_2026.pdf" },
+        { "name": "HW2_LAMDATA.xlsx" },
+        { "name": "ECO101_Pset2_2026.pdf" },
+        { "name": "ECO101_Pset3_2026.pdf" },
+        { "name": "ECO101_Pset4_2026.pdf" },
+        { "name": "ECO101_Pset5_2026.pdf" },
+        { "name": "ECO101_HW6_excel_data.xls" },
+        { "name": "ECO101_Pset6_2026.pdf" },
+        { "name": "ECO101_Pset7_2026.pdf" },
+        { "name": "ECO101_Pset8_2026.pdf" },
+        { "name": "ECO101_Pset9_2026.pdf" }
+      ]
+    },
+    {
+      "module_name": "Exam and Solutions",
+      "module_contents": [
+        { "name": "ECO101_midterm_2026_solutions.pdf" },
+        { "name": "ECO101_midterm_2026.pdf" },
+        { "name": "eco101_2026_final_solutions_withfigures.pdf" },
+        { "name": "eco101_2026_final (1).pdf" }
+      ]
+    },
+    {
+      "module_name": "Assignment Solutions",
+      "module_contents": [
+        { "name": "HW_1_solutions.pdf" },
+        { "name": "ECO101_Pset2_solutions.pdf" },
+        { "name": "ECO101_Pset3_solutions_2026.pdf" },
+        { "name": "ECO101_Pset4_2026_solutions (1).pdf" },
+        { "name": "ECO101_Pset5_solutions_2026 (1).pdf" },
+        { "name": "ECO101_Pset6_solutions_2026.pdf" },
+        { "name": "ECO101_Pset7_solutions_2026.pdf" },
+        { "name": "ECO101_Pset8_solutions_2026 (1) (1).pdf" },
+        { "name": "ECO101_Pset9_2026_solutions (1).pdf" }
+      ]
+    },
+    {
+      "module_name": "Past Exam and Solutions",
+      "module_contents": [
+        { "name": "ECO101_2021_midterm.pdf" },
+        { "name": "ECO101_2021_midterm_solutions.pdf" },
+        { "name": "eco101_2021_final.pdf" },
+        { "name": "eco101_2021_final_solutions_modified.pdf" },
+        { "name": "eco101_2022_final_modified.pdf" },
+        { "name": "eco101_2022_final_solutions.pdf" },
+        { "name": "eco101_2023_midterm.pdf" },
+        { "name": "eco101_2023_midterm_solutions.pdf" },
+        { "name": "eco101_2024_midterm.pdf" },
+        { "name": "eco101_2024_midterm_solutions.pdf" },
+        { "name": "eco101_2024_final.pdf" },
+        { "name": "eco101_2024_final_solutions_w_figures.pdf" },
+        { "name": "ECO101_Midterm_2025.pdf" },
+        { "name": "ECO101_Midterm_solutions_2025 (1).pdf" },
+        { "name": "ECO101_final_2025.pdf" },
+        { "name": "eco101_final_2025_solutions_withfigures.pdf" }
+      ]
+    },
+    {
+      "module_name": "Precept C01 & C02 - Kevin Cui",
+      "module_contents": [
+        { "name": "ECO101_Precept_12.pdf" },
+        { "name": "ECO_101_Precept11.pdf" },
+        { "name": "ECO_101_Precept10.pdf" },
+        { "name": "ECO_101_Precept9.pdf" },
+        { "name": "ECO101_Precept8.pdf" },
+        { "name": "ECO_101_Precept7.pdf" },
+        { "name": "ECO_101_Precept5.pdf" },
+        { "name": "ECO_101_Precept4.pdf" },
+        { "name": "ECO_101_Precept3.pdf" },
+        { "name": "Solow_transition_raw.xlsx" },
+        { "name": "Solow_transition.xlsx" },
+        { "name": "Solow_constant_growth_raw.xlsx" },
+        { "name": "Solow_constant_growth.xlsx" },
+        { "name": "ECO_101_Precept2.pdf" },
+        { "name": "Precept2_Excel_Raw.xlsx" },
+        { "name": "Precept2_Excel_Final.xlsx" },
+        { "name": "ECO_101_Precept1.pdf" }
+      ]
+    },
+    {
+      "module_name": "Precept C03 & C06 - Xiang Zhang",
+      "module_contents": [
+        { "name": "ECO101_precept1.pdf" },
+        { "name": "ECO101_precept2_XZ.pdf" },
+        { "name": "Precept2_Excel_XZ.xlsx" },
+        { "name": "ECO101_precept3.pdf" },
+        { "name": "Precept3_Solow_constant_growth.xlsx" },
+        { "name": "Precept3_Solow_practice.xlsx" },
+        { "name": "ECO101_precept4.pdf" },
+        { "name": "ECO101_precept5.pdf" },
+        { "name": "ECO_101_Precept5_solution.pdf" },
+        { "name": "ECO101_precept7.pdf" },
+        { "name": "ECO101_precept8_xz.pdf" },
+        { "name": "ECO101_precept9.pdf" },
+        { "name": "ECO101_precept10.pdf" },
+        { "name": "ECO_101_Precept11.pdf" },
+        { "name": "ECO101_structural_change.pdf" }
+      ]
+    },
+    {
+      "module_name": "Precept C07 & C08 - Rafael Goncalves",
+      "module_contents": [
+        { "name": "ECO101_precept12.pdf" },
+        { "name": "ECO_101_precept10.pdf" },
+        { "name": "ECO_101_precept9.pdf" },
+        { "name": "ECO_101_precept8.pdf" },
+        { "name": "ECO_101_precept7.pdf" },
+        { "name": "Precept5_Example_Solutions.pdf" },
+        { "name": "ECO_101_precept5.pdf" },
+        { "name": "ECO_101_precept4.pdf" },
+        { "name": "ECO_101_precept3.pdf" },
+        { "name": "Precept3_Solow.xlsx" },
+        { "name": "ECO_101_precept2.pdf" },
+        { "name": "Precept2_Raw.xlsx" },
+        { "name": "Precept2_final.xlsx" },
+        { "name": "ECO_101_precept1.pdf" }
+      ]
+    },
+    {
+      "module_name": "Videos",
+      "module_contents": [
+        { "name": "\"Why Trump Tariffs Are a Massive Mistake\" The Economist" },
+        { "name": "\"What Economists Got Wrong on Tariffs\", Bloomberg" }
+      ]
+    }
+  ]
+}

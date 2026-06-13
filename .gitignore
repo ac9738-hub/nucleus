@@ -21,3 +21,4 @@ engine-search-cache/
 frame-html/
 app/canvas/canvas_homepages/
 *.pdf
+.cache/

@@ -1,0 +1,366 @@
+{
+  "assignments": [
+    { "name": "Assignment 1: Architectural Photograph", "due_at": "9/11/2025" },
+    { "name": "Assignment 2: Drawing", "due_at": "9/25/2025" },
+    { "name": "Assignment 3: Vitruvius", "due_at": "10/3/2025" },
+    { "name": "Assignment 4", "due_at": "10/31/2025" },
+    { "name": "Assignment 5", "due_at": "11/14/2025" },
+    { "name": "Assignment 6", "due_at": "12/5/2025" }
+  ],
+  "modules": [
+    {
+      "module_name": "0 Syllabus and Other Important Documents",
+      "module_contents": [
+        { "name": "ART 102_2025 Fall Syllabus.pdf" },
+        { "name": "ART 102 Fall 2025-Assignments.pdf" },
+        { "name": "Assignment 1 Photography.pdf" }
+      ]
+    },
+    {
+      "module_name": "1 Origins of Architecture",
+      "module_contents": [
+        { "name": "Rudofsky" },
+        { "name": "Rudofsky.pdf" },
+        { "name": "ART 102_2025 Lecture 1.1.pdf" },
+        { "name": "ART 102_2025 Lecture 1.2.pdf" }
+      ]
+    },
+    {
+      "module_name": "2 Clients and Patrons",
+      "module_contents": [
+        { "name": "Vitruvius" },
+        { "name": "Vitruvius.pdf" },
+        { "name": "ART 102_2025 Lecture 2.1.pdf" },
+        { "name": "ART 102_2025 Lecture 2.2.pdf" },
+        { "name": "Assignment 2 Drawing.pdf" }
+      ]
+    },
+    {
+      "module_name": "3 Who is an Architect?",
+      "module_contents": [
+        { "name": "Pliny" },
+        { "name": "Pliny.pdf" },
+        { "name": "Sinan" },
+        { "name": "ART 102_2023 Lecture 3.1.pdf" },
+        { "name": "ART 102_2023 Lecture 3.2.pdf" }
+      ]
+    },
+    {
+      "module_name": "4 Design",
+      "module_contents": [
+        { "name": "Liefferinge" },
+        { "name": "Liefferinge.pdf" },
+        { "name": "ART 102_2025 Lecture 4.1.pdf" },
+        { "name": "ART 102_2025 Lecture 4.2.pdf" },
+        { "name": "Assignment 3.pdf" }
+      ]
+    },
+    {
+      "module_name": "5 Proportions",
+      "module_contents": [
+        { "name": "Vasari" },
+        { "name": "Vasari.pdf" },
+        { "name": "Ackerman" },
+        { "name": "Ackerman.pdf" },
+        { "name": "ART 102_2025 Lecture 5.1.pdf" },
+        { "name": "ART 102_2025 Lecture 5.2.pdf" }
+      ]
+    },
+    {
+      "module_name": "6 Forms",
+      "module_contents": [
+        { "name": "Midterm Exam-Fall 2025.pdf" },
+        { "name": "Belcher-10 Ways AI is Ruining Your Students.pdf" },
+        { "name": "ART 102_2025 Lecture 6.1.pdf" },
+        { "name": "ART 102_2025 Lecture 6.2.pdf" }
+      ]
+    },
+    {
+      "module_name": "7 Materials",
+      "module_contents": [
+        { "name": "Korres" },
+        { "name": "Korres.pdf" },
+        { "name": "Collins" },
+        { "name": "Collins.pdf" },
+        { "name": "ART 102_2025 Lecture 7.1.pdf" },
+        { "name": "ART 102_2025 Lecture 7.2.pdf" },
+        { "name": "Assignment 4.pdf" }
+      ]
+    },
+    {
+      "module_name": "8 How Does a Building Stand Up?",
+      "module_contents": [
+        { "name": "Giedion" },
+        { "name": "Giedion.pdf" },
+        { "name": "Salvadori" },
+        { "name": "Salvadori.pdf" },
+        { "name": "ART 102_2025 Lecture 8.1.pdf" },
+        { "name": "ART 102_2025 Lecture 8.2.pdf" }
+      ]
+    },
+    {
+      "module_name": "9 Style and Ornament",
+      "module_contents": [
+        { "name": "Colquhoun" },
+        { "name": "Colquhoun.pdf" },
+        { "name": "Assignment 5.pdf" },
+        { "name": "Schuyler_Brooklyn_Bridge_as_Monument.pdf" },
+        { "name": "ART 102_2025 Lecture 9.1.pdf" },
+        { "name": "ART 102_2025 Lecture 9.2.pdf" }
+      ]
+    },
+    {
+      "module_name": "10 Architecture and Environment",
+      "module_contents": [
+        { "name": "Jones" },
+        { "name": "Jones.pdf" },
+        { "name": "ART 102_2025 Lecture 10.1.pdf" },
+        { "name": "ART 102_2025 Lecture 10.2.pdf" }
+      ]
+    },
+    {
+      "module_name": "Contruction and Labor",
+      "module_contents": [
+        { "name": "Chiang" },
+        { "name": "Chiang.pdf" },
+        { "name": "Venturi-Complexity and Contradiction.pdf" },
+        { "name": "Assignment 6.pdf" },
+        { "name": "ART 102_2025 Lecture 11.1.pdf" },
+        { "name": "ART 102_2025 Lecture 11.2.pdf" }
+      ]
+    },
+    {
+      "module_name": "12 Thanksgiving Week",
+      "module_contents": []
+    },
+    {
+      "module_name": "13-Reception and Resistance",
+      "module_contents": [
+        { "name": "Stratigakos" },
+        { "name": "Stratigakos.pdf" },
+        {
+          "name": "PODCAST: Cynthia Cracauer, \"Fast Food and Radical Rooflines: Helen Fong Shapes Los Angeles Coffee Shops,\" New Angle Voices"
+        },
+        { "name": "ART 102_2025 Lecture 13.2.pdf" }
+      ]
+    }
+  ],
+  "weekly_schedule": [
+    {
+      "name": "Week 1",
+      "start_date": "9/1/2025",
+      "end_date": "9/7/2025",
+      "files": [
+        { "name": "ART 102_2025 Lecture 1.1.pdf" },
+        { "name": "ART 102_2025 Lecture 1.2.pdf" },
+        { "name": "Rudofsky" },
+        { "name": "Rudofsky.pdf" }
+      ],
+      "assignments": [],
+      "events": []
+    },
+    {
+      "name": "Week 2",
+      "start_date": "9/8/2025",
+      "end_date": "9/14/2025",
+      "files": [
+        { "name": "ART 102_2025 Lecture 2.1.pdf" },
+        { "name": "ART 102_2025 Lecture 2.2.pdf" },
+        { "name": "Vitruvius" },
+        { "name": "Vitruvius.pdf" }
+      ],
+      "assignments": [
+        {
+          "name": "Assignment 1 Photography",
+          "files": [{ "name": "Assignment 1 Photography.pdf" }]
+        }
+      ],
+      "events": []
+    },
+    {
+      "name": "Week 3",
+      "start_date": "9/15/2025",
+      "end_date": "9/21/2025",
+      "files": [
+        { "name": "ART 102_2025 Lecture 3.1.pdf" },
+        { "name": "ART 102_2025 Lecture 3.2.pdf" },
+        { "name": "Pliny" },
+        { "name": "Pliny.pdf" },
+        { "name": "Sinan" }
+      ],
+      "assignments": [],
+      "events": []
+    },
+    {
+      "name": "Week 4",
+      "start_date": "9/22/2025",
+      "end_date": "9/28/2025",
+      "files": [
+        { "name": "ART 102_2025 Lecture 4.1.pdf" },
+        { "name": "ART 102_2025 Lecture 4.2.pdf" },
+        { "name": "Vasari" },
+        { "name": "Vasari.pdf" },
+        { "name": "Ackerman" },
+        { "name": "Ackerman.pdf" }
+      ],
+      "assignments": [
+        {
+          "name": "Assignment 2 Drawing",
+          "files": [{ "name": "Assignment 2 Drawing.pdf" }]
+        }
+      ],
+      "events": []
+    },
+    {
+      "name": "Week 5",
+      "start_date": "9/29/2025",
+      "end_date": "10/5/2025",
+      "files": [
+        { "name": "ART 102_2025 Lecture 5.1.pdf" },
+        { "name": "ART 102_2025 Lecture 5.2.pdf" },
+        { "name": "Liefferinge" },
+        { "name": "Liefferinge.pdf" }
+      ],
+      "assignments": [],
+      "events": []
+    },
+    {
+      "name": "Week 6",
+      "start_date": "10/6/2025",
+      "end_date": "10/12/2025",
+      "files": [
+        { "name": "ART 102_2025 Lecture 6.1.pdf" },
+        { "name": "ART 102_2025 Lecture 6.2.pdf" }
+      ],
+      "assignments": [],
+      "events": [{ "name": "Midterm Exam", "files": [] }]
+    },
+    {
+      "name": "Week 7",
+      "start_date": "10/13/2025",
+      "end_date": "10/19/2025",
+      "files": [],
+      "assignments": [],
+      "events": []
+    },
+    {
+      "name": "Week 8",
+      "start_date": "10/20/2025",
+      "end_date": "10/26/2025",
+      "files": [
+        { "name": "ART 102_2025 Lecture 7.1.pdf" },
+        { "name": "ART 102_2025 Lecture 7.2.pdf" },
+        { "name": "Korres" },
+        { "name": "Korres.pdf" },
+        { "name": "Collins" },
+        { "name": "Collins.pdf" }
+      ],
+      "assignments": [],
+      "events": []
+    },
+    {
+      "name": "Week 9",
+      "start_date": "10/27/2025",
+      "end_date": "11/2/2025",
+      "files": [
+        { "name": "ART 102_2025 Lecture 8.1.pdf" },
+        { "name": "ART 102_2025 Lecture 8.2.pdf" },
+        { "name": "Salvadori" },
+        { "name": "Salvadori.pdf" }
+      ],
+      "assignments": [
+        {
+          "name": "Assignment 4",
+          "files": [{ "name": "Assignment 4.pdf" }]
+        }
+      ],
+      "events": []
+    },
+    {
+      "name": "Week 10",
+      "start_date": "11/3/2025",
+      "end_date": "11/9/2025",
+      "files": [
+        { "name": "ART 102_2025 Lecture 9.1.pdf" },
+        { "name": "ART 102_2025 Lecture 9.2.pdf" },
+        { "name": "Colquhoun" },
+        { "name": "Colquhoun.pdf" }
+      ],
+      "assignments": [],
+      "events": []
+    },
+    {
+      "name": "Week 11",
+      "start_date": "11/10/2025",
+      "end_date": "11/16/2025",
+      "files": [
+        { "name": "ART 102_2025 Lecture 10.1.pdf" },
+        { "name": "ART 102_2025 Lecture 10.2.pdf" },
+        { "name": "Jones" },
+        { "name": "Jones.pdf" }
+      ],
+      "assignments": [
+        {
+          "name": "Assignment 5",
+          "files": [{ "name": "Assignment 5.pdf" }]
+        }
+      ],
+      "events": []
+    },
+    {
+      "name": "Week 12",
+      "start_date": "11/17/2025",
+      "end_date": "11/23/2025",
+      "files": [
+        { "name": "ART 102_2025 Lecture 11.1.pdf" },
+        { "name": "ART 102_2025 Lecture 11.2.pdf" },
+        { "name": "Chiang" },
+        { "name": "Chiang.pdf" }
+      ],
+      "assignments": [],
+      "events": []
+    },
+    {
+      "name": "Week 13",
+      "start_date": "11/24/2025",
+      "end_date": "11/30/2025",
+      "files": [{ "name": "ART 102_2025 Lecture 12.1.pdf" }],
+      "assignments": [],
+      "events": []
+    },
+    {
+      "name": "Week 14",
+      "start_date": "12/1/2025",
+      "end_date": "12/7/2025",
+      "files": [
+        { "name": "ART 102_2025 Lecture 13.1.pdf" },
+        { "name": "ART 102_2025 Lecture 13.2.pdf" },
+        { "name": "Stratigakos" },
+        { "name": "Stratigakos.pdf" }
+      ],
+      "assignments": [
+        {
+          "name": "Assignment 6",
+          "files": [{ "name": "Assignment 6.pdf" }]
+        }
+      ],
+      "events": []
+    },
+    {
+      "name": "Week 15",
+      "start_date": "12/8/2025",
+      "end_date": "12/14/2025",
+      "files": [],
+      "assignments": [],
+      "events": []
+    },
+    {
+      "name": "Week 16",
+      "start_date": "12/15/2025",
+      "end_date": "12/21/2025",
+      "files": [],
+      "assignments": [],
+      "events": [{ "name": "Final Exam", "files": [] }]
+    }
+  ]
+}

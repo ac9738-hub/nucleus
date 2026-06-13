@@ -1,0 +1,1843 @@
+{
+  "assignments": [
+    {
+      "name": "Week 1 语法作业",
+      "due_at": "1/30/2025"
+    },
+    {
+      "name": "作文 1 outline",
+      "due_at": "2/3/2025"
+    },
+    {
+      "name": "Week 2 语法作业",
+      "due_at": "2/6/2025"
+    },
+    {
+      "name": "春节的习俗",
+      "due_at": "2/7/2025"
+    },
+    {
+      "name": "作文 1",
+      "due_at": "2/10/2025"
+    },
+    {
+      "name": "Week 3 语法作业",
+      "due_at": "2/13/2025"
+    },
+    {
+      "name": "周考一 Weekly Test 1",
+      "due_at": "2/14/2025"
+    },
+    {
+      "name": "周考一 Oral Task (practice quiz)",
+      "due_at": "2/14/2025"
+    },
+    {
+      "name": "作文 2 Outline",
+      "due_at": "2/17/2025"
+    },
+    {
+      "name": "Week 4 语法作业",
+      "due_at": "2/20/2025"
+    },
+    {
+      "name": "我最喜欢的地方",
+      "due_at": "2/20/2025"
+    },
+    {
+      "name": "周考二 Weekly Test 2",
+      "due_at": "2/21/2025"
+    },
+    {
+      "name": "周考二 Oral Task",
+      "due_at": "2/21/2025"
+    },
+    {
+      "name": "作文 2",
+      "due_at": "2/24/2025"
+    },
+    {
+      "name": "周考三 Weekly Test 3",
+      "due_at": "2/28/2025"
+    },
+    {
+      "name": "周考三 Oral Task",
+      "due_at": "2/28/2025"
+    },
+    {
+      "name": "Midterm Oral Presentation Essay",
+      "due_at": "3/1/2025"
+    },
+    {
+      "name": "ANC L26 铁饭碗打破了",
+      "due_at": "3/4/2025"
+    },
+    {
+      "name": "Midterm Oral exam - Impromptu Speech",
+      "due_at": "3/5/2025"
+    },
+    {
+      "name": "Midterm Oral Presentation",
+      "due_at": "3/6/2025"
+    },
+    {
+      "name": "期中笔试 Midterm Written Exam",
+      "due_at": "3/7/2025"
+    },
+    {
+      "name": "Week 7 语法作业",
+      "due_at": "3/20/2025"
+    },
+    {
+      "name": "周考四 Weekly Test 4",
+      "due_at": "3/21/2025"
+    },
+    {
+      "name": "周考四 Oral Task",
+      "due_at": "3/21/2025"
+    },
+    {
+      "name": "Week 8 语法作业",
+      "due_at": "3/27/2025"
+    },
+    {
+      "name": "周考五 Weekly Test 5",
+      "due_at": "3/28/2025"
+    },
+    {
+      "name": "周考五 Oral task",
+      "due_at": "3/28/2025"
+    },
+    {
+      "name": "作文 3 Interview Report",
+      "due_at": "3/31/2025"
+    },
+    {
+      "name": "Week 9 语法作业",
+      "due_at": "4/3/2025"
+    },
+    {
+      "name": "高考/留学",
+      "due_at": "4/4/2025"
+    },
+    {
+      "name": "周考六 Weekly Test 6",
+      "due_at": "4/4/2025"
+    },
+    {
+      "name": "周考六 Oral Task",
+      "due_at": "4/4/2025"
+    },
+    {
+      "name": "Format and Topic",
+      "due_at": "4/7/2025"
+    },
+    {
+      "name": "Week 10 语法作业",
+      "due_at": "4/10/2025"
+    },
+    {
+      "name": "听写比赛（二）",
+      "due_at": "4/11/2025"
+    },
+    {
+      "name": "周考七 Weekly Test 7",
+      "due_at": "4/11/2025"
+    },
+    {
+      "name": "周考七 Oral Task",
+      "due_at": "4/11/2025"
+    },
+    {
+      "name": "作文4 Debate Outline",
+      "due_at": "4/14/2025"
+    },
+    {
+      "name": "期末口语报告 Final Oral Project Outline (Group or individual submission)",
+      "due_at": "4/14/2025"
+    },
+    {
+      "name": "Week 11 语法作业",
+      "due_at": "4/17/2025"
+    },
+    {
+      "name": "辩论Debate",
+      "due_at": "4/18/2025"
+    },
+    {
+      "name": "周考八 Weekly Test 8",
+      "due_at": "4/18/2025"
+    },
+    {
+      "name": "周考八 Oral Task",
+      "due_at": "4/18/2025"
+    },
+    {
+      "name": "期末口语报告 Final Oral Project Script",
+      "due_at": "4/21/2025"
+    },
+    {
+      "name": "期末口语报告 video link/presentation slides submission",
+      "due_at": "4/28/2025"
+    },
+    {
+      "name": "期末即兴表达 Final Impromptu Speech",
+      "due_at": "4/30/2025"
+    },
+    {
+      "name": "期末口语报告 Final Oral Project",
+      "due_at": "5/1/2025"
+    },
+    {
+      "name": "期末笔试 Final Written Exam",
+      "due_at": "5/10/2025"
+    },
+    {
+      "name": "听写比赛（一）"
+    },
+    {
+      "name": "上半学期课堂表现"
+    },
+    {
+      "name": "出勤分"
+    },
+    {
+      "name": "期末课堂表现"
+    }
+  ],
+  "discussions": [
+    {
+      "name": "ATC L11 Privacy",
+      "due_at": "1/27/2025"
+    },
+    {
+      "name": "ATC L12 走后门",
+      "due_at": "1/29/2025"
+    },
+    {
+      "name": "ANC L18 到时候再说吧 preview",
+      "due_at": "2/3/2025"
+    },
+    {
+      "name": "OC L18 《饭桌上的客套》 Preview",
+      "due_at": "2/5/2025"
+    },
+    {
+      "name": "ATC L14 北京的早晨",
+      "due_at": "2/10/2025"
+    },
+    {
+      "name": "ANC L15 北京的夜市",
+      "due_at": "2/12/2025"
+    },
+    {
+      "name": "ATC L16 北京的交通",
+      "due_at": "2/17/2025"
+    },
+    {
+      "name": "ATC L20 麦当劳",
+      "due_at": "2/19/2025"
+    },
+    {
+      "name": "ATC 22 体育和爱国",
+      "due_at": "2/24/2025"
+    },
+    {
+      "name": "ANC 24 中国制造",
+      "due_at": "2/26/2025"
+    },
+    {
+      "name": "ANC L29 高考",
+      "due_at": "3/17/2025"
+    },
+    {
+      "name": "ANC L38 开放留学政策",
+      "due_at": "3/19/2025"
+    },
+    {
+      "name": "ATC L27 家里的小皇帝",
+      "due_at": "3/24/2025"
+    },
+    {
+      "name": "ATC L28 读书和考试",
+      "due_at": "3/26/2025"
+    },
+    {
+      "name": "OC L19 美国的华侨",
+      "due_at": "3/31/2025"
+    },
+    {
+      "name": "OC L20 华裔需不需要政治代表",
+      "due_at": "4/2/2025"
+    },
+    {
+      "name": "ATC L33 现在好还是从前好？",
+      "due_at": "4/7/2025"
+    },
+    {
+      "name": "OC L22 双语教育",
+      "due_at": "4/9/2025"
+    },
+    {
+      "name": "ATC L25 中国的妇女",
+      "due_at": "4/14/2025"
+    },
+    {
+      "name": "ATC L26 离婚",
+      "due_at": "4/16/2025"
+    },
+    {
+      "name": "复习问题",
+      "due_at": "4/24/2025"
+    }
+  ],
+  "participation": [
+    {
+      "name": "Attendance"
+    },
+    {
+      "name": "Performance"
+    }
+  ],
+  "modules": [
+    {
+      "module_name": "Course orientation",
+      "module_contents": [
+        {
+          "name": "CHI108 syllabus(2025 Spring).pdf"
+        },
+        {
+          "name": "2025 CHI108 Semester Schedule.pdf"
+        },
+        {
+          "name": "Tips for improving your performance grade.pdf"
+        },
+        {
+          "name": "CHI108 2025S Writing workshop I.pdf"
+        }
+      ]
+    },
+    {
+      "module_name": "Week 1",
+      "module_contents": [
+        {
+          "name": "Week 1 schedule.pdf"
+        },
+        {
+          "name": "ATC-11 Privacy-study guide.pdf"
+        },
+        {
+          "name": "ATC-11 Privacy-study guide traditional characters.pdf"
+        },
+        {
+          "name": "ATC-12 走后门-study guide.pdf"
+        },
+        {
+          "name": "ATC-12 走后门-study guide Traditional characters.pdf"
+        },
+        {
+          "name": "A Trip to China - L11 - Text.mp3"
+        },
+        {
+          "name": "A Trip to China - L11 - Vocabulary.mp3"
+        },
+        {
+          "name": "A Trip to China - L12 - Text .mp3"
+        },
+        {
+          "name": "A Trip to China - L12 - Vocabulary.mp3"
+        },
+        {
+          "name": "A trip to China-Lesson 11 汉字.pdf"
+        },
+        {
+          "name": "A trip to China-Lesson 12 汉字.pdf"
+        }
+      ]
+    },
+    {
+      "module_name": "Week 2",
+      "module_contents": [
+        {
+          "name": "Week 2 schedule.pdf"
+        },
+        {
+          "name": "ANC L18 到时候再说吧 Text.pdf"
+        },
+        {
+          "name": "ANC-18 到时候再说吧-study guide.pdf"
+        },
+        {
+          "name": "ANC-18 到时候再说吧-study guide Traditional character.pdf"
+        },
+        {
+          "name": "Oh,China-18 饭桌上的客套-study guide .pdf"
+        },
+        {
+          "name": "Oh, China-18 飯桌上的客套 study guide Traditional.pdf"
+        },
+        {
+          "name": "ANC L18 到时候再说吧 Text.wav"
+        },
+        {
+          "name": "ANC L18 到时候再说吧 Vocabulary.wav"
+        },
+        {
+          "name": "OC L18 饭桌上的客套 Text.wav"
+        },
+        {
+          "name": "OC L18 饭桌上的客套 Vocabulary.wav"
+        },
+        {
+          "name": "ANC L18 到时候再说吧 character worksheet.pdf"
+        },
+        {
+          "name": "ANC L18 到时候再说吧 character worksheet Traditional.pdf"
+        },
+        {
+          "name": "OC L18 饭桌上的客套 character worksheet.pdf"
+        },
+        {
+          "name": "OC L18 饭桌上的客套 character worksheet Traditional.pdf"
+        }
+      ]
+    },
+    {
+      "module_name": "Week 3",
+      "module_contents": [
+        {
+          "name": "Week 3 schedule.pdf"
+        },
+        {
+          "name": "A New China L15 北京的夜市 Text.pdf"
+        },
+        {
+          "name": "ATC-14 北京的早晨-study guide.pdf"
+        },
+        {
+          "name": "ATC-L14 北京的早晨 Study guide - traditional.pdf"
+        },
+        {
+          "name": "ANC-15 北京的夜市-study guide.pdf"
+        },
+        {
+          "name": "ANC-L15 北京的夜市 Study guide - traditional.pdf"
+        },
+        {
+          "name": "A Trip to China - L14 - Text.mp3"
+        },
+        {
+          "name": "A Trip to China - L14 - Vocabulary.mp3"
+        },
+        {
+          "name": "ANC L15 北京的夜市 Text.mp3"
+        },
+        {
+          "name": "ANC L15 北京的夜市 Vocabulary.mp3"
+        },
+        {
+          "name": "A trip to China-Lesson 14 Characters.pdf"
+        },
+        {
+          "name": "A trip to China-Lesson 14 Characters Traditional.pdf"
+        },
+        {
+          "name": "ANC L15 北京的夜市 characters.pdf"
+        },
+        {
+          "name": "ANC L15 北京的夜市 characters Traditional.pdf"
+        }
+      ]
+    },
+    {
+      "module_name": "Week 4",
+      "module_contents": [
+        {
+          "name": "Week 4 schedule.pdf"
+        },
+        {
+          "name": "ATC-16 北京的交通 Study guide.pdf"
+        },
+        {
+          "name": "ATC-16 北京的交通 Study guide Traditional characters.pdf"
+        },
+        {
+          "name": "ATC-20 麦当劳 Study guide.pdf"
+        },
+        {
+          "name": "ATC-20 麥當勞 Study guide Traditional characters.pdf"
+        },
+        {
+          "name": "A Trip to China - L16 - Text.mp3"
+        },
+        {
+          "name": "A Trip to China - L16 - Vocabulary.mp3"
+        },
+        {
+          "name": "A Trip to China - L20 - Text.mp3"
+        },
+        {
+          "name": "A Trip to China - L20 - Vocabulary.mp3"
+        },
+        {
+          "name": "A trip to China-Lesson 16.pdf"
+        },
+        {
+          "name": "A trip to China-Lesson 20.pdf"
+        },
+        {
+          "name": "A trip to China-Lesson 16 Traditional.pdf"
+        },
+        {
+          "name": "A trip to China-Lesson 20 Traditional.pdf"
+        }
+      ]
+    },
+    {
+      "module_name": "Week 5",
+      "module_contents": [
+        {
+          "name": "Week 5 schedule.pdf"
+        },
+        {
+          "name": "《A New China》- 中国制造 Text.pdf"
+        },
+        {
+          "name": "ATC-22体育和爱国 Study Guide.pdf"
+        },
+        {
+          "name": "ATC-22 體育和愛國 Study Guide 繁體.pdf"
+        },
+        {
+          "name": "ANC-24 中国制造-study guide.pdf"
+        },
+        {
+          "name": "ANC-24 中國製造 Study guide 繁體.pdf"
+        },
+        {
+          "name": "A Trip to China - L22 - Text.mp3"
+        },
+        {
+          "name": "A Trip to China - L22 - Vocabulary.mp3"
+        },
+        {
+          "name": "ANC 24 中国制造 Text.mp3"
+        },
+        {
+          "name": "ANC 24 中国制造 生词.mp3"
+        },
+        {
+          "name": "A trip to China-Lesson 22.pdf"
+        },
+        {
+          "name": "A trip to China-Lesson 22 Traditional.pdf"
+        },
+        {
+          "name": "ANC-24 中国制造 character worksheet.pdf"
+        },
+        {
+          "name": "ANC-24 中國製造 character worksheet Traditional.pdf"
+        }
+      ]
+    },
+    {
+      "module_name": "Week 6",
+      "module_contents": [
+        {
+          "name": "Week 6 schedule.pdf"
+        },
+        {
+          "name": "ANC L27 铁饭碗打破了 Text.pdf"
+        },
+        {
+          "name": "ANC L27 铁饭碗打破了 Study Guide.pdf"
+        },
+        {
+          "name": "ANC L26 鐵飯碗打破了 Study Guide 繁體.pdf"
+        },
+        {
+          "name": "L27 铁饭碗打破了 生词.mp3"
+        },
+        {
+          "name": "L27 铁饭碗打破了 课文.mp3"
+        },
+        {
+          "name": "ANC L26 铁饭碗打破了 character worksheet.pdf"
+        },
+        {
+          "name": "ANC L26 鐵飯碗打破了 character worksheet Traditional.pdf"
+        },
+        {
+          "name": "Midterm Review 1 W1 W2.pdf"
+        },
+        {
+          "name": "Midterm Reivew 2 W 345.pdf"
+        }
+      ]
+    },
+    {
+      "module_name": "Week 7",
+      "module_contents": [
+        {
+          "name": "Week 7 schedule.pdf"
+        },
+        {
+          "name": "ANC L29 高考 Text.pdf"
+        },
+        {
+          "name": "ANC L38 开放留学政策 Text.pdf"
+        },
+        {
+          "name": "ANC L29 高考 Study Guide.pdf"
+        },
+        {
+          "name": "ANC L29 高考 Study Guide 繁體.pdf"
+        },
+        {
+          "name": "ANC L38 开放留学政策 Study Guide.pdf"
+        },
+        {
+          "name": "ANC L38 開放留學政策 Study Guide 繁体.pdf"
+        },
+        {
+          "name": "ANC L29 高考 生词.mp3"
+        },
+        {
+          "name": "ANC L29 高考 课文.mp3"
+        },
+        {
+          "name": "ANC L38 开放留学政策 生词.mp3"
+        },
+        {
+          "name": "ANC L38 开放留学政策 课文.mp3"
+        },
+        {
+          "name": "ANC L29 高考 character worksheet.pdf"
+        },
+        {
+          "name": "ANC L29 高考 character worksheet 繁體.pdf"
+        },
+        {
+          "name": "ANC L38 开放留学政策 character worksheet.pdf"
+        },
+        {
+          "name": "ANC L38 開放留學政策 character worksheet 繁體.pdf"
+        },
+        {
+          "name": "ANC L39 现音 Study Guide.pdf"
+        },
+        {
+          "name": "ANC L39 现音 Study Guide 繁體.pdf"
+        }
+      ]
+    },
+    {
+      "module_name": "Week 8",
+      "module_contents": [
+        {
+          "name": "Week 8 schedule.pdf"
+        },
+        {
+          "name": "ATC L27 家里的小皇帝 Study guide updated.pdf"
+        },
+        {
+          "name": "ATC L27 家裡的小皇帝 Study Guide updated 繁体.pdf"
+        },
+        {
+          "name": "ATC L28 读书和考试 study guide.pdf"
+        },
+        {
+          "name": "ATC L28 讀書和考試 Study guide 繁体.pdf"
+        },
+        {
+          "name": "A Trip to China - L27 - Text.mp3"
+        },
+        {
+          "name": "A Trip to China - L27 - Vocabulary.mp3"
+        },
+        {
+          "name": "A Trip to China - L28 - Text.mp3"
+        },
+        {
+          "name": "A Trip to China - L28 - Vocabulary.mp3"
+        },
+        {
+          "name": "A trip to China-Lesson 27.pdf"
+        },
+        {
+          "name": "A trip to China-Lesson 28.pdf"
+        },
+        {
+          "name": "A trip to China-Lesson 27 繁体.pdf"
+        },
+        {
+          "name": "A trip to China-Lesson 28 繁体.pdf"
+        }
+      ]
+    },
+    {
+      "module_name": "Week 9",
+      "module_contents": [
+        {
+          "name": "Week 9 schedule.pdf"
+        },
+        {
+          "name": "OC L19 美国的华侨 study guide.pdf"
+        },
+        {
+          "name": "OC L19 美國的華僑 Study guide 繁体.pdf"
+        },
+        {
+          "name": "OC L20 华裔需不需要政治代表 Study guide.pdf"
+        },
+        {
+          "name": "OC L20 華裔需不需要政治代表 Study guide 繁体.pdf"
+        },
+        {
+          "name": "OC L19 美国的华侨 Vocabulary.m4a"
+        },
+        {
+          "name": "OC L19 美国的华侨 Text.m4a"
+        },
+        {
+          "name": "Oh, China! - L20 - Vocabulary.mp3"
+        },
+        {
+          "name": "Oh, China! - L20 - Text.mp3"
+        },
+        {
+          "name": "OC L19 美国的华侨 character worksheet.pdf"
+        },
+        {
+          "name": "OC L19 美國的華僑 character worksheet 繁體.pdf"
+        },
+        {
+          "name": "Oh, China- Lesson 20.pdf"
+        },
+        {
+          "name": "Oh, China- Lesson 20 Traditional.pdf"
+        }
+      ]
+    },
+    {
+      "module_name": "Week 10",
+      "module_contents": [
+        {
+          "name": "Week 10 schedule.pdf"
+        },
+        {
+          "name": "ATC L33 现在好还是从前好 Study Guide.pdf"
+        },
+        {
+          "name": "ATC L33 現在好還是從前好 Study Guide 繁体.pdf"
+        },
+        {
+          "name": "OC L22 双语教育 Study guide.pdf"
+        },
+        {
+          "name": "OC L22 雙語教育 Study guide 繁体.pdf"
+        },
+        {
+          "name": "ATC L33 现在好还是从前好 Text.m4a"
+        },
+        {
+          "name": "ATC L33 现在好还是从前好 Vocabulary.m4a"
+        },
+        {
+          "name": "OC L22 双语教育 Text.m4a"
+        },
+        {
+          "name": "OC L22 双语教育 Vocabulary.m4a"
+        },
+        {
+          "name": "ATC L33 现在好还是从前好 Character worksheets.pdf"
+        },
+        {
+          "name": "ATC L33 现在好还是从前好 Character worksheets 繁体.pdf"
+        },
+        {
+          "name": "OC L22 双语教育 Character worksheets.pdf"
+        },
+        {
+          "name": "OC L22 双语教育 Character worksheets 繁体.pdf"
+        }
+      ]
+    },
+    {
+      "module_name": "Week 11",
+      "module_contents": [
+        {
+          "name": "Week 11 schedule.pdf"
+        },
+        {
+          "name": "ATC L25 中国的妇女 Study guide.pdf"
+        },
+        {
+          "name": "ATC L25 中国的婦女 Study Guide 繁体.pdf"
+        },
+        {
+          "name": "ATC L26 离婚 Study Guide.pdf"
+        },
+        {
+          "name": "ATC L26 離婚 Study guide 繁体.pdf"
+        },
+        {
+          "name": "A Trip to China - L25 - Text.mp3"
+        },
+        {
+          "name": "A Trip to China - L25 - Vocabulary.mp3"
+        },
+        {
+          "name": "A Trip to China - L26 - Text.mp3"
+        },
+        {
+          "name": "A Trip to China - L26 - Vocabulary.mp3"
+        },
+        {
+          "name": "A trip to China-Lesson 25.pdf"
+        },
+        {
+          "name": "A trip to China-Lesson 26.pdf"
+        },
+        {
+          "name": "A trip to China-Lesson 25 繁体.pdf"
+        },
+        {
+          "name": "A trip to China-Lesson 26 繁体.pdf"
+        }
+      ]
+    },
+    {
+      "module_name": "Week 12",
+      "module_contents": [
+        {
+          "name": "Week 12 schedule.pdf"
+        },
+        {
+          "name": "OC L23人权和贸易 Study guide.pdf"
+        },
+        {
+          "name": "OC L23 人權與貿易 Study guide 繁体.pdf"
+        },
+        {
+          "name": "OC L31 中国人的衣食住行 Study guide.pdf"
+        },
+        {
+          "name": "OC L31 中國人的衣食住行 Study guide 繁体.pdf"
+        },
+        {
+          "name": "Oh, China! - L23 - Text.mp3"
+        },
+        {
+          "name": "Oh, China! - L23 - Vocabulary.mp3"
+        },
+        {
+          "name": "Oh, China! - L31 - Text.mp3"
+        },
+        {
+          "name": "Oh, China! - L31 - Vocabulary.mp3"
+        },
+        {
+          "name": "Oh, China- Lesson 23.pdf"
+        },
+        {
+          "name": "Oh, China- Lesson 31.pdf"
+        },
+        {
+          "name": "Oh, China- Lesson 23 Traditional.pdf"
+        },
+        {
+          "name": "Oh, China- Lesson 31 Traditional.pdf"
+        }
+      ]
+    },
+    {
+      "module_name": "Week 13",
+      "module_contents": [
+        {
+          "name": "Week 13 schedule.pdf"
+        },
+        {
+          "name": "CHI108 2025S Final Review-1.pdf"
+        },
+        {
+          "name": "S25 CHI108 Final Review 2.pdf"
+        },
+        {
+          "name": "S2025 CHI108 Final Review 3.pdf"
+        }
+      ]
+    }
+  ],
+  "weekly_schedule": [
+    {
+      "name": "Week 1",
+      "start_date": "1/27/2025",
+      "end_date": "2/2/2025",
+      "files": [
+        {
+          "name": "CHI108 syllabus(2025 Spring).pdf"
+        },
+        {
+          "name": "2025 CHI108 Semester Schedule.pdf"
+        },
+        {
+          "name": "Tips for improving your performance grade.pdf"
+        },
+        {
+          "name": "CHI108 2025S Writing workshop I.pdf"
+        },
+        {
+          "name": "Week 1 schedule.pdf"
+        },
+        {
+          "name": "ATC-11 Privacy-study guide.pdf"
+        },
+        {
+          "name": "ATC-11 Privacy-study guide traditional characters.pdf"
+        },
+        {
+          "name": "ATC-12 走后门-study guide.pdf"
+        },
+        {
+          "name": "ATC-12 走后门-study guide Traditional characters.pdf"
+        },
+        {
+          "name": "A Trip to China - L11 - Text.mp3"
+        },
+        {
+          "name": "A Trip to China - L11 - Vocabulary.mp3"
+        },
+        {
+          "name": "A Trip to China - L12 - Text .mp3"
+        },
+        {
+          "name": "A Trip to China - L12 - Vocabulary.mp3"
+        },
+        {
+          "name": "A trip to China-Lesson 11 汉字.pdf"
+        },
+        {
+          "name": "A trip to China-Lesson 12 汉字.pdf"
+        }
+      ],
+      "assignments": [
+        {
+          "name": "Week 1 语法作业",
+          "files": []
+        }
+      ],
+      "events": [
+        {
+          "name": "L11 Privacy 小考",
+          "files": []
+        },
+        {
+          "name": "CHI108 2025S Writing workshop I",
+          "files": []
+        }
+      ]
+    },
+    {
+      "name": "Week 2",
+      "start_date": "2/3/2025",
+      "end_date": "2/9/2025",
+      "files": [
+        {
+          "name": "Week 2 schedule.pdf"
+        },
+        {
+          "name": "ANC L18 到时候再说吧 Text.pdf"
+        },
+        {
+          "name": "ANC-18 到时候再说吧-study guide.pdf"
+        },
+        {
+          "name": "ANC-18 到时候再说吧-study guide Traditional character.pdf"
+        },
+        {
+          "name": "Oh,China-18 饭桌上的客套-study guide .pdf"
+        },
+        {
+          "name": "Oh, China-18 飯桌上的客套 study guide Traditional.pdf"
+        },
+        {
+          "name": "ANC L18 到时候再说吧 Text.wav"
+        },
+        {
+          "name": "ANC L18 到时候再说吧 Vocabulary.wav"
+        },
+        {
+          "name": "OC L18 饭桌上的客套 Text.wav"
+        },
+        {
+          "name": "OC L18 饭桌上的客套 Vocabulary.wav"
+        },
+        {
+          "name": "ANC L18 到时候再说吧 character worksheet.pdf"
+        },
+        {
+          "name": "ANC L18 到时候再说吧 character worksheet Traditional.pdf"
+        },
+        {
+          "name": "OC L18 饭桌上的客套 character worksheet.pdf"
+        },
+        {
+          "name": "OC L18 饭桌上的客套 character worksheet Traditional.pdf"
+        }
+      ],
+      "assignments": [
+        {
+          "name": "作文 1 outline",
+          "files": []
+        },
+        {
+          "name": "Week 2 语法作业",
+          "files": []
+        },
+        {
+          "name": "春节的习俗",
+          "files": []
+        }
+      ],
+      "events": [
+        {
+          "name": "L18 到时候再说吧 小考",
+          "files": []
+        }
+      ]
+    },
+    {
+      "name": "Week 3",
+      "start_date": "2/10/2025",
+      "end_date": "2/16/2025",
+      "files": [
+        {
+          "name": "Week 3 schedule.pdf"
+        },
+        {
+          "name": "A New China L15 北京的夜市 Text.pdf"
+        },
+        {
+          "name": "ATC-14 北京的早晨-study guide.pdf"
+        },
+        {
+          "name": "ATC-L14 北京的早晨 Study guide - traditional.pdf"
+        },
+        {
+          "name": "ANC-15 北京的夜市-study guide.pdf"
+        },
+        {
+          "name": "ANC-L15 北京的夜市 Study guide - traditional.pdf"
+        },
+        {
+          "name": "A Trip to China - L14 - Text.mp3"
+        },
+        {
+          "name": "A Trip to China - L14 - Vocabulary.mp3"
+        },
+        {
+          "name": "ANC L15 北京的夜市 Text.mp3"
+        },
+        {
+          "name": "ANC L15 北京的夜市 Vocabulary.mp3"
+        },
+        {
+          "name": "A trip to China-Lesson 14 Characters.pdf"
+        },
+        {
+          "name": "A trip to China-Lesson 14 Characters Traditional.pdf"
+        },
+        {
+          "name": "ANC L15 北京的夜市 characters.pdf"
+        },
+        {
+          "name": "ANC L15 北京的夜市 characters Traditional.pdf"
+        }
+      ],
+      "assignments": [
+        {
+          "name": "作文 1",
+          "files": []
+        },
+        {
+          "name": "Week 3 语法作业",
+          "files": []
+        },
+        {
+          "name": "周考一 Weekly Test 1",
+          "files": []
+        },
+        {
+          "name": "周考一 Oral Task (practice quiz)",
+          "files": []
+        }
+      ],
+      "events": [
+        {
+          "name": "L14 北京的早晨 小考",
+          "files": []
+        }
+      ]
+    },
+    {
+      "name": "Week 4",
+      "start_date": "2/17/2025",
+      "end_date": "2/23/2025",
+      "files": [
+        {
+          "name": "Week 4 schedule.pdf"
+        },
+        {
+          "name": "ATC-16 北京的交通 Study guide.pdf"
+        },
+        {
+          "name": "ATC-16 北京的交通 Study guide Traditional characters.pdf"
+        },
+        {
+          "name": "ATC-20 麦当劳 Study guide.pdf"
+        },
+        {
+          "name": "ATC-20 麥當勞 Study guide Traditional characters.pdf"
+        },
+        {
+          "name": "A Trip to China - L16 - Text.mp3"
+        },
+        {
+          "name": "A Trip to China - L16 - Vocabulary.mp3"
+        },
+        {
+          "name": "A Trip to China - L20 - Text.mp3"
+        },
+        {
+          "name": "A Trip to China - L20 - Vocabulary.mp3"
+        },
+        {
+          "name": "A trip to China-Lesson 16.pdf"
+        },
+        {
+          "name": "A trip to China-Lesson 20.pdf"
+        },
+        {
+          "name": "A trip to China-Lesson 16 Traditional.pdf"
+        },
+        {
+          "name": "A trip to China-Lesson 20 Traditional.pdf"
+        }
+      ],
+      "assignments": [
+        {
+          "name": "作文 2 Outline",
+          "files": []
+        },
+        {
+          "name": "Week 4 语法作业",
+          "files": []
+        },
+        {
+          "name": "我最喜欢的地方",
+          "files": []
+        },
+        {
+          "name": "周考二 Weekly Test 2",
+          "files": []
+        },
+        {
+          "name": "周考二 Oral Task",
+          "files": []
+        }
+      ],
+      "events": [
+        {
+          "name": "L16 北京的交通 小考",
+          "files": []
+        }
+      ]
+    },
+    {
+      "name": "Week 5",
+      "start_date": "2/24/2025",
+      "end_date": "3/2/2025",
+      "files": [
+        {
+          "name": "Week 5 schedule.pdf"
+        },
+        {
+          "name": "《A New China》- 中国制造 Text.pdf"
+        },
+        {
+          "name": "ATC-22体育和爱国 Study Guide.pdf"
+        },
+        {
+          "name": "ATC-22 體育和愛國 Study Guide 繁體.pdf"
+        },
+        {
+          "name": "ANC-24 中国制造-study guide.pdf"
+        },
+        {
+          "name": "ANC-24 中國製造 Study guide 繁體.pdf"
+        },
+        {
+          "name": "A Trip to China - L22 - Text.mp3"
+        },
+        {
+          "name": "A Trip to China - L22 - Vocabulary.mp3"
+        },
+        {
+          "name": "ANC 24 中国制造 Text.mp3"
+        },
+        {
+          "name": "ANC 24 中国制造 生词.mp3"
+        },
+        {
+          "name": "A trip to China-Lesson 22.pdf"
+        },
+        {
+          "name": "A trip to China-Lesson 22 Traditional.pdf"
+        },
+        {
+          "name": "ANC-24 中国制造 character worksheet.pdf"
+        },
+        {
+          "name": "ANC-24 中國製造 character worksheet Traditional.pdf"
+        }
+      ],
+      "assignments": [
+        {
+          "name": "作文 2",
+          "files": []
+        },
+        {
+          "name": "周考三 Weekly Test 3",
+          "files": []
+        },
+        {
+          "name": "周考三 Oral Task",
+          "files": []
+        },
+        {
+          "name": "Midterm Oral Presentation Essay",
+          "files": []
+        }
+      ],
+      "events": [
+        {
+          "name": "L22 体育和爱国 小考",
+          "files": []
+        }
+      ]
+    },
+    {
+      "name": "Week 6",
+      "start_date": "3/3/2025",
+      "end_date": "3/9/2025",
+      "files": [
+        {
+          "name": "Week 6 schedule.pdf"
+        },
+        {
+          "name": "ANC L27 铁饭碗打破了 Text.pdf"
+        },
+        {
+          "name": "ANC L27 铁饭碗打破了 Study Guide.pdf"
+        },
+        {
+          "name": "ANC L26 鐵飯碗打破了 Study Guide 繁體.pdf"
+        },
+        {
+          "name": "L27 铁饭碗打破了 生词.mp3"
+        },
+        {
+          "name": "L27 铁饭碗打破了 课文.mp3"
+        },
+        {
+          "name": "ANC L26 铁饭碗打破了 character worksheet.pdf"
+        },
+        {
+          "name": "ANC L26 鐵飯碗打破了 character worksheet Traditional.pdf"
+        },
+        {
+          "name": "Midterm Review 1 W1 W2.pdf"
+        },
+        {
+          "name": "Midterm Reivew 2 W 345.pdf"
+        }
+      ],
+      "assignments": [
+        {
+          "name": "ANC L26 铁饭碗打破了",
+          "files": []
+        },
+        {
+          "name": "Midterm Oral exam - Impromptu Speech",
+          "files": []
+        },
+        {
+          "name": "Midterm Oral Presentation",
+          "files": []
+        },
+        {
+          "name": "期中笔试 Midterm Written Exam",
+          "files": []
+        }
+      ],
+      "events": [
+        {
+          "name": "Midterm Oral exam - Impromptu Speech",
+          "files": []
+        },
+        {
+          "name": "Midterm Oral Presentation",
+          "files": []
+        },
+        {
+          "name": "期中笔试 Midterm Written Exam",
+          "files": []
+        }
+      ]
+    },
+    {
+      "name": "Week 7",
+      "start_date": "3/17/2025",
+      "end_date": "3/23/2025",
+      "files": [
+        {
+          "name": "Week 7 schedule.pdf"
+        },
+        {
+          "name": "ANC L29 高考 Text.pdf"
+        },
+        {
+          "name": "ANC L38 开放留学政策 Text.pdf"
+        },
+        {
+          "name": "ANC L29 高考 Study Guide.pdf"
+        },
+        {
+          "name": "ANC L29 高考 Study Guide 繁體.pdf"
+        },
+        {
+          "name": "ANC L38 开放留学政策 Study Guide.pdf"
+        },
+        {
+          "name": "ANC L38 開放留學政策 Study Guide 繁体.pdf"
+        },
+        {
+          "name": "ANC L29 高考 生词.mp3"
+        },
+        {
+          "name": "ANC L29 高考 课文.mp3"
+        },
+        {
+          "name": "ANC L38 开放留学政策 生词.mp3"
+        },
+        {
+          "name": "ANC L38 开放留学政策 课文.mp3"
+        },
+        {
+          "name": "ANC L29 高考 character worksheet.pdf"
+        },
+        {
+          "name": "ANC L29 高考 character worksheet 繁體.pdf"
+        },
+        {
+          "name": "ANC L38 开放留学政策 character worksheet.pdf"
+        },
+        {
+          "name": "ANC L38 開放留學政策 character worksheet 繁體.pdf"
+        },
+        {
+          "name": "ANC L39 现音 Study Guide.pdf"
+        },
+        {
+          "name": "ANC L39 现音 Study Guide 繁體.pdf"
+        }
+      ],
+      "assignments": [
+        {
+          "name": "Week 7 语法作业",
+          "files": []
+        },
+        {
+          "name": "周考四 Weekly Test 4",
+          "files": []
+        },
+        {
+          "name": "周考四 Oral Task",
+          "files": []
+        }
+      ],
+      "events": []
+    },
+    {
+      "name": "Week 8",
+      "start_date": "3/24/2025",
+      "end_date": "3/30/2025",
+      "files": [
+        {
+          "name": "Week 8 schedule.pdf"
+        },
+        {
+          "name": "ATC L27 家里的小皇帝 Study guide updated.pdf"
+        },
+        {
+          "name": "ATC L27 家裡的小皇帝 Study Guide updated 繁体.pdf"
+        },
+        {
+          "name": "ATC L28 读书和考试 study guide.pdf"
+        },
+        {
+          "name": "ATC L28 讀書和考試 Study guide 繁体.pdf"
+        },
+        {
+          "name": "A Trip to China - L27 - Text.mp3"
+        },
+        {
+          "name": "A Trip to China - L27 - Vocabulary.mp3"
+        },
+        {
+          "name": "A Trip to China - L28 - Text.mp3"
+        },
+        {
+          "name": "A Trip to China - L28 - Vocabulary.mp3"
+        },
+        {
+          "name": "A trip to China-Lesson 27.pdf"
+        },
+        {
+          "name": "A trip to China-Lesson 28.pdf"
+        },
+        {
+          "name": "A trip to China-Lesson 27 繁体.pdf"
+        },
+        {
+          "name": "A trip to China-Lesson 28 繁体.pdf"
+        }
+      ],
+      "assignments": [
+        {
+          "name": "Week 8 语法作业",
+          "files": []
+        },
+        {
+          "name": "周考五 Weekly Test 5",
+          "files": []
+        },
+        {
+          "name": "周考五 Oral task",
+          "files": []
+        }
+      ],
+      "events": [
+        {
+          "name": "ATC L27 家里的小皇帝 小考",
+          "files": []
+        }
+      ]
+    },
+    {
+      "name": "Week 9",
+      "start_date": "3/31/2025",
+      "end_date": "4/6/2025",
+      "files": [
+        {
+          "name": "Week 9 schedule.pdf"
+        },
+        {
+          "name": "OC L19 美国的华侨 study guide.pdf"
+        },
+        {
+          "name": "OC L19 美國的華僑 Study guide 繁体.pdf"
+        },
+        {
+          "name": "OC L20 华裔需不需要政治代表 Study guide.pdf"
+        },
+        {
+          "name": "OC L20 華裔需不需要政治代表 Study guide 繁体.pdf"
+        },
+        {
+          "name": "OC L19 美国的华侨 Vocabulary.m4a"
+        },
+        {
+          "name": "OC L19 美国的华侨 Text.m4a"
+        },
+        {
+          "name": "Oh, China! - L20 - Vocabulary.mp3"
+        },
+        {
+          "name": "Oh, China! - L20 - Text.mp3"
+        },
+        {
+          "name": "OC L19 美国的华侨 character worksheet.pdf"
+        },
+        {
+          "name": "OC L19 美國的華僑 character worksheet 繁體.pdf"
+        },
+        {
+          "name": "Oh, China- Lesson 20.pdf"
+        },
+        {
+          "name": "Oh, China- Lesson 20 Traditional.pdf"
+        }
+      ],
+      "assignments": [
+        {
+          "name": "作文 3 Interview Report",
+          "files": []
+        },
+        {
+          "name": "Week 9 语法作业",
+          "files": []
+        },
+        {
+          "name": "高考/留学",
+          "files": []
+        },
+        {
+          "name": "周考六 Weekly Test 6",
+          "files": []
+        },
+        {
+          "name": "周考六 Oral Task",
+          "files": []
+        }
+      ],
+      "events": [
+        {
+          "name": "OC L19 美国的华侨 小考",
+          "files": []
+        }
+      ]
+    },
+    {
+      "name": "Week 10",
+      "start_date": "4/7/2025",
+      "end_date": "4/13/2025",
+      "files": [
+        {
+          "name": "Week 10 schedule.pdf"
+        },
+        {
+          "name": "ATC L33 现在好还是从前好 Study Guide.pdf"
+        },
+        {
+          "name": "ATC L33 現在好還是從前好 Study Guide 繁体.pdf"
+        },
+        {
+          "name": "OC L22 双语教育 Study guide.pdf"
+        },
+        {
+          "name": "OC L22 雙語教育 Study guide 繁体.pdf"
+        },
+        {
+          "name": "ATC L33 现在好还是从前好 Text.m4a"
+        },
+        {
+          "name": "ATC L33 现在好还是从前好 Vocabulary.m4a"
+        },
+        {
+          "name": "OC L22 双语教育 Text.m4a"
+        },
+        {
+          "name": "OC L22 双语教育 Vocabulary.m4a"
+        },
+        {
+          "name": "ATC L33 现在好还是从前好 Character worksheets.pdf"
+        },
+        {
+          "name": "ATC L33 现在好还是从前好 Character worksheets 繁体.pdf"
+        },
+        {
+          "name": "OC L22 双语教育 Character worksheets.pdf"
+        },
+        {
+          "name": "OC L22 双语教育 Character worksheets 繁体.pdf"
+        }
+      ],
+      "assignments": [
+        {
+          "name": "Format and Topic",
+          "files": []
+        },
+        {
+          "name": "Week 10 语法作业",
+          "files": []
+        },
+        {
+          "name": "听写比赛（二）",
+          "files": []
+        },
+        {
+          "name": "周考七 Weekly Test 7",
+          "files": []
+        },
+        {
+          "name": "周考七 Oral Task",
+          "files": []
+        }
+      ],
+      "events": [
+        {
+          "name": "ATC L33 现在好还是从前好 小考",
+          "files": []
+        }
+      ]
+    },
+    {
+      "name": "Week 11",
+      "start_date": "4/14/2025",
+      "end_date": "4/20/2025",
+      "files": [
+        {
+          "name": "Week 11 schedule.pdf"
+        },
+        {
+          "name": "ATC L25 中国的妇女 Study guide.pdf"
+        },
+        {
+          "name": "ATC L25 中国的婦女 Study Guide 繁体.pdf"
+        },
+        {
+          "name": "ATC L26 离婚 Study Guide.pdf"
+        },
+        {
+          "name": "ATC L26 離婚 Study guide 繁体.pdf"
+        },
+        {
+          "name": "A Trip to China - L25 - Text.mp3"
+        },
+        {
+          "name": "A Trip to China - L25 - Vocabulary.mp3"
+        },
+        {
+          "name": "A Trip to China - L26 - Text.mp3"
+        },
+        {
+          "name": "A Trip to China - L26 - Vocabulary.mp3"
+        },
+        {
+          "name": "A trip to China-Lesson 25.pdf"
+        },
+        {
+          "name": "A trip to China-Lesson 26.pdf"
+        },
+        {
+          "name": "A trip to China-Lesson 25 繁体.pdf"
+        },
+        {
+          "name": "A trip to China-Lesson 26 繁体.pdf"
+        }
+      ],
+      "assignments": [
+        {
+          "name": "作文4 Debate Outline",
+          "files": []
+        },
+        {
+          "name": "期末口语报告 Final Oral Project Outline (Group or individual submission)",
+          "files": []
+        },
+        {
+          "name": "Week 11 语法作业",
+          "files": []
+        },
+        {
+          "name": "辩论Debate",
+          "files": []
+        },
+        {
+          "name": "周考八 Weekly Test 8",
+          "files": []
+        },
+        {
+          "name": "周考八 Oral Task",
+          "files": []
+        }
+      ],
+      "events": [
+        {
+          "name": "ATC L25 中国的妇女 小考",
+          "files": []
+        }
+      ]
+    },
+    {
+      "name": "Week 12",
+      "start_date": "4/21/2025",
+      "end_date": "4/27/2025",
+      "files": [
+        {
+          "name": "Week 12 schedule.pdf"
+        },
+        {
+          "name": "OC L23人权和贸易 Study guide.pdf"
+        },
+        {
+          "name": "OC L23 人權與貿易 Study guide 繁体.pdf"
+        },
+        {
+          "name": "OC L31 中国人的衣食住行 Study guide.pdf"
+        },
+        {
+          "name": "OC L31 中國人的衣食住行 Study guide 繁体.pdf"
+        },
+        {
+          "name": "Oh, China! - L23 - Text.mp3"
+        },
+        {
+          "name": "Oh, China! - L23 - Vocabulary.mp3"
+        },
+        {
+          "name": "Oh, China! - L31 - Text.mp3"
+        },
+        {
+          "name": "Oh, China! - L31 - Vocabulary.mp3"
+        },
+        {
+          "name": "Oh, China- Lesson 23.pdf"
+        },
+        {
+          "name": "Oh, China- Lesson 31.pdf"
+        },
+        {
+          "name": "Oh, China- Lesson 23 Traditional.pdf"
+        },
+        {
+          "name": "Oh, China- Lesson 31 Traditional.pdf"
+        }
+      ],
+      "assignments": [
+        {
+          "name": "期末口语报告 Final Oral Project Script",
+          "files": []
+        }
+      ],
+      "events": [
+        {
+          "name": "L23 人权和贸易 小考",
+          "files": []
+        }
+      ]
+    },
+    {
+      "name": "Week 13",
+      "start_date": "4/28/2025",
+      "end_date": "5/4/2025",
+      "files": [
+        {
+          "name": "Week 13 schedule.pdf"
+        },
+        {
+          "name": "CHI108 2025S Final Review-1.pdf"
+        },
+        {
+          "name": "S25 CHI108 Final Review 2.pdf"
+        },
+        {
+          "name": "S2025 CHI108 Final Review 3.pdf"
+        }
+      ],
+      "assignments": [
+        {
+          "name": "期末口语报告 video link/presentation slides submission",
+          "files": []
+        },
+        {
+          "name": "期末即兴表达 Final Impromptu Speech",
+          "files": []
+        },
+        {
+          "name": "期末口语报告 Final Oral Project",
+          "files": []
+        }
+      ],
+      "events": []
+    },
+    {
+      "name": "Week 14",
+      "start_date": "4/28/2025",
+      "end_date": "5/4/2025",
+      "files": [],
+      "assignments": [
+        {
+          "name": "期末口语报告 video link/presentation slides submission",
+          "files": []
+        },
+        {
+          "name": "期末即兴表达 Final Impromptu Speech",
+          "files": []
+        },
+        {
+          "name": "期末口语报告 Final Oral Project",
+          "files": []
+        }
+      ],
+      "events": [
+        {
+          "name": "Reading Period",
+          "files": []
+        }
+      ]
+    },
+    {
+      "name": "Week 15",
+      "start_date": "5/5/2025",
+      "end_date": "5/11/2025",
+      "files": [],
+      "assignments": [
+        {
+          "name": "期末笔试 Final Written Exam",
+          "files": []
+        }
+      ],
+      "events": [
+        {
+          "name": "Final Written Exam",
+          "files": []
+        }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "L11 Privacy 小考",
+      "due_at": "1/29/2025"
+    },
+    {
+      "name": "L18 到时候再说吧 小考",
+      "due_at": "2/5/2025"
+    },
+    {
+      "name": "L14 北京的早晨 小考",
+      "due_at": "2/12/2025"
+    },
+    {
+      "name": "L16 北京的交通 小考",
+      "due_at": "2/19/2025"
+    },
+    {
+      "name": "L22 体育和爱国 小考",
+      "due_at": "2/26/2025"
+    },
+    {
+      "name": "ATC L27 家里的小皇帝 小考",
+      "due_at": "3/26/2025"
+    },
+    {
+      "name": "OC L19 美国的华侨 小考",
+      "due_at": "4/2/2025"
+    },
+    {
+      "name": "ATC L33 现在好还是从前好 小考",
+      "due_at": "4/9/2025"
+    },
+    {
+      "name": "ATC L25 中国的妇女 小考",
+      "due_at": "4/16/2025"
+    },
+    {
+      "name": "L23 人权和贸易 小考",
+      "due_at": "4/23/2025"
+    }
+  ]
+}
