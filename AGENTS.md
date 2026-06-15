@@ -120,3 +120,16 @@ Known course-specific rules still in `format.py` (candidates to generalize): ASA
 - Never swap in the JS `buildWeeklySchedule` output as the eval weekly schedule.
 - Do not commit `.env`, cookies, or API keys.
 - Weekly aggregate excludes courses with empty `weekly_schedule` GT.
+
+## Cursor Cloud specific instructions
+
+Dependencies are installed by the startup update script (`npm install` for the Electron app + `pip install --user` for the Python pipeline: `pytest PyMuPDF openai anthropic ollama python-dotenv python-docx python-pptx numpy requests`). There is no Python manifest in the repo, so that explicit list is the source of truth. The `pytest`/`dotenv`/`pymupdf` console scripts land in `~/.local/bin`, which is not on `PATH`; invoke tools as modules (e.g. `python3 -m pytest`).
+
+Non-obvious caveats:
+
+- **Python tests must run with `-s`**: `python3 -m pytest tests/ -q -s`. `parser.py` calls `sys.stdin.reconfigure(...)` at import time; under pytest's default captured stdin this raises `AttributeError: 'DontReadFromInput' object has no attribute 'reconfigure'` and aborts collection of any test that imports `parser` (e.g. `tests/test_normalize_date.py`). `-s` (no capture) keeps the real stdin and all tests pass. JS tests run normally with `npm test` (`node --test`).
+- **Weekly eval exit code**: `python -m canvas_parser.weekly_iteration [--llm]` exits `1` whenever aggregate accuracy is below the `--target` (default 0.97). That is the pass/fail signal, not a crash. Report is written to `.cache/weekly_iteration/report.json`. Without a `.cache/weekly_iteration/graph_eval.json`, `--llm` logs a warning and falls back to heuristics-only.
+- **Running the Electron app on Linux**: the `package.json` `start` scripts use Windows `set` syntax and do not work as-is. Launch directly with `DISPLAY=:1 NUCLEUS_THEME=default ./node_modules/.bin/electron . --no-sandbox` (a display is available at `:1`; theme is `default`/`dark`/`white`).
+- **`python` vs `python3`**: `main.js` spawns child processes via `spawn('python', ...)` (`vector_retreival.py`, `sidekick.py`). The system only ships `python3`, so a `python` -> `python3` symlink is required or the app dies with a fatal `spawn python ENOENT` uncaught exception on startup. A symlink at `/usr/local/bin/python` (on `PATH`) satisfies this.
+- **Optional integrations degrade gracefully**: with no secrets set (`OPENAI_API_KEY`, `DEEP_SEEK_API_KEY`, `ANTHROPIC_API_KEY`, `BRAVE_API_KEY`, Canvas auth, Gmail OAuth, local Ollama), the eval/tests still run, and the GUI still opens — the `vector_retreival.py`/`sidekick.py` child processes just error out and close while the main window stays up. The embedded browser (Canvas/Synapse/Mail tiles) loads real external sites without secrets.
+- The `eval:context` / `test:context` scripts also need committed runtime artifacts (`canvas_graph.json`, `canvas_data.json`) that are gitignored; their JS portions pass but the Python portion exits early with `Missing canvas_graph.json` when those files are absent. This is expected, not a setup failure.
