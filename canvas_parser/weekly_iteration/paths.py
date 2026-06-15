@@ -15,6 +15,10 @@ def default_snapshot_path(root: Path) -> Path:
     return cache_dir(root) / 'snapshots_enriched.json'
 
 
+def fixture_snapshot_path(root: Path) -> Path:
+    return root / 'fixtures' / 'weekly_iteration' / 'snapshots_gt.json'
+
+
 def default_graph_cache_path(root: Path) -> Path:
     return cache_dir(root) / 'graph_eval.json'
 

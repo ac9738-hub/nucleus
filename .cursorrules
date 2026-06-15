@@ -1,0 +1,9 @@
+# Nucleus — weekly schedule cloud agent
+
+Follow `AGENTS.md` for the full iteration loop. Target ≥97% aggregate weekly accuracy on `ground-truth/` courses.
+
+**Pipeline:** heuristics in `canvas_parser/weekly_iteration/format.py` first; parser graph (`--llm`) only enriches missing dated events — never replace the full weekly schedule with JS `buildWeeklySchedule`.
+
+**Eval:** `python -m canvas_parser.weekly_iteration --llm` → read `.cache/weekly_iteration/report.json`. After logic changes: `python -m pytest tests/test_weekly_iteration.py -q`.
+
+**Guardrails:** general layout/submission-type patterns only; no ground-truth title literals or course-specific date anchors.

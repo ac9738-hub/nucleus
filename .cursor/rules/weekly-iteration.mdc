@@ -1,0 +1,31 @@
+---
+description: Weekly schedule bucketing and parser graph enrichment against ground truth
+globs: canvas_parser/weekly_iteration/**,canvas_parser/graph/events.py,parser.py,ground-truth/**,fixtures/weekly_iteration/**
+alwaysApply: false
+---
+
+# Weekly iteration
+
+Read `AGENTS.md` before editing. Improve **weekly_schedule** accuracy only.
+
+## Edit map
+
+| Change | File |
+|--------|------|
+| Module/file/assignment bucketing | `format.py` |
+| Parser event → week placement | `weekly.py` |
+| Exam/event dates in graph | `graph/events.py`, `parser.py` |
+| Fuzzy match / scoring | `evaluate.py`, `match_utils.py` |
+
+## Loop
+
+1. `python -m canvas_parser.weekly_iteration --llm`
+2. Fix top misses from `.cache/weekly_iteration/report.json`
+3. `python -m pytest tests/test_weekly_iteration.py -q`
+4. Stop at ≥97% aggregate or when fixes need GT literals (overfitting)
+
+## Do not
+
+- Swap in JS `buildWeeklySchedule` output for eval weekly schedule
+- Add exact GT titles, event names, or calendar dates for one course
+- Commit `.env`, cookies, or API keys

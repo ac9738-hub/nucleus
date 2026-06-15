@@ -13,7 +13,12 @@ from .course_match import find_snapshot_for_ground_truth, parse_ground_truth_fil
 from .evaluate import evaluate_snapshots
 from .fetch import load_snapshots
 from .llm_parse import run_parser_for_snapshots
-from .paths import default_graph_cache_path, default_report_path, default_snapshot_path
+from .paths import (
+    default_graph_cache_path,
+    default_report_path,
+    default_snapshot_path,
+    fixture_snapshot_path,
+)
 
 
 def _ground_truth_snapshots(snapshots: list[dict], gt_dir: Path) -> list[dict]:
@@ -26,7 +31,20 @@ def _ground_truth_snapshots(snapshots: list[dict], gt_dir: Path) -> list[dict]:
     return selected
 
 
-def _load_graph(root: Path, args: argparse.Namespace) -> dict:
+def _resolve_snapshot_path(root: Path, snapshot_arg: str) -> Path:
+    snapshot_path = Path(snapshot_arg)
+    if not snapshot_path.is_absolute():
+        snapshot_path = root / snapshot_path
+    if snapshot_path.is_file():
+        return snapshot_path
+    fixture_path = fixture_snapshot_path(root)
+    if fixture_path.is_file():
+        print(f'Using committed fixture snapshot: {fixture_path}')
+        return fixture_path
+    raise FileNotFoundError(snapshot_path)
+
+
+def _load_graph(root: Path, args: argparse.Namespace, snapshot_path: Path) -> dict:
     if args.graph_cache:
         graph_path = Path(args.graph_cache)
         if not graph_path.is_absolute():
@@ -41,10 +59,15 @@ def _load_graph(root: Path, args: argparse.Namespace) -> dict:
         print(f'Using cached parser graph: {graph_path}')
         return json.loads(graph_path.read_text(encoding='utf-8'))
 
+    if not args.refresh_graph:
+        print(
+            'Parser graph cache missing; continuing with heuristics only '
+            '(pass --refresh-graph to rebuild; needs Canvas auth + DEEP_SEEK_API_KEY).',
+            file=sys.stderr,
+        )
+        return {}
+
     auth = load_auth_from_env(root)
-    snapshot_path = Path(args.snapshot)
-    if not snapshot_path.is_absolute():
-        snapshot_path = root / snapshot_path
     snapshots = load_snapshots(snapshot_path)
     gt_snapshots = _ground_truth_snapshots(snapshots, root / args.ground_truth_dir)
     if not gt_snapshots:
@@ -93,7 +116,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument('--ground-truth-dir', default='ground-truth')
     parser.add_argument('--snapshot', default=str(default_snapshot_path(root)))
     parser.add_argument('--report', default=str(default_report_path(root)))
-    parser.add_argument('--target', type=float, default=0.90)
+    parser.add_argument('--target', type=float, default=0.97)
     parser.add_argument('--llm', action='store_true', help='Enrich weekly events from parser graph')
     parser.add_argument('--graph-cache', help='Use cached parser graph instead of re-running parser.py')
     parser.add_argument('--refresh-graph', action='store_true', help='Re-run parser.py even if cache exists')
@@ -101,11 +124,10 @@ def main(argv: list[str] | None = None) -> int:
 
     root = Path(args.root)
     gt_dir = root / args.ground_truth_dir
-    snapshot_path = Path(args.snapshot)
-    if not snapshot_path.is_absolute():
-        snapshot_path = root / snapshot_path
-    if not snapshot_path.is_file():
-        print(f'Snapshot not found: {snapshot_path}', file=sys.stderr)
+    try:
+        snapshot_path = _resolve_snapshot_path(root, args.snapshot)
+    except FileNotFoundError:
+        print(f'Snapshot not found: {root / args.snapshot}', file=sys.stderr)
         print(
             'Fetch once with: python -m canvas_parser.weekly_iteration.fetch_snapshots --enrich-pages',
             file=sys.stderr,
@@ -113,7 +135,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     snapshots = load_snapshots(snapshot_path)
-    graph = _load_graph(root, args)
+    graph = _load_graph(root, args, snapshot_path)
     mode = 'heuristic+parser_graph' if args.llm else 'heuristic_only'
 
     results = evaluate_snapshots(
@@ -125,7 +147,14 @@ def main(argv: list[str] | None = None) -> int:
         weekly_only=True,
     )
 
-    aggregate = sum(result.accuracy for result in results) / len(results) if results else 0.0
+    weekly_results = [
+        result for result in results
+        if (result.sections.get('weekly_schedule') and result.sections['weekly_schedule'].total > 0)
+    ]
+    aggregate = (
+        sum(result.accuracy for result in weekly_results) / len(weekly_results)
+        if weekly_results else 0.0
+    )
     report = _build_report(results, aggregate, mode=mode, target=args.target)
 
     report_path = Path(args.report)
