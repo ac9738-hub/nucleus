@@ -12,7 +12,7 @@ const { app, BrowserWindow, ipcMain, WebContentsView, session, webFrameMain, glo
 const path = require('path');
 const fs = require('fs')
 const { spawn } = require('child_process')
-const {open_canvas_auth_window, get_auth_token, get_auth_csrf, get_base_url} = require('./app/canvas/auth')
+const {open_canvas_auth_window, get_auth_token, get_auth_csrf, get_base_url, clear_auth_state} = require('./app/canvas/auth')
 const { createAgentProcess } = require('./agent-process')
 const { createDataStore } = require('./data-store')
 const { createContextStore } = require('./context-store')
@@ -34,7 +34,7 @@ const {
   normalizeFrameUrl,
   sameTabId
 } = require('./tab-utils')
-const { createCanvasApi } = require('./app/canvas/api')
+const { createCanvasApi, clearCanvasAuthFromEnv, killParserProcess } = require('./app/canvas/api')
 const { createSynapseClient } = require('./app/synapse/client')
 const {
   getThemeSelection,
@@ -1949,7 +1949,29 @@ function loadCanvasAuthFromEnv() {
 function clearCanvasAuthState() {
   canvas_auth_cookie = null
   canvas_auth_csrf = null
+  canvas_base_url = null
   canvasAuthValidated = false
+}
+
+async function clearCanvasSessionCookies(baseUrl, targetSession = session.defaultSession) {
+  if (!baseUrl) return
+  try {
+    const origin = new URL(baseUrl).origin
+    const cookies = await targetSession.cookies.get({ url: origin })
+    await Promise.all(cookies.map(cookie => targetSession.cookies.remove(origin, cookie.name)))
+  } catch (error) {
+    console.warn('Unable to clear Canvas session cookies:', error.message || error)
+  }
+}
+
+async function logoutCanvas() {
+  const savedBaseUrl = canvas_base_url || getEnvValue('CANVAS_BASE_URL')
+  clearCanvasAuthState()
+  clear_auth_state()
+  clearCanvasAuthFromEnv(envPath)
+  killParserProcess()
+  await clearCanvasSessionCookies(savedBaseUrl)
+  return { ok: true }
 }
 
 const CANVAS_SYNC_RELATIVE_PATHS = [
@@ -5680,6 +5702,17 @@ app.whenReady().then(() => {
   })
 
   ipcMain.handle('canvas:clear_sync_data', () => clearCanvasSyncData())
+
+  ipcMain.handle('canvas:logout', async () => {
+    try {
+      return await logoutCanvas()
+    } catch (error) {
+      return {
+        ok: false,
+        error: error && error.message ? error.message : String(error)
+      }
+    }
+  })
 
   // surface:scrolled — the active WebContentsView (web or Canvas) reports a scroll
   // position change so the main process can refresh the render-context screen slice

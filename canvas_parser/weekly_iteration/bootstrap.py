@@ -6,9 +6,10 @@ import json
 import shutil
 from pathlib import Path
 
-from .course_match import find_snapshot_for_ground_truth, parse_ground_truth_filename
+from .course_match import find_snapshot_for_ground_truth, iter_ground_truth_files, parse_ground_truth_filename
 from .fetch import load_snapshots
 from .paths import default_snapshot_path, fixture_snapshot_path
+from .students import get_profile
 
 
 def export_gt_fixtures(
@@ -28,7 +29,7 @@ def export_gt_fixtures(
     out = output_path or fixture_snapshot_path(root)
     snapshots = load_snapshots(source)
     selected = []
-    for gt_path in sorted(gt_dir.glob('*.json')):
+    for gt_path in iter_ground_truth_files(gt_dir):
         spec = parse_ground_truth_filename(gt_path.name)
         snapshot = find_snapshot_for_ground_truth(snapshots, spec)
         if snapshot:
@@ -65,6 +66,11 @@ def main(argv: list[str] | None = None) -> int:
 
     export_cmd = sub.add_parser('export-fixtures', help='Export GT courses from cache to fixtures/')
     export_cmd.add_argument('--snapshot', help='Source snapshot (default: .cache/.../snapshots_enriched.json)')
+    export_cmd.add_argument(
+        '--holdout',
+        action='store_true',
+        help='Export holdout student fixtures to snapshots_holdout.json',
+    )
 
     seed_cmd = sub.add_parser('seed-cache', help='Copy fixtures into .cache for default eval path')
 
@@ -72,9 +78,15 @@ def main(argv: list[str] | None = None) -> int:
     root = Path(args.root)
 
     if args.command == 'export-fixtures':
-        snapshot = Path(args.snapshot) if args.snapshot else None
-        out = export_gt_fixtures(root, snapshot_path=snapshot)
-        print(f'Wrote {out} ({out.stat().st_size} bytes)')
+        profile = get_profile(root, 'holdout' if getattr(args, 'holdout', False) else 'primary')
+        snapshot = Path(args.snapshot) if args.snapshot else profile.snapshot_path
+        out = export_gt_fixtures(
+            root,
+            snapshot_path=snapshot,
+            ground_truth_dir=profile.ground_truth_dir,
+            output_path=profile.fixture_snapshot_path,
+        )
+        print(f'Wrote {out} ({out.stat().st_size} bytes) [profile={profile.name}]')
         return 0
 
     if args.command == 'seed-cache':

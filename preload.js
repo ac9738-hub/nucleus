@@ -26,6 +26,7 @@ contextBridge.exposeInMainWorld('nucleus', {
   synapseSend:  (payload) => ipcRenderer.invoke('synapse:send', payload),
   ensureCanvasAuth: () => ipcRenderer.invoke('canvas:ensure_auth'),
   clearCanvasSyncData: () => ipcRenderer.invoke('canvas:clear_sync_data'),
+  logoutCanvas: () => ipcRenderer.invoke('canvas:logout'),
   openCanvasApp: () => ipcRenderer.invoke('canvas:open_app'),
   ensureMailAuth: () => ipcRenderer.invoke('mail:ensure_auth'),
   getMailInbox: () => ipcRenderer.invoke('mail:get_inbox'),

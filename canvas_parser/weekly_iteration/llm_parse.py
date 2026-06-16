@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from .auth import CanvasAuth
+from .limits import MAX_PARSER_BATCH_ITEMS
 
 PARSER_DONE_MARKER = 'parser all passes completed__________________________________________________'
 
@@ -181,6 +182,26 @@ def build_parser_batches(snapshot: dict[str, Any], base_url: str) -> list[dict[s
     return batches
 
 
+def chunk_parser_batches(
+    batches: list[dict[str, Any]],
+    *,
+    max_items: int = MAX_PARSER_BATCH_ITEMS,
+) -> list[dict[str, Any]]:
+    """Split large parser batches so each stdin line stays within a fair item cap."""
+    if max_items <= 0:
+        return batches
+    chunked: list[dict[str, Any]] = []
+    for batch in batches:
+        batch_type = batch.get('type', 'unknown')
+        content = batch.get('content')
+        if not isinstance(content, list) or len(content) <= max_items:
+            chunked.append(batch)
+            continue
+        for index in range(0, len(content), max_items):
+            chunked.append({'type': batch_type, 'content': content[index:index + max_items]})
+    return chunked
+
+
 def _backup_graph(root_dir: Path) -> Path | None:
     graph_path = root_dir / 'canvas_graph.json'
     if not graph_path.is_file():
@@ -249,8 +270,10 @@ def run_parser_batches(
     watcher = threading.Thread(target=_watch_stdout, daemon=True)
     watcher.start()
 
-    for batch in batches:
-        proc.stdin.write(json.dumps(batch, ensure_ascii=False) + '\n')
+    for batch in chunk_parser_batches(batches):
+        line = json.dumps(batch, ensure_ascii=False) + '\n'
+        proc.stdin.write(line)
+        proc.stdin.flush()
     proc.stdin.write('None\n')
     proc.stdin.flush()
     proc.stdin.close()

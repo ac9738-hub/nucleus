@@ -39,6 +39,20 @@ def parse_ground_truth_filename(filename: str) -> GroundTruthSpec:
     )
 
 
+def iter_ground_truth_files(gt_dir) -> list:
+    """Return GT label files only (skip profile.json and other metadata)."""
+    from pathlib import Path
+
+    selected = []
+    for gt_path in sorted(Path(gt_dir).glob('*.json')):
+        try:
+            parse_ground_truth_filename(gt_path.name)
+        except ValueError:
+            continue
+        selected.append(gt_path)
+    return selected
+
+
 def _normalize_code(value: str) -> str:
     return re.sub(r'[^a-z0-9]', '', str(value or '').lower())
 

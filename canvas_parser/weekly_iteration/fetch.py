@@ -11,9 +11,7 @@ import urllib.request
 from typing import Any
 
 from .auth import CanvasAuth
-
-MAX_CONCURRENT = 8
-PER_PAGE = 100
+from .limits import MAX_PAGE_BODY_FETCHES, MAX_PAGINATION_ITEMS, MAX_PAGINATION_PAGES, PER_PAGE
 
 
 class CanvasFetchError(RuntimeError):
@@ -65,10 +63,25 @@ def fetch_json(auth: CanvasAuth, url: str, *, attempts: int = 3) -> Any:
     return None
 
 
-def fetch_paginated(auth: CanvasAuth, url: str, *, attempts: int = 3) -> list[Any]:
+def fetch_paginated(
+    auth: CanvasAuth,
+    url: str,
+    *,
+    attempts: int = 3,
+    max_pages: int = MAX_PAGINATION_PAGES,
+    max_items: int = MAX_PAGINATION_ITEMS,
+) -> list[Any]:
     items: list[Any] = []
     next_url = url
+    pages_fetched = 0
     while next_url:
+        if pages_fetched >= max_pages or len(items) >= max_items:
+            print(
+                f'Warning: pagination cap reached for {url} '
+                f'(pages={pages_fetched}, items={len(items)})',
+                flush=True,
+            )
+            break
         last_error: Exception | None = None
         page = None
         for attempt in range(attempts):
@@ -92,7 +105,18 @@ def fetch_paginated(auth: CanvasAuth, url: str, *, attempts: int = 3) -> list[An
             if last_error:
                 raise CanvasFetchError(f'Network error for {next_url}: {last_error}') from last_error
             break
+        pages_fetched += 1
         if isinstance(page, list):
+            remaining = max_items - len(items)
+            if remaining <= 0:
+                break
+            if len(page) > remaining:
+                items.extend(page[:remaining])
+                print(
+                    f'Warning: pagination item cap reached for {url} ({max_items} items)',
+                    flush=True,
+                )
+                break
             items.extend(page)
         else:
             return [page]
@@ -141,8 +165,17 @@ def fetch_module_items(auth: CanvasAuth, items_url: str) -> list[dict[str, Any]]
 def enrich_snapshot_with_page_bodies(auth: CanvasAuth, snapshot: dict[str, Any]) -> dict[str, Any]:
     page_bodies: dict[str, str] = {}
     seen_urls: set[str] = set()
+    fetched = 0
     for items in (snapshot.get('module_items') or {}).values():
         for item in items:
+            if fetched >= MAX_PAGE_BODY_FETCHES:
+                print(
+                    f'Warning: page-body fetch cap reached ({MAX_PAGE_BODY_FETCHES}) '
+                    f'for course {((snapshot.get("course") or {}).get("id"))}',
+                    flush=True,
+                )
+                snapshot['page_bodies'] = page_bodies
+                return snapshot
             if str(item.get('type') or '').lower() != 'page':
                 continue
             api_url = str(item.get('url') or '').strip()
@@ -153,6 +186,7 @@ def enrich_snapshot_with_page_bodies(auth: CanvasAuth, snapshot: dict[str, Any])
                 page = fetch_json(auth, api_url)
             except CanvasFetchError:
                 continue
+            fetched += 1
             if isinstance(page, dict):
                 page_bodies[api_url] = page.get('body') or ''
     snapshot['page_bodies'] = page_bodies

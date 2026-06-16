@@ -5,7 +5,13 @@
 // app/canvas/api.js after setup.
 const { WebContentsView } = require('electron')
 
-module.exports = { open_canvas_auth_window, get_auth_token, get_auth_csrf, get_base_url }
+module.exports = {
+  open_canvas_auth_window,
+  get_auth_token,
+  get_auth_csrf,
+  get_base_url,
+  clear_auth_state
+}
 
 let authtoken = null
 let csrf = null
@@ -13,13 +19,18 @@ let base_url = null
 let called = false
 
 const filter = {
-  urls: ['*://*.instructure.com/api/v1/*']
+  urls: ['*://*/api/v1/*']
 }
 
 function getHeader(headers, name) {
     const target = name.toLowerCase()
     const key = Object.keys(headers).find(item => item.toLowerCase() === target)
     return key ? headers[key] : null
+}
+
+function isCanvasApiHost(hostname) {
+    const host = String(hostname || '').toLowerCase()
+    return host.includes('instructure.com') || host.includes('canvas')
 }
 
 async function isInstitutionalCanvasPage(view) {
@@ -62,12 +73,21 @@ function open_canvas_auth_window (window, onauth, getauthview, setup = false) {
     ses.webRequest.onBeforeSendHeaders(filter, (details, callback) => {
         callback({ requestHeaders: details.requestHeaders })
 
-        if (!called) {
-            const requestOrigin = new URL(details.url).origin
+        if (called) return
 
-            isInstitutionalCanvasPage(view).then(isCanvasPage => {
-                if (called || !isCanvasPage) return
-                called = true
+        let host = ''
+        try {
+            host = new URL(details.url).hostname
+        } catch (_error) {
+            return
+        }
+        if (!isCanvasApiHost(host)) return
+
+        const requestOrigin = new URL(details.url).origin
+
+        isInstitutionalCanvasPage(view).then(isCanvasPage => {
+            if (called || !isCanvasPage) return
+            called = true
 
             const turl = requestOrigin
             const token = getHeader(details.requestHeaders, 'Cookie')
@@ -92,10 +112,9 @@ function open_canvas_auth_window (window, onauth, getauthview, setup = false) {
                     }
                 }
             }
-            }).catch(error => {
-                console.error("Unable to process Canvas auth interception:", error)
-            })
-        }
+        }).catch(error => {
+            console.error("Unable to process Canvas auth interception:", error)
+        })
     })
     view.webContents.loadURL("https://www.instructure.com/canvas/login")
     view.setBounds({
@@ -129,4 +148,11 @@ function get_base_url() {
         return null
     }
     return base_url
+}
+
+function clear_auth_state() {
+    authtoken = null
+    csrf = null
+    base_url = null
+    called = false
 }

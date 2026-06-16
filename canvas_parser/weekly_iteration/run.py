@@ -10,25 +10,20 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .auth import load_auth_from_env, load_env_file
-from .course_match import find_snapshot_for_ground_truth, parse_ground_truth_filename
+from .course_match import find_snapshot_for_ground_truth, iter_ground_truth_files, parse_ground_truth_filename
 from .evaluate import evaluate_snapshots
 from .fetch import load_snapshots
 from .llm_parse import run_parser_for_snapshots
 from .paths import (
-    default_graph_cache_path,
     default_report_path,
     default_snapshot_path,
-    fixture_snapshot_path,
-    holdout_fixture_snapshot_path,
-    holdout_ground_truth_dir,
-    holdout_report_path,
-    holdout_snapshot_path,
 )
+from .students import StudentProfile, get_profile, holdout_profile
 
 
 def _ground_truth_snapshots(snapshots: list[dict], gt_dir: Path) -> list[dict]:
     selected = []
-    for gt_path in sorted(gt_dir.glob('*.json')):
+    for gt_path in iter_ground_truth_files(gt_dir):
         spec = parse_ground_truth_filename(gt_path.name)
         snapshot = find_snapshot_for_ground_truth(snapshots, spec)
         if snapshot:
@@ -36,13 +31,13 @@ def _ground_truth_snapshots(snapshots: list[dict], gt_dir: Path) -> list[dict]:
     return selected
 
 
-def _resolve_snapshot_path(root: Path, snapshot_arg: str) -> Path:
+def _resolve_snapshot_path(root: Path, snapshot_arg: str, profile: StudentProfile) -> Path:
     snapshot_path = Path(snapshot_arg)
     if not snapshot_path.is_absolute():
         snapshot_path = root / snapshot_path
     if snapshot_path.is_file():
         return snapshot_path
-    fixture_path = fixture_snapshot_path(root)
+    fixture_path = profile.fixture_snapshot_path
     if fixture_path.is_file():
         print(f'Using committed fixture snapshot: {fixture_path}')
         return fixture_path
@@ -61,13 +56,21 @@ def _build_graph_cache(
     snapshot_path: Path,
     ground_truth_dir: Path,
     graph_path: Path,
+    *,
+    profile_name: str,
 ) -> dict:
-    auth = load_auth_from_env(root)
+    profile_obj = get_profile(root, profile_name)
+    auth = load_auth_from_env(root, profile=profile_name)
+    if not auth.is_valid:
+        raise SystemExit(
+            f'Canvas auth for profile {profile_name!r} is missing. '
+            f'Set {profile_obj.auth_cookie_env} and {profile_obj.base_url_env} in .env.'
+        )
     snapshots = load_snapshots(snapshot_path)
     gt_snapshots = _ground_truth_snapshots(snapshots, ground_truth_dir)
     if not gt_snapshots:
         raise SystemExit('No ground-truth courses matched in snapshots.')
-    print(f'Running parser.py for {len(gt_snapshots)} ground-truth course(s)...')
+    print(f'Running parser.py for {len(gt_snapshots)} ground-truth course(s) [{profile_name}]...')
     graph = run_parser_for_snapshots(gt_snapshots, root, auth)
     graph_path.parent.mkdir(parents=True, exist_ok=True)
     graph_path.write_text(json.dumps(graph, indent=2, ensure_ascii=False), encoding='utf-8')
@@ -75,7 +78,12 @@ def _build_graph_cache(
     return graph
 
 
-def _load_graph(root: Path, args: argparse.Namespace, snapshot_path: Path) -> dict:
+def _load_graph(
+    root: Path,
+    args: argparse.Namespace,
+    snapshot_path: Path,
+    profile: StudentProfile,
+) -> dict:
     if args.graph_cache:
         graph_path = Path(args.graph_cache)
         if not graph_path.is_absolute():
@@ -85,7 +93,7 @@ def _load_graph(root: Path, args: argparse.Namespace, snapshot_path: Path) -> di
     if not args.llm:
         return {}
 
-    graph_path = default_graph_cache_path(root)
+    graph_path = profile.graph_cache_path
     if graph_path.is_file() and not args.refresh_graph:
         print(f'Using cached parser graph: {graph_path}')
         return json.loads(graph_path.read_text(encoding='utf-8'))
@@ -109,8 +117,9 @@ def _load_graph(root: Path, args: argparse.Namespace, snapshot_path: Path) -> di
     return _build_graph_cache(
         root,
         snapshot_path,
-        root / args.ground_truth_dir,
+        profile.ground_truth_dir,
         graph_path,
+        profile_name=profile.name,
     )
 
 
@@ -177,32 +186,39 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     root = Path(args.root)
-    if args.holdout:
-        gt_dir = holdout_ground_truth_dir(root)
-        default_snapshot = holdout_snapshot_path(root)
-        default_report = holdout_report_path(root)
-        report_label = 'holdout'
-    else:
-        gt_dir = root / args.ground_truth_dir
-        default_snapshot = default_snapshot_path(root)
-        default_report = default_report_path(root)
-        report_label = 'weekly'
+    profile = holdout_profile(root) if args.holdout else get_profile(root, 'primary')
+    gt_dir = profile.ground_truth_dir
+    default_snapshot = profile.snapshot_path
+    default_report = profile.report_path
+    report_label = profile.name if profile.name != 'primary' else 'weekly'
 
-    snapshot_arg = args.snapshot if args.snapshot != str(default_snapshot_path(root)) else str(default_snapshot)
-    report_arg = args.report if args.report != str(default_report_path(root)) else str(default_report)
+    snapshot_arg = (
+        args.snapshot
+        if args.snapshot != str(default_snapshot_path(root))
+        else str(default_snapshot)
+    )
+    report_arg = (
+        args.report
+        if args.report != str(default_report_path(root))
+        else str(default_report)
+    )
     try:
-        snapshot_path = _resolve_snapshot_path(root, snapshot_arg)
+        snapshot_path = _resolve_snapshot_path(root, snapshot_arg, profile)
     except FileNotFoundError:
         if args.holdout:
-            fixture = holdout_fixture_snapshot_path(root)
+            fixture = profile.fixture_snapshot_path
             if fixture.is_file():
                 snapshot_path = fixture
             else:
+                course_ids = ' '.join(f'--course-id {cid}' for cid in profile.canvas_course_ids)
                 print(f'Holdout snapshot not found: {root / snapshot_arg}', file=sys.stderr)
                 print(
                     'Fetch with: python -m canvas_parser.weekly_iteration.fetch_snapshots '
-                    '--course-id 20812 --course-id 19097 --enrich-pages '
-                    f'--save {holdout_snapshot_path(root)}',
+                    f'--holdout {course_ids} --enrich-pages',
+                    file=sys.stderr,
+                )
+                print(
+                    f'Set {profile.auth_cookie_env} (and optional {profile.auth_csrf_env}) in .env.',
                     file=sys.stderr,
                 )
                 return 2
@@ -215,7 +231,7 @@ def main(argv: list[str] | None = None) -> int:
             return 2
 
     snapshots = load_snapshots(snapshot_path)
-    graph = _load_graph(root, args, snapshot_path)
+    graph = _load_graph(root, args, snapshot_path, profile)
     mode = 'heuristic+parser_graph' if args.llm else 'heuristic_only'
 
     results = evaluate_snapshots(

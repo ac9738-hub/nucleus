@@ -18,6 +18,42 @@ const {
 // Project root, used to resolve the active theme palette for saved homepages.
 const THEME_ROOT = path.join(__dirname, '..', '..')
 
+const RESOURCE_LIMITS = {
+  MAX_PAGINATION_PAGES: Number(process.env.CANVAS_MAX_PAGINATION_PAGES || 50),
+  MAX_PAGINATION_ITEMS: Number(process.env.CANVAS_MAX_PAGINATION_ITEMS || 5000),
+  MAX_PAGE_BODY_FETCHES: Number(process.env.CANVAS_MAX_PAGE_BODY_FETCHES || 250),
+  MAX_PARSER_BATCH_ITEMS: Number(process.env.PARSER_MAX_BATCH_ITEMS || 50),
+  CANVAS_FETCH_TIMEOUT_MS: Number(process.env.CANVAS_FETCH_TIMEOUT_MS || 60000),
+  PARSER_TASK_REFRESH_MS: Number(process.env.PARSER_TASK_REFRESH_MS || 2000),
+}
+
+function chunkParserPayload(payload) {
+  if (!payload || payload === 'None' || typeof payload !== 'object') return [payload]
+  const items = payload.content
+  if (!Array.isArray(items) || items.length <= RESOURCE_LIMITS.MAX_PARSER_BATCH_ITEMS) {
+    return [payload]
+  }
+  const chunks = []
+  for (let index = 0; index < items.length; index += RESOURCE_LIMITS.MAX_PARSER_BATCH_ITEMS) {
+    chunks.push({
+      type: payload.type,
+      content: items.slice(index, index + RESOURCE_LIMITS.MAX_PARSER_BATCH_ITEMS)
+    })
+  }
+  return chunks
+}
+
+function canvasFetchOptions(extra = {}) {
+  const options = {
+    method: 'GET',
+    ...extra
+  }
+  if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
+    options.signal = AbortSignal.timeout(RESOURCE_LIMITS.CANVAS_FETCH_TIMEOUT_MS)
+  }
+  return options
+}
+
 const canvasCourseColors = ["#1d9e75", "#378add", "#7f77dd", "#d85a30", "#d4537e", "#c58d35"]
 
 function sleepSync(ms) {
@@ -110,6 +146,30 @@ function saveCanvasAuthToEnv(envPath, { canvasAuthCookie, canvasAuthCsrf, canvas
   })
 
   fs.writeFileSync(envPath, nextLines.join('\n'))
+}
+
+const CANVAS_AUTH_ENV_KEYS = ['CANVAS_AUTH_COOKIE', 'CANVAS_AUTH_CSRF', 'CANVAS_BASE_URL']
+
+function clearCanvasAuthFromEnv(envPath, keys = CANVAS_AUTH_ENV_KEYS) {
+  if (!fs.existsSync(envPath)) return
+  const keySet = new Set(keys)
+  const lines = fs.readFileSync(envPath, 'utf8').split(/\r?\n/)
+  const nextLines = lines.filter(line => {
+    const match = line.match(/^([A-Za-z_][A-Za-z0-9_]*)=/)
+    return !(match && keySet.has(match[1]))
+  })
+  fs.writeFileSync(envPath, nextLines.join('\n'))
+}
+
+function killParserProcess() {
+  if (!parserProc || parserProc.killed) {
+    parserProc = null
+    parserAuthSignature = null
+    return
+  }
+  parserProc.kill()
+  parserProc = null
+  parserAuthSignature = null
 }
 
 function parseCanvasDate(value) {
@@ -886,6 +946,20 @@ function getParserProcess(authState, rootDir, onCanvasTasks) {
   })
   let stdoutBuffer = ''
   let handledCompletion = false
+  let taskRefreshTimer = null
+  let taskRefreshRestartVector = false
+
+  function scheduleCanvasTasksRefresh(restartVector = false) {
+    taskRefreshRestartVector = restartVector || taskRefreshRestartVector
+    if (taskRefreshTimer) return
+    taskRefreshTimer = setTimeout(() => {
+      taskRefreshTimer = null
+      const restart = taskRefreshRestartVector
+      taskRefreshRestartVector = false
+      onCanvasTasks(make_canvas_tasks(rootDir), { restartVector: restart })
+    }, RESOURCE_LIMITS.PARSER_TASK_REFRESH_MS)
+  }
+
   parserProc.on('error', error => {
     console.error('parser process error:', error && error.message ? error.message : error)
   })
@@ -903,14 +977,14 @@ function getParserProcess(authState, rootDir, onCanvasTasks) {
     for (const line of lines) {
       const trimmed = line.trim()
       if (trimmed.startsWith("parser task update assignment")) {
-        onCanvasTasks(make_canvas_tasks(rootDir), { restartVector: false })
+        scheduleCanvasTasksRefresh(false)
       }
       if (trimmed === "parser local summaries completed__________________________________________________") {
-        onCanvasTasks(make_canvas_tasks(rootDir), { restartVector: false })
+        scheduleCanvasTasksRefresh(false)
       }
       if (trimmed === "parser all passes completed__________________________________________________" && !handledCompletion) {
         handledCompletion = true
-        onCanvasTasks(make_canvas_tasks(rootDir), { restartVector: true })
+        scheduleCanvasTasksRefresh(true)
       }
     }
   })
@@ -1085,20 +1159,43 @@ function createCanvasApi({ canvasDataPath, getAuthState, sendCanvasDataUpdate, r
   async function fetchCanvasPaginated(url, context, errors) {
     const items = []
     let nextUrl = url.includes('?') ? `${url}&per_page=100` : `${url}?per_page=100`
+    let pagesFetched = 0
 
     while (nextUrl) {
+      if (
+        pagesFetched >= RESOURCE_LIMITS.MAX_PAGINATION_PAGES
+        || items.length >= RESOURCE_LIMITS.MAX_PAGINATION_ITEMS
+      ) {
+        console.warn(
+          `Canvas pagination cap reached for ${context} `
+          + `(pages=${pagesFetched}, items=${items.length})`
+        )
+        errors.push({
+          context,
+          url: nextUrl,
+          message: `Pagination cap reached (${pagesFetched} pages, ${items.length} items)`
+        })
+        break
+      }
       await acquireCanvasSlot()
       try {
-        const response = await fetch(nextUrl, {
-          method: 'GET',
+        const response = await fetch(nextUrl, canvasFetchOptions({
           headers: getCanvasApiHeaders()
-        })
+        }))
         if (!response.ok) {
           const body = await response.text()
           throw new Error(`Canvas API request failed ${response.status} ${response.statusText}: ${nextUrl}${body ? ` (${body.slice(0, 200)})` : ''}`)
         }
         const pageItems = await response.json()
+        pagesFetched += 1
         if (Array.isArray(pageItems)) {
+          const remaining = RESOURCE_LIMITS.MAX_PAGINATION_ITEMS - items.length
+          if (remaining <= 0) break
+          if (pageItems.length > remaining) {
+            items.push(...pageItems.slice(0, remaining))
+            console.warn(`Canvas item cap reached for ${context} (${RESOURCE_LIMITS.MAX_PAGINATION_ITEMS} items)`)
+            break
+          }
           items.push(...pageItems)
         }
         const links = parseLinkHeader(response.headers.get('link'))
@@ -1122,10 +1219,9 @@ function createCanvasApi({ canvasDataPath, getAuthState, sendCanvasDataUpdate, r
     for (let attempt = 0; attempt < 5; attempt += 1) {
       await acquireCanvasSlot()
       try {
-        const response = await fetch(url, {
-          method: 'GET',
+        const response = await fetch(url, canvasFetchOptions({
           headers: getCanvasApiHeaders()
-        })
+        }))
 
         if (response.status === 429 && attempt < 4) {
           const retryAfterHeader = Number(response.headers.get('retry-after'))
@@ -1206,13 +1302,27 @@ function createCanvasApi({ canvasDataPath, getAuthState, sendCanvasDataUpdate, r
         errors
       )
       const pages = []
+      let pageBodyFetches = 0
       for (const page of pageList) {
+        if (pageBodyFetches >= RESOURCE_LIMITS.MAX_PAGE_BODY_FETCHES) {
+          console.warn(
+            `Canvas page-body fetch cap reached for course ${tcourse.id} `
+            + `(${RESOURCE_LIMITS.MAX_PAGE_BODY_FETCHES})`
+          )
+          errors.push({
+            context: `course ${tcourse.id} pages`,
+            url: `${canvasBaseUrl}/api/v1/courses/${tcourse.id}/pages`,
+            message: `Page-body fetch cap reached (${RESOURCE_LIMITS.MAX_PAGE_BODY_FETCHES})`
+          })
+          break
+        }
         if (!page || !page.url) continue
         const body = await fetchCanvasJsonOrNull(
           `${canvasBaseUrl}/api/v1/courses/${tcourse.id}/pages/${encodeURIComponent(page.url)}`,
           `course ${tcourse.id} page ${page.url}`,
           errors
         )
+        pageBodyFetches += 1
         if (body) {
           pages.push(body)
         }
@@ -1424,7 +1534,12 @@ ${html}
       throw new Error("Canvas auth is missing cookie or base URL.")
     }
     const profileresponse = fetchCanvasJson(canvasBaseUrl + '/api/v1/users/self')
-    const coursesresponse = fetchCanvasJson(canvasBaseUrl + '/api/v1/courses?per_page=100')
+    const canvasErrors = []
+    const coursesresponse = fetchCanvasPaginated(
+      `${canvasBaseUrl}/api/v1/courses?include[]=term`,
+      'courses list',
+      canvasErrors
+    )
     const responses = await Promise.all([
       profileresponse,
       coursesresponse
@@ -1438,7 +1553,6 @@ ${html}
     }
     const alldata = JSON.stringify({ profile: prof, courses: course }, null, 2)
     fs.writeFileSync(canvasDataPath, alldata)
-    const canvasErrors = []
     let filecount = 0
     const data1 = JSON.parse(fs.readFileSync(canvasDataPath, 'utf8'))
     data1.front_pages = await fetchCanvasFrontPages(course, canvasErrors)
@@ -1466,18 +1580,23 @@ ${html}
         console.warn('parser stdin unavailable; skipped parser payload')
         return false
       }
-      const line = payload === 'None' ? 'None' : JSON.stringify(payload)
-      try {
-        proc.stdin.write(`${line}\n`, 'utf8', error => {
-          if (error) {
-            console.error('parser stdin write failed:', error)
-          }
-        })
-        return true
-      } catch (error) {
-        console.error('parser stdin write threw:', error)
-        return false
+      const payloads = chunkParserPayload(payload)
+      let wroteAny = false
+      for (const chunk of payloads) {
+        const line = chunk === 'None' ? 'None' : JSON.stringify(chunk)
+        try {
+          proc.stdin.write(`${line}\n`, 'utf8', error => {
+            if (error) {
+              console.error('parser stdin write failed:', error)
+            }
+          })
+          wroteAny = true
+        } catch (error) {
+          console.error('parser stdin write threw:', error)
+          return false
+        }
       }
+      return wroteAny
     }
 
     const [assignmentsByCourse, filesByCourse, pagesByCourse] = await Promise.all([
@@ -1695,6 +1814,8 @@ ${html}
 
 module.exports = {
   createCanvasApi,
+  clearCanvasAuthFromEnv,
+  killParserProcess,
   resolveSchedulingDate,
   resolveWeekStartMs,
   resolveModuleAnchorWeekMs,

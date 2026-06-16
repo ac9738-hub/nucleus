@@ -45,6 +45,9 @@ Add these in the cloud agent **Environment → Secrets** panel. Names must match
 | `CANVAS_BASE_URL`    | Recommended | e.g. `https://princeton.instructure.com`               |
 | `CANVAS_AUTH_COOKIE` | Recommended | Browser session cookie; parser subprocess uses it      |
 | `CANVAS_AUTH_CSRF`   | Optional    | CSRF token if Canvas requests fail                     |
+| `CANVAS_AUTH_COOKIE_HOLDOUT` | For holdout eval | Separate student's Canvas cookie (`--holdout`) |
+| `CANVAS_AUTH_CSRF_HOLDOUT`   | Optional    | Holdout CSRF token                                     |
+| `CANVAS_BASE_URL_HOLDOUT`    | Optional    | Holdout Canvas URL; falls back to `CANVAS_BASE_URL`  |
 
 
 Without `DEEP_SEEK_API_KEY`, eval falls back to heuristics only (~~93%). Exam/event misses (CHM201, ART102) need the parser graph (~~95.5%+).
@@ -140,6 +143,37 @@ Most gap from ~95.5% → 97% is **parser traversal and extraction** — the Canv
 | `ground-truth/CHI108_S2025.json`               | Chinese; `Week N` modules; midterm variants                        |
 | `ground-truth/CHM201_F2024.json`               | Lecture PDFs from page bodies; exam events                         |
 | `ground-truth/ECO101_S2026.json`               | No `weekly_schedule` section — excluded from weekly aggregate      |
+
+
+### Holdout student (separate Canvas account)
+
+Generalization eval on a **second student's** courses. Labels live in `ground-truth/holdout/`; profile metadata in `ground-truth/holdout/profile.json`.
+
+| File | Notes |
+| ---- | ----- |
+| `ground-truth/holdout/MAT201_S2026.json` | Multivariable calculus; numbered weeks, quizzes, midterm |
+| `ground-truth/holdout/MAT202_F2025.json` | Linear algebra; PSET modules, exam weeks |
+
+Uses **`CANVAS_AUTH_COOKIE_HOLDOUT`** (not the primary cookie). Cache/fixtures are isolated:
+
+| Artifact | Location |
+| -------- | -------- |
+| Holdout snapshots | `.cache/weekly_iteration/snapshots_holdout.json` |
+| Holdout fixtures | `fixtures/weekly_iteration/snapshots_holdout.json` |
+| Holdout parser graph | `.cache/weekly_iteration/graph_eval_holdout.json` |
+| Holdout report | `.cache/weekly_iteration/report_holdout.json` |
+
+```bash
+# Fetch holdout courses (needs CANVAS_AUTH_COOKIE_HOLDOUT in .env)
+python -m canvas_parser.weekly_iteration.fetch_snapshots --holdout --enrich-pages
+
+# Eval holdout (does not affect primary aggregate)
+python -m canvas_parser.weekly_iteration --holdout
+python -m canvas_parser.weekly_iteration --holdout --llm --ensure-graph
+
+# Commit holdout fixtures after fetch
+python -m canvas_parser.weekly_iteration.bootstrap export-fixtures --holdout
+```
 
 
 ## Evaluate

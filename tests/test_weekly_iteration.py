@@ -1,3 +1,4 @@
+import json
 import sys
 from pathlib import Path
 
@@ -136,3 +137,51 @@ def test_final_exam_module_files_bucket_by_late_pset_weeks():
         for week in weeks
         if int(str(week.get('start_date') or '12/31/2026').split('/')[0]) <= 2
     )
+
+
+def test_chunk_parser_batches_splits_large_content():
+    from canvas_parser.weekly_iteration.llm_parse import chunk_parser_batches
+
+    batches = [{
+        'type': 'assignment',
+        'content': [{'id': index} for index in range(125)],
+    }]
+    chunked = chunk_parser_batches(batches, max_items=50)
+    assert len(chunked) == 3
+    assert all(batch['type'] == 'assignment' for batch in chunked)
+    assert [len(batch['content']) for batch in chunked] == [50, 50, 25]
+
+
+def test_fetch_paginated_respects_item_cap(monkeypatch):
+    from canvas_parser.weekly_iteration.auth import CanvasAuth
+    from canvas_parser.weekly_iteration import fetch as fetch_module
+
+    class FakeResponse:
+        def __init__(self, payload, link=''):
+            self._payload = payload
+            self.headers = {'Link': link}
+
+        def read(self):
+            return self._payload.encode('utf-8')
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    pages = [json.dumps([{'id': index} for index in range(100)]) for _ in range(3)]
+    calls = {'count': 0}
+
+    def fake_urlopen(request, timeout=60):
+        index = calls['count']
+        calls['count'] += 1
+        link = '<https://example.test/next>; rel="next"' if index < len(pages) - 1 else ''
+        return FakeResponse(pages[index], link)
+
+    monkeypatch.setattr(fetch_module.urllib.request, 'urlopen', fake_urlopen)
+
+    auth = CanvasAuth(base_url='https://example.test', cookie='x', csrf='')
+    items = fetch_module.fetch_paginated(auth, 'https://example.test/items', max_pages=10, max_items=150)
+    assert len(items) == 150
+    assert calls['count'] == 2

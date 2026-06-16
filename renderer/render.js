@@ -1146,6 +1146,37 @@ async function closeSettings() {
   }
 }
 
+async function logoutCanvas() {
+  const confirmed = window.confirm(
+    "Log out of Canvas?\n\n" +
+    "Saved login cookies will be removed from this device. " +
+    "Synced course data and parsed graph are kept."
+  );
+  if (!confirmed) return;
+
+  const button = document.getElementById("canvas-logout-button");
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Logging out…";
+  }
+
+  try {
+    const result = await window.nucleus.logoutCanvas();
+    if (!result || !result.ok) {
+      throw new Error(result && result.error ? result.error : "Logout failed.");
+    }
+    window.alert("Logged out of Canvas.");
+  } catch (error) {
+    console.error("Unable to log out of Canvas:", error);
+    window.alert(error && error.message ? error.message : "Unable to log out of Canvas.");
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = "Log out of Canvas";
+    }
+  }
+}
+
 async function clearCanvasSyncData() {
   const confirmed = window.confirm(
     "Clear all Canvas sync data from disk?\n\n" +
@@ -1199,6 +1230,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (closeSettingsButton) closeSettingsButton.addEventListener("click", closeSettings);
   const clearCanvasSyncButton = document.getElementById("clear-canvas-sync-button");
   if (clearCanvasSyncButton) clearCanvasSyncButton.addEventListener("click", clearCanvasSyncData);
+  const canvasLogoutButton = document.getElementById("canvas-logout-button");
+  if (canvasLogoutButton) canvasLogoutButton.addEventListener("click", logoutCanvas);
   const settingsOverlay = document.getElementById("settings-overlay");
   if (settingsOverlay) {
     settingsOverlay.addEventListener("click", event => {

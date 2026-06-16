@@ -6,12 +6,15 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from .students import StudentProfile, get_profile, primary_profile
+
 
 @dataclass(frozen=True)
 class CanvasAuth:
     cookie: str
     csrf: str
     base_url: str
+    profile: str = 'primary'
 
     @property
     def is_valid(self) -> bool:
@@ -42,11 +45,33 @@ def load_env_file(env_path: Path) -> dict[str, str]:
     return values
 
 
-def load_auth_from_env(root_dir: Path | None = None) -> CanvasAuth:
-    root = root_dir or Path(__file__).resolve().parents[2]
-    env_values = load_env_file(root / '.env')
+def _env_value(name: str, env_values: dict[str, str], fallback_names: tuple[str, ...] = ()) -> str:
+    value = os.getenv(name) or env_values.get(name, '')
+    if value:
+        return value
+    for fallback in fallback_names:
+        value = os.getenv(fallback) or env_values.get(fallback, '')
+        if value:
+            return value
+    return ''
+
+
+def load_auth_for_profile(root_dir: Path, profile: StudentProfile) -> CanvasAuth:
+    env_values = load_env_file(root_dir / '.env')
+    primary = primary_profile(root_dir)
+    base_url = _env_value(
+        profile.base_url_env,
+        env_values,
+        fallback_names=(primary.base_url_env,),
+    ).rstrip('/')
     return CanvasAuth(
-        cookie=os.getenv('CANVAS_AUTH_COOKIE') or env_values.get('CANVAS_AUTH_COOKIE', ''),
-        csrf=os.getenv('CANVAS_AUTH_CSRF') or env_values.get('CANVAS_AUTH_CSRF', ''),
-        base_url=(os.getenv('CANVAS_BASE_URL') or env_values.get('CANVAS_BASE_URL', '')).rstrip('/'),
+        cookie=_env_value(profile.auth_cookie_env, env_values),
+        csrf=_env_value(profile.auth_csrf_env, env_values),
+        base_url=base_url,
+        profile=profile.name,
     )
+
+
+def load_auth_from_env(root_dir: Path | None = None, *, profile: str = 'primary') -> CanvasAuth:
+    root = root_dir or Path(__file__).resolve().parents[2]
+    return load_auth_for_profile(root, get_profile(root, profile))

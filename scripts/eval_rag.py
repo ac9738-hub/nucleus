@@ -18,6 +18,7 @@ from vector_retreival import (  # noqa: E402
 )
 
 GT_PATH = ROOT / "RAG_ground_truth.json"
+GRAPH_PATH = ROOT / "canvas_graph.json"
 
 INTENT_EXPECTED_TYPES = {
     "deadline": {"event", "assignment", "syllabus"},
@@ -28,6 +29,59 @@ INTENT_EXPECTED_TYPES = {
     "syllabus": {"syllabus", "file", "event"},
     "general": {"assignment", "file", "concept", "event", "syllabus"},
 }
+
+
+def audit_embedding_coverage(path: Path = GRAPH_PATH) -> dict:
+    if not path.exists():
+        return {}
+    data = json.loads(path.read_text(encoding="utf-8"))
+
+    def has_embedding(node: dict) -> bool:
+        embedded = node.get("embedded") if isinstance(node, dict) else {}
+        if not isinstance(embedded, dict):
+            return False
+        for key in ("name", "description"):
+            value = embedded.get(key)
+            if isinstance(value, list) and value:
+                return True
+        return False
+
+    files = [
+        file_node
+        for course_files in (data.get("files") or {}).values()
+        if isinstance(course_files, dict)
+        for file_node in course_files.values()
+    ]
+    assignments = [
+        assignment
+        for syllabus in (data.get("syllabi") or {}).values()
+        for assignment in (syllabus.get("assignments") or [])
+    ]
+    groups = {
+        "concept": data.get("concepts") or [],
+        "problem": data.get("problems") or [],
+        "event": data.get("events") or [],
+        "syllabus": list((data.get("syllabi") or {}).values()),
+        "assignment": assignments,
+        "file": files,
+    }
+    report = {}
+    for label, nodes in groups.items():
+        total = len(nodes)
+        embedded = sum(1 for node in nodes if has_embedding(node))
+        report[label] = {"total": total, "embedded": embedded, "pct": embedded / total if total else 1.0}
+    return report
+
+
+def print_embedding_audit() -> None:
+    report = audit_embedding_coverage()
+    if not report:
+        print("No canvas_graph.json found for embedding audit.")
+        return
+    print("Embedding coverage (canvas_graph.json):")
+    for label, stats in report.items():
+        pct = 100 * stats["pct"]
+        print(f"  {label:12s} {stats['embedded']:4d}/{stats['total']:<4d} ({pct:5.1f}%)")
 
 
 def load_ground_truth(path: Path = GT_PATH) -> dict:
@@ -141,7 +195,16 @@ def main() -> None:
         help="Use production semantic cutoff (default: compare against GT full-rank snapshot with cutoff off)",
     )
     parser.add_argument("--json", action="store_true", help="Print full JSON report")
+    parser.add_argument(
+        "--audit-embeddings",
+        action="store_true",
+        help="Print embedding coverage from canvas_graph.json and exit",
+    )
     args = parser.parse_args()
+
+    if args.audit_embeddings:
+        print_embedding_audit()
+        return
 
     gt = load_ground_truth()
     rows = []

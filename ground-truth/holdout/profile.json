@@ -1,0 +1,28 @@
+{
+  "profile": "holdout",
+  "description": "Separate student holdout set for weekly schedule generalization eval. Uses its own Canvas session.",
+  "auth_env": {
+    "cookie": "CANVAS_AUTH_COOKIE_HOLDOUT",
+    "csrf": "CANVAS_AUTH_CSRF_HOLDOUT",
+    "base_url": "CANVAS_BASE_URL_HOLDOUT"
+  },
+  "courses": [
+    {
+      "ground_truth_file": "MAT201_S2026.json",
+      "canvas_course_id": 20812,
+      "label": "MAT201_S2026 Multivariable Calculus"
+    },
+    {
+      "ground_truth_file": "MAT202_F2025.json",
+      "canvas_course_id": 19097,
+      "label": "MAT202_F2025 Linear Algebra with Applications"
+    }
+  ],
+  "iteration": {
+    "fetch": "python -m canvas_parser.weekly_iteration.fetch_snapshots --holdout --enrich-pages",
+    "eval_heuristic": "python -m canvas_parser.weekly_iteration --holdout",
+    "eval_graph": "python -m canvas_parser.weekly_iteration --holdout --llm --ensure-graph",
+    "refresh_graph": "python -m canvas_parser.weekly_iteration --holdout --llm --refresh-graph",
+    "export_fixtures": "python -m canvas_parser.weekly_iteration.bootstrap export-fixtures --holdout"
+  }
+}

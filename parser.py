@@ -93,7 +93,8 @@ def create_deepseek_client():
         return None
     return AsyncOpenAI(
         api_key=api_key,
-        base_url="https://api.deepseek.com"
+        base_url="https://api.deepseek.com",
+        timeout=float(os.getenv("DEEPSEEK_TIMEOUT_SECONDS", "180")),
     )
 
 
@@ -207,6 +208,8 @@ EXTERNAL_CRAWL_MAX_PAGES = int(os.getenv("EXTERNAL_CRAWL_MAX_PAGES", "40"))
 EXTERNAL_COURSE_WEBSITE_MAX_DEPTH = int(os.getenv("EXTERNAL_COURSE_WEBSITE_MAX_DEPTH", "6"))
 EXTERNAL_COURSE_WEBSITE_MAX_PAGES = int(os.getenv("EXTERNAL_COURSE_WEBSITE_MAX_PAGES", "120"))
 EXTERNAL_CRAWL_TIMEOUT_SECONDS = float(os.getenv("EXTERNAL_CRAWL_TIMEOUT_SECONDS", "15"))
+CANVAS_DOWNLOAD_TIMEOUT_SECONDS = float(os.getenv("CANVAS_DOWNLOAD_TIMEOUT_SECONDS", "120"))
+CANVAS_DOWNLOAD_MAX_BYTES = int(os.getenv("CANVAS_DOWNLOAD_MAX_BYTES", str(100 * 1024 * 1024)))
 EXTERNAL_COURSE_WEBSITE_TYPES = {
     'course website', 'course site', 'class website', 'course homepage',
     'course home page', 'course portal', 'class site', 'public website', 'course wiki'
@@ -3955,11 +3958,15 @@ def finish_completed_embedding_tasks(tasks):
             'description': embedded['description']
         }
         embedding_cache[task['cache_key']] = result
-        task['node'].embedded = result
+        nodes = task.get('nodes') or [task['node']]
+        for node in nodes:
+            node.embedded = result
         task['complete'] = True
         wrote_cache = True
+        label = getattr(task['node'], 'name', '')
+        suffix = f" copies={len(nodes)}" if len(nodes) > 1 else ''
         print(
-            f"parser debug embedding: embedded helper={task['embed_func'].__name__} node={getattr(task['node'], 'name', '')!r}",
+            f"parser debug embedding: embedded helper={task['embed_func'].__name__} node={label!r}{suffix}",
             flush=True
         )
     if wrote_cache:
@@ -3968,16 +3975,41 @@ def finish_completed_embedding_tasks(tasks):
 
 def _build_embedding_requests(items, batch_size=OPENAI_EMBEDDING_BATCH_SIZE):
     tasks = []
+    task_by_cache_key = {}
     for item in items:
         node, embed_func, name, description, *rest = item
         force = bool(rest[0]) if rest else False
-        task = make_embedding_task(node, embed_func, name, description, force)
-        if task:
+        if not force and has_complete_embedding(node):
+            continue
+        name = html_to_text(name)
+        description = html_to_text(description)
+        cache_key = embedding_cache_key(embed_func, name, description)
+        if cache_key in embedding_cache:
+            node.embedded = embedding_cache[cache_key]
             print(
-                f"parser debug embedding: queued helper={embed_func.__name__} node={getattr(node, 'name', '')!r}",
+                f"parser debug embedding: cache hit helper={embed_func.__name__} node={getattr(node, 'name', '')!r}",
                 flush=True
             )
-            tasks.append(task)
+            continue
+        if cache_key in task_by_cache_key:
+            task_by_cache_key[cache_key]['nodes'].append(node)
+            continue
+        task = {
+            'node': node,
+            'nodes': [node],
+            'embed_func': embed_func,
+            'name': name,
+            'description': description,
+            'cache_key': cache_key,
+            'embedded': {},
+            'complete': False,
+        }
+        task_by_cache_key[cache_key] = task
+        tasks.append(task)
+        print(
+            f"parser debug embedding: queued helper={embed_func.__name__} node={getattr(node, 'name', '')!r}",
+            flush=True
+        )
     if not tasks:
         return tasks, []
 
@@ -4205,13 +4237,32 @@ def update_file_embedded_fields():
     _run_file_embedding_tasks_sync()
 
 
-def update_assignment_embedded_fields():
-    assignment_count = sum(len(syllabus.assignments) for syllabus in syllabusNodes.values())
+def update_assignment_embedded_fields(force=False):
+    if openai_client is None:
+        assignment_count = sum(len(syllabus.assignments) for syllabus in syllabusNodes.values())
+        print(
+            f"parser debug embedding: skipped assignment embeddings count={assignment_count} "
+            "(OPENAI_API_KEY missing)",
+            flush=True
+        )
+        return
+
+    assignment_tasks = []
+    for courseid, syllabus in syllabusNodes.items():
+        for assignment in syllabus.assignments:
+            assignment_tasks.append((
+                assignment,
+                embed_named_description,
+                course_scoped_embedding_name(courseid, assignment.name),
+                html_to_text(assignment.description or ''),
+                force,
+            ))
     print(
-        f"parser debug embedding: skipped bulk assignment embeddings count={assignment_count} "
-        "(assignment summaries embed individually)",
+        f"parser debug embedding: assignments start count={len(assignment_tasks)} force={force}",
         flush=True
     )
+    safe_embed_nodes(assignment_tasks)
+    print("parser debug embedding: assignments complete", flush=True)
 
 
 async def update_embedded_fields_async():
@@ -4340,6 +4391,13 @@ def add_detail_node(courseid, conceptNodeId, detailname, description):
             conceptNode = node
             break
     if conceptNode:
+        detailname = str(detailname or '').strip()
+        if any(existing.name == detailname for existing in conceptNode.details):
+            return {
+                'status': 'SUCCESS',
+                'detailid': make_child_node_ref('detail', conceptNodeId, detailname),
+                'duplicate': True,
+            }
         conceptNode.details.append(detailNode(detailname, description))
         return {
             'status': 'SUCCESS',
@@ -4967,7 +5025,13 @@ def downloadtopath(path, url):
         headers["X-CSRF-Token"] = canvas_auth_csrf
 
     try:
-        response = requests.get(url, stream=True, headers=headers, allow_redirects=True)
+        response = requests.get(
+            url,
+            stream=True,
+            headers=headers,
+            allow_redirects=True,
+            timeout=CANVAS_DOWNLOAD_TIMEOUT_SECONDS,
+        )
     except requests.RequestException as error:
         print(f"parser: skipped canvas download request failed url={url} error={error}", flush=True)
         return None
@@ -4988,10 +5052,21 @@ def downloadtopath(path, url):
         )
         return None
 
+    downloaded_bytes = 0
     with target_path.open('wb') as file:
         for chunk in response.iter_content(chunk_size=8192):
-            if chunk:
-                file.write(chunk)
+            if not chunk:
+                continue
+            downloaded_bytes += len(chunk)
+            if downloaded_bytes > CANVAS_DOWNLOAD_MAX_BYTES:
+                print(
+                    f"parser: skipped canvas download too large "
+                    f"bytes={downloaded_bytes} max={CANVAS_DOWNLOAD_MAX_BYTES} url={url}",
+                    flush=True,
+                )
+                target_path.unlink(missing_ok=True)
+                return None
+            file.write(chunk)
 
     return target_path
 
@@ -6493,8 +6568,10 @@ async def main():
             rawline = await loop.run_in_executor(None, sys.stdin.readline)
 
             if rawline == "":
-                await asyncio.sleep(0.1)
-                continue
+                if inflight_tasks:
+                    await asyncio.sleep(0.1)
+                    continue
+                break
 
             rawline = rawline.strip()
             if not rawline:

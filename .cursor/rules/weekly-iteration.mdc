@@ -25,6 +25,15 @@ Read `AGENTS.md` before editing. Improve **weekly_schedule** accuracy only.
 4. `python -m pytest tests/test_weekly_iteration.py -q tests/test_finalize_events.py -q`
 5. Stop at ≥97% aggregate or when fixes need GT literals (overfitting)
 
+## Holdout student
+
+Separate Canvas auth: `CANVAS_AUTH_COOKIE_HOLDOUT`. GT in `ground-truth/holdout/`.
+
+```bash
+python -m canvas_parser.weekly_iteration.fetch_snapshots --holdout --enrich-pages
+python -m canvas_parser.weekly_iteration --holdout --llm --ensure-graph
+```
+
 ## Do not
 
 - Swap in JS `buildWeeklySchedule` output for eval weekly schedule

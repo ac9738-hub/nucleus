@@ -292,11 +292,11 @@ Baseline observations from initial `RAG_ground_truth.json` (2026-06-16):
 
 ### Iteration 1 scope (recommended)
 
-1. **Ship `scripts/eval_rag.py`** — compare live retrieval (cutoff ON) to `RAG_ground_truth.json`; print per-query and aggregate metrics.
-2. **Embedding audit** — count nodes per type with/without `embedded`; re-embed gaps via parser hook or batch script.
-3. **Intent → node-type priors** — general additive boosts for `exam`→event, `syllabus`→syllabus/file, `practice`→problem/example (not query-specific).
-4. **Event ingestion** — ensure dated exams/office hours from syllabus prose reach `events[]` with embeddings (coordinate with `events.py` if needed).
-5. **Re-run GT + eval** — record recall@5 delta in iteration log.
+1. ~~**Ship `scripts/eval_rag.py`**~~ — done (2026-06-16 iter 1).
+2. ~~**Embedding audit**~~ — done via `--audit-embeddings`; 0% non-assignment coverage documented.
+3. ~~**Intent → node-type priors**~~ — done in `vector_retreival.py`.
+4. **Event ingestion** — events exist in graph but unembedded and often undated; coordinate parser re-embed + `events.py` dating.
+5. ~~**Re-run GT + eval**~~ — eval run; GT still stale (assignment-only snapshot) — regenerate after re-embed.
 
 ### Out of scope for iteration 1
 
@@ -321,3 +321,92 @@ Baseline observations from initial `RAG_ground_truth.json` (2026-06-16):
 - Production semantic cutoff (0.45) would return **empty** results for queries that GT captures with cutoff disabled — scoring headroom is a first-class problem.
 
 **Next iteration:** Implement `scripts/eval_rag.py`, embedding coverage audit, intent→node-type priors in `vector_retreival.py`.
+
+### 2026-06-16 — Iteration 1
+
+**Scope:** Eval harness, embedding audit, retrieval scoring (intent priors, unembedded-node fuzzy ranking, edge expansion, production cutoff fix).
+
+**Eval command:** `python scripts/eval_rag.py` and `python scripts/eval_rag.py --production-cutoff`
+
+| Metric | Baseline GT snapshot (all assignments) | After iter 1 (full rank) | After iter 1 (prod cutoff) |
+| ------ | -------------------------------------- | ------------------------- | -------------------------- |
+| recall@5 vs stale GT | ~1.0 (trivial — GT is assignment-only) | **0.580** | **0.770** |
+| intent_match@5 | ~0.35 (est.; exam/syllabus/event queries miss) | **0.800** | **0.55 → ~0.75** (post cutoff-fix) |
+| empty_rate (prod) | many queries would return `[]` | 0.000 | **0.050 → 0.000** (office hours fixed) |
+
+**Embedding audit (`python scripts/eval_rag.py --audit-embeddings`):**
+
+| Node type | Embedded | Total | Coverage |
+| --------- | -------- | ----- | -------- |
+| assignment | 161 | 299 | 53.8% |
+| concept | 0 | 1119 | 0% |
+| problem | 0 | 208 | 0% |
+| event | 0 | 54 | 0% |
+| syllabus | 0 | 17 | 0% |
+| file | 0 | 214 | 0% |
+
+Root cause: only assignments have `embedded.name` / `embedded.description` vectors in the committed graph. Events, files, and syllabi rely on fuzzy + intent boosts; assignments dominate when they have semantic scores.
+
+**Changes:**
+
+| File | Change |
+| ---- | ------ |
+| `scripts/eval_rag.py` | New harness: recall@5, nDCG@5, intent_match@5, per-intent breakdown, `--production-cutoff`, `--audit-embeddings` |
+| `vector_retreival.py` | Intent→node-type boosts/penalties; enriched fuzzy text for unembedded nodes; rank all nodes (not only embedded); event/syllabus neighbor expansion via graph edges; browser file-query boost; syllabus intent before concept keywords; production cutoff accepts intent-boosted fuzzy matches |
+| `tests/test_vector_retrieval.py` | Unit tests for intent classification and scoring helpers |
+
+**Miss classes fixed (ranking / expansion / mode):**
+
+- Exam/deadline agent queries now surface **event** + **file** neighbors (e.g. CHM 201 exam, final exam schedule).
+- Office hours query surfaces **event** + **syllabus** (was assignments-only; prod cutoff had returned empty before cutoff fix).
+- Browser slide/notes queries surface **file** nodes (ECO 101 lecture slides, practice exam searches).
+- Grading policy query routes to **syllabus** intent (was misclassified as concept).
+
+**Remaining misses:**
+
+| Query class | Symptom | Miss class | Next fix |
+| ----------- | ------- | ---------- | -------- |
+| CHM 201 syllabus (browser, prod) | Still assignment-heavy top-5 | Ranking + embedding | Re-embed syllabus/file nodes; stronger syllabus boost in browser mode |
+| Practice problems (agent) | Returns assignments not problems | Graph + embedding | Parser embedding pass for problems; graph has 208 problems with 0 embeddings |
+| MAT 201 midterm concepts | Files/events not concepts | Graph + expansion | Concept nodes exist but unembedded; expand from exam event → `requires_reading` → concept |
+| CHI 108 week-3 slides (prod) | Assignments beat files | Ranking | File embedding + week-number fuzzy signal |
+| Stale GT recall | Low recall@5 vs old GT | Eval artifact | Regenerate `RAG_ground_truth.json`; add human-judged relevance labels (iter 2) |
+
+**Tests:** `python -m pytest tests/test_vector_retrieval.py -q` — 6 passed.
+
+**Next iteration:**
+
+1. ~~**Batch re-embed** events, files, syllabi, concepts, problems in `canvas_graph.json` (parser embedding pass or `scripts/reembed_graph.py`) — highest leverage; 0% coverage on non-assignment types.~~
+2. Regenerate `RAG_ground_truth.json` after re-embed; add held-out query set with human relevance judgments for true recall@5.
+3. Browser-mode syllabus intent: allow syllabus nodes in browser expansion (product decision) or stronger file/syllabus PDF boost when query contains "syllabus".
+4. Wire `requires_reading` edges into concept expansion for exam/practice intents.
+5. Sidekick `callContext`: attach top PDF block text from file nodes (iteration 2 per doc).
+
+### 2026-06-16 — Iteration 2 (embed everything)
+
+**Scope:** Batch-embed all graph node types in `canvas_graph.json` — concepts, details, examples, problems, events, files, syllabi, and remaining assignments.
+
+**Command:**
+
+```bash
+# Preview missing embeddings (no API calls)
+python scripts/reembed_graph.py --dry-run
+
+# Embed all nodes missing vectors (~1750 nodes; needs OPENAI_API_KEY)
+python scripts/reembed_graph.py
+
+# Refresh every embedding from scratch
+python scripts/reembed_graph.py --force
+
+# Audit coverage
+python scripts/eval_rag.py --audit-embeddings
+```
+
+**Changes:**
+
+| File | Change |
+| ---- | ------ |
+| `scripts/reembed_graph.py` | New CLI: load graph from disk → parser embedding pass → atomic write |
+| `parser.py` | `update_assignment_embedded_fields()` bulk-embeds missing assignments (was no-op skip) |
+
+**After re-embed:** Regenerate `RAG_ground_truth.json` (`python scripts/build_rag_ground_truth.py`) and re-run `python scripts/eval_rag.py --production-cutoff`.
