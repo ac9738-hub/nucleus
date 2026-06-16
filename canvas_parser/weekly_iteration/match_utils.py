@@ -37,4 +37,11 @@ def names_match(left: str, right: str, threshold: float = 0.82) -> bool:
 
     if a in b or b in a:
         return True
+
+    shorter, longer = (a, b) if len(a.split()) <= len(b.split()) else (b, a)
+    stopwords = {'the', 'a', 'an', 'for', 'and', 'of', 'to', 'in'}
+    key_tokens = [token for token in shorter.split() if token not in stopwords]
+    if len(key_tokens) >= 3 and all(token in longer.split() for token in key_tokens):
+        return True
+
     return SequenceMatcher(None, a, b).ratio() >= threshold

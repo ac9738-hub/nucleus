@@ -4,7 +4,7 @@
 // Dependencies: main.js provides auth state/update callbacks; parser.py consumes
 // streamed Canvas records; data-store.js receives generated tasks.
 const fs = require('fs')
-const { spawn } = require('child_process')
+const { spawn, spawnSync } = require('child_process')
 const path = require('path')
 const { getThemePalette, getThemeColorScheme } = require('../../theme-manager')
 const {
@@ -524,7 +524,190 @@ function compactWeeklyAssignment(assignment, canvasAssignment) {
   }
 }
 
+function normalizeWeeklyLookupText(value) {
+  return String(value || '').trim().toLowerCase().replace(/_/g, ' ').replace(/\s+/g, ' ')
+}
+
+function parseGroundTruthDate(value) {
+  const text = String(value || '').trim()
+  if (!text) return null
+  const parts = text.split('/')
+  if (parts.length !== 3) return null
+  const month = Number(parts[0])
+  const day = Number(parts[1])
+  const year = Number(parts[2])
+  if (!month || !day || !year) return null
+  const date = new Date(year, month - 1, day)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+function formatWeekDateRangeFromDates(startDate, endDate) {
+  const start = parseGroundTruthDate(startDate)
+  const end = parseGroundTruthDate(endDate)
+  if (!start || !end) return ''
+  const opts = { month: 'short', day: 'numeric', year: 'numeric' }
+  return `${start.toLocaleDateString(undefined, opts)} – ${end.toLocaleDateString(undefined, opts)}`
+}
+
+function findCanvasFileByName(name, canvasFiles) {
+  const target = normalizeWeeklyLookupText(name)
+  if (!target) return null
+  return (canvasFiles || []).find(file => {
+    const candidate = normalizeWeeklyLookupText(file.display_name || file.filename || file.name || '')
+    if (!candidate) return false
+    if (candidate === target) return true
+    return candidate.replace(/\.pdf$/i, '') === target.replace(/\.pdf$/i, '')
+  }) || null
+}
+
+function findLoggedAssignmentByName(name, loggedAssignments) {
+  const target = normalizeWeeklyLookupText(name)
+  return (loggedAssignments || []).find(assignment => (
+    normalizeWeeklyLookupText(assignment.name) === target
+  )) || null
+}
+
+function adaptPythonWeek(pyWeek, weekNumber, courseId, context) {
+  const {
+    canvasFiles,
+    canvasAssignments,
+    loggedAssignments,
+    lookup
+  } = context
+  const weekStart = parseGroundTruthDate(pyWeek.start_date)
+  const weekEnd = parseGroundTruthDate(pyWeek.end_date)
+  const weekStartMs = weekStart ? startOfWeekMs(weekStart.toISOString()) : null
+  const files = (pyWeek.files || []).map(entry => {
+    const canvasFile = findCanvasFileByName(entry.name, canvasFiles)
+    if (canvasFile) {
+      return {
+        id: String(canvasFile.id || ''),
+        name: canvasFile.display_name || canvasFile.filename || entry.name,
+        courseid: courseId,
+        description: canvasFile['content-type'] || canvasFile.mime_class || '',
+        url: canvasFile.previewurl || canvasFile.url || '',
+        downloadurl: canvasFile.url || '',
+        canvaspreviewurl: canvasFile.previewurl || canvasFile.url || ''
+      }
+    }
+    return {
+      id: String(entry.name || ''),
+      name: entry.name || 'Untitled file',
+      courseid: courseId,
+      description: 'File',
+      url: '',
+      downloadurl: '',
+      canvaspreviewurl: ''
+    }
+  })
+  const assignments = (pyWeek.assignments || []).map(entry => {
+    const logged = findLoggedAssignmentByName(entry.name, loggedAssignments)
+    const canvasAssignment = (canvasAssignments || []).find(assignment => (
+      normalizeWeeklyLookupText(assignment.name) === normalizeWeeklyLookupText(entry.name)
+    )) || (logged ? findCanvasAssignment(lookup, courseId, logged) : null)
+    if (logged) {
+      return compactWeeklyAssignment(logged, canvasAssignment)
+    }
+    return {
+      assignmentid: canvasAssignment && canvasAssignment.id ? String(canvasAssignment.id) : entry.name,
+      name: entry.name || 'Untitled assignment',
+      description: canvasAssignment ? stripHtmlToText(canvasAssignment.description || '') : '',
+      duedate: canvasAssignment && canvasAssignment.due_at ? canvasAssignment.due_at : (entry.due_at || ''),
+      unlockdate: canvasAssignment && canvasAssignment.unlock_at ? canvasAssignment.unlock_at : '',
+      url: (canvasAssignment && canvasAssignment.html_url) || '',
+      points_possible: canvasAssignment && canvasAssignment.points_possible,
+      filechildren: []
+    }
+  })
+  const events = (pyWeek.events || []).map(entry => ({
+    event: {
+      eventid: entry.name,
+      name: entry.name,
+      startdate: '',
+      enddate: '',
+      description: '',
+      type: 'test'
+    },
+    eventType: 'test',
+    concepts: [],
+    files: [],
+    assignments: []
+  }))
+  return {
+    weekNumber,
+    weekLabel: pyWeek.name || `Week ${weekNumber}`,
+    dateRange: formatWeekDateRangeFromDates(pyWeek.start_date, pyWeek.end_date),
+    weekStart: weekStart ? weekStart.toISOString() : '',
+    weekEnd: weekEnd ? weekEnd.toISOString() : '',
+    isCurrentWeek: weekStartMs != null && startOfWeekMs(new Date().toISOString()) === weekStartMs,
+    sortKey: weekStartMs != null ? weekStartMs : Number.MAX_SAFE_INTEGER,
+    files,
+    assignments,
+    events,
+    moduleGroups: []
+  }
+}
+
+function adaptPythonWeeklySchedule(pythonSchedules, canvasData, rootDir) {
+  const graph = readCanvasGraphFromRoot(rootDir)
+  const lookup = makeCanvasTaskLookup(rootDir)
+  const schedule = {}
+  const courses = Array.isArray(canvasData && canvasData.courses) ? canvasData.courses : []
+  courses.forEach(course => {
+    if (!course || !course.id) return
+    const courseId = String(course.id)
+    const pyWeeks = pythonSchedules[courseId] || pythonSchedules[course.id] || []
+    if (!Array.isArray(pyWeeks) || !pyWeeks.length) return
+    const syllabus = (graph.syllabi || {})[courseId] || (graph.syllabi || {})[course.id] || {}
+    const loggedAssignments = Array.isArray(syllabus.assignments) ? syllabus.assignments : []
+    schedule[courseId] = pyWeeks.map((pyWeek, index) => adaptPythonWeek(pyWeek, index + 1, courseId, {
+      canvasFiles: getCourseArrayBucket(canvasData, 'file', courseId),
+      canvasAssignments: getCourseArrayBucket(canvasData, 'assignments', courseId),
+      loggedAssignments,
+      lookup
+    }))
+  })
+  return schedule
+}
+
+function buildWeeklyScheduleViaPython(canvasData, rootDir) {
+  const graphPath = path.join(rootDir, 'canvas_graph.json')
+  const args = ['-m', 'canvas_parser.weekly', '--canvas-data', '-']
+  if (fs.existsSync(graphPath)) {
+    args.push('--graph', graphPath)
+  } else {
+    args.push('--no-graph')
+  }
+  const proc = spawnSync('python', args, {
+    cwd: rootDir,
+    input: JSON.stringify(canvasData),
+    encoding: 'utf8',
+    maxBuffer: 50 * 1024 * 1024,
+    timeout: 120000,
+    windowsHide: true
+  })
+  if (proc.error) {
+    throw proc.error
+  }
+  if (proc.status !== 0) {
+    const detail = String(proc.stderr || proc.stdout || '').trim()
+    throw new Error(detail || `python weekly exited with code ${proc.status}`)
+  }
+  const stdout = String(proc.stdout || '').trim()
+  if (!stdout) return {}
+  return adaptPythonWeeklySchedule(JSON.parse(stdout), canvasData, rootDir)
+}
+
 function buildWeeklySchedule(canvasData, rootDir) {
+  try {
+    const pythonSchedule = buildWeeklyScheduleViaPython(canvasData, rootDir)
+    if (pythonSchedule && Object.keys(pythonSchedule).length) {
+      return pythonSchedule
+    }
+  } catch (error) {
+    console.error('Python weekly schedule build failed; falling back to JS:', error.message || error)
+  }
+
   const graph = readCanvasGraphFromRoot(rootDir)
   const graphFiles = graph.files || {}
   const lookup = makeCanvasTaskLookup(rootDir)

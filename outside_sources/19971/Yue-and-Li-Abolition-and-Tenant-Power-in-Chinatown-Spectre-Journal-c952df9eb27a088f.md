@@ -3,7 +3,7 @@
 - Course ID: 19971
 - Crawl mode: resource
 - Max link depth: 0
-- Crawled at: 2026-06-12T23:27:54Z
+- Crawled at: 2026-06-15T22:40:06Z
 
 
 ---
@@ -162,4 +162,4 @@ See Options
 - http://spectrejournal.com/feed/rss
 - https://spectrejournal.com/subscription-management/
 - https://spectrejournal.com/reading-groups/
-- https://spectrejournal.com/contributor-access/?action=logout&redirect_to=https%3A%2F%2Fspectrejournal.com&_wpnonce=4d8b7f3ffe
+- https://spectrejournal.com/contributor-access/?action=logout&redirect_to=https%3A%2F%2Fspectrejournal.com&_wpnonce=cccf2f7c3c

@@ -13,6 +13,7 @@ from canvas_parser.graph.events import (
     classify_study_material_filename,
     create_events_from_exam_assignments,
     event_needs_date,
+    extract_prose_exam_hints,
     extract_syllabus_exam_hints,
     finalize_course_events,
     is_schedulable_date,
@@ -205,6 +206,20 @@ def test_extract_syllabus_exam_hints():
     names = {hint['name'] for hint in hints}
     assert 'Midterm' in names
     assert 'Final' in names
+
+
+def test_extract_prose_exam_hints():
+    text = (
+        'The midterm will be a take-home assignment due on Friday, October 10, at 5pm. '
+        'The final exam will be conducted in person on Monday, December 15, 4:00pm-7:00pm.'
+    )
+    hints = extract_prose_exam_hints(text)
+    labels = {hint['name'] for hint in hints}
+    dates = {hint['date_text'] for hint in hints}
+    assert 'Midterm' in labels
+    assert 'Final' in labels
+    assert 'Friday, October 10' in dates
+    assert 'Monday, December 15' in dates
 
 
 def test_canonical_test_event_name():

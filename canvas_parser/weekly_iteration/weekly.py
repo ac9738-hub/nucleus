@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+import re
+from datetime import datetime, timezone
 from typing import Any
 
 from canvas_parser.graph.events import normalize_event_type
@@ -27,9 +28,12 @@ def _canonical_event_name(name: str) -> str:
 
 
 def _format_week_start(value: datetime, default_year: int | None) -> str:
-    from .format import _monday_start, format_ground_truth_date
+    from .format import _canvas_week_start, format_ground_truth_date
 
-    return format_ground_truth_date(_monday_start(value).isoformat(), default_year=default_year)
+    return format_ground_truth_date(
+        _canvas_week_start(value).replace(tzinfo=timezone.utc).isoformat(),
+        default_year=default_year,
+    )
 
 
 def _event_already_present(week: dict[str, Any], name: str) -> bool:
@@ -37,6 +41,66 @@ def _event_already_present(week: dict[str, Any], name: str) -> bool:
         if names_match(name, entry.get('name') or ''):
             return True
     return False
+
+
+def _undated_event_date_from_snapshot(
+    snapshot: dict[str, Any],
+    event_name: str,
+    default_year: int | None,
+) -> datetime | None:
+    from canvas_parser.graph.events import build_snapshot_exam_text, extract_syllabus_exam_hints
+    from .format import MONTH_DAY_NAME, _parse_any_date
+
+    lowered = str(event_name or '').lower()
+    if not lowered:
+        return None
+
+    month_day = MONTH_DAY_NAME.search(str(event_name or ''))
+    if not month_day and default_year:
+        month_only = re.search(
+            r'\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2})\b',
+            str(event_name or ''),
+            re.IGNORECASE,
+        )
+        if month_only:
+            parsed = _parse_any_date(f'{month_only.group(1)} {month_only.group(2)}', default_year=default_year)
+            if parsed:
+                return parsed
+    elif month_day and default_year:
+        parsed = _parse_any_date(month_day.group(0), default_year=default_year)
+        if parsed:
+            return parsed
+
+    for hint in extract_syllabus_exam_hints(build_snapshot_exam_text(snapshot)):
+        label = str(hint.get('label') or hint.get('name') or '').lower()
+        if not label:
+            continue
+        if label in lowered or lowered in label or (lowered == 'midterm' and 'midterm' in label):
+            parsed = _parse_any_date(hint.get('date_text') or '', default_year=default_year)
+            if parsed:
+                return parsed
+
+    for assignment in snapshot.get('assignments') or []:
+        name = str(assignment.get('name') or '').strip()
+        if not name:
+            continue
+        if not (names_match(event_name, name) or name.lower() == lowered):
+            continue
+        due = assignment.get('due_at') or ''
+        parsed = _parse_any_date(due, default_year=default_year)
+        if parsed:
+            return parsed
+        assignment_id = str(assignment.get('id') or '')
+        for module in snapshot.get('modules') or []:
+            module_name = str(module.get('name') or '')
+            items = (snapshot.get('module_items') or {}).get(str(module.get('id') or '')) or []
+            for item in items:
+                if str(item.get('content_id') or '') != assignment_id:
+                    continue
+                parsed = _parse_any_date(module_name, default_year=default_year)
+                if parsed:
+                    return parsed
+    return None
 
 
 def enrich_weekly_with_graph(
@@ -89,6 +153,8 @@ def enrich_weekly_with_graph(
 
     for candidate in candidates:
         parsed = _parse_graph_date(candidate.get('date') or '', default_year)
+        if not parsed:
+            parsed = _undated_event_date_from_snapshot(snapshot, candidate.get('name') or '', default_year)
         if not parsed:
             continue
         week_start = _format_week_start(parsed, default_year)

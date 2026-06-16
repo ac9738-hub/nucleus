@@ -191,6 +191,20 @@ def fetch_course_snapshot(auth: CanvasAuth, course: dict[str, Any]) -> dict[str,
     return enrich_snapshot_with_page_bodies(auth, snapshot)
 
 
+def fetch_course_snapshot_by_id(auth: CanvasAuth, course_id: int | str) -> dict[str, Any]:
+    course = fetch_course_syllabus(auth, course_id)
+    if not course or not course.get('id'):
+        raise CanvasFetchError(f'Could not load course {course_id}')
+    return fetch_course_snapshot(auth, course)
+
+
+def fetch_course_snapshots_by_ids(auth: CanvasAuth, course_ids: list[int | str]) -> list[dict[str, Any]]:
+    snapshots: list[dict[str, Any]] = []
+    for course_id in course_ids:
+        snapshots.append(fetch_course_snapshot_by_id(auth, course_id))
+    return snapshots
+
+
 def fetch_all_courses(auth: CanvasAuth) -> list[dict[str, Any]]:
     if not auth.is_valid:
         raise CanvasFetchError('Canvas auth is missing. Log in through Nucleus first.')

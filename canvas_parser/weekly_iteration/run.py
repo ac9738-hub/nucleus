@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .auth import load_auth_from_env
+from .auth import load_auth_from_env, load_env_file
 from .course_match import find_snapshot_for_ground_truth, parse_ground_truth_filename
 from .evaluate import evaluate_snapshots
 from .fetch import load_snapshots
@@ -18,6 +19,10 @@ from .paths import (
     default_report_path,
     default_snapshot_path,
     fixture_snapshot_path,
+    holdout_fixture_snapshot_path,
+    holdout_ground_truth_dir,
+    holdout_report_path,
+    holdout_snapshot_path,
 )
 
 
@@ -44,6 +49,32 @@ def _resolve_snapshot_path(root: Path, snapshot_arg: str) -> Path:
     raise FileNotFoundError(snapshot_path)
 
 
+def _parser_keys_available(root: Path) -> bool:
+    env_values = load_env_file(root / '.env')
+    return bool(
+        os.getenv('DEEP_SEEK_API_KEY') or env_values.get('DEEP_SEEK_API_KEY')
+    )
+
+
+def _build_graph_cache(
+    root: Path,
+    snapshot_path: Path,
+    ground_truth_dir: Path,
+    graph_path: Path,
+) -> dict:
+    auth = load_auth_from_env(root)
+    snapshots = load_snapshots(snapshot_path)
+    gt_snapshots = _ground_truth_snapshots(snapshots, ground_truth_dir)
+    if not gt_snapshots:
+        raise SystemExit('No ground-truth courses matched in snapshots.')
+    print(f'Running parser.py for {len(gt_snapshots)} ground-truth course(s)...')
+    graph = run_parser_for_snapshots(gt_snapshots, root, auth)
+    graph_path.parent.mkdir(parents=True, exist_ok=True)
+    graph_path.write_text(json.dumps(graph, indent=2, ensure_ascii=False), encoding='utf-8')
+    print(f'Wrote parser graph to {graph_path}')
+    return graph
+
+
 def _load_graph(root: Path, args: argparse.Namespace, snapshot_path: Path) -> dict:
     if args.graph_cache:
         graph_path = Path(args.graph_cache)
@@ -59,28 +90,31 @@ def _load_graph(root: Path, args: argparse.Namespace, snapshot_path: Path) -> di
         print(f'Using cached parser graph: {graph_path}')
         return json.loads(graph_path.read_text(encoding='utf-8'))
 
-    if not args.refresh_graph:
+    should_build = args.refresh_graph or args.ensure_graph
+    if not should_build:
         print(
             'Parser graph cache missing; continuing with heuristics only '
-            '(pass --refresh-graph to rebuild; needs Canvas auth + DEEP_SEEK_API_KEY).',
+            '(pass --ensure-graph or --refresh-graph; needs DEEP_SEEK_API_KEY).',
             file=sys.stderr,
         )
         return {}
 
-    auth = load_auth_from_env(root)
-    snapshots = load_snapshots(snapshot_path)
-    gt_snapshots = _ground_truth_snapshots(snapshots, root / args.ground_truth_dir)
-    if not gt_snapshots:
-        raise SystemExit('No ground-truth courses matched in snapshots.')
-    print(f'Running parser.py for {len(gt_snapshots)} ground-truth course(s)...')
-    graph = run_parser_for_snapshots(gt_snapshots, root, auth)
-    graph_path.parent.mkdir(parents=True, exist_ok=True)
-    graph_path.write_text(json.dumps(graph, indent=2, ensure_ascii=False), encoding='utf-8')
-    print(f'Wrote parser graph to {graph_path}')
-    return graph
+    if not _parser_keys_available(root):
+        print(
+            'DEEP_SEEK_API_KEY is not set; cannot build parser graph cache.',
+            file=sys.stderr,
+        )
+        return {}
+
+    return _build_graph_cache(
+        root,
+        snapshot_path,
+        root / args.ground_truth_dir,
+        graph_path,
+    )
 
 
-def _build_report(results, aggregate: float, *, mode: str, target: float) -> dict:
+def _build_report(results, aggregate: float, *, mode: str, target: float, label: str = 'weekly') -> dict:
     courses = []
     for result in results:
         weekly = result.sections.get('weekly_schedule')
@@ -88,14 +122,24 @@ def _build_report(results, aggregate: float, *, mode: str, target: float) -> dic
             'ground_truth_file': result.ground_truth_file,
             'course_label': result.course_label,
             'accuracy': round(result.accuracy, 4),
-            'weekly_accuracy': round(weekly.accuracy, 4) if weekly else None,
+            'weekly_accuracy': round(weekly.accuracy, 4) if weekly and weekly.total else None,
             'weekly_matched': weekly.matched if weekly else 0,
             'weekly_total': weekly.total if weekly else 0,
-            'misses': weekly.misses if weekly else [],
+            'weekly_misses': weekly.misses if weekly else [],
+            'sections': {
+                name: {
+                    'matched': section.matched,
+                    'total': section.total,
+                    'accuracy': round(section.accuracy, 4),
+                    'misses': section.misses,
+                }
+                for name, section in result.sections.items()
+            },
         })
     return {
         'generated_at': datetime.now(timezone.utc).isoformat(),
         'mode': mode,
+        'label': label,
         'aggregate_weekly_accuracy': round(aggregate, 4),
         'target': target,
         'passed': aggregate >= target,
@@ -120,19 +164,55 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument('--llm', action='store_true', help='Enrich weekly events from parser graph')
     parser.add_argument('--graph-cache', help='Use cached parser graph instead of re-running parser.py')
     parser.add_argument('--refresh-graph', action='store_true', help='Re-run parser.py even if cache exists')
+    parser.add_argument(
+        '--ensure-graph',
+        action='store_true',
+        help='Build parser graph cache when missing (needs DEEP_SEEK_API_KEY)',
+    )
+    parser.add_argument(
+        '--holdout',
+        action='store_true',
+        help='Evaluate holdout ground truth (ground-truth/holdout/) without affecting main score',
+    )
     args = parser.parse_args(argv)
 
     root = Path(args.root)
-    gt_dir = root / args.ground_truth_dir
+    if args.holdout:
+        gt_dir = holdout_ground_truth_dir(root)
+        default_snapshot = holdout_snapshot_path(root)
+        default_report = holdout_report_path(root)
+        report_label = 'holdout'
+    else:
+        gt_dir = root / args.ground_truth_dir
+        default_snapshot = default_snapshot_path(root)
+        default_report = default_report_path(root)
+        report_label = 'weekly'
+
+    snapshot_arg = args.snapshot if args.snapshot != str(default_snapshot_path(root)) else str(default_snapshot)
+    report_arg = args.report if args.report != str(default_report_path(root)) else str(default_report)
     try:
-        snapshot_path = _resolve_snapshot_path(root, args.snapshot)
+        snapshot_path = _resolve_snapshot_path(root, snapshot_arg)
     except FileNotFoundError:
-        print(f'Snapshot not found: {root / args.snapshot}', file=sys.stderr)
-        print(
-            'Fetch once with: python -m canvas_parser.weekly_iteration.fetch_snapshots --enrich-pages',
-            file=sys.stderr,
-        )
-        return 2
+        if args.holdout:
+            fixture = holdout_fixture_snapshot_path(root)
+            if fixture.is_file():
+                snapshot_path = fixture
+            else:
+                print(f'Holdout snapshot not found: {root / snapshot_arg}', file=sys.stderr)
+                print(
+                    'Fetch with: python -m canvas_parser.weekly_iteration.fetch_snapshots '
+                    '--course-id 20812 --course-id 19097 --enrich-pages '
+                    f'--save {holdout_snapshot_path(root)}',
+                    file=sys.stderr,
+                )
+                return 2
+        else:
+            print(f'Snapshot not found: {root / snapshot_arg}', file=sys.stderr)
+            print(
+                'Fetch once with: python -m canvas_parser.weekly_iteration.fetch_snapshots --enrich-pages',
+                file=sys.stderr,
+            )
+            return 2
 
     snapshots = load_snapshots(snapshot_path)
     graph = _load_graph(root, args, snapshot_path)
@@ -145,6 +225,7 @@ def main(argv: list[str] | None = None) -> int:
         root_dir=root,
         use_llm_weekly=args.llm,
         weekly_only=True,
+        strict_weekly=args.holdout,
     )
 
     weekly_results = [
@@ -155,15 +236,15 @@ def main(argv: list[str] | None = None) -> int:
         sum(result.accuracy for result in weekly_results) / len(weekly_results)
         if weekly_results else 0.0
     )
-    report = _build_report(results, aggregate, mode=mode, target=args.target)
+    report = _build_report(results, aggregate, mode=mode, target=args.target, label=report_label)
 
-    report_path = Path(args.report)
+    report_path = Path(report_arg)
     if not report_path.is_absolute():
         report_path = root / report_path
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding='utf-8')
 
-    print(f'\nWeekly schedule accuracy: {aggregate * 100:.1f}% (target {args.target * 100:.0f}%)')
+    print(f'\n{report_label.title()} schedule accuracy: {aggregate * 100:.1f}% (target {args.target * 100:.0f}%)')
     print(f'Report: {report_path}')
     for course in report['courses']:
         weekly_accuracy = course.get('weekly_accuracy')

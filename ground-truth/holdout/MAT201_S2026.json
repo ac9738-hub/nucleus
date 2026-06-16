@@ -1,0 +1,428 @@
+{
+  "assignments": [
+    { "name": "DIAGNOSTIC QUIZ", "due_at": "1/30/2026" },
+    { "name": "Problem Set 1", "due_at": "2/3/2026" },
+    { "name": "Worksheet 1", "due_at": "2/4/2026" },
+    { "name": "Problem Set 2", "due_at": "2/10/2026" },
+    { "name": "Worksheet 2", "due_at": "2/11/2026" },
+    { "name": "QUIZ 1", "due_at": "2/16/2026" },
+    { "name": "Problem Set 3", "due_at": "2/19/2026" },
+    { "name": "Problem Set 4", "due_at": "2/24/2026" },
+    { "name": "Worksheet 3", "due_at": "2/25/2026" },
+    { "name": "MIDTERM EXAM", "due_at": "3/4/2026" },
+    { "name": "Problem Set 5", "due_at": "3/6/2026" },
+    { "name": "Worksheet 4", "due_at": "3/18/2026" },
+    { "name": "Problem Set 6 (Part 1: 15.5-15.7)", "due_at": "3/24/2026" },
+    { "name": "Problem Set 6 (Part 2: 15.8)", "due_at": "3/27/2026" },
+    { "name": "Worksheet 5", "due_at": "3/27/2026" },
+    { "name": "QUIZ 2", "due_at": "4/1/2026" },
+    { "name": "Problem Set 7", "due_at": "4/4/2026" },
+    { "name": "Worksheet 6", "due_at": "4/8/2026" },
+    { "name": "Problem Set 8", "due_at": "4/14/2026" },
+    { "name": "Worksheet 7", "due_at": "4/15/2026" },
+    { "name": "Problem Set 9", "due_at": "4/21/2026" },
+    { "name": "Worksheet 8", "due_at": "4/22/2026" },
+    { "name": "MAKE-UP QUIZ", "due_at": "4/29/2026" },
+    { "name": "Problem Set 10", "due_at": "4/30/2026" }
+  ],
+  "modules": [
+    {
+      "module_name": "Syllabus + schedule",
+      "module_contents": [
+        { "name": "Syllabus" },
+        { "name": "Schedule" }
+      ]
+    },
+    {
+      "module_name": "Diagnostic Quiz",
+      "module_contents": [
+        { "name": "Version 1" },
+        { "name": "Solutions" },
+        { "name": "Version 2" },
+        { "name": "Solutions" },
+        { "name": "Version 3" },
+        { "name": "Solutions" }
+      ]
+    },
+    {
+      "module_name": "Quiz 1",
+      "module_contents": [
+        { "name": "Practice 1" },
+        { "name": "Solutions (#2, #3 corrected 2pm 02/15)" },
+        { "name": "Practice 2 (#3 corrected 12pm 02/14)" },
+        { "name": "Solutions" },
+        { "name": "Actual quiz (v1)" },
+        { "name": "Solutions (corrected 02/23)" },
+        { "name": "Actual quiz (v2)" }
+      ]
+    },
+    {
+      "module_name": "Midterm",
+      "module_contents": [
+        { "name": "Practice 1" },
+        { "name": "Solutions" },
+        { "name": "Practice 2" },
+        { "name": "Solutions" },
+        { "name": "Actual exam" },
+        { "name": "Solutions" }
+      ]
+    },
+    {
+      "module_name": "Quiz 2",
+      "module_contents": [
+        { "name": "Practice 1" },
+        { "name": "Solutions" },
+        { "name": "Practice 2" },
+        { "name": "Solutions" },
+        { "name": "Actual quiz" },
+        { "name": "Solutions" }
+      ]
+    },
+    {
+      "module_name": "Final Exam",
+      "module_contents": [
+        { "name": "Practice 1" },
+        { "name": "Solutions" },
+        { "name": "Practice 2" },
+        { "name": "Solutions" },
+        { "name": "Practice 3" },
+        { "name": "Solutions" },
+        { "name": "Practice 4" },
+        { "name": "Practice 5" },
+        { "name": "Solutions to Practice 4 and Practice 5" },
+        { "name": "Actual Exam" },
+        { "name": "Solutions" }
+      ]
+    },
+    {
+      "module_name": "Problem Set Solutions",
+      "module_contents": [
+        { "name": "Problem Set 1 solutions (by Dr. Shankar)" },
+        { "name": "Problem Set 2 solutions (by Dr. Shankar)" },
+        { "name": "Problem Set 3 solutions (by Dr. Shankar)" },
+        { "name": "Problem Set 4 solutions (by Dr. Shankar)" },
+        { "name": "Problem Set 5 solutions (by Dr. Shankar)" },
+        { "name": "Problem Set 6 solutions (by Dr. Shankar)" },
+        { "name": "Problem Set 7 solutions (by Dr. Shankar)" },
+        { "name": "Problem Set 8 solutions (by Dr. Shankar)" },
+        { "name": "Problem Set 9 solutions (by Dr. Shankar)" },
+        { "name": "Problem Set 10 solutions (by Dr. Shankar)" }
+      ]
+    },
+    {
+      "module_name": "Worksheets",
+      "module_contents": [
+        { "name": "Worksheet 1" },
+        { "name": "Solutions" },
+        { "name": "Worksheet 2" },
+        { "name": "Solutions" },
+        { "name": "Worksheet 3" },
+        { "name": "Worksheet 4" },
+        { "name": "Worksheet 5" },
+        { "name": "Worksheet 6" }
+      ]
+    }
+  ],
+  "weekly_schedule": [
+    {
+      "name": "Week 1",
+      "start_date": "1/26/2026",
+      "end_date": "2/1/2026",
+      "files": [
+        { "name": "Syllabus" },
+        { "name": "Schedule" },
+        { "name": "Version 1" },
+        { "name": "Solutions" },
+        { "name": "Version 2" },
+        { "name": "Solutions" },
+        { "name": "Version 3" },
+        { "name": "Solutions" }
+      ],
+      "assignments": [
+        { "name": "DIAGNOSTIC QUIZ", "files": [] }
+      ],
+      "events": [
+        { "name": "Diagnostic Quiz", "files": [] }
+      ]
+    },
+    {
+      "name": "Week 2",
+      "start_date": "2/2/2026",
+      "end_date": "2/8/2026",
+      "files": [
+        { "name": "Worksheet 1" }
+      ],
+      "assignments": [
+        { "name": "Problem Set 1", "files": [] },
+        { "name": "Worksheet 1", "files": [] }
+      ],
+      "events": []
+    },
+    {
+      "name": "Week 3",
+      "start_date": "2/9/2026",
+      "end_date": "2/15/2026",
+      "files": [
+        { "name": "Solutions" },
+        { "name": "Worksheet 2" },
+        { "name": "Problem Set 1 solutions (by Dr. Shankar)" },
+        { "name": "Practice 1" },
+        { "name": "Solutions (#2, #3 corrected 2pm 02/15)" },
+        { "name": "Practice 2 (#3 corrected 12pm 02/14)" },
+        { "name": "Solutions" }
+      ],
+      "assignments": [
+        { "name": "Problem Set 2", "files": [] },
+        { "name": "Worksheet 2", "files": [] }
+      ],
+      "events": [
+        { "name": "QUIZ 1", "files": [
+          { "name": "Practice 1" },
+          { "name": "Solutions (#2, #3 corrected 2pm 02/15)" },
+          { "name": "Practice 2 (#3 corrected 12pm 02/14)" },
+          { "name": "Solutions" }
+        ] }
+      ]
+    },
+    {
+      "name": "Week 4",
+      "start_date": "2/16/2026",
+      "end_date": "2/22/2026",
+      "files": [
+        { "name": "Solutions" },
+        { "name": "Problem Set 2 solutions (by Dr. Shankar)" },
+        { "name": "Actual quiz (v1)" },
+        { "name": "Actual quiz (v2)" }
+      ],
+      "assignments": [
+        { "name": "QUIZ 1", "files": [] },
+        { "name": "Problem Set 3", "files": [] }
+      ],
+      "events": [
+        { "name": "QUIZ 1", "files": [
+          { "name": "Actual quiz (v1)" },
+          { "name": "Actual quiz (v2)" }
+        ] }
+      ]
+    },
+    {
+      "name": "Week 5",
+      "start_date": "2/23/2026",
+      "end_date": "3/1/2026",
+      "files": [
+        { "name": "Solutions (corrected 02/23)" },
+        { "name": "Worksheet 3" },
+        { "name": "Problem Set 3 solutions (by Dr. Shankar)" },
+        { "name": "Practice 1" },
+        { "name": "Solutions" },
+        { "name": "Practice 2" },
+        { "name": "Solutions" }
+      ],
+      "assignments": [
+        { "name": "Problem Set 4", "files": [] },
+        { "name": "Worksheet 3", "files": [] }
+      ],
+      "events": [
+        { "name": "QUIZ 1", "files": [
+          { "name": "Solutions (corrected 02/23)" }
+        ] },
+        { "name": "MIDTERM EXAM", "files": [
+          { "name": "Practice 1" },
+          { "name": "Solutions" },
+          { "name": "Practice 2" },
+          { "name": "Solutions" }
+        ] }
+      ]
+    },
+    {
+      "name": "Week 6",
+      "start_date": "3/2/2026",
+      "end_date": "3/8/2026",
+      "files": [
+        { "name": "Problem Set 4 solutions (by Dr. Shankar)" },
+        { "name": "Actual exam" },
+        { "name": "Solutions" }
+      ],
+      "assignments": [
+        { "name": "MIDTERM EXAM", "files": [] },
+        { "name": "Problem Set 5", "files": [] }
+      ],
+      "events": [
+        { "name": "MIDTERM EXAM", "files": [
+          { "name": "Actual exam" },
+          { "name": "Solutions" }
+        ] }
+      ]
+    },
+    {
+      "name": "Week 7",
+      "start_date": "3/9/2026",
+      "end_date": "3/15/2026",
+      "files": [
+        { "name": "Problem Set 5 solutions (by Dr. Shankar)" }
+      ],
+      "assignments": [],
+      "events": []
+    },
+    {
+      "name": "Week 8",
+      "start_date": "3/16/2026",
+      "end_date": "3/22/2026",
+      "files": [
+        { "name": "Worksheet 4" }
+      ],
+      "assignments": [
+        { "name": "Worksheet 4", "files": [] }
+      ],
+      "events": []
+    },
+    {
+      "name": "Week 9",
+      "start_date": "3/23/2026",
+      "end_date": "3/29/2026",
+      "files": [
+        { "name": "Worksheet 5" },
+        { "name": "Problem Set 6 solutions (by Dr. Shankar)" },
+        { "name": "Practice 1" },
+        { "name": "Solutions" },
+        { "name": "Practice 2" },
+        { "name": "Solutions" }
+      ],
+      "assignments": [
+        { "name": "Problem Set 6 (Part 1: 15.5-15.7)", "files": [] },
+        { "name": "Problem Set 6 (Part 2: 15.8)", "files": [] },
+        { "name": "Worksheet 5", "files": [] }
+      ],
+      "events": [
+        { "name": "QUIZ 2", "files": [
+          { "name": "Practice 1" },
+          { "name": "Solutions" },
+          { "name": "Practice 2" },
+          { "name": "Solutions" }
+        ] }
+      ]
+    },
+    {
+      "name": "Week 10",
+      "start_date": "3/30/2026",
+      "end_date": "4/5/2026",
+      "files": [
+        { "name": "Problem Set 7 solutions (by Dr. Shankar)" },
+        { "name": "Actual quiz" },
+        { "name": "Solutions" }
+      ],
+      "assignments": [
+        { "name": "QUIZ 2", "files": [] },
+        { "name": "Problem Set 7", "files": [] }
+      ],
+      "events": [
+        { "name": "QUIZ 2", "files": [
+          { "name": "Actual quiz" },
+          { "name": "Solutions" }
+        ] }
+      ]
+    },
+    {
+      "name": "Week 11",
+      "start_date": "4/6/2026",
+      "end_date": "4/12/2026",
+      "files": [
+        { "name": "Worksheet 6" }
+      ],
+      "assignments": [
+        { "name": "Worksheet 6", "files": [] }
+      ],
+      "events": []
+    },
+    {
+      "name": "Week 12",
+      "start_date": "4/13/2026",
+      "end_date": "4/19/2026",
+      "files": [
+        { "name": "Problem Set 8 solutions (by Dr. Shankar)" },
+        { "name": "Practice 1" },
+        { "name": "Solutions" },
+        { "name": "Practice 2" },
+        { "name": "Solutions" }
+      ],
+      "assignments": [
+        { "name": "Problem Set 8", "files": [] },
+        { "name": "Worksheet 7", "files": [] }
+      ],
+      "events": [
+        { "name": "Final Exam", "files": [
+          { "name": "Practice 1" },
+          { "name": "Solutions" },
+          { "name": "Practice 2" },
+          { "name": "Solutions" }
+        ] }
+      ]
+    },
+    {
+      "name": "Week 13",
+      "start_date": "4/20/2026",
+      "end_date": "4/26/2026",
+      "files": [
+        { "name": "Problem Set 9 solutions (by Dr. Shankar)" },
+        { "name": "Practice 3" },
+        { "name": "Solutions" },
+        { "name": "Practice 4" },
+        { "name": "Practice 5" }
+      ],
+      "assignments": [
+        { "name": "Problem Set 9", "files": [] },
+        { "name": "Worksheet 8", "files": [] }
+      ],
+      "events": [
+        { "name": "Final Exam", "files": [
+          { "name": "Practice 3" },
+          { "name": "Solutions" },
+          { "name": "Practice 4" },
+          { "name": "Practice 5" }
+        ] }
+      ]
+    },
+    {
+      "name": "Week 14",
+      "start_date": "4/27/2026",
+      "end_date": "5/3/2026",
+      "files": [
+        { "name": "Solutions to Practice 4 and Practice 5" }
+      ],
+      "assignments": [
+        { "name": "MAKE-UP QUIZ", "files": [] },
+        { "name": "Problem Set 10", "files": [] }
+      ],
+      "events": [
+        { "name": "Final Exam", "files": [
+          { "name": "Solutions to Practice 4 and Practice 5" }
+        ] },
+        { "name": "Reading Period", "files": [] },
+        { "name": "MAKE-UP QUIZ", "files": [] }
+      ]
+    },
+    {
+      "name": "Week 15",
+      "start_date": "5/4/2026",
+      "end_date": "5/10/2026",
+      "files": [
+        { "name": "Problem Set 10 solutions (by Dr. Shankar)" }
+      ],
+      "assignments": [],
+      "events": []
+    },
+    {
+      "name": "Week 16",
+      "start_date": "5/11/2026",
+      "end_date": "5/17/2026",
+      "files": [],
+      "assignments": [],
+      "events": [
+        { "name": "Final Exam", "files": [
+          { "name": "Actual Exam" },
+          { "name": "Solutions" }
+        ] }
+      ]
+    }
+  ]
+}

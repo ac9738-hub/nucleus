@@ -204,7 +204,7 @@ def run_parser_batches(
     root_dir: Path,
     auth: CanvasAuth,
     *,
-    timeout_seconds: int = 900,
+    timeout_seconds: int = 2100,
 ) -> dict[str, Any]:
     if not batches:
         return {}

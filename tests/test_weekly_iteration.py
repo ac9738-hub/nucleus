@@ -24,7 +24,25 @@ def test_names_match_is_fuzzy():
     assert names_match('Exam 1 (Midterm)', 'Midterm Exam') is False
 
 
-def test_format_course_snapshot_basic():
+def test_parse_filename_date_handles_underscore_before_month():
+    from canvas_parser.weekly_iteration.format import _parse_filename_date
+
+    parsed = _parse_filename_date('Dr Francis Slides_Sept 3, 2024.pdf', 2024)
+    assert parsed is not None
+    assert parsed.month == 9
+    assert parsed.day == 3
+
+
+def test_extract_page_file_names_includes_assignment_descriptions():
+    from canvas_parser.weekly_iteration.format import _extract_page_file_names
+
+    snapshot = {
+        'page_bodies': {},
+        'assignments': [{
+            'description': '<a href="/files/1">Linked Lecture.pdf</a>',
+        }],
+    }
+    assert _extract_page_file_names(snapshot) == ['Linked Lecture.pdf']
     snapshot = {
         'course': {
             'id': 1,
@@ -74,3 +92,47 @@ def test_compare_to_ground_truth_modules():
     score = compare_to_ground_truth(parsed, ground_truth)
     assert score.sections['assignments'].accuracy == 1.0
     assert score.sections['modules'].accuracy == 1.0
+
+
+def test_final_exam_module_files_bucket_by_late_pset_weeks():
+    snapshot = {
+        'course': {
+            'id': 20812,
+            'course_code': 'MAT201',
+            'start_at': '2026-01-09T05:00:00Z',
+            'term': {'start_at': '2026-01-09T05:00:00Z'},
+        },
+        'assignments': [
+            _assignment('QUIZ 1', '2026-02-17T04:59:00Z'),
+            _assignment('Problem Set 8', '2026-04-15T03:59:59Z'),
+            _assignment('Problem Set 9', '2026-04-22T03:59:00Z'),
+            _assignment('MAKE-UP QUIZ', '2026-04-30T03:59:59Z'),
+        ],
+        'files': [
+            {'id': 'f1', 'display_name': 'Practice 1.pdf'},
+            {'id': 'f2', 'display_name': 'Actual Exam.pdf'},
+        ],
+        'modules': [{'id': 'm1', 'name': 'Quizzes/Exams', 'position': 1}],
+        'module_items': {
+            'm1': [
+                {'id': 'h1', 'type': 'SubHeader', 'title': 'Final Exam', 'position': 1},
+                {'id': 'i1', 'type': 'File', 'content_id': 'f1', 'title': 'Practice 1', 'position': 2},
+                {'id': 'i2', 'type': 'File', 'content_id': 'f2', 'title': 'Actual Exam', 'position': 3},
+            ],
+        },
+    }
+    parsed = format_course_snapshot(snapshot)
+    weeks = parsed.get('weekly_schedule') or []
+    final_weeks = [
+        week for week in weeks
+        if any(event.get('name') == 'Final Exam' for event in week.get('events') or [])
+    ]
+    assert final_weeks
+    for week in final_weeks:
+        month = int(str(week.get('start_date') or '1/1/2026').split('/')[0])
+        assert month >= 4
+    assert not any(
+        'Final Exam' in {event.get('name') for event in week.get('events') or []}
+        for week in weeks
+        if int(str(week.get('start_date') or '12/31/2026').split('/')[0]) <= 2
+    )

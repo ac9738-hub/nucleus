@@ -72,10 +72,53 @@ INTENT_CONTEXT = {
 INTENT_KEYWORDS = {
     "deadline": ["due", "deadline", "when", "date", "schedule"],
     "exam": ["exam", "midterm", "final", "quiz", "test", "review"],
+    "syllabus": ["syllabus", "policy", "grading", "grade", "participation", "office hours", "office hour"],
     "assignment": ["assignment", "homework", "problem set", "pset", "submit", "submission"],
     "practice": ["example", "practice", "problem", "exercise", "solution"],
     "concept": ["define", "definition", "what is", "what are", "explain", "concept"],
-    "syllabus": ["syllabus", "policy", "grading", "grade", "participation", "office hours"],
+}
+
+INTENT_NODE_TYPE_BOOST = {
+    "deadline": {"event": 0.35, "assignment": 0.08, "syllabus": 0.12},
+    "exam": {"event": 0.42, "syllabus": 0.15, "file": 0.08},
+    "syllabus": {"syllabus": 0.45, "file": 0.22},
+    "assignment": {"assignment": 0.18, "file": 0.08},
+    "practice": {"problem": 0.28, "example": 0.18, "file": 0.1, "concept": 0.08},
+    "concept": {"concept": 0.28, "detail": 0.15, "example": 0.12, "file": 0.08},
+}
+
+INTENT_NODE_TYPE_PENALTY = {
+    "exam": {"assignment": 0.32, "problem": 0.15},
+    "deadline": {"problem": 0.12, "example": 0.12},
+    "syllabus": {"assignment": 0.22, "problem": 0.15},
+}
+
+FILE_QUERY_KEYWORDS = [
+    "slide",
+    "slides",
+    "lecture",
+    "notes",
+    "pdf",
+    "reading",
+    "readings",
+    "audio",
+    "recording",
+    "handout",
+    "syllabus",
+]
+
+EXAM_ASSIGNMENT_PATTERN = re.compile(
+    r"\b(exam|midterm|final|quiz|test|review)\b",
+    re.IGNORECASE,
+)
+
+NODE_TYPE_SEARCH_PHRASES = {
+    "event": "calendar exam quiz deadline office hours schedule date",
+    "syllabus": "syllabus course policy grading schedule class information",
+    "file": "lecture slides notes pdf reading handout study material",
+    "assignment": "assignment homework problem set submission due",
+    "problem": "practice problem exercise solution",
+    "concept": "concept definition explanation topic",
 }
 
 FUZZY_STOPWORDS = {
@@ -157,6 +200,52 @@ def classify_query_intent(query):
         if any(keyword in lowered for keyword in keywords):
             return intent
     return "general"
+
+
+def assignment_exam_like(name):
+    return bool(EXAM_ASSIGNMENT_PATTERN.search(str(name or "")))
+
+
+def node_ranking_text(nodetype, node, courseid=None):
+    parts = [
+        fuzzy_match_name(node, courseid),
+        str(getattr(node, "name", "") or ""),
+        str(getattr(node, "description", "") or ""),
+    ]
+    event_type = getattr(node, "type", "")
+    if event_type:
+        parts.append(str(event_type))
+    if getattr(node, "startdate", ""):
+        parts.append(str(getattr(node, "startdate", "")))
+    if getattr(node, "duedate", ""):
+        parts.append(str(getattr(node, "duedate", "")))
+    phrase = NODE_TYPE_SEARCH_PHRASES.get(nodetype, "")
+    if phrase:
+        parts.append(phrase)
+    return " ".join(part for part in parts if part)
+
+
+def intent_type_adjustment(intent, nodetype, node):
+    boost = INTENT_NODE_TYPE_BOOST.get(intent, {}).get(nodetype, 0.0)
+    penalty = INTENT_NODE_TYPE_PENALTY.get(intent, {}).get(nodetype, 0.0)
+    if intent in {"exam", "deadline"} and nodetype == "assignment":
+        if assignment_exam_like(getattr(node, "name", "")):
+            penalty = 0.0
+            boost = max(boost, 0.12)
+    if nodetype == "event" and getattr(node, "startdate", ""):
+        boost += 0.08
+    if nodetype == "event" and str(getattr(node, "type", "") or "").lower() == "office_hours":
+        boost += 0.12
+    return boost - penalty
+
+
+def browser_file_query_boost(query, nodetype):
+    if nodetype != "file":
+        return 0.0
+    lowered = sanitize_query(query).lower()
+    if any(keyword in lowered for keyword in FILE_QUERY_KEYWORDS):
+        return 0.14
+    return 0.0
 
 
 def prepare_query_for_embedding(query):
@@ -539,6 +628,38 @@ COURSE_NAMES_LIST = build_course_names_list(COURSE_CATALOG)
 COURSE_BUCKETS = build_course_buckets()
 
 
+def build_edge_lookup(edges):
+    by_from = {}
+    for edge in edges or []:
+        key = (str(edge.get("fromType") or ""), str(edge.get("fromId") or ""))
+        by_from.setdefault(key, []).append(edge)
+    return by_from
+
+
+EDGE_LOOKUP = build_edge_lookup(allnodes.get("edges", []))
+
+
+def find_file(fileid, courseid=None):
+    fileid = str(fileid or "")
+    if courseid is not None:
+        filenode = allnodes["files"].get(str(courseid), {}).get(fileid)
+        if filenode:
+            return filenode
+    for coursefiles in allnodes["files"].values():
+        filenode = coursefiles.get(fileid)
+        if filenode:
+            return filenode
+    return None
+
+
+def find_event(eventid):
+    eventid = str(eventid or "")
+    for event in allnodes["events"]:
+        if str(getattr(event, "eventid", "")) == eventid:
+            return event
+    return None
+
+
 def get_course_embeddings(catalog=None):
     global _course_embeddings_cache
     if _course_embeddings_cache is not None:
@@ -756,6 +877,35 @@ def node_neighbors(nodetype, node):
                 neighbors.append(("problem", problem))
         return neighbors
 
+    if nodetype == "event":
+        eventid = str(getattr(node, "eventid", "") or "")
+        courseid = str(getattr(node, "courseid", "") or "")
+        for edge in EDGE_LOOKUP.get(("event", eventid), []):
+            target_type = str(edge.get("toType") or "")
+            target_id = str(edge.get("toId") or "")
+            if target_type == "file":
+                filenode = find_file(target_id, courseid)
+                if filenode:
+                    neighbors.append(("file", filenode))
+            elif target_type == "concept":
+                concept = find_concept(target_id)
+                if concept:
+                    neighbors.append(("concept", concept))
+        syllabus = allnodes["syllabi"].get(courseid)
+        if syllabus:
+            neighbors.append(("syllabus", syllabus))
+        return neighbors
+
+    if nodetype == "syllabus":
+        courseid = str(getattr(node, "courseid", "") or "")
+        for assignment in getattr(node, "assignments", []) or []:
+            neighbors.append(("assignment", assignment))
+        for fileid in getattr(node, "filechildren", []) or []:
+            filenode = find_file(fileid, courseid)
+            if filenode:
+                neighbors.append(("file", filenode))
+        return neighbors
+
     return neighbors
 
 
@@ -873,23 +1023,36 @@ def retreive(query, k = 3, mode = "agent"):
             ))
             heap_counter += 1
 
+    def passes_semantic_cutoff(semantic_similarity, fuzzy_similarity, nodetype, node):
+        if semantic_similarity >= cutoff_score:
+            return True
+        adjustment = intent_type_adjustment(newquery["intent"], nodetype, node)
+        if adjustment <= 0:
+            return False
+        return fuzzy_similarity >= 0.5 and (semantic_similarity + adjustment) >= cutoff_score
+
     def rank_node(nodetype, node, courseid=None):
-        if not getattr(node, "embedded", None):
-            return
-        if "name" in node.embedded:
-            name_similarity = np.dot(embeddedq, node.embedded.get("name", []))
-        else:
-            name_similarity = 0.0
-        if "description" in node.embedded:
-            description_similarity = np.dot(embeddedq, node.embedded.get("description", []))
-        else:
-            description_similarity = 0.0
+        embedded = getattr(node, "embedded", None) or {}
+        name_similarity = 0.0
+        description_similarity = 0.0
+        if embedded:
+            if "name" in embedded:
+                name_similarity = float(np.dot(embeddedq, embedded.get("name", [])))
+            if "description" in embedded:
+                description_similarity = float(np.dot(embeddedq, embedded.get("description", [])))
         embedding_similarity = max(name_similarity, description_similarity)
-        fuzzy_similarity = fuzzy_name_similarity(query_terms, fuzzy_match_name(node, courseid))
+        ranking_text = node_ranking_text(nodetype, node, courseid)
+        fuzzy_similarity = fuzzy_name_similarity(query_terms, ranking_text)
         resolved_courseid = str(courseid or getattr(node, "courseid", "") or "")
         course_match = course_score_by_id.get(resolved_courseid, {})
         course_similarity = course_match.get("semantic_fuzzy", 0.0)
-        overall_similarity = combine_retrieval_scores(embedding_similarity, fuzzy_similarity)
+        adjustment = intent_type_adjustment(newquery["intent"], nodetype, node)
+        if mode == "browser":
+            adjustment += browser_file_query_boost(query, nodetype)
+        overall_similarity = (
+            combine_retrieval_scores(embedding_similarity, fuzzy_similarity)
+            + adjustment
+        )
         push_node(overall_similarity, embedding_similarity, fuzzy_similarity, course_similarity, nodetype, node)
 
     for nodetype, node, courseid in iter_bucket_nodes(course_pool):
@@ -906,7 +1069,7 @@ def retreive(query, k = 3, mode = "agent"):
             f"Fuzzy: {fuzzy_score:.4f}, Course: {course_score:.4f}",
             file=sys.stderr
         )
-        if semantic_score >= cutoff_score:
+        if passes_semantic_cutoff(semantic_score, fuzzy_score, nodetype, node):
             startpoints.append({
                 'type': nodetype,
                 'node': node,

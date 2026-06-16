@@ -126,7 +126,9 @@ def format_exam_assignments_for_hints(assignments):
             continue
         if normalize_event_type('', name) != 'test':
             continue
-        duedate = getattr(assignment, 'duedate', '') if not isinstance(assignment, dict) else assignment.get('duedate', '')
+        duedate = getattr(assignment, 'duedate', '') if not isinstance(assignment, dict) else (
+            assignment.get('duedate', '') or assignment.get('due_at', '')
+        )
         unlockdate = getattr(assignment, 'unlockdate', '') if not isinstance(assignment, dict) else assignment.get('unlockdate', '')
         date_text = duedate or unlockdate
         if date_text:
@@ -134,6 +136,55 @@ def format_exam_assignments_for_hints(assignments):
         else:
             lines.append(str(name))
     return '\n'.join(lines)
+
+
+PROSE_EXAM_PATTERN = re.compile(
+    r'\b(?P<label>midterm(?:\s+exam)?|final(?:\s+exam)?)\b'
+    r'(?P<middle>[^.!?]{0,250}?)'
+    r'(?P<date>(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),?\s+'
+    r'(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2})',
+    re.IGNORECASE | re.DOTALL,
+)
+BREAK_MODULE_PATTERN = re.compile(
+    r'\b(?:thanksgiving|spring break|reading period|recess)\b',
+    re.IGNORECASE,
+)
+
+
+def extract_prose_exam_hints(other_text=''):
+    hints = []
+    seen = set()
+    for match in PROSE_EXAM_PATTERN.finditer(str(other_text or '')):
+        label = match.group('label').strip()
+        date_text = match.group('date').strip()
+        if not is_plausible_exam_date_text(date_text):
+            continue
+        canonical = canonical_test_event_name(label)
+        key = (canonical.casefold(), date_text.casefold())
+        if key in seen:
+            continue
+        seen.add(key)
+        hints.append({
+            'name': canonical,
+            'date_text': date_text,
+            'type': 'test',
+        })
+    return hints
+
+
+def build_snapshot_exam_text(snapshot):
+    if not isinstance(snapshot, dict):
+        return ''
+    course = snapshot.get('course') or {}
+    parts = [str(course.get('syllabus_body') or '').strip()]
+    for assignment in snapshot.get('assignments') or []:
+        description = assignment.get('description') if isinstance(assignment, dict) else ''
+        if description:
+            parts.append(str(description))
+    for body in (snapshot.get('page_bodies') or {}).values():
+        if body:
+            parts.append(str(body))
+    return build_syllabus_exam_text(other='\n'.join(part for part in parts if part), assignments=snapshot.get('assignments'))
 
 
 def build_syllabus_exam_text(classtimes='', other='', assignments=None):
@@ -297,6 +348,13 @@ def event_names_match(left='', right=''):
 def extract_syllabus_exam_hints(other_text=''):
     hints = []
     seen = set()
+    for source in (extract_prose_exam_hints(other_text),):
+        for hint in source:
+            key = (hint['name'].casefold(), hint['date_text'].casefold())
+            if key in seen:
+                continue
+            seen.add(key)
+            hints.append(hint)
     for match in SYLLABUS_EXAM_LINE_PATTERN.finditer(str(other_text or '')):
         label = match.group('label').strip()
         date_text = match.group('date').strip()

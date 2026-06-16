@@ -17,12 +17,13 @@ Read `AGENTS.md` before editing. Improve **weekly_schedule** accuracy only.
 | Exam/event dates in graph | `graph/events.py`, `parser.py` |
 | Fuzzy match / scoring | `evaluate.py`, `match_utils.py` |
 
-## Loop
+## Loop (graph-first)
 
-1. `python -m canvas_parser.weekly_iteration --llm`
-2. Fix top misses from `.cache/weekly_iteration/report.json`
-3. `python -m pytest tests/test_weekly_iteration.py -q`
-4. Stop at ≥97% aggregate or when fixes need GT literals (overfitting)
+1. `python -m canvas_parser.weekly_iteration --llm --ensure-graph`
+2. Fix `:events:` misses in `events.py` / `parser.py`; re-run with `--refresh-graph`
+3. Fix remaining `:assignments:` / `:files:` in `format.py`
+4. `python -m pytest tests/test_weekly_iteration.py -q tests/test_finalize_events.py -q`
+5. Stop at ≥97% aggregate or when fixes need GT literals (overfitting)
 
 ## Do not
 

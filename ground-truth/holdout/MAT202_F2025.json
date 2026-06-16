@@ -1,0 +1,301 @@
+{
+  "assignments": [
+    { "name": "PSET 1", "due_at": "9/9/2025" },
+    { "name": "PSET 2", "due_at": "9/16/2025" },
+    { "name": "PSET 3", "due_at": "9/23/2025" },
+    { "name": "PSET 4", "due_at": "9/30/2025" },
+    { "name": "PSET 5", "due_at": "10/21/2025" },
+    { "name": "PSET 6", "due_at": "10/28/2025" },
+    { "name": "PSET 7", "due_at": "11/4/2025" },
+    { "name": "PSET 8", "due_at": "11/11/2025" },
+    { "name": "PSET 9", "due_at": "11/18/2025" },
+    { "name": "PSET 10", "due_at": "11/25/2025" },
+    { "name": "PSET 11", "due_at": "12/2/2025" },
+    { "name": "PSET 12", "due_at": "12/9/2025" }
+  ],
+  "modules": [
+    {
+      "module_name": "Notes by David Villalobos",
+      "module_contents": [
+        { "name": "Notes by David Villalobos_PrintingVersion.pdf" },
+        { "name": "Notes by David Villalobos.pdf" }
+      ]
+    },
+    {
+      "module_name": "Exercise Pages from Bretscher's textbook",
+      "module_contents": [
+        { "name": "Sec1.1_exercises.pdf" },
+        { "name": "Sec1.2_exercises.pdf" },
+        { "name": "Sec1.3_exercises.pdf" },
+        { "name": "Sec2.1_exercises.pdf" },
+        { "name": "Sec2.2_exercises.pdf" },
+        { "name": "Sec2.3_exercises.pdf" },
+        { "name": "Sec2.4_exercises.pdf" },
+        { "name": "Sec3.1_exercises.pdf" },
+        { "name": "Sec3.2_exercises.pdf" },
+        { "name": "Sec3.3_exercises.pdf" },
+        { "name": "Sec3.4_exercises.pdf" },
+        { "name": "Sec5.1_exercises.pdf" },
+        { "name": "Sec5.2_exercises.pdf" },
+        { "name": "Sec5.3_exercises.pdf" },
+        { "name": "Sec5.4_exercises.pdf" },
+        { "name": "Sec6.1_exercises.pdf" },
+        { "name": "Sec6.2_exercises.pdf" },
+        { "name": "Sec6.3_exercises.pdf" },
+        { "name": "Sec7.1_exercises.pdf" },
+        { "name": "Sec7.2_exercises.pdf" },
+        { "name": "Sec7.3_exercises.pdf" },
+        { "name": "Sec7.5_exercises.pdf" },
+        { "name": "Sec7.6_exercises.pdf" },
+        { "name": "Sec8.1_exercises.pdf" },
+        { "name": "Sec8.2_exercises.pdf" },
+        { "name": "Sec8.3_exercises.pdf" },
+        { "name": "Sec9.1_exercises.pdf" },
+        { "name": "Sec9.2_exercises.pdf" }
+      ]
+    },
+    {
+      "module_name": "Solutions to the PSETs",
+      "module_contents": [
+        { "name": "MAT202F2025_PSET1_Solutions.pdf" },
+        { "name": "MAT202F2025_PSET2_Solution.pdf" },
+        { "name": "MAT202F2025_PSET3_Solutions.pdf" },
+        { "name": "MAT202F2025_PSET4_Solutions.pdf" },
+        { "name": "MAT202F2025_PSET5_Solutions.pdf" },
+        { "name": "MAT202F2025_PSET6_Solutions.pdf" },
+        { "name": "MAT202F2025_PSET7_Solutions.pdf" },
+        { "name": "MAT202F2025_PSET8_Solutions.pdf" },
+        { "name": "MAT202F2025_PSET9_Solutions.pdf" },
+        { "name": "MAT202F2025_PSET10_Solutions.pdf" },
+        { "name": "MAT202F2025_PSET11_Solutions.PDF" },
+        { "name": "MAT202F2025_PSET12_Solutions.pdf" }
+      ]
+    },
+    {
+      "module_name": "Review Session",
+      "module_contents": [
+        { "name": "MidtermReviewSessionQuestions-Fall2025.pdf" }
+      ]
+    }
+  ],
+  "weekly_schedule": [
+    {
+      "name": "Week 1",
+      "start_date": "9/8/2025",
+      "end_date": "9/14/2025",
+      "files": [
+        { "name": "Notes by David Villalobos_PrintingVersion.pdf" },
+        { "name": "Notes by David Villalobos.pdf" },
+        { "name": "Sec1.1_exercises.pdf" },
+        { "name": "Sec1.2_exercises.pdf" },
+        { "name": "Sec1.3_exercises.pdf" }
+      ],
+      "assignments": [
+        { "name": "PSET 1", "files": [] }
+      ],
+      "events": []
+    },
+    {
+      "name": "Week 2",
+      "start_date": "9/15/2025",
+      "end_date": "9/21/2025",
+      "files": [
+        { "name": "Sec2.1_exercises.pdf" },
+        { "name": "Sec2.2_exercises.pdf" },
+        { "name": "Sec2.3_exercises.pdf" },
+        { "name": "Sec2.4_exercises.pdf" }
+      ],
+      "assignments": [
+        { "name": "PSET 2", "files": [] },
+        { "name": "PSET 1", "files": [{ "name": "MAT202F2025_PSET1_Solutions.pdf" }] }
+      ],
+      "events": []
+    },
+    {
+      "name": "Week 3",
+      "start_date": "9/22/2025",
+      "end_date": "9/28/2025",
+      "files": [
+        { "name": "Sec3.1_exercises.pdf" },
+        { "name": "Sec3.2_exercises.pdf" },
+        { "name": "Sec3.3_exercises.pdf" },
+        { "name": "Sec3.4_exercises.pdf" }
+      ],
+      "assignments": [
+        { "name": "PSET 3", "files": [] },
+        { "name": "PSET 2", "files": [{ "name": "MAT202F2025_PSET2_Solution.pdf" }] }
+      ],
+      "events": [
+        { "name": "Quiz 1", "files": [
+          { "name": "Sec1.1_exercises.pdf" },
+          { "name": "Sec1.2_exercises.pdf" },
+          { "name": "Sec1.3_exercises.pdf" },
+          { "name": "Sec2.1_exercises.pdf" },
+          { "name": "Sec2.2_exercises.pdf" },
+          { "name": "Sec2.3_exercises.pdf" },
+          { "name": "Sec2.4_exercises.pdf" }
+        ] }
+      ]
+    },
+    {
+      "name": "Week 4",
+      "start_date": "9/29/2025",
+      "end_date": "10/5/2025",
+      "files": [
+        { "name": "Sec5.1_exercises.pdf" },
+        { "name": "Sec5.2_exercises.pdf" },
+        { "name": "Sec5.3_exercises.pdf" },
+        { "name": "Sec5.4_exercises.pdf" }
+      ],
+      "assignments": [
+        { "name": "PSET 4", "files": [] },
+        { "name": "PSET 3", "files": [{ "name": "MAT202F2025_PSET3_Solutions.pdf" }] }
+      ],
+      "events": []
+    },
+    {
+      "name": "Week 5",
+      "start_date": "10/6/2025",
+      "end_date": "10/12/2025",
+      "files": [
+        { "name": "Sec6.1_exercises.pdf" },
+        { "name": "Sec6.2_exercises.pdf" }
+      ],
+      "assignments": [
+        { "name": "PSET 4", "files": [{ "name": "MAT202F2025_PSET4_Solutions.pdf" }] }
+      ],
+      "events": [
+        { "name": "Midterm Exam", "files": [
+          { "name": "MidtermReviewSessionQuestions-Fall2025.pdf" },
+          { "name": "Sec5.1_exercises.pdf" },
+          { "name": "Sec5.2_exercises.pdf" }
+        ] }
+      ]
+    },
+    {
+      "name": "Week 6",
+      "start_date": "10/13/2025",
+      "end_date": "10/19/2025",
+      "files": [
+        { "name": "Sec6.3_exercises.pdf" },
+        { "name": "Sec7.1_exercises.pdf" },
+        { "name": "Sec7.2_exercises.pdf" }
+      ],
+      "assignments": [],
+      "events": []
+    },
+    {
+      "name": "Week 7",
+      "start_date": "10/20/2025",
+      "end_date": "10/26/2025",
+      "files": [
+        { "name": "Sec7.3_exercises.pdf" },
+        { "name": "Sec7.5_exercises.pdf" },
+        { "name": "Sec7.6_exercises.pdf" }
+      ],
+      "assignments": [
+        { "name": "PSET 5", "files": [{ "name": "MAT202F2025_PSET5_Solutions.pdf" }] }
+      ],
+      "events": []
+    },
+    {
+      "name": "Week 8",
+      "start_date": "10/27/2025",
+      "end_date": "11/2/2025",
+      "files": [
+        { "name": "Sec8.1_exercises.pdf" },
+        { "name": "Sec8.2_exercises.pdf" }
+      ],
+      "assignments": [
+        { "name": "PSET 6", "files": [{ "name": "MAT202F2025_PSET6_Solutions.pdf" }] }
+      ],
+      "events": []
+    },
+    {
+      "name": "Week 9",
+      "start_date": "11/3/2025",
+      "end_date": "11/9/2025",
+      "files": [
+        { "name": "Sec8.3_exercises.pdf" },
+        { "name": "Sec9.1_exercises.pdf" },
+        { "name": "Sec9.2_exercises.pdf" }
+      ],
+      "assignments": [
+        { "name": "PSET 7", "files": [{ "name": "MAT202F2025_PSET7_Solutions.pdf" }] }
+      ],
+      "events": []
+    },
+    {
+      "name": "Week 10",
+      "start_date": "11/10/2025",
+      "end_date": "11/16/2025",
+      "files": [],
+      "assignments": [
+        { "name": "PSET 8", "files": [{ "name": "MAT202F2025_PSET8_Solutions.pdf" }] }
+      ],
+      "events": [
+        { "name": "Quiz 2", "files": [
+          { "name": "Sec7.1_exercises.pdf" },
+          { "name": "Sec7.2_exercises.pdf" },
+          { "name": "Sec7.3_exercises.pdf" }
+        ] }
+      ]
+    },
+    {
+      "name": "Week 11",
+      "start_date": "11/17/2025",
+      "end_date": "11/23/2025",
+      "files": [],
+      "assignments": [
+        { "name": "PSET 9", "files": [{ "name": "MAT202F2025_PSET9_Solutions.pdf" }] }
+      ],
+      "events": []
+    },
+    {
+      "name": "Week 12",
+      "start_date": "11/24/2025",
+      "end_date": "11/30/2025",
+      "files": [],
+      "assignments": [
+        { "name": "PSET 10", "files": [{ "name": "MAT202F2025_PSET10_Solutions.pdf" }] }
+      ],
+      "events": []
+    },
+    {
+      "name": "Week 13",
+      "start_date": "12/1/2025",
+      "end_date": "12/7/2025",
+      "files": [],
+      "assignments": [
+        { "name": "PSET 11", "files": [{ "name": "MAT202F2025_PSET11_Solutions.PDF" }] }
+      ],
+      "events": [
+        { "name": "Make-up Quiz", "files": [
+          { "name": "Sec7.1_exercises.pdf" },
+          { "name": "Sec7.2_exercises.pdf" },
+          { "name": "Sec7.3_exercises.pdf" }
+        ] }
+      ]
+    },
+    {
+      "name": "Week 14",
+      "start_date": "12/8/2025",
+      "end_date": "12/14/2025",
+      "files": [],
+      "assignments": [
+        { "name": "PSET 12", "files": [{ "name": "MAT202F2025_PSET12_Solutions.pdf" }] }
+      ],
+      "events": []
+    },
+    {
+      "name": "Week 15",
+      "start_date": "12/15/2025",
+      "end_date": "12/21/2025",
+      "files": [],
+      "assignments": [],
+      "events": [
+        { "name": "Final Exam", "files": [] }
+      ]
+    }
+  ]
+}

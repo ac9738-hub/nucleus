@@ -141,9 +141,44 @@ def _flatten_weekly_items(weeks: list[dict[str, Any]], key: str) -> list[dict[st
     return items
 
 
+def _find_matching_week(
+    expected_week: dict[str, Any],
+    actual_weeks: list[dict[str, Any]],
+    *,
+    strict_weeks: bool,
+) -> dict[str, Any] | None:
+    expected_start = normalize_date(expected_week.get('start_date') or '')
+    if strict_weeks:
+        if expected_start:
+            for week in actual_weeks or []:
+                if dates_match(expected_start, week.get('start_date') or '', tolerance_days=6):
+                    return week
+        week_name = str(expected_week.get('name') or '').strip()
+        if week_name:
+            match = next(
+                (
+                    week for week in (actual_weeks or [])
+                    if str(week.get('name') or '').strip() == week_name
+                ),
+                None,
+            )
+            if match:
+                return match
+        return None
+    return next(
+        (
+            week for week in (actual_weeks or [])
+            if normalize_date(week.get('start_date') or '') == expected_start
+        ),
+        None,
+    )
+
+
 def _match_weekly_schedule(
     expected_weeks: list[dict[str, Any]],
     actual_weeks: list[dict[str, Any]],
+    *,
+    strict_weeks: bool = False,
 ) -> tuple[int, int, list[str]]:
     matched = 0
     total = 0
@@ -151,26 +186,29 @@ def _match_weekly_schedule(
 
     for expected_week in expected_weeks or []:
         expected_start = normalize_date(expected_week.get('start_date') or '')
-        actual_week = next(
-            (
-                week for week in (actual_weeks or [])
-                if normalize_date(week.get('start_date') or '') == expected_start
-            ),
-            None,
-        )
+        actual_week = _find_matching_week(expected_week, actual_weeks, strict_weeks=strict_weeks)
         for bucket_key in ('files', 'assignments', 'events'):
             for expected_item in expected_week.get(bucket_key) or []:
                 total += 1
                 expected_name = expected_item.get('name') or ''
-                candidates = _flatten_weekly_items(actual_weeks, bucket_key) if not actual_week else (
-                    [
-                        {
-                            'name': row.get('name') or '',
-                            'start_date': expected_start,
-                        }
-                        for row in (actual_week.get(bucket_key) or [])
-                    ]
-                )
+                if not actual_week:
+                    if strict_weeks:
+                        misses.append(f'{expected_week.get("name")}:{bucket_key}:{expected_name}')
+                    elif any(
+                        names_match(expected_name, row.get('name') or '')
+                        for row in _flatten_weekly_items(actual_weeks, bucket_key)
+                    ):
+                        matched += 1
+                    else:
+                        misses.append(f'{expected_week.get("name")}:{bucket_key}:{expected_name}')
+                    continue
+                candidates = [
+                    {
+                        'name': row.get('name') or '',
+                        'start_date': expected_start,
+                    }
+                    for row in (actual_week.get(bucket_key) or [])
+                ]
                 if any(names_match(expected_name, row.get('name') or '') for row in candidates):
                     matched += 1
                 else:
@@ -215,7 +253,7 @@ class CourseScore:
         return weighted / weight_total
 
 
-def score_parsed_course(parsed: dict[str, Any], ground_truth: dict[str, Any], *, weekly_only: bool = False) -> CourseScore:
+def score_parsed_course(parsed: dict[str, Any], ground_truth: dict[str, Any], *, weekly_only: bool = False, strict_weekly: bool = False) -> CourseScore:
     score = CourseScore(ground_truth_file='', course_label='')
     if not weekly_only:
         for section_name in ('assignments', 'discussions', 'participation'):
@@ -239,6 +277,7 @@ def score_parsed_course(parsed: dict[str, Any], ground_truth: dict[str, Any], *,
         matched, total, misses = _match_weekly_schedule(
             ground_truth.get('weekly_schedule') or [],
             parsed.get('weekly_schedule') or [],
+            strict_weeks=strict_weekly,
         )
         score.sections['weekly_schedule'] = SectionScore('weekly_schedule', matched, total, misses)
 
@@ -254,8 +293,9 @@ def compare_to_ground_truth(
     ground_truth_file: str = '',
     course_label: str = '',
     weekly_only: bool = False,
+    strict_weekly: bool = False,
 ) -> CourseScore:
-    result = score_parsed_course(parsed, ground_truth, weekly_only=weekly_only)
+    result = score_parsed_course(parsed, ground_truth, weekly_only=weekly_only, strict_weekly=strict_weekly)
     result.ground_truth_file = ground_truth_file
     result.course_label = course_label
     return result
@@ -269,6 +309,7 @@ def evaluate_snapshots(
     root_dir: Path | None = None,
     use_llm_weekly: bool = False,
     weekly_only: bool = True,
+    strict_weekly: bool = False,
 ) -> list[CourseScore]:
     results: list[CourseScore] = []
     for gt_path in sorted(ground_truth_dir.glob('*.json')):
@@ -296,6 +337,7 @@ def evaluate_snapshots(
             ground_truth_file=gt_path.name,
             course_label=str(label),
             weekly_only=weekly_only,
+            strict_weekly=strict_weekly,
         )
         results.append(result)
     return results

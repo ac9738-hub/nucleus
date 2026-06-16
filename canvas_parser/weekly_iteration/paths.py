@@ -25,3 +25,19 @@ def default_graph_cache_path(root: Path) -> Path:
 
 def default_report_path(root: Path) -> Path:
     return cache_dir(root) / 'report.json'
+
+
+def holdout_ground_truth_dir(root: Path) -> Path:
+    return root / 'ground-truth' / 'holdout'
+
+
+def holdout_snapshot_path(root: Path) -> Path:
+    return cache_dir(root) / 'snapshots_holdout.json'
+
+
+def holdout_fixture_snapshot_path(root: Path) -> Path:
+    return root / 'fixtures' / 'weekly_iteration' / 'snapshots_holdout.json'
+
+
+def holdout_report_path(root: Path) -> Path:
+    return cache_dir(root) / 'report_holdout.json'

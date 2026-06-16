@@ -11,8 +11,10 @@ from .fetch import (
     CanvasFetchError,
     enrich_snapshot_with_page_bodies,
     fetch_all_courses,
+    fetch_course_snapshots_by_ids,
     load_snapshots,
     save_snapshots,
+    validate_auth,
 )
 from .paths import default_snapshot_path
 
@@ -30,6 +32,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument('--snapshot', help='Refresh an existing snapshot file in place')
     parser.add_argument('--save', default=str(default_snapshot_path(root)), help='Output snapshot path')
     parser.add_argument('--enrich-pages', action='store_true', help='Fetch module page bodies')
+    parser.add_argument(
+        '--course-id',
+        action='append',
+        type=int,
+        help='Fetch only these Canvas course id(s); repeatable',
+    )
     args = parser.parse_args(argv)
 
     root = Path(args.root)
@@ -43,6 +51,13 @@ def main(argv: list[str] | None = None) -> int:
         if not snapshot_path.is_absolute():
             snapshot_path = root / snapshot_path
         snapshots = load_snapshots(snapshot_path)
+    elif args.course_id:
+        try:
+            validate_auth(auth)
+            snapshots = fetch_course_snapshots_by_ids(auth, args.course_id)
+        except CanvasFetchError as error:
+            print(f'Canvas fetch failed: {error}', file=sys.stderr)
+            return 2
     else:
         try:
             snapshots = fetch_all_courses(auth)
