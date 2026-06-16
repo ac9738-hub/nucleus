@@ -1,0 +1,524 @@
+{
+  "assignments": [
+    {
+      "name": "W2 Weekly Response",
+      "due_at": "2/1/2026"
+    },
+    {
+      "name": "W3 Critical Citation and Analysis",
+      "due_at": "2/8/2026"
+    },
+    {
+      "name": "W4 Critical Citation and Film Analysis",
+      "due_at": "2/17/2026"
+    },
+    {
+      "name": "W5 Critical Summary and Analysis",
+      "due_at": "2/24/2026"
+    },
+    {
+      "name": "W6 Stars of Globalizing South Korea",
+      "due_at": "3/2/2026"
+    },
+    {
+      "name": "Memes",
+      "due_at": "3/8/2026"
+    },
+    {
+      "name": "W7 The Making of K-pop",
+      "due_at": "3/23/2026"
+    },
+    {
+      "name": "3D Fan-Merch Design",
+      "due_at": "3/29/2026"
+    },
+    {
+      "name": "W8 Sports and National Stars",
+      "due_at": "3/29/2026"
+    },
+    {
+      "name": "W9 Race and Korean Popular Music Culture",
+      "due_at": "4/5/2026"
+    },
+    {
+      "name": "Synopsis Writing",
+      "due_at": "4/12/2026"
+    },
+    {
+      "name": "Final Project Abstract",
+      "due_at": "4/19/2026"
+    },
+    {
+      "name": "Final Project Presentation",
+      "due_at": "4/29/2026"
+    },
+    {
+      "name": "Final Project Submission",
+      "due_at": "5/6/2026"
+    },
+    {
+      "name": "Midterm Exam"
+    }
+  ],
+  "modules": [
+    "W2 (2/2, 2/4) Key Concepts for Studying Stars",
+    "W3 (2/9, 2/11) Stars Beyond National Borders",
+    "W4 (2/18) Performing Gender and State Development",
+    "W5 (2/23, 2/25) Rebellious Singers and the Rise of the Young Spirit",
+    "W6 (3/2, 3/4) Stars of Globalizing South Korea",
+    "Midterm study guide"
+  ],
+  "file_folders": [
+    {
+      "folder_name": "W2",
+      "folder_contents": [
+        {
+          "name": "Dyer_stars_.pdf"
+        },
+        {
+          "name": "Fedorenko_K-spice_.pdf"
+        },
+        {
+          "name": "NYT_political leaders jamming to kpop.pdf"
+        },
+        {
+          "name": "Korean Stars W2 2026 W (canvas).pdf"
+        },
+        {
+          "name": "W2 Korean stars 2026 M (canvas).pdf"
+        }
+      ]
+    },
+    {
+      "folder_name": "W3",
+      "folder_contents": [
+        {
+          "name": "Maliangkay_movie narrators.pdf"
+        },
+        {
+          "name": "Han_kim sisters.pdf"
+        },
+        {
+          "name": "Korean Stars W3 M 2026 (canvas).pdf"
+        },
+        {
+          "name": "Korean Stars W3 W 2026 (canvas).pdf"
+        }
+      ]
+    },
+    {
+      "folder_name": "W4",
+      "folder_contents": [
+        {
+          "name": "Butler_performative acts.pdf"
+        },
+        {
+          "name": "Joo_Shin Young-kyun.pdf"
+        },
+        {
+          "name": "Korean Stars_W4 (canvas).pdf"
+        }
+      ]
+    },
+    {
+      "folder_name": "W5",
+      "folder_contents": [
+        {
+          "name": "Adorno_on popular music.pdf"
+        },
+        {
+          "name": "Hwang_from victimhood to martyrdom.pdf"
+        },
+        {
+          "name": "Kim&Shin_korean rock.pdf"
+        },
+        {
+          "name": "Jung_Seo Taiji syndrome.pdf"
+        },
+        {
+          "name": "Korean Stars W5 M 2026 (canvas).pdf"
+        },
+        {
+          "name": "Korean Stars W5 W 2026 (canvas).pdf"
+        }
+      ]
+    },
+    {
+      "folder_name": "W6",
+      "folder_contents": [
+        {
+          "name": "Jin_evolution of the korean cultural industries.pdf"
+        },
+        {
+          "name": "Mori_winter sonata.pdf"
+        },
+        {
+          "name": "Korean Stars_W6_M.pdf"
+        },
+        {
+          "name": "Korean Stars_W6_W_HYI lecture.pdf"
+        }
+      ]
+    },
+    {
+      "folder_name": "Midterm",
+      "folder_contents": [
+        {
+          "name": "EAFM 123 Midterm Study Guide_with timeline.pdf"
+        }
+      ]
+    },
+    {
+      "folder_name": "3D Production",
+      "folder_contents": [
+        {
+          "name": "EAFM123_3D Production_Cook2026.pptx"
+        }
+      ]
+    }
+  ],
+  "weekly_schedule": [
+    {
+      "name": "Week 1",
+      "start_date": "1/26/2026",
+      "end_date": "2/1/2026",
+      "files": [],
+      "assignments": [],
+      "events": [
+        {
+          "name": "Introduction",
+          "files": []
+        }
+      ]
+    },
+    {
+      "name": "Week 2",
+      "start_date": "2/2/2026",
+      "end_date": "2/8/2026",
+      "files": [
+        {
+          "name": "Dyer_stars_.pdf"
+        },
+        {
+          "name": "Fedorenko_K-spice_.pdf"
+        },
+        {
+          "name": "Korean Stars W2 2026 W (canvas).pdf"
+        },
+        {
+          "name": "W2 Korean stars 2026 M (canvas).pdf"
+        }
+      ],
+      "assignments": [
+        {
+          "name": "W2 Weekly Response",
+          "files": []
+        },
+        {
+          "name": "W3 Critical Citation and Analysis",
+          "files": []
+        }
+      ],
+      "events": [
+        {
+          "name": "Key Concepts for Studying Stars (2/2, 2/4)",
+          "files": []
+        }
+      ]
+    },
+    {
+      "name": "Week 3",
+      "start_date": "2/9/2026",
+      "end_date": "2/15/2026",
+      "files": [
+        {
+          "name": "Maliangkay_movie narrators.pdf"
+        },
+        {
+          "name": "Han_kim sisters.pdf"
+        },
+        {
+          "name": "Korean Stars W3 M 2026 (canvas).pdf"
+        },
+        {
+          "name": "Korean Stars W3 W 2026 (canvas).pdf"
+        }
+      ],
+      "assignments": [],
+      "events": [
+        {
+          "name": "Stars Beyond National Borders (2/9, 2/11)",
+          "files": []
+        }
+      ]
+    },
+    {
+      "name": "Week 4",
+      "start_date": "2/16/2026",
+      "end_date": "2/22/2026",
+      "files": [
+        {
+          "name": "Butler_performative acts.pdf"
+        },
+        {
+          "name": "Joo_Shin Young-kyun.pdf"
+        },
+        {
+          "name": "Korean Stars_W4 (canvas).pdf"
+        }
+      ],
+      "assignments": [
+        {
+          "name": "W4 Critical Citation and Film Analysis",
+          "files": []
+        }
+      ],
+      "events": [
+        {
+          "name": "Performing Gender and State Development (2/18)",
+          "files": []
+        }
+      ]
+    },
+    {
+      "name": "Week 5",
+      "start_date": "2/23/2026",
+      "end_date": "3/1/2026",
+      "files": [
+        {
+          "name": "Adorno_on popular music.pdf"
+        },
+        {
+          "name": "Kim&Shin_korean rock.pdf"
+        },
+        {
+          "name": "Jung_Seo Taiji syndrome.pdf"
+        },
+        {
+          "name": "Korean Stars W5 M 2026 (canvas).pdf"
+        },
+        {
+          "name": "Korean Stars W5 W 2026 (canvas).pdf"
+        }
+      ],
+      "assignments": [
+        {
+          "name": "W5 Critical Summary and Analysis",
+          "files": []
+        }
+      ],
+      "events": [
+        {
+          "name": "Rebellious Singers and the Rise of the Young Spirit (2/23, 2/25)",
+          "files": []
+        }
+      ]
+    },
+    {
+      "name": "Week 6",
+      "start_date": "3/2/2026",
+      "end_date": "3/8/2026",
+      "files": [
+        {
+          "name": "Jin_evolution of the korean cultural industries.pdf"
+        },
+        {
+          "name": "Mori_winter sonata.pdf"
+        },
+        {
+          "name": "Korean Stars_W6_M.pdf"
+        },
+        {
+          "name": "Korean Stars_W6_W_HYI lecture.pdf"
+        }
+      ],
+      "assignments": [
+        {
+          "name": "W6 Stars of Globalizing South Korea",
+          "files": []
+        },
+        {
+          "name": "Memes",
+          "files": []
+        }
+      ],
+      "events": [
+        {
+          "name": "Stars of Globalizing South Korea (3/2, 3/4)",
+          "files": []
+        }
+      ]
+    },
+    {
+      "name": "Week 7",
+      "start_date": "3/9/2026",
+      "end_date": "3/15/2026",
+      "files": [
+        {
+          "name": "EAFM 123 Midterm Study Guide_with timeline.pdf"
+        }
+      ],
+      "assignments": [
+        {
+          "name": "Midterm Exam",
+          "files": [
+            {
+              "name": "EAFM 123 Midterm Study Guide_with timeline.pdf"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "name": "3D Printing Workshop (3/9)",
+          "files": []
+        },
+        {
+          "name": "Midterm Exam (3/11)",
+          "files": []
+        }
+      ]
+    },
+    {
+      "name": "Week 8",
+      "start_date": "3/16/2026",
+      "end_date": "3/22/2026",
+      "files": [],
+      "assignments": [],
+      "events": [
+        {
+          "name": "Spring Break",
+          "files": []
+        }
+      ]
+    },
+    {
+      "name": "Week 9",
+      "start_date": "3/23/2026",
+      "end_date": "3/29/2026",
+      "files": [
+        {
+          "name": "EAFM123_3D Production_Cook2026.pptx"
+        }
+      ],
+      "assignments": [
+        {
+          "name": "W7 The Making of K-pop",
+          "files": []
+        },
+        {
+          "name": "3D Fan-Merch Design",
+          "files": []
+        },
+        {
+          "name": "W8 Sports and National Stars",
+          "files": []
+        }
+      ],
+      "events": [
+        {
+          "name": "K-pop, Netflix, and Hallyu 4.0 (3/23, 3/25)",
+          "files": []
+        }
+      ]
+    },
+    {
+      "name": "Week 10",
+      "start_date": "3/30/2026",
+      "end_date": "4/5/2026",
+      "files": [],
+      "assignments": [
+        {
+          "name": "W9 Race and Korean Popular Music Culture",
+          "files": []
+        }
+      ],
+      "events": [
+        {
+          "name": "Korean Hip Hop (3/30, 4/1)",
+          "files": []
+        }
+      ]
+    },
+    {
+      "name": "Week 11",
+      "start_date": "4/6/2026",
+      "end_date": "4/12/2026",
+      "files": [],
+      "assignments": [
+        {
+          "name": "Synopsis Writing",
+          "files": []
+        }
+      ],
+      "events": [
+        {
+          "name": "New Media, Streamers, and AI (4/6, 4/8)",
+          "files": []
+        }
+      ]
+    },
+    {
+      "name": "Week 12",
+      "start_date": "4/13/2026",
+      "end_date": "4/19/2026",
+      "files": [],
+      "assignments": [
+        {
+          "name": "Final Project Abstract",
+          "files": []
+        }
+      ],
+      "events": [
+        {
+          "name": "Newtro, Archive, and Nostalgic Return of Stars (4/13, 4/15)",
+          "files": []
+        }
+      ]
+    },
+    {
+      "name": "Week 13",
+      "start_date": "4/20/2026",
+      "end_date": "4/26/2026",
+      "files": [],
+      "assignments": [],
+      "events": [
+        {
+          "name": "Ethics of Stardom and Fandom (4/20, 4/22)",
+          "files": []
+        }
+      ]
+    },
+    {
+      "name": "Week 14",
+      "start_date": "4/27/2026",
+      "end_date": "5/3/2026",
+      "files": [],
+      "assignments": [
+        {
+          "name": "Final Project Presentation",
+          "files": []
+        }
+      ],
+      "events": [
+        {
+          "name": "Final Project Presentations (4/22, 4/27, 4/29)",
+          "files": []
+        }
+      ]
+    },
+    {
+      "name": "Finals",
+      "start_date": "5/4/2026",
+      "end_date": "5/11/2026",
+      "files": [],
+      "assignments": [
+        {
+          "name": "Final Project Submission",
+          "files": []
+        }
+      ],
+      "events": []
+    }
+  ]
+}
