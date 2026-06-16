@@ -1,0 +1,339 @@
+{
+  "assignments": [
+    { "name": "C01_01262026_CI", "due_at": "1/26/2026" },
+    { "name": "C02_01282026_CI" },
+    { "name": "C03_02022026_CI", "due_at": "2/2/2026" },
+    { "name": "C04_02042026_CI" },
+    { "name": "C06_02112026_CI" },
+    { "name": "C07_02182026_CI" },
+
+    { "name": "PSET 01", "due_at": "2/6/2026" },
+    { "name": "PSET 02", "due_at": "2/13/2026" },
+    { "name": "PSET 03", "due_at": "2/27/2026" },
+    { "name": "PSET 04", "due_at": "3/13/2026" },
+    { "name": "PSET 05", "due_at": "3/27/2026" },
+    { "name": "PSET 06", "due_at": "4/10/2026" },
+    { "name": "PSET 07", "due_at": "4/24/2026" },
+    { "name": "PSET 08", "due_at": "5/1/2026" },
+
+    { "name": "Quiz 01" },
+    { "name": "Quiz 02" },
+    { "name": "Quiz 03" },
+    { "name": "Quiz 04" },
+    { "name": "Final" }
+  ],
+
+  "modules": [],
+
+  "file_folders": [
+    {
+      "folder_name": "Class",
+      "folder_contents": [
+        { "name": "C01_01262026" },
+        { "name": "C02_01282026" },
+        { "name": "C03_02022026" },
+        { "name": "C04_02042026" },
+        { "name": "C05_02092026" },
+        { "name": "C06_02112026" },
+        { "name": "C07_02182026" },
+        { "name": "C08_02252026" },
+        { "name": "C09_02272026" },
+        { "name": "C10_03022026" },
+        { "name": "C11_03042026" },
+        { "name": "C12_03092026" },
+        { "name": "C13_03112026" },
+        { "name": "C14_03232026" },
+        { "name": "C15_03252026" },
+        { "name": "C16_03302026" },
+        { "name": "C17_04012026" },
+        { "name": "C18_04062026" },
+        { "name": "C19_04082026" },
+        { "name": "C20_04132026" },
+        { "name": "C21_04152026" },
+        { "name": "C22_04202026" },
+        { "name": "C23_04222026" },
+        { "name": "C24_04272026" },
+        { "name": "C25_04292026" }
+      ]
+    },
+    {
+      "folder_name": "PSETS",
+      "folder_contents": [
+        { "name": "PSET01" },
+        { "name": "PSET02" },
+        { "name": "PSET03" },
+        { "name": "PSET04" },
+        { "name": "PSET05" },
+        { "name": "PSET06" },
+        { "name": "PSET07" },
+        { "name": "PSET08" },
+        { "name": "SampleStudentSubmission.pdf" },
+        { "name": "SubmissionGuidelines.pdf" }
+      ]
+    },
+    {
+      "folder_name": "Quizzes",
+      "folder_contents": [
+        { "name": "Quiz01_S26_solns.pdf" },
+        { "name": "Quiz02_S26_solution.pdf" },
+        { "name": "Quiz03_S26_solns.pdf" },
+        { "name": "Quiz04_S26_solns.pdf" }
+      ]
+    },
+    {
+      "folder_name": "Final",
+      "folder_contents": [
+        { "name": "Review_Final.pdf" },
+        { "name": "Review_Final_solutions.pdf" }
+      ]
+    },
+    {
+      "folder_name": "Section",
+      "folder_contents": [
+        { "name": "Ben's Section Notes" },
+        { "name": "Jacqui's Section Notes" },
+        { "name": "Ori's Section Notes" },
+        { "name": "Robert's Section Notes" }
+      ]
+    }
+  ],
+
+  "weekly_schedule": [
+    {
+      "name": "Week 1",
+      "start_date": "1/26/2026",
+      "end_date": "2/1/2026",
+      "files": [
+        { "name": "C01_01262026" },
+        { "name": "C02_01282026" }
+      ],
+      "assignments": [
+        { "name": "C01_01262026_CI", "files": [] },
+        { "name": "C02_01282026_CI", "files": [] }
+      ],
+      "events": [
+        { "name": "Recitation section R01", "files": [] }
+      ]
+    },
+    {
+      "name": "Week 2",
+      "start_date": "2/2/2026",
+      "end_date": "2/8/2026",
+      "files": [
+        { "name": "C03_02022026" },
+        { "name": "C04_02042026" }
+      ],
+      "assignments": [
+        { "name": "C03_02022026_CI", "files": [] },
+        { "name": "C04_02042026_CI", "files": [] },
+        { "name": "PSET 01", "files": [{ "name": "PSET01" }] }
+      ],
+      "events": [
+        { "name": "Recitation section R02", "files": [] }
+      ]
+    },
+    {
+      "name": "Week 3",
+      "start_date": "2/9/2026",
+      "end_date": "2/15/2026",
+      "files": [
+        { "name": "C05_02092026" },
+        { "name": "C06_02112026" },
+        { "name": "C06code.zip" }
+      ],
+      "assignments": [
+        { "name": "C06_02112026_CI", "files": [] },
+        { "name": "PSET 02", "files": [{ "name": "PSET02" }] }
+      ],
+      "events": [
+        { "name": "Recitation section R03", "files": [] }
+      ]
+    },
+    {
+      "name": "Week 4",
+      "start_date": "2/16/2026",
+      "end_date": "2/22/2026",
+      "files": [
+        { "name": "C07_02182026" },
+        { "name": "C07code.zip" }
+      ],
+      "assignments": [
+        { "name": "C07_02182026_CI", "files": [] }
+      ],
+      "events": [
+        {
+          "name": "Quiz 01",
+          "files": [{ "name": "Quiz01_S26_solns.pdf" }]
+        }
+      ]
+    },
+    {
+      "name": "Week 5",
+      "start_date": "2/23/2026",
+      "end_date": "3/1/2026",
+      "files": [
+        { "name": "C08_02252026" },
+        { "name": "C09_02272026" }
+      ],
+      "assignments": [
+        { "name": "PSET 03", "files": [{ "name": "PSET03" }] }
+      ],
+      "events": [
+        { "name": "Snow Day", "files": [] }
+      ]
+    },
+    {
+      "name": "Week 6",
+      "start_date": "3/2/2026",
+      "end_date": "3/8/2026",
+      "files": [
+        { "name": "C10_03022026" },
+        { "name": "C11_03042026" }
+      ],
+      "assignments": [],
+      "events": [
+        {
+          "name": "Quiz 02",
+          "files": [{ "name": "Quiz02_S26_solution.pdf" }]
+        }
+      ]
+    },
+    {
+      "name": "Week 7",
+      "start_date": "3/9/2026",
+      "end_date": "3/15/2026",
+      "files": [
+        { "name": "C12_03092026" },
+        { "name": "C13_03112026" }
+      ],
+      "assignments": [
+        { "name": "PSET 04", "files": [{ "name": "PSET04" }] }
+      ],
+      "events": [
+        { "name": "Recitation section R04", "files": [] }
+      ]
+    },
+    {
+      "name": "Week 8",
+      "start_date": "3/16/2026",
+      "end_date": "3/22/2026",
+      "files": [],
+      "assignments": [],
+      "events": [
+        { "name": "Spring Break", "files": [] }
+      ]
+    },
+    {
+      "name": "Week 9",
+      "start_date": "3/23/2026",
+      "end_date": "3/29/2026",
+      "files": [
+        { "name": "C14_03232026" },
+        { "name": "C15_03252026" },
+        { "name": "class14.m" },
+        { "name": "myode.m" }
+      ],
+      "assignments": [
+        { "name": "PSET 05", "files": [{ "name": "PSET05" }] }
+      ],
+      "events": [
+        { "name": "Recitation section R05", "files": [] }
+      ]
+    },
+    {
+      "name": "Week 10",
+      "start_date": "3/30/2026",
+      "end_date": "4/5/2026",
+      "files": [
+        { "name": "C16_03302026" },
+        { "name": "C17_04012026" }
+      ],
+      "assignments": [],
+      "events": [
+        {
+          "name": "Quiz 03",
+          "files": [{ "name": "Quiz03_S26_solns.pdf" }]
+        }
+      ]
+    },
+    {
+      "name": "Week 11",
+      "start_date": "4/6/2026",
+      "end_date": "4/12/2026",
+      "files": [
+        { "name": "C18_04062026" },
+        { "name": "C19_04082026" },
+        { "name": "class18_symbolic.m" },
+        { "name": "class19_FSsymbolic.m" }
+      ],
+      "assignments": [
+        { "name": "PSET 06", "files": [{ "name": "PSET06" }] }
+      ],
+      "events": [
+        { "name": "Recitation section R06", "files": [] }
+      ]
+    },
+    {
+      "name": "Week 12",
+      "start_date": "4/13/2026",
+      "end_date": "4/19/2026",
+      "files": [
+        { "name": "C20_04132026" },
+        { "name": "C21_04152026" },
+        { "name": "class21_genFS.m" }
+      ],
+      "assignments": [],
+      "events": [
+        {
+          "name": "Quiz 04",
+          "files": [{ "name": "Quiz04_S26_solns.pdf" }]
+        }
+      ]
+    },
+    {
+      "name": "Week 13",
+      "start_date": "4/20/2026",
+      "end_date": "4/26/2026",
+      "files": [
+        { "name": "C22_04202026" },
+        { "name": "C23_04222026" },
+        { "name": "randomwalks_unbiased.m" },
+        { "name": "diffusion1D.m" }
+      ],
+      "assignments": [
+        { "name": "PSET 07", "files": [{ "name": "PSET07" }] }
+      ],
+      "events": [
+        { "name": "Recitation section R07", "files": [] }
+      ]
+    },
+    {
+      "name": "Week 14",
+      "start_date": "4/27/2026",
+      "end_date": "5/3/2026",
+      "files": [
+        { "name": "C24_04272026" },
+        { "name": "C25_04292026" }
+      ],
+      "assignments": [
+        { "name": "PSET 08", "files": [{ "name": "PSET08" }] }
+      ],
+      "events": []
+    },
+    {
+      "name": "Finals",
+      "start_date": "5/4/2026",
+      "end_date": "5/11/2026",
+      "files": [
+        { "name": "Review_Final.pdf" },
+        { "name": "Review_Final_solutions.pdf" }
+      ],
+      "assignments": [],
+      "events": [
+        { "name": "Final Exam", "files": [{ "name": "Review_Final.pdf" }] },
+        { "name": "Final Review Session 1", "files": [] },
+        { "name": "Final Review Session 2", "files": [] }
+      ]
+    }
+  ]
+}
