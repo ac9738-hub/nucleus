@@ -28,14 +28,16 @@ For each query in `RAG_ground_truth.json` (or a fresh run of `scripts/build_rag_
 2. Compare live top-5 to the ground-truth snapshot (or to human-judged “should retrieve”).
 3. Classify the miss:
 
-| Miss class | Symptom | Likely fix area |
-| ---------- | ------- | --------------- |
-| **Graph gap** | Correct content never entered `canvas_graph.json` | `parser.py`, `llm_parse.py`, fetch/enrichment |
-| **Embedding gap** | Node exists but has no `embedded.name` / `embedded.description` | `parser.py` embedding pass, re-parse |
-| **Ranking gap** | Node is embedded and in pool but scored below cutoff or below top-k | `vector_retreival.py` scoring, intent routing, course pool |
-| **Expansion gap** | Correct startpoint found but neighbors (concept, file, event) not expanded | `node_neighbors`, `expand_startpoints` |
-| **Mode gap** | Correct node type filtered out by `browser` vs `agent` mode rules | mode-specific filters in `expand_startpoints` |
-| **Agent-use gap** | Retrieval is fine but sidekick ignores or misreads `callContext` | `sidekick.py`, `formatRetrievalContext` in `main.js` |
+
+| Miss class        | Symptom                                                                    | Likely fix area                                            |
+| ----------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| **Graph gap**     | Correct content never entered `canvas_graph.json`                          | `parser.py`, `llm_parse.py`, fetch/enrichment              |
+| **Embedding gap** | Node exists but has no `embedded.name` / `embedded.description`            | `parser.py` embedding pass, re-parse                       |
+| **Ranking gap**   | Node is embedded and in pool but scored below cutoff or below top-k        | `vector_retreival.py` scoring, intent routing, course pool |
+| **Expansion gap** | Correct startpoint found but neighbors (concept, file, event) not expanded | `node_neighbors`, `expand_startpoints`                     |
+| **Mode gap**      | Correct node type filtered out by `browser` vs `agent` mode rules          | mode-specific filters in `expand_startpoints`              |
+| **Agent-use gap** | Retrieval is fine but sidekick ignores or misreads `callContext`           | `sidekick.py`, `formatRetrievalContext` in `main.js`       |
+
 
 Always locate the **source in Canvas** (syllabus body, assignment description, module file, page HTML) before changing code.
 
@@ -111,16 +113,18 @@ Retrieved startpoints (+ neighbors)
 callContext → sidekick.py → user-facing answer / tools
 ```
 
-| Stage | File | Role |
-| ----- | ---- | ---- |
-| Ingest | `parser.py`, `canvas_parser/weekly_iteration/llm_parse.py` | LLM passes extract nodes and relationships |
-| Finalize events | `canvas_parser/graph/events.py` | Date/type normalization for exams, deadlines, office hours |
-| Persist | `canvas_graph.json` | Versioned graph store (~19 courses in current snapshot) |
-| Retrieve | `vector_retreival.py` | Embed query, score nodes, expand neighbors, serialize |
-| Agent bridge | `main.js` | Spawns retrieval subprocess; attaches `callContext` to agent payload |
-| Agent | `sidekick.py` | Claude tools + retrieved context |
-| Eval GT | `RAG_ground_truth.json` | 10 search + 10 agent queries with top-5 results |
-| GT builder | `scripts/build_rag_ground_truth.py` | Regenerates GT from live graph |
+
+| Stage           | File                                                       | Role                                                                 |
+| --------------- | ---------------------------------------------------------- | -------------------------------------------------------------------- |
+| Ingest          | `parser.py`, `canvas_parser/weekly_iteration/llm_parse.py` | LLM passes extract nodes and relationships                           |
+| Finalize events | `canvas_parser/graph/events.py`                            | Date/type normalization for exams, deadlines, office hours           |
+| Persist         | `canvas_graph.json`                                        | Versioned graph store (~19 courses in current snapshot)              |
+| Retrieve        | `vector_retreival.py`                                      | Embed query, score nodes, expand neighbors, serialize                |
+| Agent bridge    | `main.js`                                                  | Spawns retrieval subprocess; attaches `callContext` to agent payload |
+| Agent           | `sidekick.py`                                              | Claude tools + retrieved context                                     |
+| Eval GT         | `RAG_ground_truth.json`                                    | 10 search + 10 agent queries with top-5 results                      |
+| GT builder      | `scripts/build_rag_ground_truth.py`                        | Regenerates GT from live graph                                       |
+
 
 ---
 
@@ -128,55 +132,63 @@ callContext → sidekick.py → user-facing answer / tools
 
 ### Graph nodes
 
-| Term | Meaning |
-| ---- | ------- |
-| **concept** | Top-level knowledge unit for a course; links to details, examples, problems, prerequisite concepts |
-| **detail** | Sub-point of a concept (definition, mechanism, policy clause) |
-| **example** | Worked example or illustration attached to a concept |
-| **problem** | Practice or assignment problem; links to concepts and assignments |
-| **assignment** | Canvas assignment (due date, description, submission URL); stored under syllabus |
-| **event** | Calendar-like item: exam, quiz, office hours, lecture, deadline, review session |
-| **file** | PDF or study material; may link to concepts/problems; may contain `pages[].blocks[]` text |
-| **syllabus** | Per-course syllabus node with grading policy, schedule hints, nested assignments |
-| **learningBlock** | PDF block span linked to a concept (viewport-aware context pipeline) |
-| **edge** | Typed relationship (e.g. `event --requires_reading--> file`) |
+
+| Term              | Meaning                                                                                            |
+| ----------------- | -------------------------------------------------------------------------------------------------- |
+| **concept**       | Top-level knowledge unit for a course; links to details, examples, problems, prerequisite concepts |
+| **detail**        | Sub-point of a concept (definition, mechanism, policy clause)                                      |
+| **example**       | Worked example or illustration attached to a concept                                               |
+| **problem**       | Practice or assignment problem; links to concepts and assignments                                  |
+| **assignment**    | Canvas assignment (due date, description, submission URL); stored under syllabus                   |
+| **event**         | Calendar-like item: exam, quiz, office hours, lecture, deadline, review session                    |
+| **file**          | PDF or study material; may link to concepts/problems; may contain `pages[].blocks[]` text          |
+| **syllabus**      | Per-course syllabus node with grading policy, schedule hints, nested assignments                   |
+| **learningBlock** | PDF block span linked to a concept (viewport-aware context pipeline)                               |
+| **edge**          | Typed relationship (e.g. `event --requires_reading--> file`)                                       |
+
 
 ### Retrieval
 
-| Term | Meaning |
-| ---- | ------- |
-| **startpoint** | Top-scoring node(s) before neighbor expansion |
-| **neighbor expansion** | Pull related concepts, files, problems, assignments from graph adjacency |
-| **browser mode** | Search-bar retrieval; files and assignments only |
-| **agent mode** | Chat retrieval; all node types + expansion |
-| **raw mode** | Startpoints only, no expansion (debug) |
-| **course pool** | Subset of courses searched after course-level embedding + keyword match |
-| **intent** | Query class: `deadline`, `exam`, `assignment`, `practice`, `concept`, `syllabus`, `general` — appends context phrase to embedding text |
-| **semantic score** | Dot product of query embedding vs node `embedded.name` or `embedded.description` |
-| **fuzzy score** | Token overlap / partial string match on course-scoped node name |
-| **course score** | Course catalog embedding + keyword match (`semantic_fuzzy`) |
-| **similarity** | Combined rank: semantic + fuzzy + course (see `combine_retrieval_scores`) |
-| **semantic cutoff** | Production filter at 0.45; nodes below are excluded from startpoints |
-| **callContext** | Plain-text block of retrieved nodes injected into the sidekick user message |
+
+| Term                   | Meaning                                                                                                                                |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| **startpoint**         | Top-scoring node(s) before neighbor expansion                                                                                          |
+| **neighbor expansion** | Pull related concepts, files, problems, assignments from graph adjacency                                                               |
+| **browser mode**       | Search-bar retrieval; files and assignments only                                                                                       |
+| **agent mode**         | Chat retrieval; all node types + expansion                                                                                             |
+| **raw mode**           | Startpoints only, no expansion (debug)                                                                                                 |
+| **course pool**        | Subset of courses searched after course-level embedding + keyword match                                                                |
+| **intent**             | Query class: `deadline`, `exam`, `assignment`, `practice`, `concept`, `syllabus`, `general` — appends context phrase to embedding text |
+| **semantic score**     | Dot product of query embedding vs node `embedded.name` or `embedded.description`                                                       |
+| **fuzzy score**        | Token overlap / partial string match on course-scoped node name                                                                        |
+| **course score**       | Course catalog embedding + keyword match (`semantic_fuzzy`)                                                                            |
+| **similarity**         | Combined rank: semantic + fuzzy + course (see `combine_retrieval_scores`)                                                              |
+| **semantic cutoff**    | Production filter at 0.45; nodes below are excluded from startpoints                                                                   |
+| **callContext**        | Plain-text block of retrieved nodes injected into the sidekick user message                                                            |
+
 
 ### Eval
 
-| Term | Meaning |
-| ---- | ------- |
-| **RAG ground truth** | `RAG_ground_truth.json` — frozen query → top-5 node list |
-| **recall@k** | Fraction of human-expected relevant nodes found in top-k |
-| **nDCG@k** | Rank-aware score rewarding relevant nodes near the top |
-| **search query** | Short keyword query mimicking Nucleus search bar (`browser` mode) |
-| **agent query** | Natural-language question mimicking sidekick chat (`agent` mode) |
+
+| Term                 | Meaning                                                           |
+| -------------------- | ----------------------------------------------------------------- |
+| **RAG ground truth** | `RAG_ground_truth.json` v2 — 10 search + 10 agent queries with `expected` nodes, `answer` text, live `results` |
+| **recall@k**         | Fraction of `expected` relevant nodes found in top-k (production retrieval) |
+| **nDCG@k**           | Rank-aware score rewarding relevant nodes near the top            |
+| **search query**     | Short keyword query mimicking Nucleus search bar (`browser` mode) |
+| **agent query**      | Natural-language question mimicking sidekick chat (`agent` mode)  |
+
 
 ### Agent (sidekick)
 
-| Term | Meaning |
-| ---- | ------- |
-| **contextSnapshot** | Structured live UI state (tabs, visible PDF blocks, workspace layout) |
-| **systemContext** | Ad-hoc text context (region capture, caller extras) |
-| **classifier** | Routes messages toward tool-action (Claude), app-data (DeepSeek), or general chat |
-| **tool_action** | Mutating app state — tasks, workspaces, open Canvas tab |
+
+| Term                | Meaning                                                                           |
+| ------------------- | --------------------------------------------------------------------------------- |
+| **contextSnapshot** | Structured live UI state (tabs, visible PDF blocks, workspace layout)             |
+| **systemContext**   | Ad-hoc text context (region capture, caller extras)                               |
+| **classifier**      | Routes messages toward tool-action (Claude), app-data (DeepSeek), or general chat |
+| **tool_action**     | Mutating app state — tasks, workspaces, open Canvas tab                           |
+
 
 ---
 
@@ -219,22 +231,26 @@ When in doubt, ask: **would this rule help a new course and a new query with the
 
 ### Secrets
 
-| Variable | Required? | Notes |
-| -------- | --------- | ----- |
-| `OPENAI_API_KEY` | **Yes** | Query + course embeddings in `vector_retreival.py` |
-| `DEEP_SEEK_API_KEY` | For graph rebuild | Parser LLM passes when fixing ingestion |
-| `ANTHROPIC_API_KEY` | Optional | Sidekick integration tests |
-| `CANVAS_AUTH_COOKIE` | For refresh | Re-fetch Canvas when graph is stale |
+
+| Variable             | Required?         | Notes                                              |
+| -------------------- | ----------------- | -------------------------------------------------- |
+| `OPENAI_API_KEY`     | **Yes**           | Query + course embeddings in `vector_retreival.py` |
+| `DEEP_SEEK_API_KEY`  | For graph rebuild | Parser LLM passes when fixing ingestion            |
+| `ANTHROPIC_API_KEY`  | Optional          | Sidekick integration tests                         |
+| `CANVAS_AUTH_COOKIE` | For refresh       | Re-fetch Canvas when graph is stale                |
+
 
 ### Bootstrap artifacts
 
-| Artifact | Location | Committed? |
-| -------- | -------- | ---------- |
-| Parsed graph | `canvas_graph.json` | Yes (large) |
-| Course catalog | `canvas_data.json` | Yes |
-| RAG ground truth | `RAG_ground_truth.json` | Yes |
-| GT builder | `scripts/build_rag_ground_truth.py` | Yes |
-| PDF files | `canvasfiles/` | Partial / local |
+
+| Artifact         | Location                            | Committed?      |
+| ---------------- | ----------------------------------- | --------------- |
+| Parsed graph     | `canvas_graph.json`                 | Yes (large)     |
+| Course catalog   | `canvas_data.json`                  | Yes             |
+| RAG ground truth | `RAG_ground_truth.json`             | Yes             |
+| GT builder       | `scripts/build_rag_ground_truth.py` | Yes             |
+| PDF files        | `canvasfiles/`                      | Partial / local |
+
 
 ### Update script (cloud VM)
 
@@ -259,17 +275,19 @@ pip install -r requirements.txt 2>/dev/null || pip install openai numpy python-d
 
 ## Where to edit
 
-| Area | File |
-| ---- | ---- |
-| Parser LLM passes | `parser.py` |
-| Parser batch coverage | `canvas_parser/weekly_iteration/llm_parse.py` |
-| Event extraction | `canvas_parser/graph/events.py` |
-| Retrieval scoring & expansion | `vector_retreival.py` |
-| Agent context formatting | `main.js` (`formatRetrievalContext`, `vectorRetrieval`) |
-| Sidekick consumption | `sidekick.py` |
-| RAG GT generation | `scripts/build_rag_ground_truth.py` |
-| Graph analysis | `scripts/analyze_graph.py` |
-| Local retrieval probe | `canvas_vector_tester.js` |
+
+| Area                          | File                                                    |
+| ----------------------------- | ------------------------------------------------------- |
+| Parser LLM passes             | `parser.py`                                             |
+| Parser batch coverage         | `canvas_parser/weekly_iteration/llm_parse.py`           |
+| Event extraction              | `canvas_parser/graph/events.py`                         |
+| Retrieval scoring & expansion | `vector_retreival.py`                                   |
+| Agent context formatting      | `main.js` (`formatRetrievalContext`, `vectorRetrieval`) |
+| Sidekick consumption          | `sidekick.py`                                           |
+| RAG GT generation             | `scripts/build_rag_ground_truth.py`                     |
+| Graph analysis                | `scripts/analyze_graph.py`                              |
+| Local retrieval probe         | `canvas_vector_tester.js`                               |
+
 
 ---
 
@@ -277,26 +295,28 @@ pip install -r requirements.txt 2>/dev/null || pip install openai numpy python-d
 
 Baseline observations from initial `RAG_ground_truth.json` (2026-06-16):
 
-| Issue | Example | Proposed direction |
-| ----- | ------- | ------------------ |
-| **Assignment-heavy results** | “CHM 201 syllabus” → problem sets, not syllabus PDF | Boost `syllabus` nodes and `file` nodes with syllabus keywords when intent = `syllabus`; ensure syllabus PDFs are embedded |
-| **Event nodes absent** | “When is the CHM 201 exam?” → problem sets | When intent = `exam` or `deadline`, include `event` bucket in rank pass; boost dated events over undated assignments |
-| **Office hours miss** | “Office hours for MAT 201” → PSETs | Parse and embed `office_hours` events; intent keyword `office hour` → event type filter |
-| **File underrepresentation in browser mode** | “ECO 101 lecture slides” → homework assignments | Embed file names from module items; include `files[]` in browser expansion when query mentions slides/notes/PDF |
-| **Low embedding coverage** | ART102 returns only 4 assignments | Audit nodes missing `embedded`; re-run embedding pass in parser |
-| **Course pool bleed** | “tariffs” briefly matched wrong course | Tighten moderate pool when keyword match is strong; require course token overlap |
-| **Production cutoff drops valid hits** | GT uses cutoff=0; prod returns `[]` for some queries | Separate “score improvement” from “cutoff tuning”; document per-intent cutoff if needed |
-| **Concept/practice path unused** | “What concepts on MAT 201 midterm?” → QUIZ assignment | Expand from exam events via `requires_reading` edges to linked files/concepts |
-| **Agent never sees PDF blocks** | Retrieval returns metadata only | Iteration 2: attach top block text from `learningBlocks` / file pages to `callContext` |
-| **No eval script yet** | Manual JSON diff only | Add `scripts/eval_rag.py`: recall@5, nDCG@5, per-intent breakdown, production vs full-rank |
+
+| Issue                                        | Example                                               | Proposed direction                                                                                                         |
+| -------------------------------------------- | ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| **Assignment-heavy results**                 | “CHM 201 syllabus” → problem sets, not syllabus PDF   | Boost `syllabus` nodes and `file` nodes with syllabus keywords when intent = `syllabus`; ensure syllabus PDFs are embedded |
+| **Event nodes absent**                       | “When is the CHM 201 exam?” → problem sets            | When intent = `exam` or `deadline`, include `event` bucket in rank pass; boost dated events over undated assignments       |
+| **Office hours miss**                        | “Office hours for MAT 201” → PSETs                    | Parse and embed `office_hours` events; intent keyword `office hour` → event type filter                                    |
+| **File underrepresentation in browser mode** | “ECO 101 lecture slides” → homework assignments       | Embed file names from module items; include `files[]` in browser expansion when query mentions slides/notes/PDF            |
+| **Low embedding coverage**                   | ART102 returns only 4 assignments                     | Audit nodes missing `embedded`; re-run embedding pass in parser                                                            |
+| **Course pool bleed**                        | “tariffs” briefly matched wrong course                | Tighten moderate pool when keyword match is strong; require course token overlap                                           |
+| **Production cutoff drops valid hits**       | GT uses cutoff=0; prod returns `[]` for some queries  | Separate “score improvement” from “cutoff tuning”; document per-intent cutoff if needed                                    |
+| **Concept/practice path unused**             | “What concepts on MAT 201 midterm?” → QUIZ assignment | Expand from exam events via `requires_reading` edges to linked files/concepts                                              |
+| **Agent never sees PDF blocks**              | Retrieval returns metadata only                       | Iteration 2: attach top block text from `learningBlocks` / file pages to `callContext`                                     |
+| **No eval script yet**                       | Manual JSON diff only                                 | Add `scripts/eval_rag.py`: recall@5, nDCG@5, per-intent breakdown, production vs full-rank                                 |
+
 
 ### Iteration 1 scope (recommended)
 
-1. ~~**Ship `scripts/eval_rag.py`**~~ — done (2026-06-16 iter 1).
+1. ~~**Ship `scripts/eval_rag.py**`~~ — done (2026-06-16 iter 1).
 2. ~~**Embedding audit**~~ — done via `--audit-embeddings`; 0% non-assignment coverage documented.
 3. ~~**Intent → node-type priors**~~ — done in `vector_retreival.py`.
 4. ~~**Event ingestion / expansion**~~ — `coveredConcepts` restored + event→concept neighbors (iter 3); coordinate parser re-embed + `events.py` dating for undated events.
-5. ~~**Re-run GT + eval**~~ — eval run; GT still stale (assignment-only snapshot) — regenerate after re-embed.
+5. ~~**Re-run GT + eval**~~ — v2 GT with human-judged `expected` nodes (iter 5); recall@5 **0.675** production.
 
 ### Out of scope for iteration 1
 
@@ -328,32 +348,38 @@ Baseline observations from initial `RAG_ground_truth.json` (2026-06-16):
 
 **Eval command:** `python scripts/eval_rag.py` and `python scripts/eval_rag.py --production-cutoff`
 
-| Metric | Baseline GT snapshot (all assignments) | After iter 1 (full rank) | After iter 1 (prod cutoff) |
-| ------ | -------------------------------------- | ------------------------- | -------------------------- |
-| recall@5 vs stale GT | ~1.0 (trivial — GT is assignment-only) | **0.580** | **0.770** |
-| intent_match@5 | ~0.35 (est.; exam/syllabus/event queries miss) | **0.800** | **0.55 → ~0.75** (post cutoff-fix) |
-| empty_rate (prod) | many queries would return `[]` | 0.000 | **0.050 → 0.000** (office hours fixed) |
+
+| Metric               | Baseline GT snapshot (all assignments)         | After iter 1 (full rank) | After iter 1 (prod cutoff)             |
+| -------------------- | ---------------------------------------------- | ------------------------ | -------------------------------------- |
+| recall@5 vs stale GT | ~1.0 (trivial — GT is assignment-only)         | **0.580**                | **0.770**                              |
+| intent_match@5       | ~0.35 (est.; exam/syllabus/event queries miss) | **0.800**                | **0.55 → ~0.75** (post cutoff-fix)     |
+| empty_rate (prod)    | many queries would return `[]`                 | 0.000                    | **0.050 → 0.000** (office hours fixed) |
+
 
 **Embedding audit (`python scripts/eval_rag.py --audit-embeddings`):**
 
-| Node type | Embedded | Total | Coverage |
-| --------- | -------- | ----- | -------- |
-| assignment | 161 | 299 | 53.8% |
-| concept | 0 | 1119 | 0% |
-| problem | 0 | 208 | 0% |
-| event | 0 | 54 | 0% |
-| syllabus | 0 | 17 | 0% |
-| file | 0 | 214 | 0% |
+
+| Node type  | Embedded | Total | Coverage |
+| ---------- | -------- | ----- | -------- |
+| assignment | 161      | 299   | 53.8%    |
+| concept    | 0        | 1119  | 0%       |
+| problem    | 0        | 208   | 0%       |
+| event      | 0        | 54    | 0%       |
+| syllabus   | 0        | 17    | 0%       |
+| file       | 0        | 214   | 0%       |
+
 
 Root cause: only assignments have `embedded.name` / `embedded.description` vectors in the committed graph. Events, files, and syllabi rely on fuzzy + intent boosts; assignments dominate when they have semantic scores.
 
 **Changes:**
 
-| File | Change |
-| ---- | ------ |
-| `scripts/eval_rag.py` | New harness: recall@5, nDCG@5, intent_match@5, per-intent breakdown, `--production-cutoff`, `--audit-embeddings` |
-| `vector_retreival.py` | Intent→node-type boosts/penalties; enriched fuzzy text for unembedded nodes; rank all nodes (not only embedded); event/syllabus neighbor expansion via graph edges; browser file-query boost; syllabus intent before concept keywords; production cutoff accepts intent-boosted fuzzy matches |
-| `tests/test_vector_retrieval.py` | Unit tests for intent classification and scoring helpers |
+
+| File                             | Change                                                                                                                                                                                                                                                                                        |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `scripts/eval_rag.py`            | New harness: recall@5, nDCG@5, intent_match@5, per-intent breakdown, `--production-cutoff`, `--audit-embeddings`                                                                                                                                                                              |
+| `vector_retreival.py`            | Intent→node-type boosts/penalties; enriched fuzzy text for unembedded nodes; rank all nodes (not only embedded); event/syllabus neighbor expansion via graph edges; browser file-query boost; syllabus intent before concept keywords; production cutoff accepts intent-boosted fuzzy matches |
+| `tests/test_vector_retrieval.py` | Unit tests for intent classification and scoring helpers                                                                                                                                                                                                                                      |
+
 
 **Miss classes fixed (ranking / expansion / mode):**
 
@@ -364,13 +390,15 @@ Root cause: only assignments have `embedded.name` / `embedded.description` vecto
 
 **Remaining misses:**
 
-| Query class | Symptom | Miss class | Next fix |
-| ----------- | ------- | ---------- | -------- |
-| CHM 201 syllabus (browser, prod) | Still assignment-heavy top-5 | Ranking + embedding | Re-embed syllabus/file nodes; stronger syllabus boost in browser mode |
-| Practice problems (agent) | Returns assignments not problems | Graph + embedding | Parser embedding pass for problems; graph has 208 problems with 0 embeddings |
-| MAT 201 midterm concepts | Files/events not concepts | Graph + expansion | Concept nodes exist but unembedded; expand from exam event → `requires_reading` → concept |
-| CHI 108 week-3 slides (prod) | Assignments beat files | Ranking | File embedding + week-number fuzzy signal |
-| Stale GT recall | Low recall@5 vs old GT | Eval artifact | Regenerate `RAG_ground_truth.json`; add human-judged relevance labels (iter 2) |
+
+| Query class                      | Symptom                          | Miss class          | Next fix                                                                                  |
+| -------------------------------- | -------------------------------- | ------------------- | ----------------------------------------------------------------------------------------- |
+| CHM 201 syllabus (browser, prod) | Still assignment-heavy top-5     | Ranking + embedding | Re-embed syllabus/file nodes; stronger syllabus boost in browser mode                     |
+| Practice problems (agent)        | Returns assignments not problems | Graph + embedding   | Parser embedding pass for problems; graph has 208 problems with 0 embeddings              |
+| MAT 201 midterm concepts         | Files/events not concepts        | Graph + expansion   | Concept nodes exist but unembedded; expand from exam event → `requires_reading` → concept |
+| CHI 108 week-3 slides (prod)     | Assignments beat files           | Ranking             | File embedding + week-number fuzzy signal                                                 |
+| Stale GT recall                  | Low recall@5 vs old GT           | Eval artifact       | Regenerate `RAG_ground_truth.json`; add human-judged relevance labels (iter 2)            |
+
 
 **Tests:** `python -m pytest tests/test_vector_retrieval.py -q` — 6 passed.
 
@@ -404,10 +432,12 @@ python scripts/eval_rag.py --audit-embeddings
 
 **Changes:**
 
-| File | Change |
-| ---- | ------ |
-| `scripts/reembed_graph.py` | New CLI: load graph from disk → parser embedding pass → atomic write |
-| `parser.py` | `update_assignment_embedded_fields()` bulk-embeds missing assignments (was no-op skip) |
+
+| File                       | Change                                                                                 |
+| -------------------------- | -------------------------------------------------------------------------------------- |
+| `scripts/reembed_graph.py` | New CLI: load graph from disk → parser embedding pass → atomic write                   |
+| `parser.py`                | `update_assignment_embedded_fields()` bulk-embeds missing assignments (was no-op skip) |
+
 
 **After re-embed:** Regenerate `RAG_ground_truth.json` (`python scripts/build_rag_ground_truth.py`) and re-run `python scripts/eval_rag.py --production-cutoff`.
 
@@ -417,11 +447,13 @@ python scripts/eval_rag.py --audit-embeddings
 
 **Eval command:** `python scripts/eval_rag.py --production-cutoff`
 
-| Metric | Iter 3 (prod) | Iter 4 (prod) | Δ |
-| ------ | ------------- | ------------- | --- |
-| recall@5 | 0.020 | **0.290** | +0.27 |
-| intent_match@5 | 0.300 | **1.000** | +0.70 |
-| empty_rate | 0.700 | **0.000** | −0.70 |
+
+| Metric         | Iter 3 (prod) | Iter 4 (prod) | Δ     |
+| -------------- | ------------- | ------------- | ----- |
+| recall@5       | 0.020         | **0.290**     | +0.27 |
+| intent_match@5 | 0.300         | **1.000**     | +0.70 |
+| empty_rate     | 0.700         | **0.000**     | −0.70 |
+
 
 **Root causes fixed:**
 
@@ -432,13 +464,15 @@ python scripts/eval_rag.py --audit-embeddings
 
 **Changes (`vector_retreival.py` only):**
 
-| Change | Detail |
-| ------ | ------ |
-| Graph course aliases | Extract `CHM201`/`MAT 201` codes from graph file names → enrich catalog `keyword_name` + `course_codes` |
-| Course-code pool | `select_course_search_pool` narrows to explicit code matches (`course_code` mode) |
-| Ranking | Include `course_similarity` in `combine_retrieval_scores`; syllabus `node_ranking_text` uses catalog keywords |
-| Cutoff | `passes_retrieval_cutoff` accepts strong course+fuzzy or combined score paths |
-| Intent | New `material` intent for slides/notes/audio/precept queries |
+
+| Change               | Detail                                                                                                        |
+| -------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Graph course aliases | Extract `CHM201`/`MAT 201` codes from graph file names → enrich catalog `keyword_name` + `course_codes`       |
+| Course-code pool     | `select_course_search_pool` narrows to explicit code matches (`course_code` mode)                             |
+| Ranking              | Include `course_similarity` in `combine_retrieval_scores`; syllabus `node_ranking_text` uses catalog keywords |
+| Cutoff               | `passes_retrieval_cutoff` accepts strong course+fuzzy or combined score paths                                 |
+| Intent               | New `material` intent for slides/notes/audio/precept queries                                                  |
+
 
 **Tests:** `python -m pytest tests/test_vector_retrieval.py -q` — 15 passed.
 
@@ -466,46 +500,66 @@ graph_eval.json (weekly eval cache)      canvas_graph.json (production + RAG)
 weekly schedule accuracy                 search / agent callContext
 ```
 
-| Concern | Weekly (`AGENTS.md`) | RAG (`graphagents.md`) |
-| ------- | -------------------- | ---------------------- |
-| Primary metric | Week placement accuracy | intent_match@5, recall@5, empty_rate |
-| Baseline | **99.2%** aggregate | intent_match **1.0**, empty **0.0** (iter 4) |
-| Parser edits | `parser.py`, `llm_parse.py`, `events.py` | same files + embeddings |
-| Heuristic layer | `format.py` only | none (ranking in `vector_retreival.py`) |
-| Rebuild graph | `--refresh-graph` (~16 min) | `scripts/full_reparse.py` or `scripts/reembed_graph.py` |
-| Eval | `python -m canvas_parser.weekly_iteration --llm` | `python scripts/eval_rag.py --production-cutoff` |
-| Unit tests | `tests/test_weekly_iteration.py` | `tests/test_vector_retrieval.py` |
+
+| Concern         | Weekly (`AGENTS.md`)                             | RAG (`graphagents.md`)                                  |
+| --------------- | ------------------------------------------------ | ------------------------------------------------------- |
+| Primary metric  | Week placement accuracy                          | intent_match@5, recall@5, empty_rate                    |
+| Baseline        | **99.2%** aggregate                              | recall **0.675**, intent_match **1.0**, empty **0.0** (iter 5) |
+| Parser edits    | `parser.py`, `llm_parse.py`, `events.py`         | same files + embeddings                                 |
+| Heuristic layer | `format.py` only                                 | none (ranking in `vector_retreival.py`)                 |
+| Rebuild graph   | `--refresh-graph` (~16 min)                      | `scripts/full_reparse.py` or `scripts/reembed_graph.py` |
+| Eval            | `python -m canvas_parser.weekly_iteration --llm` | `python scripts/eval_rag.py --production-cutoff`        |
+| Unit tests      | `tests/test_weekly_iteration.py`                 | `tests/test_vector_retrieval.py`                        |
+
 
 **Do not** commit `canvas_graph.json` (gitignored). Regenerate locally after parser/embed changes.
 
 ---
 
-## Next iteration (5)
+### 2026-06-16 — Iteration 5 (ground truth rewrite)
+
+**Scope:** Rewrite all 20 RAG queries with human-judged `expected` nodes + `answer` strings; regenerate `RAG_ground_truth.json` v2; re-eval with production cutoff.
+
+**GT changes (`scripts/build_rag_ground_truth.py`):**
+
+- Schema **v2**: each query has `intent`, `answer`, `expected` (relevant nodes), and `results` (live production snapshot).
+- Queries tightened for graph reality (e.g. `CHM 201 practice exam`, `MAT 202 midterm review`, `ASA344 midterm readings`).
+- Live `results` captured with production cutoff on.
+
+**Eval changes (`scripts/eval_rag.py`):** recall@5 / nDCG@5 scored against `expected` (flexible id + type/name/courseid match).
+
+**Eval:** `python scripts/build_rag_ground_truth.py && python scripts/eval_rag.py --production-cutoff`
+
+| Metric | Iter 4 (stale GT) | Iter 5 (v2 GT) | Δ |
+| ------ | ----------------- | -------------- | --- |
+| recall@5 | 0.290 | **0.675** | +0.385 |
+| nDCG@5 | 0.262 | **0.611** | +0.349 |
+| intent_match@5 | 1.000 | **1.000** | — |
+| empty_rate | 0.000 | **0.000** | — |
+
+**Recall misses (production):** MAT 202 pset (0.00), CHM 201 practice exam (0.00), MAT 202 midterm review (0.00), ASA344 midterm readings (0.00); partial: CHM 201 exam when (0.33), MAT 201 pset solutions (0.50), ECO homework/final (0.50).
+
+**Tests:** 15 passed (`tests/test_vector_retrieval.py`).
+
+---
+
+## Next iteration (6)
 
 **RAG (priority):**
 
-1. Regenerate ground truth: `python scripts/build_rag_ground_truth.py` (needs `OPENAI_API_KEY`).
-2. Fix syllabus embedding — `syllabus.other` is empty; embed course name + homepage file text in `parser.py` / `reembed_graph.py`.
-3. Finish assignment embed pass (`python scripts/reembed_graph.py`) if coverage &lt; 100%.
-4. Tune practice-intent ranking so `problem` nodes surface for chemistry practice queries.
-5. Optional: human-judged relevance labels for true recall@5 (held-out query set).
+1. Browser assignment ranking: MAT 202 PSET, CHM 201 exam/practice, MAT 202 midterm review PDF.
+2. Agent: ASA344 midterm assignment; CHM 201 exam (`Exam 1` / `Exameventid` above unrelated PSets).
+3. Syllabus embedding fix (`syllabus.other` empty → homepage filename text).
+4. Held-out query set (5+5) not in `QUERY_SPECS`.
 
-**Weekly (maintenance):**
+**Weekly (maintenance):** Re-run weekly eval ≥97%; parser fixes for ART102 Final Exam + ASA344 fieldtrip.
 
-1. Re-run `python -m canvas_parser.weekly_iteration --llm` after graph refresh; confirm ≥97%.
-2. Remaining ~0.8% misses (ART102 Final Exam, ASA344 fieldtrip) need parser/syllabus extraction, not `format.py` literals.
-3. Enrich fixtures with `--enrich-pages` where `page_bodies` missing.
-
-**Shared infra:**
+**Commands:**
 
 ```bash
-# Full graph rebuild from fixtures (parser + embed)
-python scripts/full_reparse.py          # or weekly: --llm --refresh-graph
-python scripts/dedupe_graph.py          # after reparse if duplicate details
-python scripts/reembed_graph.py       # fill missing embeddings
-
-# Eval both tracks
-python -m canvas_parser.weekly_iteration --llm
+python scripts/build_rag_ground_truth.py
 python scripts/eval_rag.py --production-cutoff
+python -m canvas_parser.weekly_iteration --llm
 python -m pytest tests/test_weekly_iteration.py tests/test_vector_retrieval.py -q
 ```
+

@@ -440,4 +440,4 @@ Retrieval quality is tracked separately in `graphagents.md`. Both tracks share t
 - `scripts/dedupe_graph.py` — collapse duplicate concept details after reparse
 - `scripts/build_rag_ground_truth.py` / `scripts/eval_rag.py` / `scripts/rag_query_audit.py` — RAG eval harness
 
-**RAG baseline (iter 4):** intent_match@5 **1.0**, empty_rate **0.0**, recall@5 **0.29** (GT stale — regenerate after graph refresh).
+**RAG baseline (iter 5):** recall@5 **0.675**, intent_match **1.0**, empty **0.0** (v2 GT, production cutoff).

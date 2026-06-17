@@ -93,6 +93,50 @@ def result_id(item: dict) -> str:
     return f"{item.get('type')}:{item.get('id') or item.get('name')}"
 
 
+def node_match_key(item: dict) -> tuple[str, str, str]:
+    return (
+        str(item.get("type") or ""),
+        str(item.get("courseid") or ""),
+        str(item.get("name") or "").strip().lower(),
+    )
+
+
+def expected_items(entry: dict) -> list[dict]:
+    return list(entry.get("expected") or entry.get("results") or [])
+
+
+def recall_at_k(expected: list[dict], actual: list[dict], k: int) -> float:
+    if not expected:
+        return 1.0
+    actual_ids = {result_id(item) for item in actual[:k]}
+    actual_keys = {node_match_key(item) for item in actual[:k]}
+    hits = 0
+    for item in expected:
+        if result_id(item) in actual_ids or node_match_key(item) in actual_keys:
+            hits += 1
+    return hits / len(expected)
+
+
+def ndcg_at_k(expected: list[dict], actual: list[dict], k: int) -> float:
+    if not expected:
+        return 1.0
+    expected_ids = {result_id(item) for item in expected}
+    expected_keys = {node_match_key(item) for item in expected}
+
+    def is_relevant(item: dict) -> bool:
+        return result_id(item) in expected_ids or node_match_key(item) in expected_keys
+
+    dcg = 0.0
+    for index, item in enumerate(actual[:k], start=1):
+        if is_relevant(item):
+            dcg += 1.0 / math.log2(index + 1)
+    ideal_hits = min(len(expected), k)
+    if ideal_hits == 0:
+        return 0.0
+    idcg = sum(1.0 / math.log2(index + 2) for index in range(ideal_hits))
+    return dcg / idcg if idcg else 0.0
+
+
 def run_retrieval(query: str, mode: str, k: int, production_cutoff: bool) -> list[dict]:
     import vector_retreival as vr
 
@@ -109,27 +153,6 @@ def run_retrieval(query: str, mode: str, k: int, production_cutoff: bool) -> lis
     return [serialize_startpoint(item) for item in results[:k]]
 
 
-def recall_at_k(expected_ids: set[str], actual: list[dict], k: int) -> float:
-    if not expected_ids:
-        return 1.0
-    actual_ids = {result_id(item) for item in actual[:k]}
-    return len(expected_ids & actual_ids) / len(expected_ids)
-
-
-def ndcg_at_k(expected_ids: set[str], actual: list[dict], k: int) -> float:
-    if not expected_ids:
-        return 1.0
-    dcg = 0.0
-    for index, item in enumerate(actual[:k], start=1):
-        if result_id(item) in expected_ids:
-            dcg += 1.0 / math.log2(index + 1)
-    ideal_hits = min(len(expected_ids), k)
-    if ideal_hits == 0:
-        return 0.0
-    idcg = sum(1.0 / math.log2(index + 2) for index in range(ideal_hits))
-    return dcg / idcg if idcg else 0.0
-
-
 def intent_match_at_k(query: str, actual: list[dict], k: int) -> float:
     intent = classify_query_intent(query)
     expected_types = INTENT_EXPECTED_TYPES.get(intent, INTENT_EXPECTED_TYPES["general"])
@@ -144,19 +167,20 @@ def type_distribution(results: list[dict]) -> Counter:
 def evaluate_query(entry: dict, k: int, production_cutoff: bool) -> dict:
     query = entry["query"]
     mode = entry.get("mode", "browser")
+    expected = expected_items(entry)
     gt_results = entry.get("results") or []
-    expected_ids = {result_id(item) for item in gt_results[:k]}
     actual = run_retrieval(query, mode, k, production_cutoff)
-    intent = classify_query_intent(query)
+    intent = entry.get("intent") or classify_query_intent(query)
     return {
         "query": query,
         "mode": mode,
         "intent": intent,
-        "recall_at_k": recall_at_k(expected_ids, actual, k),
-        "ndcg_at_k": ndcg_at_k(expected_ids, actual, k),
+        "recall_at_k": recall_at_k(expected, actual, k),
+        "ndcg_at_k": ndcg_at_k(expected, actual, k),
         "intent_match_at_k": intent_match_at_k(query, actual, k),
         "empty": len(actual) == 0,
-        "gt_types": dict(type_distribution(gt_results)),
+        "expected_count": len(expected),
+        "gt_types": dict(type_distribution([*expected, *gt_results])),
         "live_types": dict(type_distribution(actual)),
         "live_top": [
             {"type": item.get("type"), "name": item.get("name"), "id": item.get("id")}

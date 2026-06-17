@@ -8,7 +8,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from scripts.build_rag_ground_truth import AGENT_QUERIES, SEARCH_QUERIES  # noqa: E402
+from scripts.build_rag_ground_truth import QUERY_SPECS  # noqa: E402
 from vector_retreival import classify_query_intent, retreive, serialize_startpoint  # noqa: E402
 
 
@@ -29,11 +29,16 @@ def run_probe(query: str, mode: str, k: int = 20) -> list[dict]:
 
 def main() -> None:
     report = {'search_queries': [], 'agent_queries': []}
-    for query in SEARCH_QUERIES:
+    for spec in QUERY_SPECS:
+        if spec["mode"] != "browser":
+            continue
+        query = spec["query"]
         rows = run_probe(query, 'browser', k=20)
         report['search_queries'].append({
             'query': query,
             'intent': classify_query_intent(query),
+            'answer': spec.get('answer', ''),
+            'expected': spec.get('expected', []),
             'top20': [
                 {
                     'rank': i + 1,
@@ -46,11 +51,16 @@ def main() -> None:
                 for i, r in enumerate(rows)
             ],
         })
-    for query in AGENT_QUERIES:
+    for spec in QUERY_SPECS:
+        if spec["mode"] != "agent":
+            continue
+        query = spec["query"]
         rows = run_probe(query, 'agent', k=20)
         report['agent_queries'].append({
             'query': query,
             'intent': classify_query_intent(query),
+            'answer': spec.get('answer', ''),
+            'expected': spec.get('expected', []),
             'top20': [
                 {
                     'rank': i + 1,
