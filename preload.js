@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('nucleus', {
   listThemes: () => ipcRenderer.invoke('theme:list'),
   setTheme: (name) => ipcRenderer.invoke('theme:set', name),
   startTask:    (task)    => ipcRenderer.invoke('tasks:start', task),
+  updateStudySectionProgress: (payload) => ipcRenderer.invoke('tasks:study_section', payload),
   tabschanged:  (tabs, activeTabId = null) => ipcRenderer.invoke('tabs:push', { tabs, activeTabId }),
   newactivetab: (tab)     => ipcRenderer.invoke('tabs:new_active', tab),
   pushUiState:  (uiState) => ipcRenderer.send('context:ui_state', uiState),

@@ -1,0 +1,241 @@
+{
+  "version": 1,
+  "default_reference_date": "2026-09-14T12:00:00.000-04:00",
+  "target_baseline_accuracy": 1.0,
+  "scenarios": [
+    {
+      "id": "holdout_equal_weight_due_spread",
+      "tier": "holdout",
+      "description": "Same grade weight; order follows due dates only",
+      "source": "synthetic",
+      "reference_date": "2026-09-14T12:00:00.000-04:00",
+      "tasks": [
+        {
+          "id": "task-a",
+          "title": "Weekly response 1",
+          "due": "2026-09-15T23:59:00.000-04:00",
+          "estimate": "2h",
+          "gradepercentage": 8,
+          "type": "canvas-assignment",
+          "status": "not_started"
+        },
+        {
+          "id": "task-b",
+          "title": "Weekly response 2",
+          "due": "2026-09-18T23:59:00.000-04:00",
+          "estimate": "2h",
+          "gradepercentage": 8,
+          "type": "canvas-assignment",
+          "status": "not_started"
+        },
+        {
+          "id": "task-c",
+          "title": "Weekly response 3",
+          "due": "2026-09-22T23:59:00.000-04:00",
+          "estimate": "2h",
+          "gradepercentage": 8,
+          "type": "canvas-assignment",
+          "status": "not_started"
+        }
+      ],
+      "expected_order": ["task-a", "task-b", "task-c"]
+    },
+    {
+      "id": "holdout_admin_beats_distant_low_weight",
+      "tier": "holdout",
+      "description": "Admin task due soon beats low-weight assignment due later",
+      "source": "synthetic",
+      "reference_date": "2026-09-14T12:00:00.000-04:00",
+      "tasks": [
+        {
+          "id": "admin-form",
+          "title": "Submit travel form",
+          "due": "2026-09-16T17:00:00.000-04:00",
+          "estimate": "0.5h",
+          "task_type": "admin",
+          "priority_weight": 7,
+          "status": "not_started"
+        },
+        {
+          "id": "reading-post",
+          "title": "Discussion post",
+          "due": "2026-09-24T23:59:00.000-04:00",
+          "estimate": "1h",
+          "gradepercentage": 3,
+          "type": "canvas-assignment",
+          "status": "not_started"
+        }
+      ],
+      "constraints": [
+        {
+          "above": "admin-form",
+          "below": "reading-post",
+          "reason": "near admin deadline beats low-weight work due later"
+        }
+      ]
+    },
+    {
+      "id": "holdout_submit_beats_far_study",
+      "tier": "holdout",
+      "description": "Submission due tomorrow beats heavier study block due later",
+      "source": "synthetic",
+      "reference_date": "2026-09-14T12:00:00.000-04:00",
+      "tasks": [
+        {
+          "id": "problem-set",
+          "title": "Problem set 2",
+          "due": "2026-09-15T23:59:00.000-04:00",
+          "estimate": "5h",
+          "gradepercentage": 15,
+          "type": "canvas-assignment",
+          "problems": ["1", "2", "3"],
+          "status": "not_started"
+        },
+        {
+          "id": "exam-prep",
+          "title": "Study for unit test",
+          "due": "2026-09-17T23:59:00.000-04:00",
+          "estimate": "3h",
+          "gradepercentage": 20,
+          "type": "canvas-study-task",
+          "task_type": "study",
+          "status": "not_started"
+        }
+      ],
+      "constraints": [
+        {
+          "above": "problem-set",
+          "below": "exam-prep",
+          "reason": "submission due sooner than study block"
+        }
+      ]
+    },
+    {
+      "id": "holdout_manual_priority_same_due",
+      "tier": "holdout",
+      "description": "Same due date; higher sidekick priority wins",
+      "source": "synthetic",
+      "reference_date": "2026-09-14T12:00:00.000-04:00",
+      "tasks": [
+        {
+          "id": "low-priority",
+          "title": "Organize notes",
+          "due": "2026-09-20T23:59:00.000-04:00",
+          "estimate": "1h",
+          "priority_weight": 3,
+          "status": "not_started"
+        },
+        {
+          "id": "high-priority",
+          "title": "Draft presentation",
+          "due": "2026-09-20T23:59:00.000-04:00",
+          "estimate": "2h",
+          "priority_weight": 8,
+          "status": "not_started"
+        }
+      ],
+      "constraints": [
+        {
+          "above": "high-priority",
+          "below": "low-priority",
+          "reason": "equal deadline; higher priority_weight wins"
+        }
+      ]
+    },
+    {
+      "id": "holdout_study_section_progress",
+      "tier": "holdout",
+      "description": "Study task with more remaining sections ranks above mostly-complete peer",
+      "source": "study-sections",
+      "reference_date": "2026-09-14T12:00:00.000-04:00",
+      "tasks": [
+        {
+          "id": "study-fresh",
+          "title": "Study for module quiz",
+          "due": "2026-09-17T23:59:00.000-04:00",
+          "estimate": "4h",
+          "gradepercentage": 12,
+          "type": "canvas-study-task",
+          "task_type": "study",
+          "studySections": [
+            { "id": "topic-a", "label": "Topic A", "status": "pending" },
+            { "id": "topic-b", "label": "Topic B", "status": "pending" },
+            { "id": "topic-c", "label": "Topic C", "status": "pending" },
+            { "id": "topic-d", "label": "Topic D", "status": "pending" }
+          ],
+          "status": "not_started"
+        },
+        {
+          "id": "study-mostly-done",
+          "title": "Study for module quiz (continued)",
+          "due": "2026-09-17T23:59:00.000-04:00",
+          "estimate": "4h",
+          "gradepercentage": 12,
+          "type": "canvas-study-task",
+          "task_type": "study",
+          "studySections": [
+            { "id": "topic-a", "label": "Topic A", "status": "done" },
+            { "id": "topic-b", "label": "Topic B", "status": "done" },
+            { "id": "topic-c", "label": "Topic C", "status": "done" },
+            { "id": "topic-d", "label": "Topic D", "status": "pending" }
+          ],
+          "studyProgress": {
+            "completedSectionIds": ["topic-a", "topic-b", "topic-c"],
+            "updatedAt": "2026-09-15T10:00:00.000-04:00"
+          },
+          "status": "not_started"
+        }
+      ],
+      "constraints": [
+        {
+          "above": "study-fresh",
+          "below": "study-mostly-done",
+          "reason": "more remaining sections means more remaining work"
+        }
+      ]
+    },
+    {
+      "id": "holdout_study_complete_sinks",
+      "tier": "holdout",
+      "description": "Fully sectioned study task sinks below active assignment",
+      "source": "study-sections",
+      "reference_date": "2026-09-14T12:00:00.000-04:00",
+      "tasks": [
+        {
+          "id": "study-complete",
+          "title": "Study for lab quiz",
+          "due": "2026-09-16T23:59:00.000-04:00",
+          "estimate": "2h",
+          "gradepercentage": 8,
+          "type": "canvas-study-task",
+          "task_type": "study",
+          "studySections": [
+            { "id": "reading", "label": "Reading", "status": "done" },
+            { "id": "practice", "label": "Practice", "status": "done" }
+          ],
+          "studyProgress": {
+            "completedSectionIds": ["reading", "practice"],
+            "updatedAt": "2026-09-15T18:00:00.000-04:00"
+          },
+          "status": "not_started"
+        },
+        {
+          "id": "active-assignment",
+          "title": "Pre-lab writeup",
+          "due": "2026-09-18T23:59:00.000-04:00",
+          "estimate": "1.5h",
+          "gradepercentage": 6,
+          "type": "canvas-assignment",
+          "status": "not_started"
+        }
+      ],
+      "constraints": [
+        {
+          "above": "active-assignment",
+          "below": "study-complete",
+          "reason": "completed study sections should not outrank active work"
+        }
+      ]
+    }
+  ]
+}

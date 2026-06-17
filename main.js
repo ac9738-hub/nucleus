@@ -1617,6 +1617,9 @@ function addCanvasTasks(tasks, options = {}) {
       gradepercentage: task.gradepercentage,
       coveredConcepts: task.coveredConcepts,
       studyFiles: task.studyFiles,
+      learningBlocks: task.learningBlocks,
+      studySections: task.studySections,
+      studyProgress: task.studyProgress,
       assignmentFiles: task.assignmentFiles,
       filechildren: task.filechildren,
       problems: task.problems,
@@ -5336,6 +5339,22 @@ app.whenReady().then(() => {
     console.log(`[nucleus] Placeholder start-task script ran for: ${taskName}`)
     return { ok: true };
   });
+
+  // tasks:study_section — Mark one study section complete for a canvas study task.
+  // in:  { taskId, sectionId, status? }
+  // out: { ok, taskId?, sectionId?, studyProgress?, isComplete?, error? }
+  ipcMain.handle('tasks:study_section', (_, payload = {}) => {
+    const taskId = payload.taskId ?? payload.task_id
+    const sectionId = payload.sectionId ?? payload.section_id
+    if (!taskId || !sectionId) {
+      return { ok: false, error: 'taskId and sectionId are required.' }
+    }
+    return dataStore.updateStudySectionProgress(
+      taskId,
+      sectionId,
+      payload.status || 'done'
+    )
+  })
 
   // data:get — Returns the current app data snapshot.
   // in:  none

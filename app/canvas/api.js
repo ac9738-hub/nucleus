@@ -14,6 +14,7 @@ const {
   resolveModuleAnchorWeekMs,
   buildWeeklyScheduleFromCanvasData
 } = require('./weekly-schedule')
+const { buildStudySectionsFromTask } = require('../../study-sections')
 
 // Project root, used to resolve the active theme palette for saved homepages.
 const THEME_ROOT = path.join(__dirname, '..', '..')
@@ -1029,7 +1030,14 @@ function make_canvas_tasks(rootDir) {
       priority_weight: canvasStudyTaskImportance(event, coveredConcepts),
       coveredConcepts,
       studyFiles,
-      learningBlocks: relevantBlocks
+      learningBlocks: relevantBlocks,
+      studySections: buildStudySectionsFromTask({
+        title: `Study for ${event.name || `Canvas test ${eventId}`}`,
+        coveredConcepts,
+        studyFiles,
+        learningBlocks: relevantBlocks
+      }),
+      studyProgress: { completedSectionIds: [], updatedAt: null }
     })
   })
 
@@ -1941,6 +1949,7 @@ ${html}
 
 module.exports = {
   createCanvasApi,
+  make_canvas_tasks,
   clearCanvasAuthFromEnv,
   killParserProcess,
   resolveSchedulingDate,

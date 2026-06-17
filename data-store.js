@@ -2,6 +2,7 @@
 // Functionality: owns renderer-visible workspaces/tasks and merges Canvas project
 // groups into snapshots sent over IPC.
 // Dependencies: main.js supplies renderer emitters and Canvas data/project readers.
+const { resolveStudySections, markStudySectionComplete } = require('./study-sections')
 function createDataStore({ sendToRenderer, getCanvasProjectGroups, readCanvasData }) {
   const workspaces = [
     { id: "nucleus",          name: "Nucleus",          description: "Your main planning workspace." },
@@ -199,18 +200,58 @@ function createDataStore({ sendToRenderer, getCanvasProjectGroups, readCanvasDat
     return '#000000'
   }
 
+  function updateStudySectionProgress(taskId, sectionId, status = 'done') {
+    const task = tasks.find(entry => entry.id == taskId)
+    if (!task) {
+      return { ok: false, error: 'Task not found.' }
+    }
+
+    task.studySections = resolveStudySections(task)
+    const result = markStudySectionComplete(task, sectionId)
+    if (!result.ok) {
+      return result
+    }
+
+    task.studySections = result.sections
+    task.studyProgress = result.studyProgress
+    if (result.isComplete) {
+      task.status = 'done'
+    } else if (normalizeStudyTaskStatus(task.status) === 'done') {
+      task.status = 'not_started'
+    }
+
+    sendToRenderer('tasks:update', tasks)
+    return {
+      ok: true,
+      taskId: task.id,
+      sectionId: String(sectionId),
+      status: normalizeStudyTaskStatus(status),
+      studyProgress: task.studyProgress,
+      isComplete: result.isComplete
+    }
+  }
+
+  function normalizeStudyTaskStatus(status) {
+    const value = String(status || 'pending').toLowerCase()
+    return value === 'done' || value === 'complete' || value === 'completed'
+      ? 'done'
+      : 'pending'
+  }
+
   return {
     deleteTask,
     deleteWorkspace,
     getAllWorkspacesForTool,
     getProjectColor,
     getRendererDataSnapshot,
+    getTasksSnapshot: () => tasks.map(task => ({ ...task })),
     getWorkspaceIdsByName,
     hasWorkspaceId: id => workspaceids.has(id),
     newTask,
     newWorkspace,
     removeCanvasTasks,
-    sendCanvasDataUpdate
+    sendCanvasDataUpdate,
+    updateStudySectionProgress
   }
 }
 

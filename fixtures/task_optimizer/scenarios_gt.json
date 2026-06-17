@@ -1,0 +1,434 @@
+{
+  "version": 1,
+  "default_reference_date": "2026-06-17T12:00:00.000-04:00",
+  "target_pairwise_accuracy": 0.85,
+  "target_baseline_accuracy": 1.0,
+  "target_stretch_accuracy": 1.0,
+  "scenarios": [
+    {
+      "id": "canvas_midterm_mix",
+      "description": "Canvas assignments plus an exam study task during midterm week",
+      "source": "make_canvas_tasks",
+      "reference_date": "2026-06-17T12:00:00.000-04:00",
+      "tasks": [
+        {
+          "id": "canvas-assignment-cs110-pset3",
+          "workspaceId": "",
+          "course": "Intro to Computer Science",
+          "title": "PSET 3: Recursion",
+          "details": "Implement tree traversal helpers.",
+          "due": "2026-06-18T23:59:00.000-04:00",
+          "estimate": "6h",
+          "color": "#378add",
+          "source": "canvas",
+          "courseId": "cs110",
+          "type": "canvas-assignment",
+          "gradepercentage": 12,
+          "points_possible": 60,
+          "course_total_pts": 500,
+          "problems": ["p1", "p2", "p3", "p4", "p5"],
+          "status": "not_started"
+        },
+        {
+          "id": "canvas-study-cs110-midterm",
+          "workspaceId": "",
+          "course": "Intro to Computer Science",
+          "title": "Study for Midterm Exam",
+          "details": "Review recursion, induction, and runtime.",
+          "due": "2026-06-19T23:59:00.000-04:00",
+          "estimate": "4h",
+          "color": "#d85a30",
+          "source": "canvas",
+          "courseId": "cs110",
+          "type": "canvas-study-task",
+          "task_type": "study",
+          "gradepercentage": 25,
+          "status": "not_started"
+        },
+        {
+          "id": "canvas-assignment-bio101-reading",
+          "workspaceId": "",
+          "course": "Introductory Biology",
+          "title": "Reading: Cell Division",
+          "details": "Chapter 7 reading quiz prep.",
+          "due": "2026-06-24T23:59:00.000-04:00",
+          "estimate": "2h",
+          "color": "#1d9e75",
+          "source": "canvas",
+          "courseId": "bio101",
+          "type": "canvas-assignment",
+          "gradepercentage": 2,
+          "status": "not_started"
+        },
+        {
+          "id": "canvas-assignment-bio101-lab",
+          "workspaceId": "",
+          "course": "Introductory Biology",
+          "title": "Lab Report 2",
+          "details": "Analyze microscopy results.",
+          "due": "2026-06-20T23:59:00.000-04:00",
+          "estimate": "3h",
+          "color": "#1d9e75",
+          "source": "canvas",
+          "courseId": "bio101",
+          "type": "canvas-assignment",
+          "gradepercentage": 8,
+          "status": "not_started"
+        }
+      ],
+      "constraints": [
+        {
+          "above": "canvas-assignment-cs110-pset3",
+          "below": "canvas-assignment-bio101-reading",
+          "reason": "due tomorrow vs next week with much higher grade weight"
+        },
+        {
+          "above": "canvas-study-cs110-midterm",
+          "below": "canvas-assignment-bio101-reading",
+          "reason": "high-stakes exam prep beats low-weight reading"
+        },
+        {
+          "above": "canvas-assignment-cs110-pset3",
+          "below": "canvas-assignment-bio101-lab",
+          "reason": "closest deadline among active coursework"
+        }
+      ],
+      "expected_order": [
+        "canvas-assignment-cs110-pset3",
+        "canvas-study-cs110-midterm",
+        "canvas-assignment-bio101-lab",
+        "canvas-assignment-bio101-reading"
+      ]
+    },
+    {
+      "id": "workspace_personal_mix",
+      "description": "Manual workspace tasks mixed with one urgent Canvas assignment",
+      "source": "data-store",
+      "reference_date": "2026-06-17T12:00:00.000-04:00",
+      "tasks": [
+        {
+          "id": "manual-portfolio-refresh",
+          "workspaceId": "nucleus",
+          "course": "Personal Projects",
+          "title": "Portfolio refresh",
+          "details": "Update project writeups and polish the homepage.",
+          "due": "2026-06-28T23:59:00.000-04:00",
+          "estimate": "5h",
+          "color": "#d4537e",
+          "priority_weight": 4,
+          "status": "not_started"
+        },
+        {
+          "id": "manual-nucleus-app",
+          "workspaceId": "nucleus",
+          "course": "Product",
+          "title": "Nucleus app task optimizer iteration",
+          "details": "Build eval harness and first algorithm pass.",
+          "due": "2026-06-18T23:59:00.000-04:00",
+          "estimate": "8h",
+          "color": "#c58d35",
+          "priority_weight": 7,
+          "status": "not_started"
+        },
+        {
+          "id": "canvas-assignment-math220-quiz",
+          "workspaceId": "",
+          "course": "Linear Algebra",
+          "title": "Quiz 4: Eigenvalues",
+          "details": "In-class quiz on diagonalization.",
+          "due": "2026-06-18T08:00:00.000-04:00",
+          "estimate": "2h",
+          "color": "#7f77dd",
+          "source": "canvas",
+          "courseId": "math220",
+          "type": "canvas-assignment",
+          "gradepercentage": 10,
+          "status": "not_started"
+        },
+        {
+          "id": "manual-writing-revision",
+          "workspaceId": "writing",
+          "course": "Academic Writing",
+          "title": "Essay revision pass",
+          "details": "Fix citations and tighten the conclusion.",
+          "due": "2026-06-21T23:59:00.000-04:00",
+          "estimate": "3h",
+          "color": "#d85a30",
+          "priority_weight": 6,
+          "status": "not_started"
+        }
+      ],
+      "constraints": [
+        {
+          "above": "canvas-assignment-math220-quiz",
+          "below": "manual-nucleus-app",
+          "reason": "earlier deadline tomorrow morning"
+        },
+        {
+          "above": "canvas-assignment-math220-quiz",
+          "below": "manual-writing-revision",
+          "reason": "due soonest among remaining active tasks"
+        },
+        {
+          "above": "manual-nucleus-app",
+          "below": "manual-portfolio-refresh",
+          "reason": "due tomorrow vs later personal project"
+        }
+      ],
+      "expected_order": [
+        "canvas-assignment-math220-quiz",
+        "manual-nucleus-app",
+        "manual-writing-revision",
+        "manual-portfolio-refresh"
+      ]
+    },
+    {
+      "id": "external_admin_burst",
+      "description": "Administrative tasks with tighter external urgency curves",
+      "source": "sidekick_add_task",
+      "reference_date": "2026-06-17T12:00:00.000-04:00",
+      "tasks": [
+        {
+          "id": "admin-email-recommendation",
+          "workspaceId": "nucleus",
+          "course": "Admin",
+          "title": "Reply to recommendation letter request",
+          "details": "Respond before the department deadline.",
+          "due": "2026-06-18T17:00:00.000-04:00",
+          "estimate": "0.5h",
+          "task_type": "email",
+          "priority_weight": 8,
+          "status": "not_started"
+        },
+        {
+          "id": "admin-registration-hold",
+          "workspaceId": "nucleus",
+          "course": "Admin",
+          "title": "Clear registration hold",
+          "details": "Upload proof of vaccination form.",
+          "due": "2026-06-19T17:00:00.000-04:00",
+          "estimate": "0.25h",
+          "task_type": "admin",
+          "priority_weight": 9,
+          "status": "not_started"
+        },
+        {
+          "id": "canvas-assignment-eng105-draft",
+          "workspaceId": "",
+          "course": "Academic Writing",
+          "title": "Draft workshop submission",
+          "details": "Bring a full draft for peer review.",
+          "due": "2026-06-23T23:59:00.000-04:00",
+          "estimate": "4h",
+          "color": "#d85a30",
+          "source": "canvas",
+          "type": "canvas-assignment",
+          "gradepercentage": 5,
+          "status": "not_started"
+        }
+      ],
+      "constraints": [
+        {
+          "above": "admin-email-recommendation",
+          "below": "canvas-assignment-eng105-draft",
+          "reason": "external task due within one day"
+        },
+        {
+          "above": "admin-registration-hold",
+          "below": "canvas-assignment-eng105-draft",
+          "reason": "admin deadline beats low-weight draft due later"
+        },
+        {
+          "above": "admin-email-recommendation",
+          "below": "admin-registration-hold",
+          "reason": "email reply due sooner than registration hold"
+        }
+      ],
+      "expected_order": [
+        "admin-email-recommendation",
+        "admin-registration-hold",
+        "canvas-assignment-eng105-draft"
+      ]
+    },
+    {
+      "id": "completed_tasks_sink",
+      "description": "Completed tasks should stay below active work",
+      "source": "data-store",
+      "reference_date": "2026-06-17T12:00:00.000-04:00",
+      "tasks": [
+        {
+          "id": "done-lab1",
+          "workspaceId": "biology",
+          "course": "Introductory Biology",
+          "title": "Lab 1 writeup",
+          "due": "2026-06-10T23:59:00.000-04:00",
+          "estimate": "2h",
+          "gradepercentage": 6,
+          "status": "done"
+        },
+        {
+          "id": "active-lab3",
+          "workspaceId": "biology",
+          "course": "Introductory Biology",
+          "title": "Lab 3 writeup",
+          "due": "2026-06-19T23:59:00.000-04:00",
+          "estimate": "2h",
+          "gradepercentage": 6,
+          "status": "not_started"
+        },
+        {
+          "id": "active-lecture-quiz",
+          "workspaceId": "biology",
+          "course": "Introductory Biology",
+          "title": "Lecture quiz 5",
+          "due": "2026-06-18T23:59:00.000-04:00",
+          "estimate": "1h",
+          "gradepercentage": 3,
+          "status": "not_started"
+        }
+      ],
+      "constraints": [
+        {
+          "above": "active-lecture-quiz",
+          "below": "done-lab1",
+          "reason": "completed tasks should not outrank active work"
+        },
+        {
+          "above": "active-lab3",
+          "below": "done-lab1",
+          "reason": "completed tasks should not outrank active work"
+        },
+        {
+          "above": "active-lecture-quiz",
+          "below": "active-lab3",
+          "reason": "quiz due sooner than lab writeup"
+        }
+      ],
+      "expected_order": [
+        "active-lecture-quiz",
+        "active-lab3",
+        "done-lab1"
+      ]
+    },
+    {
+      "id": "dependency_heavy_pset",
+      "description": "Large multi-part assignment versus a smaller checklist task",
+      "source": "make_canvas_tasks",
+      "reference_date": "2026-06-17T12:00:00.000-04:00",
+      "tasks": [
+        {
+          "id": "canvas-assignment-apmth-pset4",
+          "workspaceId": "",
+          "course": "APMTH 105",
+          "title": "PSET 4",
+          "details": "Linear systems and numerical stability.",
+          "due": "2026-06-20T23:59:00.000-04:00",
+          "estimate": "10h",
+          "source": "canvas",
+          "type": "canvas-assignment",
+          "gradepercentage": 8,
+          "problems": ["1a", "1b", "2", "3", "4", "5", "6"],
+          "conceptRequirements": ["c1", "c2", "c3"],
+          "status": "not_started"
+        },
+        {
+          "id": "canvas-assignment-apmth-checkin",
+          "workspaceId": "",
+          "course": "APMTH 105",
+          "title": "C07_02182026_CI",
+          "details": "Short class check-in.",
+          "due": "2026-06-18T23:59:00.000-04:00",
+          "estimate": "0.5h",
+          "source": "canvas",
+          "type": "canvas-assignment",
+          "gradepercentage": 1,
+          "status": "not_started"
+        },
+        {
+          "id": "canvas-study-apmth-quiz2",
+          "workspaceId": "",
+          "course": "APMTH 105",
+          "title": "Study for Quiz 02",
+          "details": "Review recent problem sets.",
+          "due": "2026-06-19T23:59:00.000-04:00",
+          "estimate": "2h",
+          "source": "canvas",
+          "type": "canvas-study-task",
+          "task_type": "study",
+          "gradepercentage": 6,
+          "status": "not_started"
+        }
+      ],
+      "constraints": [
+        {
+          "above": "canvas-assignment-apmth-checkin",
+          "below": "canvas-assignment-apmth-pset4",
+          "reason": "check-in due first even though PSET has more dependencies"
+        },
+        {
+          "above": "canvas-assignment-apmth-checkin",
+          "below": "canvas-study-apmth-quiz2",
+          "reason": "immediate check-in deadline beats study block"
+        },
+        {
+          "above": "canvas-study-apmth-quiz2",
+          "below": "canvas-assignment-apmth-pset4",
+          "reason": "quiz prep due before large PSET deadline"
+        }
+      ],
+      "expected_order": [
+        "canvas-assignment-apmth-checkin",
+        "canvas-study-apmth-quiz2",
+        "canvas-assignment-apmth-pset4"
+      ]
+    },
+    {
+      "id": "study_partial_progress",
+      "description": "Partially completed study task ranks below a due-tomorrow submission",
+      "source": "study-sections",
+      "reference_date": "2026-06-17T12:00:00.000-04:00",
+      "tasks": [
+        {
+          "id": "due-tomorrow-worksheet",
+          "title": "Worksheet 4",
+          "due": "2026-06-18T23:59:00.000-04:00",
+          "estimate": "2h",
+          "gradepercentage": 10,
+          "type": "canvas-assignment",
+          "status": "not_started"
+        },
+        {
+          "id": "study-partial-midterm",
+          "title": "Study for Exam 2",
+          "due": "2026-06-19T23:59:00.000-04:00",
+          "estimate": "4h",
+          "gradepercentage": 20,
+          "type": "canvas-study-task",
+          "task_type": "study",
+          "studySections": [
+            { "id": "sec-1", "label": "Topic A", "status": "done" },
+            { "id": "sec-2", "label": "Topic B", "status": "done" },
+            { "id": "sec-3", "label": "Topic C", "status": "done" },
+            { "id": "sec-4", "label": "Topic D", "status": "pending" }
+          ],
+          "studyProgress": {
+            "completedSectionIds": ["sec-1", "sec-2", "sec-3"],
+            "updatedAt": "2026-06-17T10:00:00.000-04:00"
+          },
+          "status": "not_started"
+        }
+      ],
+      "constraints": [
+        {
+          "above": "due-tomorrow-worksheet",
+          "below": "study-partial-midterm",
+          "reason": "submission due tomorrow beats mostly-complete study block"
+        }
+      ],
+      "expected_order": [
+        "due-tomorrow-worksheet",
+        "study-partial-midterm"
+      ]
+    }
+  ]
+}

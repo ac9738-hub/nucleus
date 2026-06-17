@@ -475,6 +475,37 @@ function getCanvasCourseBorderColor(task) {
   return CANVAS_COURSE_BORDER_COLORS[courseIndex % CANVAS_COURSE_BORDER_COLORS.length];
 }
 
+function isStudyTask(task) {
+  return Boolean(
+    task && (
+      task.type === "canvas-study-task" ||
+      (Array.isArray(task.studySections) && task.studySections.length)
+    )
+  );
+}
+
+function renderStudySectionsBlock(task) {
+  if (!isStudyTask(task) || !window.StudySections) return "";
+
+  const stats = window.StudySections.getStudyProgressStats(task);
+  if (!stats.total) return "";
+
+  if (stats.isComplete) {
+    return `<div class="study-sections study-sections--complete">${stats.total} study sections complete</div>`;
+  }
+
+  const next = stats.nextSection;
+  if (!next) return "";
+
+  return `
+    <div class="study-sections">
+      <div class="study-sections-header">Section ${stats.completed + 1} of ${stats.total}</div>
+      <p class="study-section-next">${escapeHtml(next.label || next.title || "Study session")}</p>
+      <button type="button" class="study-section-complete-button" data-complete-study-section="${escapeHtml(task.id)}" data-section-id="${escapeHtml(next.id)}">Mark section done</button>
+    </div>
+  `;
+}
+
 function renderTaskCard(task) {
   const urls = Array.isArray(task.urls) ? task.urls : [];
   const details = truncateTaskText(task.details || "No description provided.");
@@ -483,6 +514,7 @@ function renderTaskCard(task) {
   const courseName = getCanvasCourseDisplayName(task);
   const encodedUrls = encodeURIComponent(JSON.stringify(urls));
   const dueText = formatTaskDueDisplay(task.due);
+  const studySectionsHtml = renderStudySectionsBlock(task);
   return `
     <article class="task-card" data-id="${escapeHtml(task.id)}" data-task-urls="${escapeHtml(encodedUrls)}"${cardStyle}>
       <div class="task-header">
@@ -491,6 +523,7 @@ function renderTaskCard(task) {
       </div>
       <h2>${escapeHtml(task.title)}</h2>
       <p title="${escapeHtml(details)}">${escapeHtml(details)}</p>
+      ${studySectionsHtml}
       <div class="task-footer">
         <span>${escapeHtml(task.estimate)}</span>
         <button type="button" class="start-task-button" data-start-task="${escapeHtml(task.id)}">Start task</button>
@@ -978,6 +1011,22 @@ function renderView() {
   // attach click listeners to buttons
   view.querySelectorAll("[data-start-task]").forEach(button => {
     button.addEventListener("click", () => startTask(button.dataset.startTask));
+  });
+
+  view.querySelectorAll("[data-complete-study-section]").forEach(button => {
+    button.addEventListener("click", async event => {
+      event.stopPropagation();
+      if (!window.nucleus || typeof window.nucleus.updateStudySectionProgress !== "function") return;
+      const taskId = button.dataset.completeStudySection;
+      const sectionId = button.dataset.sectionId;
+      if (!taskId || !sectionId) return;
+      button.disabled = true;
+      try {
+        await window.nucleus.updateStudySectionProgress({ taskId, sectionId, status: "done" });
+      } finally {
+        button.disabled = false;
+      }
+    });
   });
 
   view.querySelectorAll("[data-open-section]").forEach(button => {
