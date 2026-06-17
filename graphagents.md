@@ -504,7 +504,7 @@ weekly schedule accuracy                 search / agent callContext
 | Concern         | Weekly (`AGENTS.md`)                             | RAG (`graphagents.md`)                                  |
 | --------------- | ------------------------------------------------ | ------------------------------------------------------- |
 | Primary metric  | Week placement accuracy                          | intent_match@5, recall@5, empty_rate                    |
-| Baseline        | **99.2%** aggregate                              | recall **0.675**, intent_match **1.0**, empty **0.0** (iter 5) |
+| Baseline        | **99.2%** aggregate                              | recall **0.867**, intent_match **0.95**, empty **0.0** (iter 7) |
 | Parser edits    | `parser.py`, `llm_parse.py`, `events.py`         | same files + embeddings                                 |
 | Heuristic layer | `format.py` only                                 | none (ranking in `vector_retreival.py`)                 |
 | Rebuild graph   | `--refresh-graph` (~16 min)                      | `scripts/full_reparse.py` or `scripts/reembed_graph.py` |
@@ -543,14 +543,86 @@ weekly schedule accuracy                 search / agent callContext
 
 ---
 
-## Next iteration (6)
+### 2026-06-16 — Iteration 6 (query-aware ranking)
+
+**Scope:** Fix remaining recall misses from iter 5 by query-aware ranking boosts/penalties in `vector_retreival.py` — pset vs exam disambiguation, review-material file boost, browser exam event expansion.
+
+**Changes (`vector_retreival.py` only):**
+
+| Change | Detail |
+| ------ | ------ |
+| Query patterns | `PSET_QUERY_PATTERN`, `PSET_ASSIGNMENT_PATTERN`, `REVIEW_QUERY_PATTERN` |
+| Helpers | `assignment_pset_like`, `query_requests_assignment`, `query_requests_exam`, `query_requests_review_material`, `query_ranking_adjustment` |
+| Ranking | `intent_type_adjustment` now passes `query`/`mode` and adds per-query boosts (pset +0.24, exam assignment +0.28 browser, review file +0.26, pset penalty −0.20 on exam queries) |
+| Browser exam | `browser_allowed_types` includes `event` when intent is `exam` |
+| Cutoff | `passes_retrieval_cutoff` and `rank_node` pass query/mode into intent adjustment |
+
+**Eval:** `python -m pytest tests/test_vector_retrieval.py -q && python scripts/eval_rag.py --production-cutoff`
+
+| Metric | Iter 5 (v2 GT) | Iter 6 | Δ |
+| ------ | -------------- | ------ | --- |
+| recall@5 | 0.675 | **0.775** | +0.100 |
+| nDCG@5 | 0.611 | **0.718** | +0.107 |
+| intent_match@5 | 1.000 | **1.000** | — |
+| empty_rate | 0.000 | **0.000** | — |
+
+**Recall misses (production):** CHM 201 practice exam (0.00); partial: MAT 201 pset solutions (0.50), MAT 202 linear algebra pset (0.50), MAT 202 midterm review (0.50), CHM 201 exam when (0.33), ASA344 midterm readings (0.50), ECO homework due (0.50).
+
+**Fixed vs iter 5:** MAT 202 midterm review 0.00 → 0.50 (review PDF + event now in browser pool); several agent/browser queries improved to full recall (13/20 at 1.00).
+
+**Tests:** 18 passed (`tests/test_vector_retrieval.py`).
+
+---
+
+### 2026-06-16 — Iteration 7 (cross-course expansion + neighbor rescoring)
+
+**Scope:** Fix cross-course file pollution from shared event IDs; re-score expanded neighbors; stronger exam-assignment and practice-exam ranking.
+
+**Root causes fixed:**
+
+1. **Cross-course neighbor expansion:** `find_file(courseid=…)` no longer falls back to other courses; event→file edges filtered by course; expansion skips neighbors whose `courseid` differs from the startpoint.
+2. **Flat expansion scores:** Neighbors inherited parent similarity — all Final PDFs tied at the same score. `adjusted_result_similarity` now applies query-aware boosts/penalties per neighbor.
+3. **Wrong-course file penalty:** Files whose names embed a different course code (e.g. `NEU201_FinalPractice.pdf` for a CHM 201 query) get −0.4.
+4. **Exam assignments under-ranked:** Stronger `assignment_exam_like` boost (+0.35 intent, +0.32 for `Exam N` names); practice-exam query boosts; generic `Final` event penalized when query mentions practice.
+
+**Changes (`vector_retreival.py` + tests):**
+
+| Change | Detail |
+| ------ | ------ |
+| `find_file` | Same-course only when `courseid` provided |
+| Event neighbors | Course-scoped file/concept edges |
+| `expand_startpoints` | Query-aware neighbor rescoring; course filter |
+| Penalties | `course_code_filename_penalty` for mismatched file codes |
+| Ranking | Practice-exam files, midterm review session PDF, PSET solution PDF, homepage for readings/solutions, syllabus for homework deadline |
+
+**Eval:** `python -m pytest tests/test_vector_retrieval.py -q && python scripts/eval_rag.py --production-cutoff`
+
+| Metric | Iter 6 | Iter 7 | Δ |
+| ------ | ------ | ------ | --- |
+| recall@5 | 0.775 | **0.867** | +0.092 |
+| nDCG@5 | 0.718 | **0.801** | +0.083 |
+| intent_match@5 | 1.000 | **0.950** | −0.050 |
+| empty_rate | 0.000 | **0.000** | — |
+
+**Fixed vs iter 6:** CHM 201 practice exam 0.00 → 0.67; ASA344 midterm readings 0.50 → 1.00; CHM 201 exam when 0.33 → 0.67; MAT 201 midterm topics 0.67 → 1.00.
+
+**Remaining partial misses (0.50):** MAT 201 pset solutions (homepage not in top-5), MAT 202 linear algebra pset (PSET-1Solutions PDF), MAT 202 midterm review (one of two expected nodes), ECO homework due (syllabus).
+
+**Intent regression:** `CHM 201 practice exam` returns assignment-only top-5 (recall 0.67 but intent_match=0 for that query) — exam assignments now dominate browser exam pool.
+
+**Tests:** 20 passed (`tests/test_vector_retrieval.py`).
+
+---
+
+## Next iteration (8)
 
 **RAG (priority):**
 
-1. Browser assignment ranking: MAT 202 PSET, CHM 201 exam/practice, MAT 202 midterm review PDF.
-2. Agent: ASA344 midterm assignment; CHM 201 exam (`Exam 1` / `Exameventid` above unrelated PSets).
-3. Syllabus embedding fix (`syllabus.other` empty → homepage filename text).
-4. Held-out query set (5+5) not in `QUERY_SPECS`.
+1. **Browser mixed-type balance:** CHM 201 practice exam — diversify top-5 to include exam event + practice PDF alongside exam assignments (without losing recall).
+2. **Homepage/syllabus in top-5:** MAT 201 pset solutions, ECO homework — boost course homepage/syllabus when query mentions solutions/homework but no dedicated file ranks high.
+3. **PSET solution PDFs:** MAT 202 `MAT202-PSET-1Solutions.pdf` — verify in graph; boost `-PSET-N-Solution` filename pattern.
+4. Syllabus embedding fix (`syllabus.other` empty → homepage filename text).
+5. Held-out query set (5+5) not in `QUERY_SPECS`.
 
 **Weekly (maintenance):** Re-run weekly eval ≥97%; parser fixes for ART102 Final Exam + ASA344 fieldtrip.
 

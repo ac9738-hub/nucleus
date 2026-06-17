@@ -7,10 +7,12 @@ if not hasattr(sys.stdin, "reconfigure"):
 
 from vector_retreival import (
     assignment_exam_like,
+    assignment_pset_like,
     browser_allowed_types,
     browser_file_query_boost,
     browser_syllabus_query_boost,
     classify_query_intent,
+    course_code_filename_penalty,
     course_code_match_score,
     enrich_catalog_entry_from_graph,
     event_concept_neighbors,
@@ -18,6 +20,7 @@ from vector_retreival import (
     intent_type_adjustment,
     node_ranking_text,
     passes_retrieval_cutoff,
+    query_ranking_adjustment,
     week_query_file_boost,
 )
 
@@ -125,6 +128,35 @@ def test_passes_retrieval_cutoff_with_course_match():
         nodetype="assignment",
         node=node,
     )
+
+
+def test_assignment_pset_like():
+    assert assignment_pset_like("PSET 1")
+    assert assignment_pset_like("Problem Set 2")
+    assert not assignment_pset_like("Exam 1")
+
+
+def test_query_ranking_pset_boost():
+    node = DummyNode(name="PSET 1")
+    boost = query_ranking_adjustment("MAT 202 linear algebra pset", "assignment", "assignment", node, "browser")
+    assert boost > 0.2
+
+
+def test_query_ranking_exam_penalty_on_pset():
+    node = DummyNode(name="Problem Set 8")
+    penalty = query_ranking_adjustment("When is the CHM 201 exam?", "deadline", "assignment", node, "agent")
+    assert penalty < 0
+
+
+def test_course_code_filename_penalty():
+    wrong_course = DummyNode(name="NEU201_FinalPractice.pdf")
+    assert course_code_filename_penalty("CHM 201 practice exam", "file", wrong_course) < 0
+    same_course = DummyNode(name="CHM201_practice_exam.pdf")
+    assert course_code_filename_penalty("CHM 201 practice exam", "file", same_course) == 0.0
+
+
+def test_browser_allowed_types_for_exam():
+    assert "event" in browser_allowed_types("browser", "exam")
 
 
 def test_enrich_catalog_entry_from_graph():

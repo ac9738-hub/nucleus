@@ -213,6 +213,7 @@ const BROWSER_POOL_LIMITS = {
   web: { activeMax: 4, backupCount: 2, maxSize: 6 },
   canvas: { activeMax: 4, backupCount: 2, maxSize: 6 }
 }
+const BROWSER_POOL_STARTUP_DELAY_MS = 3500
 const BROWSER_POOL_PROTECTED_RECENT = 2
 const CANVAS_PREDICTIVE_LINK_COUNT = 2
 const canvasPredictiveByTab = new Map()
@@ -754,6 +755,15 @@ class BrowserPool {
     await this.warm(window, "canvas", 2)
   }
 
+  // Deferred startup warm: one hidden view per pool type after a delay so the
+  // shell can paint before spinning up extra Chromium processes. Backups are
+  // filled on first tab open via newTab → ensureBackupSlots.
+  async loadDeferred(window, delayMs = BROWSER_POOL_STARTUP_DELAY_MS) {
+    await new Promise(resolve => setTimeout(resolve, delayMs))
+    await this.warm(window, "web", 1)
+    await this.warm(window, "canvas", 1)
+  }
+
   hideAllViews(window = mainwindow) {
     for (const type of ["web", "canvas"]) {
       for (const entry of this.inUse(type)) {
@@ -999,19 +1009,28 @@ const canvasBlankWarmUrl = "data:text/html;charset=utf-8," + encodeURIComponent(
   </html>
 `)
 
-const agent = createAgentProcess({
-  scriptPath: path.join(__dirname, 'sidekick.py'),
-  onText: text => {
-    BrowserWindow.getAllWindows()[0].webContents.send('prompt:response-chunk', text)
-  },
-  onDone: () => {
-    const window = BrowserWindow.getAllWindows()[0]
-    if (window && !window.webContents.isDestroyed()) {
-      window.webContents.send('prompt:response-done')
-    }
-  },
-  onToolCall: data => runfunction(data)
-})
+let agent = null
+
+function getAgent() {
+  if (agent) return agent
+  agent = createAgentProcess({
+    scriptPath: path.join(__dirname, 'sidekick.py'),
+    onText: text => {
+      const window = BrowserWindow.getAllWindows()[0]
+      if (window && !window.webContents.isDestroyed()) {
+        window.webContents.send('prompt:response-chunk', text)
+      }
+    },
+    onDone: () => {
+      const window = BrowserWindow.getAllWindows()[0]
+      if (window && !window.webContents.isDestroyed()) {
+        window.webContents.send('prompt:response-done')
+      }
+    },
+    onToolCall: data => runfunction(data)
+  })
+  return agent
+}
 
 const vectorRetrieval = (() => {
   let proc = null
@@ -1109,8 +1128,6 @@ const vectorRetrieval = (() => {
       proc = null
     })
   }
-
-  start()
 
   return {
     restart() {
@@ -1215,10 +1232,10 @@ async function senduserprompt(payload) {
     delete payloadObject.regionContext
     payloadObject.text = messageText
     logAppState('prompt-send')
-    agent.send(['message', payloadObject])
+    getAgent().send(['message', payloadObject])
     return
   }
-  agent.send(payload)
+  getAgent().send(payload)
 }
 
 
@@ -1639,7 +1656,13 @@ canvasApi = createCanvasApi({
   onCanvasTasks: (tasks, options) => addCanvasTasks(tasks, options)
 })
 
-addCanvasTasks(canvasApi.getCanvasTasksFromDisk(), { restartVector: false })
+setImmediate(() => {
+  try {
+    addCanvasTasks(canvasApi.getCanvasTasksFromDisk(), { restartVector: false })
+  } catch (error) {
+    console.error('Unable to load Canvas tasks from disk:', error)
+  }
+})
 
 // return the contents of a file
 function readInjectionCssFile(filename) {
@@ -5217,7 +5240,7 @@ async function coverCurrentCanvasNavigationWithSlate(window, view, navpromise, o
 }
 
 async function loadbrowserpool(window) {
-  await browserpool.load(window)
+  await browserpool.loadDeferred(window)
 }
 // ─────────────────────────────────────────────────────────────────────────────
 // APP LIFECYCLE

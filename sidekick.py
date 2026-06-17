@@ -13,7 +13,6 @@ from context_format import format_context_snapshot
 import json
 import sys
 import os
-import fitz
 import base64
 
 
@@ -21,19 +20,24 @@ load_dotenv()
 claude_client = Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
 deepseek_client = OpenAI(api_key = os.environ.get("DEEP_SEEK_API_KEY"), base_url="https://api.deepseek.com")
 
-hardcoded_syllabus = ""
 MAX_ATTACHMENT_TEXT_CHARS = 60000
 
+_hardcoded_syllabus_cache = None
 
-doc = fitz.open("NEU201 syllabus.pdf")
 
-pages = []
-for page in doc:
-    pages.append(page.get_text())
-
-hardcoded_syllabus = "\n".join(pages)
-
-doc.close()
+def get_hardcoded_syllabus():
+    global _hardcoded_syllabus_cache
+    if _hardcoded_syllabus_cache is not None:
+        return _hardcoded_syllabus_cache
+    try:
+        import fitz
+        doc = fitz.open("NEU201 syllabus.pdf")
+        pages = [page.get_text() for page in doc]
+        doc.close()
+        _hardcoded_syllabus_cache = "\n".join(pages)
+    except Exception:
+        _hardcoded_syllabus_cache = ""
+    return _hardcoded_syllabus_cache
 
 system_prompt = (
     "You are a helpful assistant for a student organization app called Nucleus. "
@@ -466,7 +470,7 @@ def runclaude(prompt):
     response = claude_client.messages.create(
         model="claude-sonnet-4-6",
         max_tokens=1000,
-        system=dynamic_system_prompt + "\nThis is the syllabus for NEU 201:" + hardcoded_syllabus,
+        system=dynamic_system_prompt + "\nThis is the syllabus for NEU 201:" + get_hardcoded_syllabus(),
         messages=model_messages,
         tools=tools,
         stream=True
@@ -557,6 +561,7 @@ def attachment_to_content_blocks(attachment):
 
     if kind == "document" and attachment.get("data") and media_type == "application/pdf":
         try:
+            import fitz
             pdf_bytes = base64.b64decode(attachment.get("data"))
             doc = fitz.open(stream=pdf_bytes, filetype="pdf")
             pages = [page.get_text() for page in doc]

@@ -758,16 +758,47 @@ function buildWeeklyScheduleViaPython(canvasData, rootDir) {
   return adaptPythonWeeklySchedule(JSON.parse(stdout), canvasData, rootDir)
 }
 
-function buildWeeklySchedule(canvasData, rootDir) {
-  try {
-    const pythonSchedule = buildWeeklyScheduleViaPython(canvasData, rootDir)
-    if (pythonSchedule && Object.keys(pythonSchedule).length) {
-      return pythonSchedule
-    }
-  } catch (error) {
-    console.error('Python weekly schedule build failed; falling back to JS:', error.message || error)
+function buildWeeklyScheduleViaPythonAsync(canvasData, rootDir) {
+  const graphPath = path.join(rootDir, 'canvas_graph.json')
+  const args = ['-m', 'canvas_parser.weekly', '--canvas-data', '-']
+  if (fs.existsSync(graphPath)) {
+    args.push('--graph', graphPath)
+  } else {
+    args.push('--no-graph')
   }
+  return new Promise((resolve, reject) => {
+    const proc = spawn('python', args, {
+      cwd: rootDir,
+      stdio: ['pipe', 'pipe', 'pipe'],
+      windowsHide: true
+    })
+    let stdout = ''
+    let stderr = ''
+    proc.stdout.on('data', chunk => { stdout += chunk.toString() })
+    proc.stderr.on('data', chunk => { stderr += chunk.toString() })
+    proc.on('error', reject)
+    proc.on('close', code => {
+      if (code !== 0) {
+        reject(new Error(stderr.trim() || stdout.trim() || `python weekly exited with code ${code}`))
+        return
+      }
+      const trimmed = stdout.trim()
+      if (!trimmed) {
+        resolve({})
+        return
+      }
+      try {
+        resolve(adaptPythonWeeklySchedule(JSON.parse(trimmed), canvasData, rootDir))
+      } catch (error) {
+        reject(error)
+      }
+    })
+    proc.stdin.write(JSON.stringify(canvasData))
+    proc.stdin.end()
+  })
+}
 
+function buildWeeklyScheduleJsFallback(canvasData, rootDir) {
   const graph = readCanvasGraphFromRoot(rootDir)
   const graphFiles = graph.files || {}
   const lookup = makeCanvasTaskLookup(rootDir)
@@ -783,6 +814,94 @@ function buildWeeklySchedule(canvasData, rootDir) {
       resolveWeeklyFile(graphFiles, courseId, fileId, canvasFiles)
     )
   })
+}
+
+const weeklyScheduleCache = {
+  key: '',
+  schedule: null,
+  buildPromise: null,
+  pendingKey: ''
+}
+
+function weeklyScheduleCacheKey(rootDir, canvasDataPath) {
+  const parts = []
+  try {
+    if (fs.existsSync(canvasDataPath)) {
+      parts.push(`d:${fs.statSync(canvasDataPath).mtimeMs}`)
+    }
+  } catch (_error) {}
+  const graphPath = path.join(rootDir, 'canvas_graph.json')
+  try {
+    if (fs.existsSync(graphPath)) {
+      parts.push(`g:${fs.statSync(graphPath).mtimeMs}`)
+    }
+  } catch (_error) {}
+  return parts.join(':')
+}
+
+function setWeeklyScheduleCache(rootDir, canvasDataPath, schedule) {
+  weeklyScheduleCache.key = weeklyScheduleCacheKey(rootDir, canvasDataPath)
+  weeklyScheduleCache.schedule = schedule
+  weeklyScheduleCache.buildPromise = null
+  weeklyScheduleCache.pendingKey = ''
+}
+
+function invalidateWeeklyScheduleCache() {
+  weeklyScheduleCache.key = ''
+  weeklyScheduleCache.schedule = null
+  weeklyScheduleCache.buildPromise = null
+  weeklyScheduleCache.pendingKey = ''
+}
+
+async function buildWeeklyScheduleAsync(canvasData, rootDir) {
+  try {
+    const pythonSchedule = await buildWeeklyScheduleViaPythonAsync(canvasData, rootDir)
+    if (pythonSchedule && Object.keys(pythonSchedule).length) {
+      return pythonSchedule
+    }
+  } catch (error) {
+    console.error('Python weekly schedule build failed; falling back to JS:', error.message || error)
+  }
+  return buildWeeklyScheduleJsFallback(canvasData, rootDir)
+}
+
+function scheduleWeeklyScheduleBuild(canvasData, rootDir, canvasDataPath, onReady) {
+  const key = weeklyScheduleCacheKey(rootDir, canvasDataPath)
+  if (weeklyScheduleCache.key === key && weeklyScheduleCache.schedule) {
+    return
+  }
+  if (weeklyScheduleCache.buildPromise && weeklyScheduleCache.pendingKey === key) {
+    return
+  }
+  weeklyScheduleCache.pendingKey = key
+  weeklyScheduleCache.buildPromise = buildWeeklyScheduleAsync(canvasData, rootDir)
+    .then(schedule => {
+      weeklyScheduleCache.key = key
+      weeklyScheduleCache.schedule = schedule
+      weeklyScheduleCache.buildPromise = null
+      weeklyScheduleCache.pendingKey = ''
+      if (typeof onReady === 'function') onReady()
+      return schedule
+    })
+    .catch(error => {
+      console.error('Unable to build weekly schedule:', error)
+      weeklyScheduleCache.buildPromise = null
+      weeklyScheduleCache.pendingKey = ''
+      weeklyScheduleCache.schedule = weeklyScheduleCache.schedule || {}
+    })
+}
+
+function buildWeeklySchedule(canvasData, rootDir) {
+  try {
+    const pythonSchedule = buildWeeklyScheduleViaPython(canvasData, rootDir)
+    if (pythonSchedule && Object.keys(pythonSchedule).length) {
+      return pythonSchedule
+    }
+  } catch (error) {
+    console.error('Python weekly schedule build failed; falling back to JS:', error.message || error)
+  }
+
+  return buildWeeklyScheduleJsFallback(canvasData, rootDir)
 }
 
 function make_canvas_tasks(rootDir) {
@@ -1012,7 +1131,13 @@ function createCanvasApi({ canvasDataPath, getAuthState, sendCanvasDataUpdate, r
       const raw = fs.readFileSync(canvasDataPath, 'utf8')
       if (!raw.trim()) return null
       const data = JSON.parse(raw)
-      data.weekly_schedule = buildWeeklySchedule(data, canvasRootDir)
+      const key = weeklyScheduleCacheKey(canvasRootDir, canvasDataPath)
+      if (weeklyScheduleCache.key === key && weeklyScheduleCache.schedule) {
+        data.weekly_schedule = weeklyScheduleCache.schedule
+      } else {
+        data.weekly_schedule = weeklyScheduleCache.schedule || {}
+        scheduleWeeklyScheduleBuild(data, canvasRootDir, canvasDataPath, sendCanvasDataUpdate)
+      }
       return data
     } catch (error) {
       console.error("Unable to read Canvas data:", error)
@@ -1525,6 +1650,7 @@ ${html}
     }
 
     canvasSetupInProgress = (async () => {
+    invalidateWeeklyScheduleCache()
     const authState = getAuthState()
     const { canvasAuthCookie, canvasBaseUrl } = authState
     if (!fs.existsSync(canvasDataPath)) {
@@ -1729,6 +1855,7 @@ ${html}
       delete data1.errors
     }
     data1.weekly_schedule = buildWeeklySchedule(data1, canvasRootDir)
+    setWeeklyScheduleCache(canvasRootDir, canvasDataPath, data1.weekly_schedule)
     try {
       const { syncGradescopeState } = require('../platforms/gradescope/sync')
       const gradescopeResult = await syncGradescopeState(data1)
