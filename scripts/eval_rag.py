@@ -22,11 +22,12 @@ GRAPH_PATH = ROOT / "canvas_graph.json"
 
 INTENT_EXPECTED_TYPES = {
     "deadline": {"event", "assignment", "syllabus"},
-    "exam": {"event", "syllabus", "file"},
+    "exam": {"event", "syllabus", "file", "concept"},
     "assignment": {"assignment", "file"},
     "practice": {"problem", "example", "file", "concept"},
     "concept": {"concept", "detail", "example", "file"},
     "syllabus": {"syllabus", "file", "event"},
+    "material": {"file", "assignment"},
     "general": {"assignment", "file", "concept", "event", "syllabus"},
 }
 

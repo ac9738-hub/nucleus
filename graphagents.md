@@ -295,7 +295,7 @@ Baseline observations from initial `RAG_ground_truth.json` (2026-06-16):
 1. ~~**Ship `scripts/eval_rag.py`**~~ — done (2026-06-16 iter 1).
 2. ~~**Embedding audit**~~ — done via `--audit-embeddings`; 0% non-assignment coverage documented.
 3. ~~**Intent → node-type priors**~~ — done in `vector_retreival.py`.
-4. **Event ingestion** — events exist in graph but unembedded and often undated; coordinate parser re-embed + `events.py` dating.
+4. ~~**Event ingestion / expansion**~~ — `coveredConcepts` restored + event→concept neighbors (iter 3); coordinate parser re-embed + `events.py` dating for undated events.
 5. ~~**Re-run GT + eval**~~ — eval run; GT still stale (assignment-only snapshot) — regenerate after re-embed.
 
 ### Out of scope for iteration 1
@@ -410,3 +410,102 @@ python scripts/eval_rag.py --audit-embeddings
 | `parser.py` | `update_assignment_embedded_fields()` bulk-embeds missing assignments (was no-op skip) |
 
 **After re-embed:** Regenerate `RAG_ground_truth.json` (`python scripts/build_rag_ground_truth.py`) and re-run `python scripts/eval_rag.py --production-cutoff`.
+
+### 2026-06-16 — Iteration 4 (retrieval-only)
+
+**Scope:** Fix course pool selection, production cutoff empty results, and intent/material routing — retrieval changes only in `vector_retreival.py`.
+
+**Eval command:** `python scripts/eval_rag.py --production-cutoff`
+
+| Metric | Iter 3 (prod) | Iter 4 (prod) | Δ |
+| ------ | ------------- | ------------- | --- |
+| recall@5 | 0.020 | **0.290** | +0.27 |
+| intent_match@5 | 0.300 | **1.000** | +0.70 |
+| empty_rate | 0.700 | **0.000** | −0.70 |
+
+**Root causes fixed:**
+
+1. **Wrong course pool:** Queries like `CHM 201 syllabus` searched Harvard `canvas_data.json` courses (CHNSE, ECON 1010) because graph-only Princeton courses had generic `Canvas {id}` names — course 15160 never entered the pool.
+2. **Course score ignored in ranking:** `course_similarity` was computed but not added to heap ordering.
+3. **Cutoff too strict:** Production semantic cutoff (0.45) dropped all results when semantic=0 but fuzzy+course match was strong — 70% empty rate.
+4. **File/slide queries misclassified:** `ECO 101 lecture slides` was `general` not file-oriented; new `material` intent routes to files.
+
+**Changes (`vector_retreival.py` only):**
+
+| Change | Detail |
+| ------ | ------ |
+| Graph course aliases | Extract `CHM201`/`MAT 201` codes from graph file names → enrich catalog `keyword_name` + `course_codes` |
+| Course-code pool | `select_course_search_pool` narrows to explicit code matches (`course_code` mode) |
+| Ranking | Include `course_similarity` in `combine_retrieval_scores`; syllabus `node_ranking_text` uses catalog keywords |
+| Cutoff | `passes_retrieval_cutoff` accepts strong course+fuzzy or combined score paths |
+| Intent | New `material` intent for slides/notes/audio/precept queries |
+
+**Tests:** `python -m pytest tests/test_vector_retrieval.py -q` — 15 passed.
+
+**Next:** Regenerate stale `RAG_ground_truth.json` (still assignment-only snapshot); tune recall once GT reflects file/event/syllabus results.
+
+### 2026-06-16 — Iteration 3 (post-embed retrieval)
+
+**Scope:** Fix event→concept expansion gap, browser syllabus ranking, week-number file matching.
+
+**Changes:** `coveredConcepts` restore, event→concept neighbors, browser syllabus expansion, week file boost (`vector_retreival.py` + tests).
+
+---
+
+## Reconciled pipeline (weekly + RAG)
+
+Both agents share one parser graph. Weekly iteration places snapshot items into week buckets; RAG ranks the same nodes for search and sidekick context.
+
+```
+Canvas LMS
+    ↓ fetch / fixtures
+snapshots_gt.json (+ enriched cache)     canvas_data.json
+    ↓ llm_parse.py batches               ↓ parser.py (same passes)
+graph_eval.json (weekly eval cache)      canvas_graph.json (production + RAG)
+    ↓ format.py + weekly.py              ↓ vector_retreival.py
+weekly schedule accuracy                 search / agent callContext
+```
+
+| Concern | Weekly (`AGENTS.md`) | RAG (`graphagents.md`) |
+| ------- | -------------------- | ---------------------- |
+| Primary metric | Week placement accuracy | intent_match@5, recall@5, empty_rate |
+| Baseline | **99.2%** aggregate | intent_match **1.0**, empty **0.0** (iter 4) |
+| Parser edits | `parser.py`, `llm_parse.py`, `events.py` | same files + embeddings |
+| Heuristic layer | `format.py` only | none (ranking in `vector_retreival.py`) |
+| Rebuild graph | `--refresh-graph` (~16 min) | `scripts/full_reparse.py` or `scripts/reembed_graph.py` |
+| Eval | `python -m canvas_parser.weekly_iteration --llm` | `python scripts/eval_rag.py --production-cutoff` |
+| Unit tests | `tests/test_weekly_iteration.py` | `tests/test_vector_retrieval.py` |
+
+**Do not** commit `canvas_graph.json` (gitignored). Regenerate locally after parser/embed changes.
+
+---
+
+## Next iteration (5)
+
+**RAG (priority):**
+
+1. Regenerate ground truth: `python scripts/build_rag_ground_truth.py` (needs `OPENAI_API_KEY`).
+2. Fix syllabus embedding — `syllabus.other` is empty; embed course name + homepage file text in `parser.py` / `reembed_graph.py`.
+3. Finish assignment embed pass (`python scripts/reembed_graph.py`) if coverage &lt; 100%.
+4. Tune practice-intent ranking so `problem` nodes surface for chemistry practice queries.
+5. Optional: human-judged relevance labels for true recall@5 (held-out query set).
+
+**Weekly (maintenance):**
+
+1. Re-run `python -m canvas_parser.weekly_iteration --llm` after graph refresh; confirm ≥97%.
+2. Remaining ~0.8% misses (ART102 Final Exam, ASA344 fieldtrip) need parser/syllabus extraction, not `format.py` literals.
+3. Enrich fixtures with `--enrich-pages` where `page_bodies` missing.
+
+**Shared infra:**
+
+```bash
+# Full graph rebuild from fixtures (parser + embed)
+python scripts/full_reparse.py          # or weekly: --llm --refresh-graph
+python scripts/dedupe_graph.py          # after reparse if duplicate details
+python scripts/reembed_graph.py       # fill missing embeddings
+
+# Eval both tracks
+python -m canvas_parser.weekly_iteration --llm
+python scripts/eval_rag.py --production-cutoff
+python -m pytest tests/test_weekly_iteration.py tests/test_vector_retrieval.py -q
+```

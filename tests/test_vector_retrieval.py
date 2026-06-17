@@ -7,10 +7,18 @@ if not hasattr(sys.stdin, "reconfigure"):
 
 from vector_retreival import (
     assignment_exam_like,
+    browser_allowed_types,
     browser_file_query_boost,
+    browser_syllabus_query_boost,
     classify_query_intent,
+    course_code_match_score,
+    enrich_catalog_entry_from_graph,
+    event_concept_neighbors,
+    extract_course_codes_from_query,
     intent_type_adjustment,
     node_ranking_text,
+    passes_retrieval_cutoff,
+    week_query_file_boost,
 )
 
 
@@ -53,3 +61,78 @@ def test_node_ranking_text_includes_type_phrase():
 def test_browser_file_boost():
     assert browser_file_query_boost("ECO 101 lecture slides", "file") > 0.0
     assert browser_file_query_boost("ECO 101 lecture slides", "assignment") == 0.0
+
+
+def test_browser_syllabus_boost():
+    assert browser_syllabus_query_boost("CHM 201 syllabus", "syllabus") > 0.0
+    assert browser_syllabus_query_boost("CHM 201 syllabus", "assignment") == 0.0
+
+
+def test_browser_allowed_types_for_syllabus():
+    assert "syllabus" in browser_allowed_types("browser", "syllabus")
+    assert "syllabus" not in browser_allowed_types("browser", "general")
+
+
+def test_week_query_file_boost():
+    file_node = DummyNode(name="Week 3 Lecture Slides.pdf")
+    assert week_query_file_boost("CHI 108 course slides for week 3", "file", file_node) > 0.0
+    other_file = DummyNode(name="Week 5 Lecture Slides.pdf")
+    assert week_query_file_boost("CHI 108 course slides for week 3", "file", other_file) == 0.0
+
+
+def test_event_concept_neighbors_resolves_covered_concepts(monkeypatch):
+    concept = DummyNode(conceptid="abc123", name="Eigenvalues", courseid="123")
+    import vector_retreival as vr
+
+    monkeypatch.setattr(vr, "allnodes", {"concepts": [concept]})
+    event = DummyNode(
+        courseid="123",
+        dependencies=[],
+        coveredConcepts=[{"name": "Eigenvalues", "conceptid": "abc123"}],
+    )
+    neighbors = event_concept_neighbors(event)
+    assert len(neighbors) == 1
+    assert neighbors[0][0] == "concept"
+    assert neighbors[0][1] is concept
+
+
+def test_extract_course_codes_from_query():
+    codes = extract_course_codes_from_query("CHM 201 syllabus")
+    assert "chm 201" in codes
+    assert "chm201" in codes
+
+
+def test_course_code_match_score():
+    entry = {
+        "name": "CHM201_F2024 General Chemistry I syllabus",
+        "keyword_name": "CHM201 general chemistry syllabus",
+        "course_codes": ["chm 201", "chm201"],
+    }
+    assert course_code_match_score("CHM 201 syllabus", entry) >= 0.95
+
+
+def test_classify_material_intent():
+    assert classify_query_intent("ECO 101 lecture slides") == "material"
+
+
+def test_passes_retrieval_cutoff_with_course_match():
+    node = DummyNode(name="Problem Set 1")
+    assert passes_retrieval_cutoff(
+        semantic_similarity=0.0,
+        fuzzy_similarity=0.3,
+        course_similarity=0.9,
+        intent="assignment",
+        nodetype="assignment",
+        node=node,
+    )
+
+
+def test_enrich_catalog_entry_from_graph():
+    file_node = DummyNode(name="CHM201_F2024 General Chemistry I syllabus.pdf")
+    nodes = {
+        "files": {"15160": {"f1": file_node}},
+        "syllabi": {"15160": DummyNode(other="")},
+    }
+    entry = enrich_catalog_entry_from_graph("15160", {"name": "Canvas 15160", "keyword_name": "canvas 15160"}, nodes)
+    assert "chm 201" in entry["course_codes"]
+    assert "CHM201" in entry["keyword_name"]

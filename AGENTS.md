@@ -417,3 +417,27 @@ Known course-specific rules still in `format.py` (candidates to generalize or re
 **Overfitting correction (same day):** Removed fieldtrip name synthesis (`YOUTH_DISPLACEMENT_PATTERN` + hardcoded event title) and take-home-midterm → final-exam +2w calendar guess. Post-removal eval: **99.2%** aggregate (ART102 98.3% Final Exam; ASA344 98.3% fieldtrip) — still ≥97%. Those two items require parser/syllabus-page extraction, not heuristic fabrication.
 
 **Next iteration:** Enrich GT fixtures with `page_bodies` for courses fetched without `--enrich-pages`; consider promoting linked PDF discovery into `fetch.py` so `files[]` is populated at snapshot time.
+
+---
+
+## RAG / search (parallel track)
+
+Retrieval quality is tracked separately in `graphagents.md`. Both tracks share the same parser graph and embedding pass.
+
+| Stage | Weekly bucketing | RAG retrieval |
+| ----- | ---------------- | ------------- |
+| Canvas snapshots | `fixtures/weekly_iteration/snapshots_gt.json` | `canvas_data.json` + on-disk PDFs |
+| Parser graph | `.cache/weekly_iteration/graph_eval.json` (eval cache) | `canvas_graph.json` (production) |
+| Downstream | `format.py` heuristics + `weekly.py` graph merge | `vector_retreival.py` → `main.js` → `sidekick.py` |
+| Eval | `python -m canvas_parser.weekly_iteration --llm` | `python scripts/eval_rag.py --production-cutoff` |
+| Tests | `tests/test_weekly_iteration.py` | `tests/test_vector_retrieval.py` |
+
+**Shared tooling (2026-06-16):**
+
+- `canvas_parser/weekly_iteration/llm_parse.py` — parser batches; `keep_graph=True` for full reparse
+- `scripts/reembed_graph.py` — batch-embed all node types in `canvas_graph.json`
+- `scripts/full_reparse.py` — rebuild graph from cached snapshots
+- `scripts/dedupe_graph.py` — collapse duplicate concept details after reparse
+- `scripts/build_rag_ground_truth.py` / `scripts/eval_rag.py` / `scripts/rag_query_audit.py` — RAG eval harness
+
+**RAG baseline (iter 4):** intent_match@5 **1.0**, empty_rate **0.0**, recall@5 **0.29** (GT stale — regenerate after graph refresh).

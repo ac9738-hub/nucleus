@@ -226,6 +226,7 @@ def run_parser_batches(
     auth: CanvasAuth,
     *,
     timeout_seconds: int = 2100,
+    keep_graph: bool = False,
 ) -> dict[str, Any]:
     if not batches:
         return {}
@@ -239,6 +240,7 @@ def run_parser_batches(
     env.update({
         'PYTHONIOENCODING': 'utf-8',
         'PYTHONUNBUFFERED': '1',
+        'PYTHONUTF8': '1',
         'CANVAS_AUTH_COOKIE': auth.cookie,
         'CANVAS_AUTH_CSRF': auth.csrf,
         'CANVAS_BASE_URL': auth.base_url,
@@ -262,7 +264,10 @@ def run_parser_batches(
 
     def _watch_stdout() -> None:
         for line in proc.stdout:
-            sys.stdout.write(line)
+            try:
+                sys.stdout.write(line)
+            except UnicodeEncodeError:
+                sys.stdout.buffer.write(line.encode('utf-8', errors='replace'))
             if PARSER_DONE_MARKER in line:
                 done.set()
                 break
@@ -293,7 +298,10 @@ def run_parser_batches(
         return {}
 
     graph = json.loads(graph_path.read_text(encoding='utf-8'))
-    _restore_graph(root_dir, backup_path)
+    if not keep_graph:
+        _restore_graph(root_dir, backup_path)
+    elif backup_path and backup_path.is_file():
+        backup_path.unlink(missing_ok=True)
     return graph
 
 
