@@ -17,6 +17,7 @@ from vector_retreival import (
     enrich_catalog_entry_from_graph,
     event_concept_neighbors,
     extract_course_codes_from_query,
+    file_is_primary_pset_solution,
     intent_type_adjustment,
     node_ranking_text,
     passes_retrieval_cutoff,
@@ -157,6 +158,27 @@ def test_course_code_filename_penalty():
 
 def test_browser_allowed_types_for_exam():
     assert "event" in browser_allowed_types("browser", "exam")
+
+
+def test_file_is_primary_pset_solution():
+    assert file_is_primary_pset_solution("MAT202-PSET-1Solutions.pdf", "MAT 202 linear algebra pset")
+    assert file_is_primary_pset_solution("MAT202F2025_PSET1_Solutions.pdf", "MAT 202 linear algebra pset")
+    assert not file_is_primary_pset_solution("MAT202F2025_PSET11_Solutions.PDF", "MAT 202 linear algebra pset")
+    assert not file_is_primary_pset_solution("MAT202F2025_PSET2_Solution.pdf", "MAT 202 linear algebra pset")
+
+
+def test_drop_slot_protects_top_homework():
+    from vector_retreival import drop_slot_for_promotion
+
+    top = [
+        {"type": "assignment", "node": DummyNode(name="Homework 1"), "similarity": 3.9},
+        {"type": "assignment", "node": DummyNode(name="Homework 3"), "similarity": 3.8},
+        {"type": "assignment", "node": DummyNode(name="Final Exam"), "similarity": 3.7},
+    ]
+    kept = drop_slot_for_promotion(top, "What ECO 101 homework is due soon?", "deadline")
+    names = [getattr(item["node"], "name", "") for item in kept]
+    assert "Homework 1" in names
+    assert len(kept) == 2
 
 
 def test_enrich_catalog_entry_from_graph():

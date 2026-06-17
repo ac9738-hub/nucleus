@@ -258,11 +258,24 @@ def main() -> None:
         action="store_true",
         help="Capture live results with cutoff disabled (legacy full-rank snapshot)",
     )
+    parser.add_argument(
+        "--holdout",
+        action="store_true",
+        help="Build RAG_holdout_ground_truth.json from HOLDOUT_QUERY_SPECS",
+    )
     args = parser.parse_args()
     production_cutoff = not args.no_production_cutoff
 
-    search_queries = [build_entry(spec, production_cutoff=production_cutoff) for spec in QUERY_SPECS if spec["mode"] == "browser"]
-    agent_queries = [build_entry(spec, production_cutoff=production_cutoff) for spec in QUERY_SPECS if spec["mode"] == "agent"]
+    specs = QUERY_SPECS
+    out_path = ROOT / "RAG_ground_truth.json"
+    if args.holdout:
+        from scripts.rag_holdout_specs import HOLDOUT_QUERY_SPECS
+
+        specs = HOLDOUT_QUERY_SPECS
+        out_path = ROOT / "RAG_holdout_ground_truth.json"
+
+    search_queries = [build_entry(spec, production_cutoff=production_cutoff) for spec in specs if spec["mode"] == "browser"]
+    agent_queries = [build_entry(spec, production_cutoff=production_cutoff) for spec in specs if spec["mode"] == "agent"]
 
     output: dict = {
         "version": 2,
@@ -272,6 +285,7 @@ def main() -> None:
             "Human-judged expected nodes per query plus live retrieval snapshot. "
             "Search queries use browser mode; agent queries use agent mode. "
             f"Live results captured with production_cutoff={production_cutoff}."
+            + (" Held-out set — not in QUERY_SPECS." if args.holdout else "")
         ),
         "retrieval_modes": {
             "search": "browser",
@@ -281,7 +295,6 @@ def main() -> None:
         "agent_queries": agent_queries,
     }
 
-    out_path = ROOT / "RAG_ground_truth.json"
     out_path.write_text(json.dumps(output, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"Wrote {out_path} ({len(search_queries)} search + {len(agent_queries)} agent)", flush=True)
 

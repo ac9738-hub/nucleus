@@ -429,7 +429,7 @@ Retrieval quality is tracked separately in `graphagents.md`. Both tracks share t
 | Canvas snapshots | `fixtures/weekly_iteration/snapshots_gt.json` | `canvas_data.json` + on-disk PDFs |
 | Parser graph | `.cache/weekly_iteration/graph_eval.json` (eval cache) | `canvas_graph.json` (production) |
 | Downstream | `format.py` heuristics + `weekly.py` graph merge | `vector_retreival.py` → `main.js` → `sidekick.py` |
-| Eval | `python -m canvas_parser.weekly_iteration --llm` | `python scripts/eval_rag.py --production-cutoff` |
+| Eval | `python -m canvas_parser.weekly_iteration --llm` | `python scripts/eval_rag.py --all --production-cutoff` |
 | Tests | `tests/test_weekly_iteration.py` | `tests/test_vector_retrieval.py` |
 
 **Shared tooling (2026-06-16):**
@@ -439,5 +439,32 @@ Retrieval quality is tracked separately in `graphagents.md`. Both tracks share t
 - `scripts/full_reparse.py` — rebuild graph from cached snapshots
 - `scripts/dedupe_graph.py` — collapse duplicate concept details after reparse
 - `scripts/build_rag_ground_truth.py` / `scripts/eval_rag.py` / `scripts/rag_query_audit.py` — RAG eval harness
+- `scripts/rag_holdout_specs.py` — held-out query specs (not in training `QUERY_SPECS`)
 
-**RAG baseline (iter 5):** recall@5 **0.675**, intent_match **1.0**, empty **0.0** (v2 GT, production cutoff).
+**RAG ground truth:**
+
+| Artifact | Location | Notes |
+| -------- | -------- | ----- |
+| In-sample GT | `RAG_ground_truth.json` | 20 queries, v2 schema with `expected` nodes |
+| Holdout GT | `RAG_holdout_ground_truth.json` | 10 queries on COS 217, ART 102, STAT 104, NEU 201, ECON 10B, CHI 103 |
+
+```bash
+# Regenerate GT snapshots (needs OPENAI_API_KEY + canvas_graph.json)
+python scripts/build_rag_ground_truth.py
+python scripts/build_rag_ground_truth.py --holdout
+
+# Eval with production semantic cutoff
+python scripts/eval_rag.py --production-cutoff          # in-sample only
+python scripts/eval_rag.py --holdout --production-cutoff
+python scripts/eval_rag.py --all --production-cutoff    # in-sample + holdout + combined
+```
+
+**RAG baseline (iter 8–9, production cutoff):**
+
+| Set | recall@5 | nDCG@5 | intent_match@5 |
+| --- | -------- | ------ | -------------- |
+| In-sample (20) | **1.000** | 0.927 | **1.000** |
+| Holdout (10) | **0.950** | 0.767 | **1.000** |
+| Combined (30) | **0.983** | 0.874 | **1.000** |
+
+Full iteration log: `graphagents.md`. Do not commit `canvas_graph.json` (gitignored).

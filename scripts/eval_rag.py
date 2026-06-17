@@ -18,6 +18,7 @@ from vector_retreival import (  # noqa: E402
 )
 
 GT_PATH = ROOT / "RAG_ground_truth.json"
+HOLDOUT_GT_PATH = ROOT / "RAG_holdout_ground_truth.json"
 GRAPH_PATH = ROOT / "canvas_graph.json"
 
 INTENT_EXPECTED_TYPES = {
@@ -87,6 +88,19 @@ def print_embedding_audit() -> None:
 
 def load_ground_truth(path: Path = GT_PATH) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def load_query_rows(gt: dict) -> list[dict]:
+    rows = []
+    for section in ("search_queries", "agent_queries"):
+        for entry in gt.get(section, []) or []:
+            rows.append(entry)
+    return rows
+
+
+def evaluate_ground_truth(gt: dict, k: int, production_cutoff: bool) -> tuple[list[dict], dict]:
+    rows = [evaluate_query(entry, k, production_cutoff) for entry in load_query_rows(gt)]
+    return rows, aggregate(rows)
 
 
 def result_id(item: dict) -> str:
@@ -221,6 +235,16 @@ def main() -> None:
     )
     parser.add_argument("--json", action="store_true", help="Print full JSON report")
     parser.add_argument(
+        "--holdout",
+        action="store_true",
+        help="Evaluate held-out queries from RAG_holdout_ground_truth.json",
+    )
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        help="Evaluate in-sample GT and holdout GT (separate summaries)",
+    )
+    parser.add_argument(
         "--audit-embeddings",
         action="store_true",
         help="Print embedding coverage from canvas_graph.json and exit",
@@ -231,38 +255,57 @@ def main() -> None:
         print_embedding_audit()
         return
 
-    gt = load_ground_truth()
-    rows = []
-    for section in ("search_queries", "agent_queries"):
-        for entry in gt.get(section, []) or []:
-            rows.append(evaluate_query(entry, args.k, args.production_cutoff))
+    def print_summary(label: str, summary: dict, rows: list[dict]) -> None:
+        print(f"\n{label} (k={args.k}, production_cutoff={args.production_cutoff})")
+        print(f"  recall@{args.k}:        {summary['recall_at_k']:.3f}")
+        print(f"  nDCG@{args.k}:          {summary['ndcg_at_k']:.3f}")
+        print(f"  intent_match@{args.k}:  {summary['intent_match_at_k']:.3f}")
+        print(f"  empty_rate:             {summary['empty_rate']:.3f}")
+        print("\nPer query:")
+        for row in rows:
+            status = "EMPTY" if row["empty"] else "ok"
+            print(
+                f"  [{status}] {row['mode']:7s} intent={row['intent']:9s} "
+                f"recall={row['recall_at_k']:.2f} intent_match={row['intent_match_at_k']:.0f} "
+                f"{row['query']!r}"
+            )
 
-    summary = aggregate(rows)
+    if args.all:
+        in_gt = load_ground_truth(GT_PATH)
+        in_rows, in_summary = evaluate_ground_truth(in_gt, args.k, args.production_cutoff)
+        if not HOLDOUT_GT_PATH.exists():
+            print(f"Missing {HOLDOUT_GT_PATH}; run: python scripts/build_rag_ground_truth.py --holdout")
+            sys.exit(1)
+        hold_gt = load_ground_truth(HOLDOUT_GT_PATH)
+        hold_rows, hold_summary = evaluate_ground_truth(hold_gt, args.k, args.production_cutoff)
+        print_summary("In-sample GT (20 queries)", in_summary, in_rows)
+        print_summary("Holdout GT (10 queries)", hold_summary, hold_rows)
+        combined = aggregate(in_rows + hold_rows)
+        print(f"\nCombined (n={combined['queries']})")
+        print(f"  recall@{args.k}:        {combined['recall_at_k']:.3f}")
+        print(f"  nDCG@{args.k}:          {combined['ndcg_at_k']:.3f}")
+        print(f"  intent_match@{args.k}:  {combined['intent_match_at_k']:.3f}")
+        if args.json:
+            print(json.dumps({
+                "in_sample": {"summary": in_summary, "queries": in_rows},
+                "holdout": {"summary": hold_summary, "queries": hold_rows},
+                "combined": combined,
+            }, ensure_ascii=False, indent=2))
+        return
+
+    gt_path = HOLDOUT_GT_PATH if args.holdout else GT_PATH
+    if not gt_path.exists():
+        print(f"Missing {gt_path}")
+        sys.exit(1)
+    gt = load_ground_truth(gt_path)
+    rows, summary = evaluate_ground_truth(gt, args.k, args.production_cutoff)
+
     if args.json:
         print(json.dumps({"summary": summary, "queries": rows}, ensure_ascii=False, indent=2))
         return
 
-    print(f"RAG eval (k={args.k}, production_cutoff={args.production_cutoff})")
-    print(f"  recall@{args.k}:        {summary['recall_at_k']:.3f}")
-    print(f"  nDCG@{args.k}:          {summary['ndcg_at_k']:.3f}")
-    print(f"  intent_match@{args.k}:  {summary['intent_match_at_k']:.3f}")
-    print(f"  empty_rate:             {summary['empty_rate']:.3f}")
-    print("\nBy intent:")
-    for intent, stats in summary["by_intent"].items():
-        print(
-            f"  {intent:12s} n={stats['count']} "
-            f"intent_match={stats['intent_match_at_k']:.2f} empty={stats['empty_rate']:.2f}"
-        )
-    print("\nPer query:")
-    for row in rows:
-        status = "EMPTY" if row["empty"] else "ok"
-        print(
-            f"  [{status}] {row['mode']:7s} intent={row['intent']:9s} "
-            f"recall={row['recall_at_k']:.2f} intent_match={row['intent_match_at_k']:.0f} "
-            f"{row['query']!r}"
-        )
-        if row["live_types"] != row["gt_types"]:
-            print(f"           types live={row['live_types']} gt={row['gt_types']}")
+    label = "Holdout GT" if args.holdout else "In-sample GT"
+    print_summary(label, summary, rows)
 
 
 if __name__ == "__main__":

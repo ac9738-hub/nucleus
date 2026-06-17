@@ -225,6 +225,18 @@ These apply to **all** graph and retrieval changes. Violations invalidate the it
 
 When in doubt, ask: **would this rule help a new course and a new query with the same intent?** If no, reject it.
 
+### Held-out eval set (iteration 9)
+
+In-sample `QUERY_SPECS` (20 queries) must not be the only scorecard. Held-out specs live in `scripts/rag_holdout_specs.py` (10 queries, different courses/phrasing — COS 217, ART 102, STAT 104, NEU 201, ECON 10B, CHI 103).
+
+```bash
+python scripts/build_rag_ground_truth.py --holdout   # → RAG_holdout_ground_truth.json
+python scripts/eval_rag.py --all --production-cutoff # in-sample + holdout + combined
+python scripts/eval_rag.py --holdout --production-cutoff
+```
+
+Target: holdout recall@5 ≥ **0.95** without adding QUERY_SPECS literals to production code.
+
 ---
 
 ## Cloud agent setup
@@ -504,11 +516,11 @@ weekly schedule accuracy                 search / agent callContext
 | Concern         | Weekly (`AGENTS.md`)                             | RAG (`graphagents.md`)                                  |
 | --------------- | ------------------------------------------------ | ------------------------------------------------------- |
 | Primary metric  | Week placement accuracy                          | intent_match@5, recall@5, empty_rate                    |
-| Baseline        | **99.2%** aggregate                              | recall **0.867**, intent_match **0.95**, empty **0.0** (iter 7) |
+| Baseline        | **99.2%** aggregate                              | recall **1.000** in-sample / **0.950** holdout (iter 8–9) |
 | Parser edits    | `parser.py`, `llm_parse.py`, `events.py`         | same files + embeddings                                 |
 | Heuristic layer | `format.py` only                                 | none (ranking in `vector_retreival.py`)                 |
 | Rebuild graph   | `--refresh-graph` (~16 min)                      | `scripts/full_reparse.py` or `scripts/reembed_graph.py` |
-| Eval            | `python -m canvas_parser.weekly_iteration --llm` | `python scripts/eval_rag.py --production-cutoff`        |
+| Eval            | `python -m canvas_parser.weekly_iteration --llm` | `python scripts/eval_rag.py --all --production-cutoff`  |
 | Unit tests      | `tests/test_weekly_iteration.py`                 | `tests/test_vector_retrieval.py`                        |
 
 
@@ -614,24 +626,85 @@ weekly schedule accuracy                 search / agent callContext
 
 ---
 
-## Next iteration (8)
+### 2026-06-16 — Iteration 8 (fallback injection + type diversity)
+
+**Scope:** Close remaining 0.50–0.67 recall gaps — homepage/syllabus in top-5, PSET-1 solution PDF, exam event/file diversity for practice-exam browser queries.
+
+**Root causes fixed:**
+
+1. **Promotion guard (`len(results) <= k`):** Slot promotion never ran when expand returned exactly k results.
+2. **Injected score too low:** Graph-injected files/syllabi scored ~0 and were re-sorted out of top-5; `injected_result_score` now anchors to the current top-k max.
+3. **Wrong PSET file match:** `pset1` substring matched `pset11`; fixed with `(?!\d)` boundary + tiebreak for `PSET-1Solutions` filenames.
+4. **Low-score file from tail:** Promotion picked a weak file from `results[k:]`, skipped graph lookup, then re-sort dropped it — unified `consider_file_candidate` always compares graph + tail.
+5. **Syllabus/homework & exam diversity:** `promote_agent_syllabus`, `promote_agent_exam_event`, `diversify_browser_exam_results` inject course-scoped nodes; lab-exam assignments penalized on practice-exam queries.
+
+**Changes (`vector_retreival.py` + tests):**
+
+| Change | Detail |
+| ------ | ------ |
+| Syllabus text | `syllabus_homepage_text` enriches empty `syllabus.other` ranking text |
+| Homepage ranking | Course homepage files get catalog keywords + solutions-query boost (+0.62) |
+| PSET solution | `file_is_primary_pset_solution`, `pset_solution_file_tiebreak`, graph inject for browser pset queries |
+| Promotion | `drop_slot_for_promotion`, `injected_result_score`, `finalize_retrieval_results` pipeline |
+| Penalties | `assignment_final_draft_noise` demotes lab-report/lab-exam assignments on exam queries |
+
+**Eval:** `python -m pytest tests/test_vector_retrieval.py -q && python scripts/eval_rag.py --production-cutoff`
+
+| Metric | Iter 7 | Iter 8 | Δ |
+| ------ | ------ | ------ | --- |
+| recall@5 | 0.867 | **1.000** | +0.133 |
+| nDCG@5 | 0.801 | **0.927** | +0.126 |
+| intent_match@5 | 0.950 | **1.000** | +0.050 |
+| empty_rate | 0.000 | **0.000** | — |
+
+**All 20/20 queries at recall 1.00** (including MAT 202 pset, CHM 201 practice exam, ECO homework due).
+
+**Tests:** 21 passed (`tests/test_vector_retrieval.py`).
+
+---
+
+### 2026-06-16 — Iteration 9 (holdout eval + overfit mitigation)
+
+**Scope:** Add held-out query set; generalize homework slot protection; re-run in-sample + holdout eval.
+
+**Overfit mitigations:**
+
+| Change | Detail |
+| ------ | ------ |
+| Holdout GT | `scripts/rag_holdout_specs.py` — 10 queries on COS 217, ART 102, STAT 104, NEU 201, ECON 10B, CHI 103 (not in `QUERY_SPECS`) |
+| Eval | `eval_rag.py --holdout` and `--all` for separate in-sample / holdout / combined reports |
+| Homework promotion | `drop_slot_for_promotion` protects top-scoring homework (or explicit number from query), not literal `Homework 1` |
+
+**Eval:** `python scripts/build_rag_ground_truth.py --holdout && python scripts/eval_rag.py --all --production-cutoff`
+
+| Set | recall@5 | nDCG@5 | intent_match@5 |
+| --- | -------- | ------ | -------------- |
+| In-sample (20) | **1.000** | 0.927 | **1.000** |
+| Holdout (10) | **0.950** | 0.767 | **1.000** |
+| Combined (30) | **0.983** | 0.874 | **1.000** |
+
+**Holdout miss:** CHI 103 week 2 materials (0.50) — Week 2 assignment or homepage not both in top-5.
+
+**Overfit review:** No GT literals/IDs in production code. Promotion pipeline generalizes to holdout ≥0.95.
+
+**Tests:** 22 passed (`tests/test_vector_retrieval.py`).
+
+---
+
+## Next iteration (10)
 
 **RAG (priority):**
 
-1. **Browser mixed-type balance:** CHM 201 practice exam — diversify top-5 to include exam event + practice PDF alongside exam assignments (without losing recall).
-2. **Homepage/syllabus in top-5:** MAT 201 pset solutions, ECO homework — boost course homepage/syllabus when query mentions solutions/homework but no dedicated file ranks high.
-3. **PSET solution PDFs:** MAT 202 `MAT202-PSET-1Solutions.pdf` — verify in graph; boost `-PSET-N-Solution` filename pattern.
-4. Syllabus embedding fix (`syllabus.other` empty → homepage filename text).
-5. Held-out query set (5+5) not in `QUERY_SPECS`.
-
-**Weekly (maintenance):** Re-run weekly eval ≥97%; parser fixes for ART102 Final Exam + ASA344 fieldtrip.
+1. **CHI 103 week 2 holdout miss** — week-number assignment + homepage promotion (general week pattern).
+2. **Parser/graph upstream:** Syllabus embedding pass in `parser.py`.
+3. **Expand holdout** to 15+15 as more courses enter the graph.
+4. **Production validation:** Spot-check live search + sidekick on real student queries.
 
 **Commands:**
 
 ```bash
-python scripts/build_rag_ground_truth.py
-python scripts/eval_rag.py --production-cutoff
-python -m canvas_parser.weekly_iteration --llm
-python -m pytest tests/test_weekly_iteration.py tests/test_vector_retrieval.py -q
+python scripts/build_rag_ground_truth.py --holdout
+python scripts/eval_rag.py --all --production-cutoff
+python -m pytest tests/test_vector_retrieval.py -q
 ```
 
