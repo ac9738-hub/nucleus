@@ -12,6 +12,22 @@ const FORBIDDEN_LITERAL_PATTERNS = [
 ]
 
 function shiftIsoDate(value, dayOffset) {
+  if (typeof value === 'string') {
+    const match = value.match(/^(\d{4})-(\d{2})-(\d{2})(.*)$/)
+    if (match) {
+      const shifted = new Date(Date.UTC(
+        Number(match[1]),
+        Number(match[2]) - 1,
+        Number(match[3])
+      ))
+      shifted.setUTCDate(shifted.getUTCDate() + dayOffset)
+      const year = shifted.getUTCFullYear()
+      const month = String(shifted.getUTCMonth() + 1).padStart(2, '0')
+      const day = String(shifted.getUTCDate()).padStart(2, '0')
+      return `${year}-${month}-${day}${match[4]}`
+    }
+  }
+
   const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) return value
   parsed.setDate(parsed.getDate() + dayOffset)
