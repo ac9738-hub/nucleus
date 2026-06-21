@@ -62,6 +62,35 @@ function parseDate(value) {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
+function parseExplicitOffsetDay(value) {
+  if (typeof value !== "string") return null;
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})T.*[+-]\d{2}:\d{2}$/);
+  if (!match) return null;
+  return {
+    year: Number(match[1]),
+    monthIndex: Number(match[2]) - 1,
+    day: Number(match[3])
+  };
+}
+
+function localDayParts(value) {
+  const explicit = parseExplicitOffsetDay(value);
+  if (explicit) return explicit;
+
+  const date = parseDate(value);
+  if (!date) return null;
+  return {
+    year: date.getFullYear(),
+    monthIndex: date.getMonth(),
+    day: date.getDate()
+  };
+}
+
+function dayOrdinal(parts) {
+  const msPerDay = 24 * 60 * 60 * 1000;
+  return Math.floor(Date.UTC(parts.year, parts.monthIndex, parts.day) / msPerDay);
+}
+
 function resolveReferenceDay(referenceDate) {
   if (referenceDate instanceof Date && !Number.isNaN(referenceDate.getTime())) {
     return new Date(referenceDate.getFullYear(), referenceDate.getMonth(), referenceDate.getDate());
@@ -75,13 +104,13 @@ function startOfToday() {
 }
 
 function daysUntilDue(dueDate, referenceDate) {
-  const date = parseDate(dueDate);
-  if (!date) return 0;
+  const dueParts = localDayParts(dueDate);
+  if (!dueParts) return 0;
 
-  const dueDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  const refDay = resolveReferenceDay(referenceDate);
-  const msPerDay = 24 * 60 * 60 * 1000;
-  return Math.max(Math.ceil((dueDay - refDay) / msPerDay), 0);
+  const refParts = localDayParts(referenceDate) || localDayParts(resolveReferenceDay(referenceDate));
+  if (!refParts) return 0;
+
+  return Math.max(dayOrdinal(dueParts) - dayOrdinal(refParts), 0);
 }
 
 function getGradeWeight(task) {
