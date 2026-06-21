@@ -9,6 +9,7 @@ __pycache__/
 
 # Local/generated Canvas and browser data
 settings.json
+study_progress.json
 llm_context_log.jsonl
 assignmenthtml.json
 canvas_data.json

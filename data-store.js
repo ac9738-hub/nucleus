@@ -2,8 +2,100 @@
 // Functionality: owns renderer-visible workspaces/tasks and merges Canvas project
 // groups into snapshots sent over IPC.
 // Dependencies: main.js supplies renderer emitters and Canvas data/project readers.
-const { resolveStudySections, markStudySectionComplete } = require('./study-sections')
-function createDataStore({ sendToRenderer, getCanvasProjectGroups, readCanvasData }) {
+const {
+  resolveStudySections,
+  getStudyProgressStats,
+  markStudySectionComplete
+} = require('./study-sections')
+
+function normalizeStudyProgress(progress) {
+  if (!progress || typeof progress !== 'object') {
+    return null
+  }
+
+  const completedSectionIds = Array.from(new Set(
+    (Array.isArray(progress.completedSectionIds) ? progress.completedSectionIds : [])
+      .map(value => String(value))
+      .filter(Boolean)
+  ))
+  const updatedAt = progress.updatedAt ? String(progress.updatedAt) : null
+
+  return completedSectionIds.length || updatedAt
+    ? { completedSectionIds, updatedAt }
+    : null
+}
+
+function latestStudyProgressTimestamp(progresses) {
+  let latest = null
+  let latestMs = Number.NEGATIVE_INFINITY
+  progresses.forEach(progress => {
+    if (!progress || !progress.updatedAt) return
+    const timestamp = Date.parse(progress.updatedAt)
+    if (!Number.isNaN(timestamp) && timestamp > latestMs) {
+      latestMs = timestamp
+      latest = progress.updatedAt
+    }
+  })
+  return latest
+}
+
+function mergeStudyProgress(...progresses) {
+  const normalized = progresses
+    .map(normalizeStudyProgress)
+    .filter(Boolean)
+  if (!normalized.length) {
+    return null
+  }
+
+  const completedSectionIds = Array.from(new Set(
+    normalized.flatMap(progress => progress.completedSectionIds || [])
+  ))
+  return {
+    completedSectionIds,
+    updatedAt: latestStudyProgressTimestamp(normalized)
+  }
+}
+
+function isDoneStatus(status) {
+  const value = String(status || '').toLowerCase()
+  return value === 'done' || value === 'complete' || value === 'completed'
+}
+
+function applyStudyProgress(taskData, existingTask, storedProgress) {
+  const mergedProgress = mergeStudyProgress(
+    taskData.studyProgress,
+    storedProgress,
+    existingTask && existingTask.studyProgress
+  )
+  if (!mergedProgress) {
+    return
+  }
+
+  taskData.studyProgress = mergedProgress
+  if (Array.isArray(taskData.studySections) && taskData.studySections.length) {
+    taskData.studySections = resolveStudySections(taskData)
+    taskData.studyProgress = {
+      completedSectionIds: taskData.studySections
+        .filter(section => section.status === 'done')
+        .map(section => String(section.id)),
+      updatedAt: mergedProgress.updatedAt
+    }
+
+    if (getStudyProgressStats(taskData).isComplete) {
+      taskData.status = 'done'
+    } else if (existingTask && isDoneStatus(existingTask.status)) {
+      taskData.status = 'not_started'
+    }
+  }
+}
+
+function createDataStore({
+  sendToRenderer,
+  getCanvasProjectGroups,
+  readCanvasData,
+  getStudyProgress = () => null,
+  onStudyProgressUpdated = () => {}
+}) {
   const workspaces = [
     { id: "nucleus",          name: "Nucleus",          description: "Your main planning workspace." },
     { id: "biology",          name: "Biology",           description: "Labs, readings, and course projects." },
@@ -153,6 +245,7 @@ function createDataStore({ sendToRenderer, getCanvasProjectGroups, readCanvasDat
       urls,
       ...metadata
     }
+    applyStudyProgress(taskData, existing, getStudyProgress(taskId))
     if (existing) {
       const preservedWorkspaceId = existing.workspaceId || "";
       Object.assign(existing, taskData)
@@ -214,6 +307,7 @@ function createDataStore({ sendToRenderer, getCanvasProjectGroups, readCanvasDat
 
     task.studySections = result.sections
     task.studyProgress = result.studyProgress
+    onStudyProgressUpdated(task.id, task.studyProgress)
     if (result.isComplete) {
       task.status = 'done'
     } else if (normalizeStudyTaskStatus(task.status) === 'done') {

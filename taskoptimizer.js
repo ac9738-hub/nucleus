@@ -2,7 +2,24 @@
 // Functionality: scores tasks from due date, grade weight, effort, dependencies,
 // and task type; renderer/render.js uses it to order task cards.
 // Dependencies: browser global window.TaskOptimizer or CommonJS module export.
-const StudySections = require('./study-sections');
+(function(root, factory) {
+  const api = factory(
+    typeof require === "function"
+      ? require("./study-sections")
+      : root && root.StudySections
+  );
+
+  if (typeof module !== "undefined" && module.exports) {
+    module.exports = api;
+  }
+  if (root && typeof window !== "undefined") {
+    root.TaskOptimizer = api;
+  }
+})(
+  typeof window !== "undefined"
+    ? window
+    : (typeof globalThis !== "undefined" ? globalThis : null),
+  function(StudySections) {
 const Config = {
   K_BASE: 0.25,
   K_SCALE: 0.80,
@@ -45,6 +62,35 @@ function parseDate(value) {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
+function parseCalendarStringDay(value) {
+  if (typeof value !== "string") return null;
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})(?:$|T.*[+-]\d{2}:\d{2}$)/);
+  if (!match) return null;
+  return {
+    year: Number(match[1]),
+    monthIndex: Number(match[2]) - 1,
+    day: Number(match[3])
+  };
+}
+
+function localDayParts(value) {
+  const calendar = parseCalendarStringDay(value);
+  if (calendar) return calendar;
+
+  const date = parseDate(value);
+  if (!date) return null;
+  return {
+    year: date.getFullYear(),
+    monthIndex: date.getMonth(),
+    day: date.getDate()
+  };
+}
+
+function dayOrdinal(parts) {
+  const msPerDay = 24 * 60 * 60 * 1000;
+  return Math.floor(Date.UTC(parts.year, parts.monthIndex, parts.day) / msPerDay);
+}
+
 function resolveReferenceDay(referenceDate) {
   if (referenceDate instanceof Date && !Number.isNaN(referenceDate.getTime())) {
     return new Date(referenceDate.getFullYear(), referenceDate.getMonth(), referenceDate.getDate());
@@ -58,13 +104,19 @@ function startOfToday() {
 }
 
 function daysUntilDue(dueDate, referenceDate) {
-  const date = parseDate(dueDate);
-  if (!date) return 0;
+  const dueCalendarParts = parseCalendarStringDay(dueDate);
+  if (dueCalendarParts) {
+    const refParts = localDayParts(referenceDate) || localDayParts(resolveReferenceDay(referenceDate));
+    if (!refParts) return 0;
+    return Math.max(dayOrdinal(dueCalendarParts) - dayOrdinal(refParts), 0);
+  }
 
-  const dueDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  const refDay = resolveReferenceDay(referenceDate);
+  const due = parseDate(dueDate);
+  if (!due) return 0;
+
+  const ref = parseDate(referenceDate) || resolveReferenceDay(referenceDate);
   const msPerDay = 24 * 60 * 60 * 1000;
-  return Math.max(Math.ceil((dueDay - refDay) / msPerDay), 0);
+  return Math.max(Math.floor((due - ref) / msPerDay), 0);
 }
 
 function getGradeWeight(task) {
@@ -348,10 +400,5 @@ const TaskOptimizer = {
   orderTasks
 };
 
-if (typeof module !== "undefined" && module.exports) {
-  module.exports = TaskOptimizer;
-}
-
-if (typeof window !== "undefined") {
-  window.TaskOptimizer = TaskOptimizer;
-}
+return TaskOptimizer;
+});
