@@ -70,11 +70,17 @@ function startOfToday() {
 }
 
 function daysUntilDue(dueDate, referenceDate) {
-  const dueDay = calendarDay(dueDate);
-  if (!dueDay) return 0;
-  const refDay = resolveReferenceDay(referenceDate);
   const msPerDay = 24 * 60 * 60 * 1000;
-  return Math.max(Math.ceil((dueDay - refDay) / msPerDay), 0);
+  if (typeof dueDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dueDate)) {
+    const dueDay = calendarDay(dueDate);
+    if (!dueDay) return 0;
+    const refDay = resolveReferenceDay(referenceDate);
+    return Math.max(Math.ceil((dueDay - refDay) / msPerDay), 0);
+  }
+  const date = parseDate(dueDate);
+  if (!date) return 0;
+  const ref = parseDate(referenceDate) || startOfToday();
+  return Math.max(Math.floor((date - ref) / msPerDay), 0);
 }
 
 function getGradeWeight(task) {
