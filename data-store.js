@@ -3,7 +3,32 @@
 // groups into snapshots sent over IPC.
 // Dependencies: main.js supplies renderer emitters and Canvas data/project readers.
 const { resolveStudySections, markStudySectionComplete } = require('./study-sections')
-function createDataStore({ sendToRenderer, getCanvasProjectGroups, readCanvasData }) {
+
+function normalizeProgressRecord(progress) {
+  if (!progress || !Array.isArray(progress.completedSectionIds)) return null
+  const completedSectionIds = Array.from(new Set(
+    progress.completedSectionIds
+      .map(value => String(value))
+      .filter(Boolean)
+  ))
+  return {
+    completedSectionIds,
+    updatedAt: progress.updatedAt || null
+  }
+}
+
+function hasCompletedStudyProgress(progress) {
+  const normalized = normalizeProgressRecord(progress)
+  return Boolean(normalized && normalized.completedSectionIds.length)
+}
+
+function createDataStore({
+  sendToRenderer,
+  getCanvasProjectGroups,
+  readCanvasData,
+  readStudyTaskProgress = () => null,
+  writeStudyTaskProgress = () => {}
+}) {
   const workspaces = [
     { id: "nucleus",          name: "Nucleus",          description: "Your main planning workspace." },
     { id: "biology",          name: "Biology",           description: "Labs, readings, and course projects." },
@@ -153,13 +178,34 @@ function createDataStore({ sendToRenderer, getCanvasProjectGroups, readCanvasDat
       urls,
       ...metadata
     }
+    const persistedStudyProgress = metadata && metadata.type === 'canvas-study-task'
+      ? normalizeProgressRecord(readStudyTaskProgress(taskId))
+      : null
+    const existingStudyProgress = existing
+      ? normalizeProgressRecord(existing.studyProgress)
+      : null
+    const incomingStudyProgress = normalizeProgressRecord(taskData.studyProgress)
+    const studyProgressToKeep = hasCompletedStudyProgress(existingStudyProgress)
+      ? existingStudyProgress
+      : hasCompletedStudyProgress(persistedStudyProgress)
+        ? persistedStudyProgress
+        : incomingStudyProgress
+
     if (existing) {
       const preservedWorkspaceId = existing.workspaceId || "";
       Object.assign(existing, taskData)
       if (!workspaceId && preservedWorkspaceId) {
         existing.workspaceId = preservedWorkspaceId
       }
+      if (studyProgressToKeep) {
+        existing.studyProgress = studyProgressToKeep
+        existing.studySections = resolveStudySections(existing)
+      }
     } else {
+      if (studyProgressToKeep) {
+        taskData.studyProgress = studyProgressToKeep
+        taskData.studySections = resolveStudySections(taskData)
+      }
       tasks.push(taskData)
     }
     sortTasksSequentially()
@@ -214,6 +260,7 @@ function createDataStore({ sendToRenderer, getCanvasProjectGroups, readCanvasDat
 
     task.studySections = result.sections
     task.studyProgress = result.studyProgress
+    writeStudyTaskProgress(task.id, task.studyProgress)
     if (result.isComplete) {
       task.status = 'done'
     } else if (normalizeStudyTaskStatus(task.status) === 'done') {
