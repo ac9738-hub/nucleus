@@ -134,6 +134,25 @@ function createDataStore({ sendToRenderer, getCanvasProjectGroups, readCanvasDat
     })
   }
 
+  function hasCompletedStudyProgress(task) {
+    return Array.isArray(task?.studyProgress?.completedSectionIds)
+      && task.studyProgress.completedSectionIds.length > 0
+  }
+
+  function preserveCanvasStudyProgress(existing, taskData) {
+    if (existing?.source !== 'canvas' || taskData?.source !== 'canvas') {
+      return
+    }
+    if (!hasCompletedStudyProgress(existing) || hasCompletedStudyProgress(taskData)) {
+      return
+    }
+
+    taskData.studyProgress = existing.studyProgress
+    if (Array.isArray(taskData.studySections) && taskData.studySections.length) {
+      taskData.studySections = resolveStudySections(taskData)
+    }
+  }
+
   function newTask(title, priority_weight, id = "no task id", workspaceId = "", course = "no course", details = "unspecified task", due = "monday", estimate = "", color = "no color", urls = [], metadata = {}) {
     const taskId = id && id !== "no task id"
       ? String(id)
@@ -155,6 +174,7 @@ function createDataStore({ sendToRenderer, getCanvasProjectGroups, readCanvasDat
     }
     if (existing) {
       const preservedWorkspaceId = existing.workspaceId || "";
+      preserveCanvasStudyProgress(existing, taskData)
       Object.assign(existing, taskData)
       if (!workspaceId && preservedWorkspaceId) {
         existing.workspaceId = preservedWorkspaceId
