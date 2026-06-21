@@ -15,6 +15,7 @@ const { spawn } = require('child_process')
 const {open_canvas_auth_window, get_auth_token, get_auth_csrf, get_base_url, clear_auth_state} = require('./app/canvas/auth')
 const { createAgentProcess } = require('./agent-process')
 const { createDataStore } = require('./data-store')
+const { createStudyProgressStore } = require('./study-progress-store')
 const { createContextStore } = require('./context-store')
 const {
   MAX_VISIBLE_TEXT_BLOCKS,
@@ -1592,6 +1593,7 @@ async function captureRegionContextForTab(tab, region = {}) {
 }
 
 let canvasApi
+const studyProgressStore = createStudyProgressStore(path.join(__dirname, 'study_progress.json'))
 const dataStore = createDataStore({
   sendToRenderer: (channel, payload) => {
     BrowserWindow.getAllWindows().forEach(window => {
@@ -1599,7 +1601,9 @@ const dataStore = createDataStore({
     })
   },
   getCanvasProjectGroups: () => canvasApi.getCanvasProjectGroups(),
-  readCanvasData: () => canvasApi.readCanvasData()
+  readCanvasData: () => canvasApi.readCanvasData(),
+  getStudyProgress: taskId => studyProgressStore.get(taskId),
+  onStudyProgressUpdated: (taskId, progress) => studyProgressStore.set(taskId, progress)
 })
 
 function addCanvasTasks(tasks, options = {}) {

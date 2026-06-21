@@ -1,7 +1,11 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const path = require('node:path')
+const vm = require('node:vm')
 const StudySections = require('../study-sections')
 const TaskOptimizer = require('../taskoptimizer')
+const { createDataStore } = require('../data-store')
 
 test('buildStudySectionsFromTask splits long estimates into sessions', () => {
   const sections = StudySections.buildStudySectionsFromTask({
@@ -104,4 +108,92 @@ test('TaskOptimizer lowers score as study sections are completed', () => {
 
   assert.ok(fresh.raw_score > partial.raw_score)
   assert.equal(complete.raw_score, 0)
+})
+
+test('TaskOptimizer loads in browser script context without CommonJS require', () => {
+  const context = {
+    window: {},
+    console,
+    Date,
+    Math,
+    Number,
+    String,
+    Array,
+    Set,
+    Object
+  }
+  vm.createContext(context)
+  vm.runInContext(
+    fs.readFileSync(path.join(__dirname, '..', 'study-sections.js'), 'utf8'),
+    context
+  )
+  vm.runInContext(
+    fs.readFileSync(path.join(__dirname, '..', 'taskoptimizer.js'), 'utf8'),
+    context
+  )
+
+  assert.equal(typeof context.window.TaskOptimizer.orderTasks, 'function')
+})
+
+test('data store preserves study progress across Canvas task refreshes', () => {
+  const persisted = {}
+  const store = createDataStore({
+    sendToRenderer: () => {},
+    getCanvasProjectGroups: () => [],
+    readCanvasData: () => null,
+    getStudyProgress: taskId => persisted[taskId],
+    onStudyProgressUpdated: (taskId, progress) => {
+      persisted[taskId] = progress
+    }
+  })
+  const metadata = {
+    source: 'canvas',
+    type: 'canvas-study-task',
+    studySections: [
+      { id: 'a', label: 'A', status: 'pending' },
+      { id: 'b', label: 'B', status: 'pending' }
+    ],
+    studyProgress: { completedSectionIds: [], updatedAt: null }
+  }
+
+  store.newTask('Study for exam', 0, 'study-1', '', 'Course', '', 'No due date', '', '#fff', [], metadata)
+  assert.equal(store.updateStudySectionProgress('study-1', 'a').ok, true)
+  store.newTask('Study for exam', 0, 'study-1', '', 'Course', '', 'No due date', '', '#fff', [], metadata)
+
+  const task = store.getTasksSnapshot().find(entry => entry.id === 'study-1')
+  assert.deepEqual(task.studyProgress.completedSectionIds, ['a'])
+  assert.deepEqual(
+    task.studySections.map(section => section.status),
+    ['done', 'pending']
+  )
+})
+
+test('data store hydrates study progress when Canvas tasks reload after restart', () => {
+  const persisted = {
+    'study-1': {
+      completedSectionIds: ['a'],
+      updatedAt: '2026-06-17T12:00:00.000Z'
+    }
+  }
+  const store = createDataStore({
+    sendToRenderer: () => {},
+    getCanvasProjectGroups: () => [],
+    readCanvasData: () => null,
+    getStudyProgress: taskId => persisted[taskId],
+    onStudyProgressUpdated: () => {}
+  })
+
+  store.newTask('Study for exam', 0, 'study-1', '', 'Course', '', 'No due date', '', '#fff', [], {
+    source: 'canvas',
+    type: 'canvas-study-task',
+    studySections: [
+      { id: 'a', label: 'A', status: 'pending' },
+      { id: 'b', label: 'B', status: 'pending' }
+    ],
+    studyProgress: { completedSectionIds: [], updatedAt: null }
+  })
+
+  const [task] = store.getTasksSnapshot()
+  assert.deepEqual(task.studyProgress.completedSectionIds, ['a'])
+  assert.equal(task.studySections[0].status, 'done')
 })

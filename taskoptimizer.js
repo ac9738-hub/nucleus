@@ -2,7 +2,24 @@
 // Functionality: scores tasks from due date, grade weight, effort, dependencies,
 // and task type; renderer/render.js uses it to order task cards.
 // Dependencies: browser global window.TaskOptimizer or CommonJS module export.
-const StudySections = require('./study-sections');
+(function(root, factory) {
+  const api = factory(
+    typeof require === "function"
+      ? require("./study-sections")
+      : root && root.StudySections
+  );
+
+  if (typeof module !== "undefined" && module.exports) {
+    module.exports = api;
+  }
+  if (root && typeof window !== "undefined") {
+    root.TaskOptimizer = api;
+  }
+})(
+  typeof window !== "undefined"
+    ? window
+    : (typeof globalThis !== "undefined" ? globalThis : null),
+  function(StudySections) {
 const Config = {
   K_BASE: 0.25,
   K_SCALE: 0.80,
@@ -348,10 +365,5 @@ const TaskOptimizer = {
   orderTasks
 };
 
-if (typeof module !== "undefined" && module.exports) {
-  module.exports = TaskOptimizer;
-}
-
-if (typeof window !== "undefined") {
-  window.TaskOptimizer = TaskOptimizer;
-}
+return TaskOptimizer;
+});
