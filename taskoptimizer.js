@@ -47,11 +47,21 @@ function parseDate(value) {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
-function resolveReferenceDay(referenceDate) {
-  if (referenceDate instanceof Date && !Number.isNaN(referenceDate.getTime())) {
-    return new Date(referenceDate.getFullYear(), referenceDate.getMonth(), referenceDate.getDate());
+function calendarDay(value) {
+  if (!value || value === "No due date") return null;
+  if (typeof value === "string") {
+    const match = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (match) {
+      return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+    }
   }
-  return startOfToday();
+  const parsed = parseDate(value);
+  if (!parsed) return null;
+  return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
+}
+
+function resolveReferenceDay(referenceDate) {
+  return calendarDay(referenceDate) || startOfToday();
 }
 
 function startOfToday() {
@@ -60,10 +70,8 @@ function startOfToday() {
 }
 
 function daysUntilDue(dueDate, referenceDate) {
-  const date = parseDate(dueDate);
-  if (!date) return 0;
-
-  const dueDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const dueDay = calendarDay(dueDate);
+  if (!dueDay) return 0;
   const refDay = resolveReferenceDay(referenceDate);
   const msPerDay = 24 * 60 * 60 * 1000;
   return Math.max(Math.ceil((dueDay - refDay) / msPerDay), 0);
