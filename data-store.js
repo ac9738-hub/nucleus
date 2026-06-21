@@ -134,6 +134,37 @@ function createDataStore({ sendToRenderer, getCanvasProjectGroups, readCanvasDat
     })
   }
 
+  function isCanvasStudyTask(task) {
+    const type = String(task?.type || task?.task_type || task?.taskType || '').toLowerCase()
+    return type === 'canvas-study-task' || type.includes('study')
+  }
+
+  function completedStudySectionIds(task = {}) {
+    const ids = new Set(
+      (task.studyProgress?.completedSectionIds || [])
+        .map(value => String(value))
+    )
+    ;(Array.isArray(task.studySections) ? task.studySections : []).forEach(section => {
+      if (normalizeStudyTaskStatus(section.status) === 'done') {
+        ids.add(String(section.id))
+      }
+    })
+    return ids
+  }
+
+  function mergeStudyProgress(existingTask, incomingTask) {
+    const completedIds = completedStudySectionIds(existingTask)
+    completedStudySectionIds(incomingTask).forEach(id => completedIds.add(id))
+    const updatedAt = incomingTask?.studyProgress?.updatedAt
+      || existingTask?.studyProgress?.updatedAt
+      || (completedIds.size ? new Date().toISOString() : null)
+    return {
+      ...(incomingTask?.studyProgress || {}),
+      completedSectionIds: Array.from(completedIds),
+      updatedAt
+    }
+  }
+
   function newTask(title, priority_weight, id = "no task id", workspaceId = "", course = "no course", details = "unspecified task", due = "monday", estimate = "", color = "no color", urls = [], metadata = {}) {
     const taskId = id && id !== "no task id"
       ? String(id)
@@ -155,9 +186,14 @@ function createDataStore({ sendToRenderer, getCanvasProjectGroups, readCanvasDat
     }
     if (existing) {
       const preservedWorkspaceId = existing.workspaceId || "";
+      const previousTask = { ...existing }
       Object.assign(existing, taskData)
       if (!workspaceId && preservedWorkspaceId) {
         existing.workspaceId = preservedWorkspaceId
+      }
+      if (isCanvasStudyTask(existing)) {
+        existing.studyProgress = mergeStudyProgress(previousTask, taskData)
+        existing.studySections = resolveStudySections(existing)
       }
     } else {
       tasks.push(taskData)

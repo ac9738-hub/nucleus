@@ -22,6 +22,7 @@ from vector_retreival import (
     node_ranking_text,
     passes_retrieval_cutoff,
     query_ranking_adjustment,
+    reconstruct_nodes,
     week_query_file_boost,
 )
 
@@ -190,3 +191,21 @@ def test_enrich_catalog_entry_from_graph():
     entry = enrich_catalog_entry_from_graph("15160", {"name": "Canvas 15160", "keyword_name": "canvas 15160"}, nodes)
     assert "chm 201" in entry["course_codes"]
     assert "CHM201" in entry["keyword_name"]
+
+
+def test_reconstruct_nodes_missing_graph_returns_empty_graph(tmp_path):
+    nodes = reconstruct_nodes(tmp_path / "missing-canvas-graph.json")
+
+    assert nodes["concepts"] == []
+    assert nodes["problems"] == []
+    assert nodes["events"] == []
+    assert nodes["syllabi"] == {}
+    assert nodes["files"] == {}
+
+
+def test_retrieve_without_openai_client_returns_empty(monkeypatch):
+    import vector_retreival as vr
+
+    monkeypatch.setattr(vr, "openai_client", None)
+
+    assert vr.retreive("CHM 201 exam") == []
