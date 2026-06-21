@@ -1,5 +1,9 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const path = require('node:path')
+const vm = require('node:vm')
+const { createDataStore } = require('../data-store')
 const StudySections = require('../study-sections')
 const TaskOptimizer = require('../taskoptimizer')
 
@@ -104,4 +108,57 @@ test('TaskOptimizer lowers score as study sections are completed', () => {
 
   assert.ok(fresh.raw_score > partial.raw_score)
   assert.equal(complete.raw_score, 0)
+})
+
+test('TaskOptimizer loads as browser script without CommonJS require', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'taskoptimizer.js'), 'utf8')
+  const context = {
+    window: { StudySections },
+    Math,
+    Date,
+    Number,
+    String
+  }
+  vm.createContext(context)
+
+  vm.runInContext(source, context)
+
+  assert.equal(typeof context.window.TaskOptimizer.calcPriority, 'function')
+  const score = context.window.TaskOptimizer.calcPriority({
+    id: 'study-task',
+    title: 'Study for exam',
+    due: '2026-06-19T23:59:00.000-04:00',
+    type: 'canvas-study-task'
+  })
+  assert.equal(score.task_id, 'study-task')
+})
+
+test('data store preserves study section progress across Canvas task refresh', () => {
+  const dataStore = createDataStore({
+    sendToRenderer: () => {},
+    getCanvasProjectGroups: () => [],
+    readCanvasData: () => ({})
+  })
+  const studyMetadata = {
+    source: 'canvas',
+    type: 'canvas-study-task',
+    studySections: [
+      { id: 'a', label: 'A', status: 'pending' },
+      { id: 'b', label: 'B', status: 'pending' }
+    ],
+    studyProgress: { completedSectionIds: [], updatedAt: null }
+  }
+
+  dataStore.newTask('Study for Exam', 1, 'canvas-study-course-event', '', 'Course', '', '2026-06-19', '', '#d85a30', [], studyMetadata)
+  const progress = dataStore.updateStudySectionProgress('canvas-study-course-event', 'a')
+  assert.equal(progress.ok, true)
+
+  dataStore.newTask('Study for Exam', 1, 'canvas-study-course-event', '', 'Course', '', '2026-06-19', '', '#d85a30', [], studyMetadata)
+  const [task] = dataStore.getTasksSnapshot()
+
+  assert.deepEqual(task.studyProgress.completedSectionIds, ['a'])
+  assert.deepEqual(
+    task.studySections.map(section => section.status),
+    ['done', 'pending']
+  )
 })
