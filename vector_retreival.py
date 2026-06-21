@@ -31,7 +31,12 @@ from parser import (
 from openai import OpenAI
 
 load_dotenv()
-openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+if OPENAI_API_KEY:
+    openai_client = OpenAI(api_key=OPENAI_API_KEY)
+else:
+    openai_client = None
+    print("vector retrieval warning: OPENAI_API_KEY is not set; retrieval will return no semantic results", file=sys.stderr)
 
 BASE_DIR = Path(__file__).resolve().parent
 CANVAS_GRAPH_PATH = BASE_DIR / "canvas_graph.json"
@@ -1082,6 +1087,9 @@ def get_course_embeddings(catalog=None):
     global _course_embeddings_cache
     if _course_embeddings_cache is not None:
         return _course_embeddings_cache
+    if openai_client is None:
+        _course_embeddings_cache = {}
+        return _course_embeddings_cache
 
     catalog = catalog or COURSE_CATALOG
     courseids = []
@@ -1738,6 +1746,9 @@ def retreive(query, k = 3, mode = "agent"):
     startpoints = []
     heap = []
     heap_counter = 0
+    if openai_client is None:
+        print("Vector retrieval disabled: OPENAI_API_KEY is not set", file=sys.stderr)
+        return startpoints
     
     newquery = prepare_query_for_embedding(query)
     qv = openai_client.embeddings.create(

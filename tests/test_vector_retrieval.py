@@ -201,3 +201,11 @@ def test_reconstruct_nodes_missing_graph_returns_empty_graph(tmp_path):
     assert nodes["events"] == []
     assert nodes["syllabi"] == {}
     assert nodes["files"] == {}
+
+
+def test_retrieve_without_openai_client_returns_empty(monkeypatch):
+    import vector_retreival as vr
+
+    monkeypatch.setattr(vr, "openai_client", None)
+
+    assert vr.retreive("CHM 201 exam") == []
