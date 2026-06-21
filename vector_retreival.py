@@ -889,9 +889,30 @@ def reconstruct_event(data):
     return node
 
 
+def empty_graph_nodes():
+    return {
+        "concepts": [],
+        "problems": [],
+        "events": [],
+        "syllabi": {},
+        "files": {},
+        "learningBlocks": {},
+        "edges": [],
+        "logged_details": {},
+        "logged_examples": {},
+        "logged_problems": {},
+        "logged_assignments": {},
+        "logged_events": {},
+    }
+
+
 def reconstruct_nodes(path=CANVAS_GRAPH_PATH):
-    with open(path, 'r', encoding='utf-8') as f:
-        data = json.load(f)
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError) as error:
+        print(f"Unable to load Canvas graph from {path}: {error}", file=sys.stderr)
+        return empty_graph_nodes()
 
     concepts = [reconstruct_concept(item) for item in data.get("concepts", []) or []]
     problems = [reconstruct_problem(item) for item in data.get("problems", []) or []]
