@@ -13,6 +13,7 @@ llm_context_log.jsonl
 assignmenthtml.json
 canvas_data.json
 canvas_graph.json
+canvas_task_progress.json
 canvas_graph.json.*.bak
 *.pre_dedupe.bak
 *.pre_full_reparse.bak

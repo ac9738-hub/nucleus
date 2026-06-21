@@ -1591,6 +1591,63 @@ async function captureRegionContextForTab(tab, region = {}) {
   }
 }
 
+const STUDY_TASK_PROGRESS_PATH = path.join(__dirname, 'canvas_task_progress.json')
+let studyTaskProgressCache = null
+
+function loadStudyTaskProgressMap() {
+  if (studyTaskProgressCache) return studyTaskProgressCache
+  try {
+    if (!fs.existsSync(STUDY_TASK_PROGRESS_PATH)) {
+      studyTaskProgressCache = {}
+      return studyTaskProgressCache
+    }
+    const raw = fs.readFileSync(STUDY_TASK_PROGRESS_PATH, 'utf8')
+    const parsed = raw.trim() ? JSON.parse(raw) : {}
+    studyTaskProgressCache = parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? parsed
+      : {}
+  } catch (error) {
+    console.warn('Unable to read Canvas study progress:', error && error.message ? error.message : error)
+    studyTaskProgressCache = {}
+  }
+  return studyTaskProgressCache
+}
+
+function normalizeStudyTaskProgress(progress) {
+  if (!progress || !Array.isArray(progress.completedSectionIds)) return null
+  const completedSectionIds = Array.from(new Set(
+    progress.completedSectionIds.map(value => String(value)).filter(Boolean)
+  ))
+  return {
+    completedSectionIds,
+    updatedAt: progress.updatedAt || new Date().toISOString()
+  }
+}
+
+function getStudyTaskProgress(taskId) {
+  if (!taskId) return null
+  return loadStudyTaskProgressMap()[String(taskId)] || null
+}
+
+function saveStudyTaskProgress(taskId, progress) {
+  if (!taskId) return
+  const normalized = normalizeStudyTaskProgress(progress)
+  if (!normalized) return
+  const progressMap = loadStudyTaskProgressMap()
+  progressMap[String(taskId)] = normalized
+  try {
+    const tempPath = `${STUDY_TASK_PROGRESS_PATH}.tmp`
+    fs.writeFileSync(tempPath, `${JSON.stringify(progressMap, null, 2)}\n`, 'utf8')
+    fs.renameSync(tempPath, STUDY_TASK_PROGRESS_PATH)
+  } catch (error) {
+    console.warn('Unable to save Canvas study progress:', error && error.message ? error.message : error)
+  }
+}
+
+function resetStudyTaskProgressCache() {
+  studyTaskProgressCache = null
+}
+
 let canvasApi
 const dataStore = createDataStore({
   sendToRenderer: (channel, payload) => {
@@ -1599,7 +1656,9 @@ const dataStore = createDataStore({
     })
   },
   getCanvasProjectGroups: () => canvasApi.getCanvasProjectGroups(),
-  readCanvasData: () => canvasApi.readCanvasData()
+  readCanvasData: () => canvasApi.readCanvasData(),
+  readStudyTaskProgress: getStudyTaskProgress,
+  writeStudyTaskProgress: saveStudyTaskProgress
 })
 
 function addCanvasTasks(tasks, options = {}) {
@@ -2004,6 +2063,8 @@ const CANVAS_SYNC_RELATIVE_PATHS = [
   'canvas_data.json',
   'canvas_graph.json',
   'canvas_embedding_cache.json',
+  'canvas_task_progress.json',
+  'canvas_task_progress.json.tmp',
   'assignmenthtml.json',
   path.join('app', 'canvas', 'canvas_homepages'),
   'canvasfiles',
@@ -2034,6 +2095,7 @@ function clearCanvasSyncData() {
   canvasGraphIndex = null
   canvasGraphVisibleIndexes = null
   canvasGraphCacheKey = ''
+  resetStudyTaskProgressCache()
   canvasInitialSetupDone = false
   const removedTasks = dataStore.removeCanvasTasks()
   dataStore.sendCanvasDataUpdate()
