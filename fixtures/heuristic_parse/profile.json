@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "description": "Heuristic-first parse eval: file-type classification + section outline extraction.",
+  "insampleCourseIds": ["15237", "17581", "20690"],
+  "stretchCourseIds": ["19097"],
+  "legacyBenchmarkCourseIds": ["18857", "15160", "19971"],
+  "holdoutCourseIds": ["15222", "14788", "17239"],
+  "textbookCourseId": "textbook_manual",
+  "thresholds": {
+    "fileTypeAccuracy": 0.92,
+    "fileTypeHeuristicCoverage": 0.90,
+    "sectionRecall": 0.85,
+    "llmClassifyRateMax": 0.10,
+    "promptCacheHitRateMin": 0.90
+  },
+  "notes": {
+    "insample": "New base: NEU201 (15237), NEU202/PSY259 (17581), COS217 (20690), MAT202 (19097). Legacy benchmark trio in legacyBenchmarkCourseIds.",
+    "holdout": "Generalization courses — never tune heuristics against these labels.",
+    "textbook": "Paste full chapter plain text into fixtures/heuristic_parse/textbook/*.txt; section labels in textbook/manifest.json."
+  }
+}

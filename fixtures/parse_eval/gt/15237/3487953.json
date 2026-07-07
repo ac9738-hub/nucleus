@@ -1,0 +1,469 @@
+{
+  "version": 1,
+  "courseId": "15237",
+  "fileId": "3487953",
+  "filename": "2024 Quiz 2.pdf",
+  "expectedFileType": "past_exam",
+  "passPlan": {
+    "courseId": "15237",
+    "fileId": "3487953",
+    "filename": "2024 Quiz 2.pdf",
+    "resolvedType": "past_exam",
+    "heuristicConfidence": 0.84,
+    "neededPasses": [
+      "extract_pages",
+      "heuristic_classify",
+      "llm_pass1",
+      "finalize"
+    ],
+    "skippedPasses": [
+      "llm_classify",
+      "llm_pass2"
+    ],
+    "estLlmCalls": 1,
+    "estRealisticLlmCalls": 1.0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "needed": true,
+        "reason": "Required local PDF/HTML extraction; no LLM.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "heuristic_classify",
+        "needed": true,
+        "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_classify",
+        "needed": false,
+        "reason": "Heuristic confidence 0.84 sufficient; skip flash classify call.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_pass1",
+        "needed": true,
+        "reason": "Type past_exam: pass1 extracts concepts=False, problems=False, events=True.",
+        "llmCall": true,
+        "estCostTier": "high"
+      },
+      {
+        "pass": "llm_pass2",
+        "needed": false,
+        "reason": "Type past_exam disables pass2 (single-pass type-specific or link-only profile).",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "finalize",
+        "needed": true,
+        "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+        "llmCall": false,
+        "estCostTier": "free"
+      }
+    ]
+  },
+  "passAudit": {
+    "plan": {
+      "courseId": "15237",
+      "fileId": "3487953",
+      "filename": "2024 Quiz 2.pdf",
+      "resolvedType": "past_exam",
+      "heuristicConfidence": 0.84,
+      "neededPasses": [
+        "extract_pages",
+        "heuristic_classify",
+        "llm_pass1",
+        "finalize"
+      ],
+      "skippedPasses": [
+        "llm_classify",
+        "llm_pass2"
+      ],
+      "estLlmCalls": 1,
+      "estRealisticLlmCalls": 1.0,
+      "steps": [
+        {
+          "pass": "extract_pages",
+          "needed": true,
+          "reason": "Required local PDF/HTML extraction; no LLM.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "heuristic_classify",
+          "needed": true,
+          "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_classify",
+          "needed": false,
+          "reason": "Heuristic confidence 0.84 sufficient; skip flash classify call.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_pass1",
+          "needed": true,
+          "reason": "Type past_exam: pass1 extracts concepts=False, problems=False, events=True.",
+          "llmCall": true,
+          "estCostTier": "high"
+        },
+        {
+          "pass": "llm_pass2",
+          "needed": false,
+          "reason": "Type past_exam disables pass2 (single-pass type-specific or link-only profile).",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "finalize",
+          "needed": true,
+          "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+          "llmCall": false,
+          "estCostTier": "free"
+        }
+      ]
+    },
+    "actualType": "past_exam",
+    "deepseekPasses": 1,
+    "conceptCount": 36,
+    "detailCount": 0,
+    "totalLlmTokens": 0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "ran": true,
+        "useful": true,
+        "verdict": "required",
+        "note": "Local I/O; pages present means extract succeeded."
+      },
+      {
+        "pass": "heuristic_classify",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "Routed to past_exam (free)."
+      },
+      {
+        "pass": "llm_classify",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Skipped; heuristic confidence sufficient.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass1",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "No pass1 tool trace.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass2",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Correctly skipped: profile disables pass2, type-specific pass1 only, or no log_* tools.",
+        "tokens": 0
+      },
+      {
+        "pass": "finalize",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "logged_details promoted to concept details."
+      }
+    ],
+    "cutCandidates": [],
+    "recommendations": [
+      "Pass2 correctly skipped for this type/pass1 tool pattern."
+    ]
+  },
+  "passes": [
+    "extract_pages",
+    "heuristic_classify",
+    "teaching_units",
+    "type_structure",
+    "concept_candidates",
+    "problem_scan",
+    "detail_attach",
+    "reconcile"
+  ],
+  "buildMode": "template_multi_pass_offline",
+  "builtAt": "2026-07-01T22:49:35Z",
+  "concepts": [
+    {
+      "name": "• Equations (not necessary, but may be helpful)",
+      "details": []
+    },
+    {
+      "name": "Problem 1",
+      "details": []
+    },
+    {
+      "name": "Problem 2",
+      "details": []
+    },
+    {
+      "name": "Problem 8",
+      "details": []
+    },
+    {
+      "name": "Problem 9",
+      "details": []
+    },
+    {
+      "name": "Problem 10",
+      "details": []
+    },
+    {
+      "name": "Problem 11",
+      "details": []
+    },
+    {
+      "name": "Problem 15",
+      "details": []
+    },
+    {
+      "name": "Problem 16",
+      "details": []
+    },
+    {
+      "name": "Problem 18",
+      "details": []
+    },
+    {
+      "name": "Problem 19",
+      "details": []
+    },
+    {
+      "name": "Problem 20",
+      "details": []
+    },
+    {
+      "name": "Problem 21",
+      "details": []
+    },
+    {
+      "name": "Problem 22",
+      "details": []
+    },
+    {
+      "name": "Problem 24",
+      "details": []
+    },
+    {
+      "name": "Problem 26",
+      "details": []
+    },
+    {
+      "name": "Problem 28",
+      "details": []
+    },
+    {
+      "name": "Problem 29",
+      "details": []
+    },
+    {
+      "name": "Problem 30",
+      "details": []
+    },
+    {
+      "name": "Problem 31",
+      "details": []
+    },
+    {
+      "name": "Problem 32",
+      "details": []
+    },
+    {
+      "name": "Problem 33",
+      "details": []
+    },
+    {
+      "name": "Problem 35",
+      "details": []
+    },
+    {
+      "name": "Problem 37",
+      "details": []
+    },
+    {
+      "name": "(left/right) (choose all that apply)",
+      "details": []
+    },
+    {
+      "name": "Problem 38",
+      "details": []
+    },
+    {
+      "name": "Problem 40",
+      "details": []
+    },
+    {
+      "name": "Problem 41",
+      "details": []
+    },
+    {
+      "name": "Problem 43",
+      "details": []
+    },
+    {
+      "name": "Problem 45",
+      "details": []
+    },
+    {
+      "name": "Problem 47",
+      "details": []
+    },
+    {
+      "name": "Problem 49",
+      "details": []
+    },
+    {
+      "name": "Problem 50",
+      "details": []
+    },
+    {
+      "name": "inhibition",
+      "details": []
+    },
+    {
+      "name": "remember nernst)",
+      "details": []
+    },
+    {
+      "name": "standard baseline rate",
+      "details": []
+    }
+  ],
+  "conceptCount": 36,
+  "detailCount": 0,
+  "events": [],
+  "problems": [
+    "Problem 1",
+    "Problem 2",
+    "Problem 8",
+    "Problem 9",
+    "Problem 10",
+    "Problem 11",
+    "Problem 15",
+    "Problem 16",
+    "Problem 18",
+    "Problem 19",
+    "Problem 20",
+    "Problem 21",
+    "Problem 22",
+    "Problem 24",
+    "Problem 26",
+    "Problem 28",
+    "Problem 29",
+    "Problem 30",
+    "Problem 31",
+    "Problem 32",
+    "Problem 33",
+    "Problem 35",
+    "Problem 37",
+    "Problem 38",
+    "Problem 40",
+    "Problem 41",
+    "Problem 43",
+    "Problem 45",
+    "Problem 47",
+    "Problem 49",
+    "Problem 50"
+  ],
+  "sections": [
+    "• Equations (not necessary, but may be helpful)",
+    "Problem 1",
+    "Problem 2",
+    "Problem 8",
+    "Problem 9",
+    "Problem 10",
+    "Problem 11",
+    "Problem 15",
+    "Problem 16",
+    "Problem 18",
+    "Problem 19",
+    "Problem 20",
+    "Problem 21",
+    "Problem 22",
+    "Problem 24",
+    "Problem 26",
+    "Problem 28",
+    "Problem 29",
+    "remember Nernst)",
+    "Problem 30",
+    "Problem 31",
+    "Problem 32",
+    "Problem 33",
+    "Problem 35",
+    "Problem 37",
+    "(left/right) (choose all that apply)",
+    "Problem 38",
+    "Problem 40",
+    "Problem 41",
+    "Problem 43",
+    "Problem 45",
+    "Problem 47",
+    "Problem 49",
+    "Problem 50"
+  ],
+  "deepseekPasses": 1,
+  "expectsPass2": false,
+  "gtProvenance": {
+    "typeSource": "heuristic_high",
+    "typeConfidence": 0.84,
+    "offlinePassAudit": {
+      "extract_pages": {
+        "localPdf": true,
+        "pageCount": 7,
+        "pdfPath": "C:\\Allen\\nucleus\\canvasfiles\\3487953"
+      },
+      "heuristic_classify": {
+        "expectedFileType": "past_exam",
+        "source": "heuristic_high",
+        "confidence": 0.84
+      },
+      "teaching_units": {
+        "sectionCount": 34
+      },
+      "type_structure": {
+        "slideRows": 3,
+        "readingSections": 0,
+        "syllabusWeeks": 0
+      },
+      "concept_candidates": {
+        "candidateCount": 36
+      },
+      "problem_scan": {
+        "problemCount": 31
+      },
+      "detail_attach": {
+        "conceptKeysWithDetails": 0,
+        "detailCount": 0
+      },
+      "reconcile": {
+        "inputTitles": 36,
+        "accepted": 36,
+        "capped": 0,
+        "detailAttached": 0
+      }
+    },
+    "reconcileStats": {
+      "inputTitles": 36,
+      "accepted": 36,
+      "capped": 0,
+      "detailAttached": 0
+    }
+  }
+}

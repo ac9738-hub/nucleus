@@ -4,8 +4,15 @@
   "colorScheme": "light",
   "rendererStylesheets": [
     "themes/white/styles.css",
+    "lib/nucleus-ui.css",
+    "lib/context-controller.css",
+    "lib/sidekick-composer.css",
+    "lib/lumi-panel.css",
     "themes/white/synapse.css",
-    "themes/white/mail.css"
+    "themes/white/mail.css",
+    "lib/feature-shell.css",
+    "app/artifacts/artifacts.css",
+    "app/canvas/canvas.css"
   ],
   "palette": {
     "bg": "#eef1f7",

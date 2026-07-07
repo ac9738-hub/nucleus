@@ -1,0 +1,582 @@
+{
+  "version": 1,
+  "courseId": "17581",
+  "fileId": "3646953",
+  "filename": "Gomez_2019.pdf",
+  "expectedFileType": "research_article",
+  "passPlan": {
+    "courseId": "17581",
+    "fileId": "3646953",
+    "filename": "Gomez_2019.pdf",
+    "resolvedType": "research_article",
+    "heuristicConfidence": 0.86,
+    "neededPasses": [
+      "extract_pages",
+      "heuristic_classify",
+      "llm_pass1",
+      "finalize"
+    ],
+    "skippedPasses": [
+      "llm_classify",
+      "llm_pass2"
+    ],
+    "estLlmCalls": 1,
+    "estRealisticLlmCalls": 1.0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "needed": true,
+        "reason": "Required local PDF/HTML extraction; no LLM.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "heuristic_classify",
+        "needed": true,
+        "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_classify",
+        "needed": false,
+        "reason": "Heuristic confidence 0.86 sufficient; skip flash classify call.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_pass1",
+        "needed": true,
+        "reason": "Type research_article: pass1 extracts concepts=True, problems=False, events=False.",
+        "llmCall": true,
+        "estCostTier": "high"
+      },
+      {
+        "pass": "llm_pass2",
+        "needed": false,
+        "reason": "Type research_article disables pass2 (single-pass type-specific or link-only profile).",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "finalize",
+        "needed": true,
+        "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+        "llmCall": false,
+        "estCostTier": "free"
+      }
+    ]
+  },
+  "passAudit": {
+    "plan": {
+      "courseId": "17581",
+      "fileId": "3646953",
+      "filename": "Gomez_2019.pdf",
+      "resolvedType": "research_article",
+      "heuristicConfidence": 0.86,
+      "neededPasses": [
+        "extract_pages",
+        "heuristic_classify",
+        "llm_pass1",
+        "finalize"
+      ],
+      "skippedPasses": [
+        "llm_classify",
+        "llm_pass2"
+      ],
+      "estLlmCalls": 1,
+      "estRealisticLlmCalls": 1.0,
+      "steps": [
+        {
+          "pass": "extract_pages",
+          "needed": true,
+          "reason": "Required local PDF/HTML extraction; no LLM.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "heuristic_classify",
+          "needed": true,
+          "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_classify",
+          "needed": false,
+          "reason": "Heuristic confidence 0.86 sufficient; skip flash classify call.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_pass1",
+          "needed": true,
+          "reason": "Type research_article: pass1 extracts concepts=True, problems=False, events=False.",
+          "llmCall": true,
+          "estCostTier": "high"
+        },
+        {
+          "pass": "llm_pass2",
+          "needed": false,
+          "reason": "Type research_article disables pass2 (single-pass type-specific or link-only profile).",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "finalize",
+          "needed": true,
+          "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+          "llmCall": false,
+          "estCostTier": "free"
+        }
+      ]
+    },
+    "actualType": "research_article",
+    "deepseekPasses": 1,
+    "conceptCount": 80,
+    "detailCount": 2,
+    "totalLlmTokens": 0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "ran": true,
+        "useful": true,
+        "verdict": "required",
+        "note": "Local I/O; pages present means extract succeeded."
+      },
+      {
+        "pass": "heuristic_classify",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "Routed to research_article (free)."
+      },
+      {
+        "pass": "llm_classify",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Skipped; heuristic confidence sufficient.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass1",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "No pass1 tool trace.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass2",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Correctly skipped: profile disables pass2, type-specific pass1 only, or no log_* tools.",
+        "tokens": 0
+      },
+      {
+        "pass": "finalize",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "logged_details promoted to concept details."
+      }
+    ],
+    "cutCandidates": [],
+    "recommendations": [
+      "Pass2 correctly skipped for this type/pass1 tool pattern."
+    ]
+  },
+  "passes": [
+    "extract_pages",
+    "heuristic_classify",
+    "teaching_units",
+    "type_structure",
+    "concept_candidates",
+    "problem_scan",
+    "detail_attach",
+    "reconcile"
+  ],
+  "buildMode": "template_multi_pass_offline",
+  "builtAt": "2026-07-01T22:49:39Z",
+  "concepts": [
+    {
+      "name": "articles",
+      "details": []
+    },
+    {
+      "name": "articlesnature human behaviour",
+      "details": []
+    },
+    {
+      "name": "bodyword",
+      "details": []
+    },
+    {
+      "name": "animalface",
+      "details": []
+    },
+    {
+      "name": "chance",
+      "details": []
+    },
+    {
+      "name": "number of subjects",
+      "details": []
+    },
+    {
+      "name": "cartoonanimalsfacesbodieswordscarscorridors",
+      "details": []
+    },
+    {
+      "name": "cartoon",
+      "details": []
+    },
+    {
+      "name": "animals",
+      "details": []
+    },
+    {
+      "name": "faces",
+      "details": []
+    },
+    {
+      "name": "bodies",
+      "details": []
+    },
+    {
+      "name": "words",
+      "details": []
+    },
+    {
+      "name": "corridors",
+      "details": []
+    },
+    {
+      "name": "correlation (r)",
+      "details": []
+    },
+    {
+      "name": "decoding performance",
+      "details": []
+    },
+    {
+      "name": "experienced",
+      "details": []
+    },
+    {
+      "name": "novice",
+      "details": []
+    },
+    {
+      "name": "t value",
+      "details": []
+    },
+    {
+      "name": "rightleft",
+      "details": []
+    },
+    {
+      "name": "cosfgots",
+      "details": []
+    },
+    {
+      "name": "facescorridorscorridors",
+      "details": []
+    },
+    {
+      "name": "corridorsfaces",
+      "details": []
+    },
+    {
+      "name": "retinal image size (dva)size (m)",
+      "details": []
+    },
+    {
+      "name": "rectilinearity (least to most linear)",
+      "details": []
+    },
+    {
+      "name": "animacy (animate to inanimate)",
+      "details": []
+    },
+    {
+      "name": "pokemon",
+      "details": []
+    },
+    {
+      "name": "volume (cm3)",
+      "details": []
+    },
+    {
+      "name": "latfgmedfgcos",
+      "details": []
+    },
+    {
+      "name": "face selectivity(mean t value)",
+      "details": []
+    },
+    {
+      "name": "corridor selectivity(mean t value)",
+      "details": []
+    },
+    {
+      "name": "otslatfgmedfgcos",
+      "details": []
+    },
+    {
+      "name": "average t value",
+      "details": []
+    },
+    {
+      "name": "novices",
+      "details": []
+    },
+    {
+      "name": "foveaperiphery",
+      "details": []
+    },
+    {
+      "name": "eccentricity (dva)",
+      "details": []
+    },
+    {
+      "name": "prf density",
+      "details": []
+    },
+    {
+      "name": "t value320",
+      "details": []
+    },
+    {
+      "name": "individual roi",
+      "details": []
+    },
+    {
+      "name": "independent roi",
+      "details": []
+    },
+    {
+      "name": "facesfaces",
+      "details": []
+    },
+    {
+      "name": "percent signal change",
+      "details": []
+    },
+    {
+      "name": "pfusmfus",
+      "details": []
+    },
+    {
+      "name": "cartoons",
+      "details": []
+    },
+    {
+      "name": "jesse gomez (jessegomez@berkeley.edu)",
+      "details": [
+        "Corresponding author(s):Jesse Gomez (jessegomez@berkeley.edu)"
+      ]
+    },
+    {
+      "name": "reporting summary",
+      "details": []
+    },
+    {
+      "name": "statistical parameters",
+      "details": []
+    },
+    {
+      "name": "n/a confirmed",
+      "details": []
+    },
+    {
+      "name": "software and code",
+      "details": []
+    },
+    {
+      "name": "policy information about availability of data",
+      "details": []
+    },
+    {
+      "name": "field-specific reporting",
+      "details": []
+    },
+    {
+      "name": "life sciences study design",
+      "details": []
+    },
+    {
+      "name": "materials & experimental systems",
+      "details": []
+    },
+    {
+      "name": "n/a involved in the study",
+      "details": []
+    },
+    {
+      "name": "unique biological materials",
+      "details": []
+    },
+    {
+      "name": "antibodies",
+      "details": []
+    },
+    {
+      "name": "eukaryotic cell lines",
+      "details": []
+    },
+    {
+      "name": "palaeontology",
+      "details": []
+    },
+    {
+      "name": "animals and other organisms",
+      "details": []
+    },
+    {
+      "name": "human research participants",
+      "details": []
+    },
+    {
+      "name": "methods",
+      "details": []
+    },
+    {
+      "name": "chip-seq",
+      "details": []
+    },
+    {
+      "name": "flow cytometry",
+      "details": []
+    },
+    {
+      "name": "mri-based neuroimaging",
+      "details": []
+    },
+    {
+      "name": "recruitmentsee above",
+      "details": []
+    },
+    {
+      "name": "magnetic resonance imaging",
+      "details": []
+    },
+    {
+      "name": "experimental design",
+      "details": []
+    },
+    {
+      "name": "design typeblock design",
+      "details": []
+    },
+    {
+      "name": "acquisition",
+      "details": []
+    },
+    {
+      "name": "imaging type(s)functional, structural",
+      "details": []
+    },
+    {
+      "name": "field strength3 tesla",
+      "details": []
+    },
+    {
+      "name": "area of acquisitionoccipital and temporal lobes",
+      "details": []
+    },
+    {
+      "name": "diffusion mriusednot used",
+      "details": []
+    },
+    {
+      "name": "preprocessing",
+      "details": []
+    },
+    {
+      "name": "volume censoringn/a",
+      "details": []
+    },
+    {
+      "name": "statistical modeling & inference",
+      "details": []
+    },
+    {
+      "name": "whole brainroi-basedboth",
+      "details": [
+        "Specify type of analysis:Whole brainROI-basedBoth"
+      ]
+    },
+    {
+      "name": "anatomical location(s)",
+      "details": []
+    },
+    {
+      "name": "models & analysis",
+      "details": []
+    },
+    {
+      "name": "functional and/or effective connectivity",
+      "details": []
+    },
+    {
+      "name": "graph analysis",
+      "details": []
+    }
+  ],
+  "conceptCount": 80,
+  "detailCount": 2,
+  "events": [],
+  "problems": [],
+  "sections": [],
+  "deepseekPasses": 1,
+  "expectsPass2": false,
+  "gtProvenance": {
+    "typeSource": "heuristic_high",
+    "typeConfidence": 0.86,
+    "offlinePassAudit": {
+      "extract_pages": {
+        "localPdf": true,
+        "pageCount": 18,
+        "pdfPath": "C:\\Allen\\nucleus\\canvasfiles\\3646953"
+      },
+      "heuristic_classify": {
+        "expectedFileType": "research_article",
+        "source": "heuristic_high",
+        "confidence": 0.86
+      },
+      "teaching_units": {
+        "sectionCount": 0
+      },
+      "type_structure": {
+        "slideRows": 91,
+        "readingSections": 91,
+        "syllabusWeeks": 0
+      },
+      "concept_candidates": {
+        "candidateCount": 80
+      },
+      "problem_scan": {
+        "problemCount": 0
+      },
+      "detail_attach": {
+        "conceptKeysWithDetails": 2,
+        "detailCount": 2
+      },
+      "reconcile": {
+        "inputTitles": 80,
+        "accepted": 80,
+        "capped": 0,
+        "detailAttached": 2
+      }
+    },
+    "reconcileStats": {
+      "inputTitles": 80,
+      "accepted": 80,
+      "capped": 0,
+      "detailAttached": 2
+    }
+  }
+}

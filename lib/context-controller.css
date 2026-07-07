@@ -1,0 +1,465 @@
+/* Context controller / workspace control center (theme-token based). */
+
+.wcc-root,
+.ctx-root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: 1120px;
+}
+
+.wcc-header,
+.ctx-header {
+  align-items: flex-end;
+  display: flex;
+  gap: var(--space-4);
+  justify-content: space-between;
+}
+
+.wcc-eyebrow,
+.ctx-eyebrow {
+  color: var(--text-tertiary);
+  font-size: var(--font-label);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.08em;
+  margin-bottom: var(--space-1);
+  text-transform: uppercase;
+}
+
+.wcc-title,
+.ctx-title {
+  font-size: var(--font-title);
+  font-weight: var(--weight-semibold);
+  margin: 0 0 var(--space-1);
+}
+
+.wcc-subtitle,
+.ctx-subtitle {
+  color: var(--text-secondary);
+  font-size: var(--font-body);
+  margin: 0;
+}
+
+.ctx-control-bar {
+  background: var(--surface-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr) minmax(0, 0.8fr);
+  padding: var(--space-4);
+}
+
+.ctx-segmented,
+.nui-segmented.ctx-segmented {
+  /* extends .nui-segmented in nucleus-ui.css */
+}
+
+.ctx-segment,
+.nui-segmented-btn.ctx-segment {
+  /* extends .nui-segmented-btn in nucleus-ui.css */
+}
+
+.ctx-segmented-wrap {
+  flex-wrap: wrap;
+}
+
+.ctx-toggle-row {
+  align-items: center;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  font-size: var(--font-meta);
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.ctx-toggle-row.is-disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.ctx-toggle-row input {
+  accent-color: var(--accent);
+}
+
+.ctx-control-label {
+  color: var(--text-tertiary);
+  display: block;
+  font-size: var(--font-label);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.06em;
+  margin-bottom: var(--space-2);
+  text-transform: uppercase;
+}
+
+.ctx-course-filter {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-height: 132px;
+  overflow-y: auto;
+}
+
+.ctx-course-option {
+  align-items: center;
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  cursor: pointer;
+  display: flex;
+  font-size: var(--font-meta);
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+}
+
+.ctx-course-option:hover {
+  background: var(--surface-inset);
+}
+
+.ctx-course-empty,
+.ctx-control-hint {
+  color: var(--text-tertiary);
+  font-size: var(--font-meta);
+  line-height: 1.45;
+  margin: 0;
+}
+
+.ctx-stats {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.ctx-stat-card {
+  align-items: center;
+  background: var(--surface-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-3) var(--space-4);
+}
+
+.ctx-stat-card strong {
+  color: var(--text-primary);
+  display: block;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.ctx-stat-card div > span {
+  color: var(--text-secondary);
+  display: block;
+  font-size: var(--font-meta);
+  margin-top: 4px;
+}
+
+.ctx-grid {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+}
+
+.ctx-grid-main,
+.ctx-grid-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.wcc-overview,
+.ctx-panel,
+.wcc-panel {
+  background: var(--surface-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-4);
+}
+
+.wcc-overview {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
+}
+
+.wcc-panel-heading,
+.ctx-panel-heading {
+  align-items: center;
+  border-bottom: 1px solid var(--divider);
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: var(--space-3);
+  padding-bottom: var(--space-3);
+}
+
+.wcc-panel-heading h2,
+.ctx-panel-heading h2 {
+  font-size: var(--font-body);
+  font-weight: var(--weight-semibold);
+  margin: 0;
+}
+
+.wcc-panel-heading span,
+.ctx-panel-heading span {
+  color: var(--text-tertiary);
+  font-size: var(--font-meta);
+}
+
+.wcc-panel-desc {
+  color: var(--text-secondary);
+  font-size: var(--font-meta);
+  margin: calc(var(--space-2) * -1) 0 var(--space-3);
+}
+
+.wcc-course {
+  font-size: 20px;
+  font-weight: var(--weight-semibold);
+  margin: 0 0 var(--space-3);
+}
+
+.wcc-overview-grid {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.wcc-label {
+  color: var(--text-tertiary);
+  display: block;
+  font-size: var(--font-label);
+  margin-bottom: 2px;
+}
+
+.wcc-overview-grid strong,
+.wcc-meta-row strong {
+  color: var(--text-primary);
+  font-size: var(--font-meta);
+  font-weight: var(--weight-semibold);
+}
+
+.wcc-overview-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.wcc-meta-row {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.wcc-pill {
+  background: rgba(var(--accent-rgb), 0.12);
+  border: 1px solid rgba(var(--accent-rgb), 0.22);
+  border-radius: 999px;
+  color: var(--text-primary);
+  font-size: var(--font-label);
+  font-weight: var(--weight-semibold);
+  padding: 3px 10px;
+}
+
+.wcc-pill-muted {
+  background: var(--surface-inset);
+  border-color: var(--divider);
+  color: var(--text-secondary);
+}
+
+.wcc-health {
+  border-radius: 999px;
+  font-size: var(--font-label);
+  font-weight: var(--weight-semibold);
+  padding: 3px 10px;
+}
+
+.wcc-health-strong {
+  background: rgba(var(--accent-3-rgb), 0.16);
+  color: var(--accent-3);
+}
+
+.wcc-health-medium {
+  background: rgba(var(--accent-warm-rgb), 0.16);
+  color: var(--accent-warm);
+}
+
+.wcc-health-weak {
+  background: rgba(var(--border-rgb), 0.14);
+  color: var(--text-secondary);
+}
+
+.wcc-health-reasons {
+  color: var(--text-tertiary);
+  font-size: var(--font-label);
+  list-style: none;
+  margin: var(--space-1) 0 0;
+  padding: 0;
+}
+
+.wcc-health-reasons li + li {
+  margin-top: 2px;
+}
+
+.wcc-list,
+.ctx-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.wcc-open-page {
+  align-items: center;
+  border: 1px solid var(--divider);
+  border-radius: var(--radius);
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: var(--space-2);
+}
+
+.wcc-open-page-main {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  display: flex;
+  font: inherit;
+  gap: var(--space-3);
+  justify-content: space-between;
+  padding: 0;
+  text-align: left;
+  width: 100%;
+}
+
+.wcc-open-page-main h3 {
+  font-size: var(--font-body);
+  font-weight: var(--weight-semibold);
+  margin: 0 0 2px;
+}
+
+.wcc-open-page-main p {
+  color: var(--text-tertiary);
+  font-size: var(--font-label);
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wcc-toggle {
+  align-items: center;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: var(--font-label);
+  gap: var(--space-1);
+  white-space: nowrap;
+}
+
+.ctx-task-item {
+  align-items: center;
+  border: 1px solid var(--divider);
+  border-radius: var(--radius);
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  padding: var(--space-2) var(--space-3);
+}
+
+.ctx-task-main h3 {
+  font-size: var(--font-body);
+  font-weight: var(--weight-semibold);
+  margin: 0 0 2px;
+}
+
+.ctx-task-main p {
+  color: var(--text-tertiary);
+  font-size: var(--font-label);
+  margin: 0;
+}
+
+/* Task badges use .nui-badge from nucleus-ui.css */
+
+.ctx-task-start,
+.wcc-secondary-button {
+  background: rgba(var(--surface-2-rgb), 0.72);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--font-meta);
+  font-weight: var(--weight-semibold);
+  padding: 6px 10px;
+}
+
+.ctx-task-start:hover,
+.wcc-secondary-button:hover {
+  border-color: rgba(var(--accent-rgb), 0.28);
+}
+
+.wcc-activity-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.wcc-activity-item {
+  align-items: center;
+  display: flex;
+  gap: var(--space-3);
+}
+
+.wcc-activity-time {
+  color: var(--text-tertiary);
+  flex: 0 0 64px;
+  font-size: var(--font-label);
+}
+
+.wcc-activity-label {
+  color: var(--text-secondary);
+  font-size: var(--font-meta);
+}
+
+.wcc-empty,
+.ctx-empty {
+  color: var(--text-tertiary);
+  font-size: var(--font-meta);
+  padding: var(--space-2) 0;
+}
+
+.wcc-apps {
+  margin-top: var(--space-2);
+}
+
+@media (max-width: 960px) {
+  .ctx-control-bar,
+  .wcc-overview,
+  .ctx-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ctx-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .wcc-overview-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .ctx-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .ctx-task-item {
+    grid-template-columns: 1fr;
+  }
+}

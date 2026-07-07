@@ -95,7 +95,6 @@ function open_canvas_auth_window (window, onauth, getauthview, setup = false) {
              window.contentView.removeChildView(view)
              getauthview(null)
             if (tcsrf) {
-                console.log('csrf:' + tcsrf)
                 csrf = tcsrf
             }
             if (turl) {

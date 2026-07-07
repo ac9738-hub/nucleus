@@ -4,8 +4,15 @@
   "colorScheme": "dark",
   "rendererStylesheets": [
     "themes/dark/styles.css",
+    "lib/nucleus-ui.css",
+    "lib/context-controller.css",
+    "lib/sidekick-composer.css",
+    "lib/lumi-panel.css",
     "themes/dark/synapse.css",
-    "themes/dark/mail.css"
+    "themes/dark/mail.css",
+    "lib/feature-shell.css",
+    "app/artifacts/artifacts.css",
+    "app/canvas/canvas.css"
   ],
   "palette": {
     "bg": "#0a0b0e",

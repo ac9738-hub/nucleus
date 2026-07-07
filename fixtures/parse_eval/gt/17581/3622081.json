@@ -1,0 +1,326 @@
+{
+  "version": 1,
+  "courseId": "17581",
+  "fileId": "3622081",
+  "filename": "Harvey_2013.pdf",
+  "expectedFileType": "research_article",
+  "passPlan": {
+    "courseId": "17581",
+    "fileId": "3622081",
+    "filename": "Harvey_2013.pdf",
+    "resolvedType": "research_article",
+    "heuristicConfidence": 0.86,
+    "neededPasses": [
+      "extract_pages",
+      "heuristic_classify",
+      "llm_pass1",
+      "finalize"
+    ],
+    "skippedPasses": [
+      "llm_classify",
+      "llm_pass2"
+    ],
+    "estLlmCalls": 1,
+    "estRealisticLlmCalls": 1.0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "needed": true,
+        "reason": "Required local PDF/HTML extraction; no LLM.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "heuristic_classify",
+        "needed": true,
+        "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_classify",
+        "needed": false,
+        "reason": "Heuristic confidence 0.86 sufficient; skip flash classify call.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_pass1",
+        "needed": true,
+        "reason": "Type research_article: pass1 extracts concepts=True, problems=False, events=False.",
+        "llmCall": true,
+        "estCostTier": "high"
+      },
+      {
+        "pass": "llm_pass2",
+        "needed": false,
+        "reason": "Type research_article disables pass2 (single-pass type-specific or link-only profile).",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "finalize",
+        "needed": true,
+        "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+        "llmCall": false,
+        "estCostTier": "free"
+      }
+    ]
+  },
+  "passAudit": {
+    "plan": {
+      "courseId": "17581",
+      "fileId": "3622081",
+      "filename": "Harvey_2013.pdf",
+      "resolvedType": "research_article",
+      "heuristicConfidence": 0.86,
+      "neededPasses": [
+        "extract_pages",
+        "heuristic_classify",
+        "llm_pass1",
+        "finalize"
+      ],
+      "skippedPasses": [
+        "llm_classify",
+        "llm_pass2"
+      ],
+      "estLlmCalls": 1,
+      "estRealisticLlmCalls": 1.0,
+      "steps": [
+        {
+          "pass": "extract_pages",
+          "needed": true,
+          "reason": "Required local PDF/HTML extraction; no LLM.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "heuristic_classify",
+          "needed": true,
+          "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_classify",
+          "needed": false,
+          "reason": "Heuristic confidence 0.86 sufficient; skip flash classify call.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_pass1",
+          "needed": true,
+          "reason": "Type research_article: pass1 extracts concepts=True, problems=False, events=False.",
+          "llmCall": true,
+          "estCostTier": "high"
+        },
+        {
+          "pass": "llm_pass2",
+          "needed": false,
+          "reason": "Type research_article disables pass2 (single-pass type-specific or link-only profile).",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "finalize",
+          "needed": true,
+          "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+          "llmCall": false,
+          "estCostTier": "free"
+        }
+      ]
+    },
+    "actualType": "research_article",
+    "deepseekPasses": 1,
+    "conceptCount": 15,
+    "detailCount": 4,
+    "totalLlmTokens": 0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "ran": true,
+        "useful": true,
+        "verdict": "required",
+        "note": "Local I/O; pages present means extract succeeded."
+      },
+      {
+        "pass": "heuristic_classify",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "Routed to research_article (free)."
+      },
+      {
+        "pass": "llm_classify",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Skipped; heuristic confidence sufficient.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass1",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "No pass1 tool trace.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass2",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Correctly skipped: profile disables pass2, type-specific pass1 only, or no log_* tools.",
+        "tokens": 0
+      },
+      {
+        "pass": "finalize",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "logged_details promoted to concept details."
+      }
+    ],
+    "cutCandidates": [],
+    "recommendations": [
+      "Pass2 correctly skipped for this type/pass1 tool pattern."
+    ]
+  },
+  "passes": [
+    "extract_pages",
+    "heuristic_classify",
+    "teaching_units",
+    "type_structure",
+    "concept_candidates",
+    "problem_scan",
+    "detail_attach",
+    "reconcile"
+  ],
+  "buildMode": "template_multi_pass_offline",
+  "builtAt": "2026-07-01T22:49:39Z",
+  "concepts": [
+    {
+      "name": "13 may 2013; accepted 8 august 201310.1126/science.1240405",
+      "details": []
+    },
+    {
+      "name": "11 april 2013; accepted 8 august 201310.1126/science.1239052",
+      "details": []
+    },
+    {
+      "name": "b.m.harvey@uu.nl",
+      "details": [
+        "*Corresponding author. E-mail: b.m.harvey@uu.nl"
+      ]
+    },
+    {
+      "name": "reports",
+      "details": []
+    },
+    {
+      "name": "preferred numerosity",
+      "details": []
+    },
+    {
+      "name": "distance (mm)",
+      "details": []
+    },
+    {
+      "name": "minimum r2, all conditions",
+      "details": []
+    },
+    {
+      "name": "r2 threshold = 0.35",
+      "details": [
+        "Subject 2: R2 threshold = 0.35"
+      ]
+    },
+    {
+      "name": "r2 threshold = 0.30",
+      "details": [
+        "Subject 1: R2 threshold = 0.30"
+      ]
+    },
+    {
+      "name": "tuning width (fwhm)",
+      "details": []
+    },
+    {
+      "name": "10.1126/science.1239052 (6150), 1123-1126.341science",
+      "details": [
+        "DOI: 10.1126/science.1239052 (6150), 1123-1126.341Science"
+      ]
+    },
+    {
+      "name": "//science.sciencemag.org/content/341/6150/1123",
+      "details": []
+    },
+    {
+      "name": "materialssupplementary",
+      "details": []
+    },
+    {
+      "name": "//science.sciencemag.org/content/sci/341/6150/1127.2.full",
+      "details": []
+    },
+    {
+      "name": "references",
+      "details": []
+    }
+  ],
+  "conceptCount": 15,
+  "detailCount": 4,
+  "events": [],
+  "problems": [],
+  "sections": [],
+  "deepseekPasses": 1,
+  "expectsPass2": false,
+  "gtProvenance": {
+    "typeSource": "heuristic_high",
+    "typeConfidence": 0.86,
+    "offlinePassAudit": {
+      "extract_pages": {
+        "localPdf": true,
+        "pageCount": 5,
+        "pdfPath": "C:\\Allen\\nucleus\\canvasfiles\\3622081"
+      },
+      "heuristic_classify": {
+        "expectedFileType": "research_article",
+        "source": "heuristic_high",
+        "confidence": 0.86
+      },
+      "teaching_units": {
+        "sectionCount": 0
+      },
+      "type_structure": {
+        "slideRows": 17,
+        "readingSections": 17,
+        "syllabusWeeks": 0
+      },
+      "concept_candidates": {
+        "candidateCount": 15
+      },
+      "problem_scan": {
+        "problemCount": 0
+      },
+      "detail_attach": {
+        "conceptKeysWithDetails": 4,
+        "detailCount": 4
+      },
+      "reconcile": {
+        "inputTitles": 15,
+        "accepted": 15,
+        "capped": 0,
+        "detailAttached": 4
+      }
+    },
+    "reconcileStats": {
+      "inputTitles": 15,
+      "accepted": 15,
+      "capped": 0,
+      "detailAttached": 4
+    }
+  }
+}

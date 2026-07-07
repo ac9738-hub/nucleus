@@ -1,3 +1,23 @@
+import re
+
+from canvas_parser.graph.sequence_hints import document_order_sort_key, sort_concepts_by_document_order
+
+WEEK_MODULE = re.compile(r'week\s*(\d+)', re.I)
+SETUP_MODULE = re.compile(
+    r'syllabus|schedule|course resource|introduction|pinyin|course resources|semester',
+    re.I,
+)
+
+
+def _first_detail_description(concept):
+    for detail in concept.get('details') or []:
+        if isinstance(detail, dict):
+            text = str(detail.get('description') or detail.get('name') or '').strip()
+            if text:
+                return text
+    return ''
+
+
 def topological_sort_concepts(concepts, prerequisite_map):
     concept_ids = [concept.get('conceptid') for concept in concepts if concept.get('conceptid')]
     indegree = {concept_id: 0 for concept_id in concept_ids}
@@ -24,6 +44,14 @@ def topological_sort_concepts(concepts, prerequisite_map):
 
     if len(ordered) != len(concept_ids):
         remaining = [concept_id for concept_id in concept_ids if concept_id not in ordered]
+        remaining.sort(
+            key=lambda concept_id: document_order_sort_key(
+                next(
+                    (concept.get('documentOrder') for concept in concepts if concept.get('conceptid') == concept_id),
+                    None,
+                )
+            )
+        )
         ordered.extend(remaining)
     return ordered
 
@@ -49,15 +77,31 @@ def build_hybrid_learning_blocks(
                 'position': int(hint.get('position', 0) or 0),
             })
 
+    module_names: dict[str, str] = {}
+    for concept in concepts:
+        for hint in concept.get('moduleOrderHints') or module_order_hints.get(concept.get('conceptid')) or []:
+            if not isinstance(hint, dict):
+                continue
+            module_id = str(hint.get('moduleId') or '')
+            module_name = str(hint.get('moduleName') or '').strip()
+            if module_id and module_name and module_id not in module_names:
+                module_names[module_id] = module_name
+
     def module_sort_key(module_id):
         if module_id == 'unscheduled':
-            return (1, 0, module_id)
+            return (2, 9999, 0, module_id)
         entries = module_buckets.get(module_id) or []
         if entries and isinstance(entries[0], dict):
             min_position = min(item.get('position', 0) for item in entries)
         else:
             min_position = 0
-        return (0, min_position, module_id)
+        module_name = module_names.get(str(module_id), '')
+        week_match = WEEK_MODULE.search(module_name)
+        if week_match:
+            return (0, int(week_match.group(1)), min_position, module_id)
+        if SETUP_MODULE.search(module_name):
+            return (0, 0, min_position, module_id)
+        return (1, min_position, 0, module_id)
 
     sorted_module_ids = sorted(module_buckets.keys(), key=module_sort_key)
 
@@ -67,7 +111,9 @@ def build_hybrid_learning_blocks(
         if not entries:
             continue
         if isinstance(entries[0], str):
-            module_concepts = entries
+            module_concepts = sort_concepts_by_document_order(
+                [concepts_by_id[concept_id] for concept_id in entries if concept_id in concepts_by_id]
+            ) or entries
         else:
             module_concepts = [entry['conceptId'] for entry in sorted(entries, key=lambda item: item.get('position', 0))]
         module_subset = [concepts_by_id[concept_id] for concept_id in module_concepts if concept_id in concepts_by_id]
@@ -89,16 +135,21 @@ def build_hybrid_learning_blocks(
             continue
         detail_refs = [f"detail:{concept_id}:{detail.get('name')}" for detail in concept.get('details', []) if detail.get('name')]
         example_refs = [f"example:{concept_id}:{example.get('name')}" for example in concept.get('examples', []) if example.get('name')]
+        order_source = 'merged'
+        if concept.get('documentOrder'):
+            order_source = 'document_order'
+        elif concept.get('moduleOrderHints') or module_order_hints.get(concept_id):
+            order_source = 'module_hint'
         blocks.append({
             'blockId': f"{courseid}-{concept_id}-block",
             'courseid': courseid,
             'order': order,
             'conceptId': concept_id,
-            'explanation': concept.get('description', ''),
+            'explanation': concept.get('description', '') or _first_detail_description(concept),
             'detailRefs': detail_refs,
             'examples': example_refs,
             'practiceProblems': list(problems_by_concept.get(concept_id, [])),
             'sourceRefs': concept.get('sourcePages', []) or [],
-            'orderSource': 'merged',
+            'orderSource': order_source,
         })
     return blocks

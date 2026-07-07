@@ -1,0 +1,4 @@
+PASTE_CHAPTER_TEXT_HERE
+
+Second holdout chapter for textbook section mapping eval.
+Add expectedSections in textbook/manifest.json after pasting.

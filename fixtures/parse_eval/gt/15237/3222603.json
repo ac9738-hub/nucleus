@@ -1,0 +1,400 @@
+{
+  "version": 1,
+  "courseId": "15237",
+  "fileId": "3222603",
+  "filename": "Precept I_ Lecture 0 & Lecture I.pdf",
+  "expectedFileType": "lecture_slides",
+  "passPlan": {
+    "courseId": "15237",
+    "fileId": "3222603",
+    "filename": "Precept I_ Lecture 0 & Lecture I.pdf",
+    "resolvedType": "lecture_slides",
+    "heuristicConfidence": 0.92,
+    "neededPasses": [
+      "extract_pages",
+      "heuristic_classify",
+      "llm_pass1",
+      "finalize"
+    ],
+    "skippedPasses": [
+      "llm_classify",
+      "llm_pass2"
+    ],
+    "estLlmCalls": 1,
+    "estRealisticLlmCalls": 1.0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "needed": true,
+        "reason": "Required local PDF/HTML extraction; no LLM.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "heuristic_classify",
+        "needed": true,
+        "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_classify",
+        "needed": false,
+        "reason": "Heuristic confidence 0.92 sufficient; skip flash classify call.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_pass1",
+        "needed": true,
+        "reason": "Type lecture_slides: pass1 extracts concepts=True, problems=True, events=False.",
+        "llmCall": true,
+        "estCostTier": "high"
+      },
+      {
+        "pass": "llm_pass2",
+        "needed": false,
+        "reason": "Type lecture_slides disables pass2 (single-pass type-specific or link-only profile).",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "finalize",
+        "needed": true,
+        "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+        "llmCall": false,
+        "estCostTier": "free"
+      }
+    ]
+  },
+  "passAudit": {
+    "plan": {
+      "courseId": "15237",
+      "fileId": "3222603",
+      "filename": "Precept I_ Lecture 0 & Lecture I.pdf",
+      "resolvedType": "lecture_slides",
+      "heuristicConfidence": 0.92,
+      "neededPasses": [
+        "extract_pages",
+        "heuristic_classify",
+        "llm_pass1",
+        "finalize"
+      ],
+      "skippedPasses": [
+        "llm_classify",
+        "llm_pass2"
+      ],
+      "estLlmCalls": 1,
+      "estRealisticLlmCalls": 1.0,
+      "steps": [
+        {
+          "pass": "extract_pages",
+          "needed": true,
+          "reason": "Required local PDF/HTML extraction; no LLM.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "heuristic_classify",
+          "needed": true,
+          "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_classify",
+          "needed": false,
+          "reason": "Heuristic confidence 0.92 sufficient; skip flash classify call.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_pass1",
+          "needed": true,
+          "reason": "Type lecture_slides: pass1 extracts concepts=True, problems=True, events=False.",
+          "llmCall": true,
+          "estCostTier": "high"
+        },
+        {
+          "pass": "llm_pass2",
+          "needed": false,
+          "reason": "Type lecture_slides disables pass2 (single-pass type-specific or link-only profile).",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "finalize",
+          "needed": true,
+          "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+          "llmCall": false,
+          "estCostTier": "free"
+        }
+      ]
+    },
+    "actualType": "lecture_slides",
+    "deepseekPasses": 1,
+    "conceptCount": 29,
+    "detailCount": 10,
+    "totalLlmTokens": 0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "ran": true,
+        "useful": true,
+        "verdict": "required",
+        "note": "Local I/O; pages present means extract succeeded."
+      },
+      {
+        "pass": "heuristic_classify",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "Routed to lecture_slides (free)."
+      },
+      {
+        "pass": "llm_classify",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Skipped; heuristic confidence sufficient.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass1",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "No pass1 tool trace.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass2",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Correctly skipped: profile disables pass2, type-specific pass1 only, or no log_* tools.",
+        "tokens": 0
+      },
+      {
+        "pass": "finalize",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "logged_details promoted to concept details."
+      }
+    ],
+    "cutCandidates": [],
+    "recommendations": [
+      "Pass2 correctly skipped for this type/pass1 tool pattern."
+    ]
+  },
+  "passes": [
+    "extract_pages",
+    "heuristic_classify",
+    "teaching_units",
+    "type_structure",
+    "concept_candidates",
+    "problem_scan",
+    "detail_attach",
+    "reconcile"
+  ],
+  "buildMode": "template_multi_pass_offline",
+  "builtAt": "2026-07-01T22:49:38Z",
+  "concepts": [
+    {
+      "name": "Precept I_ Lecture 0 & Lecture I",
+      "details": []
+    },
+    {
+      "name": "lecture 0",
+      "details": [
+        "Lecture 0: A brief historyNEB: Ch.1"
+      ]
+    },
+    {
+      "name": "lecture 1",
+      "details": [
+        "Lecture 1: Neurons and gliaNEB: Ch. 2"
+      ]
+    },
+    {
+      "name": "-See NEB Ch.1 (how the brain enables the mind)-When I’m not in the lab",
+      "details": []
+    },
+    {
+      "name": "-Neurons need these proteins in axons and dendrites",
+      "details": []
+    },
+    {
+      "name": "lecture 0 & lecture i",
+      "details": [
+        "Precept I: Lecture 0 & Lecture I"
+      ]
+    },
+    {
+      "name": "pni a18mm. czarnik",
+      "details": [
+        "NEU 201: PNI A18MM. Czarnik"
+      ]
+    },
+    {
+      "name": "cv -g2 at pni",
+      "details": []
+    },
+    {
+      "name": "disclaimers",
+      "details": []
+    },
+    {
+      "name": "precept culture",
+      "details": [
+        "Expectations: Precept culture"
+      ]
+    },
+    {
+      "name": "precept",
+      "details": []
+    },
+    {
+      "name": "expectations",
+      "details": []
+    },
+    {
+      "name": "communication",
+      "details": []
+    },
+    {
+      "name": "communications",
+      "details": []
+    },
+    {
+      "name": "advice",
+      "details": []
+    },
+    {
+      "name": "neurons and glianeb: ch. 2",
+      "details": [
+        "Lecture 1: Neurons and gliaNEB: Ch. 2"
+      ]
+    },
+    {
+      "name": "neurons",
+      "details": []
+    },
+    {
+      "name": "neurites = radiating from soma: dendrites and axons",
+      "details": [
+        "-Dendrites, soma, axons, synapse-Vocab: neurites = radiating from soma: dendrites and axons"
+      ]
+    },
+    {
+      "name": "active transport",
+      "details": []
+    },
+    {
+      "name": "lecture review activity 2 (neurons & glia)",
+      "details": []
+    },
+    {
+      "name": "discussion group",
+      "details": [
+        "Glial cells: discussion group"
+      ]
+    },
+    {
+      "name": "astrocytes",
+      "details": []
+    },
+    {
+      "name": "microglia",
+      "details": []
+    },
+    {
+      "name": "oligodendrocytes",
+      "details": []
+    },
+    {
+      "name": "schwann cells",
+      "details": []
+    },
+    {
+      "name": "ependymal cells",
+      "details": []
+    },
+    {
+      "name": "creates myelination in the pns; 1 schwann covers 1 axon",
+      "details": [
+        "Schwann Cells: creates myelination in the PNS; 1 schwann covers 1 axon"
+      ]
+    },
+    {
+      "name": "produce and circulate csf, direct cells during development",
+      "details": [
+        "Ependymal cells: Produce and circulate CSF, direct cells during development"
+      ]
+    },
+    {
+      "name": "looking ahead",
+      "details": []
+    }
+  ],
+  "conceptCount": 29,
+  "detailCount": 10,
+  "events": [],
+  "problems": [],
+  "sections": [
+    "-See NEB Ch.1 (how the brain enables the mind)-When I’m not in the lab",
+    "Communications",
+    "0",
+    "1",
+    "-Neurons need these proteins in axons and dendrites"
+  ],
+  "deepseekPasses": 1,
+  "expectsPass2": false,
+  "gtProvenance": {
+    "typeSource": "heuristic_high",
+    "typeConfidence": 0.92,
+    "offlinePassAudit": {
+      "extract_pages": {
+        "localPdf": true,
+        "pageCount": 24,
+        "pdfPath": "C:\\Allen\\nucleus\\canvasfiles\\3222603"
+      },
+      "heuristic_classify": {
+        "expectedFileType": "lecture_slides",
+        "source": "heuristic_high",
+        "confidence": 0.92
+      },
+      "teaching_units": {
+        "sectionCount": 5
+      },
+      "type_structure": {
+        "slideRows": 29,
+        "readingSections": 0,
+        "syllabusWeeks": 0
+      },
+      "concept_candidates": {
+        "candidateCount": 29
+      },
+      "problem_scan": {
+        "problemCount": 0
+      },
+      "detail_attach": {
+        "conceptKeysWithDetails": 14,
+        "detailCount": 14
+      },
+      "reconcile": {
+        "inputTitles": 29,
+        "accepted": 29,
+        "capped": 0,
+        "detailAttached": 10
+      }
+    },
+    "reconcileStats": {
+      "inputTitles": 29,
+      "accepted": 29,
+      "capped": 0,
+      "detailAttached": 10
+    }
+  }
+}

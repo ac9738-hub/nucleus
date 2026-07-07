@@ -21,12 +21,33 @@
                 "yRatio0": 0.0,
                 "yRatio1": 0.05
               },
-              {
+            {
                 "text": "Grading policy",
                 "y0": 400,
                 "y1": 440,
                 "yRatio0": 0.5,
                 "yRatio1": 0.55
+              },
+              {
+                "text": "2.3 Matrix Products",
+                "y0": 500,
+                "y1": 540,
+                "yRatio0": 0.62,
+                "yRatio1": 0.68
+              },
+              {
+                "text": "Example 3: A system without solutions",
+                "y0": 560,
+                "y1": 600,
+                "yRatio0": 0.7,
+                "yRatio1": 0.75
+              },
+              {
+                "text": "Problem 4: compute the product",
+                "y0": 620,
+                "y1": 660,
+                "yRatio0": 0.78,
+                "yRatio1": 0.83
               }
             ]
           },

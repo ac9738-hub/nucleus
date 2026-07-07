@@ -1,0 +1,548 @@
+{
+  "version": 1,
+  "courseId": "15237",
+  "fileId": "3477977",
+  "filename": "NEU201_FinalPractice.pdf",
+  "expectedFileType": "lecture_slides",
+  "passPlan": {
+    "courseId": "15237",
+    "fileId": "3477977",
+    "filename": "NEU201_FinalPractice.pdf",
+    "resolvedType": "lecture_slides",
+    "heuristicConfidence": 0.84,
+    "neededPasses": [
+      "extract_pages",
+      "heuristic_classify",
+      "llm_pass1",
+      "finalize"
+    ],
+    "skippedPasses": [
+      "llm_classify",
+      "llm_pass2"
+    ],
+    "estLlmCalls": 1,
+    "estRealisticLlmCalls": 1.0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "needed": true,
+        "reason": "Required local PDF/HTML extraction; no LLM.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "heuristic_classify",
+        "needed": true,
+        "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_classify",
+        "needed": false,
+        "reason": "Heuristic confidence 0.84 sufficient; skip flash classify call.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_pass1",
+        "needed": true,
+        "reason": "Type lecture_slides: pass1 extracts concepts=True, problems=True, events=False.",
+        "llmCall": true,
+        "estCostTier": "high"
+      },
+      {
+        "pass": "llm_pass2",
+        "needed": false,
+        "reason": "Type lecture_slides disables pass2 (single-pass type-specific or link-only profile).",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "finalize",
+        "needed": true,
+        "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+        "llmCall": false,
+        "estCostTier": "free"
+      }
+    ]
+  },
+  "passAudit": {
+    "plan": {
+      "courseId": "15237",
+      "fileId": "3477977",
+      "filename": "NEU201_FinalPractice.pdf",
+      "resolvedType": "lecture_slides",
+      "heuristicConfidence": 0.84,
+      "neededPasses": [
+        "extract_pages",
+        "heuristic_classify",
+        "llm_pass1",
+        "finalize"
+      ],
+      "skippedPasses": [
+        "llm_classify",
+        "llm_pass2"
+      ],
+      "estLlmCalls": 1,
+      "estRealisticLlmCalls": 1.0,
+      "steps": [
+        {
+          "pass": "extract_pages",
+          "needed": true,
+          "reason": "Required local PDF/HTML extraction; no LLM.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "heuristic_classify",
+          "needed": true,
+          "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_classify",
+          "needed": false,
+          "reason": "Heuristic confidence 0.84 sufficient; skip flash classify call.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_pass1",
+          "needed": true,
+          "reason": "Type lecture_slides: pass1 extracts concepts=True, problems=True, events=False.",
+          "llmCall": true,
+          "estCostTier": "high"
+        },
+        {
+          "pass": "llm_pass2",
+          "needed": false,
+          "reason": "Type lecture_slides disables pass2 (single-pass type-specific or link-only profile).",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "finalize",
+          "needed": true,
+          "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+          "llmCall": false,
+          "estCostTier": "free"
+        }
+      ]
+    },
+    "actualType": "lecture_slides",
+    "deepseekPasses": 1,
+    "conceptCount": 47,
+    "detailCount": 21,
+    "totalLlmTokens": 0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "ran": true,
+        "useful": true,
+        "verdict": "required",
+        "note": "Local I/O; pages present means extract succeeded."
+      },
+      {
+        "pass": "heuristic_classify",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "Routed to lecture_slides (free)."
+      },
+      {
+        "pass": "llm_classify",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Skipped; heuristic confidence sufficient.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass1",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "No pass1 tool trace.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass2",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Correctly skipped: profile disables pass2, type-specific pass1 only, or no log_* tools.",
+        "tokens": 0
+      },
+      {
+        "pass": "finalize",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "logged_details promoted to concept details."
+      }
+    ],
+    "cutCandidates": [],
+    "recommendations": [
+      "Pass2 correctly skipped for this type/pass1 tool pattern."
+    ]
+  },
+  "passes": [
+    "extract_pages",
+    "heuristic_classify",
+    "teaching_units",
+    "type_structure",
+    "concept_candidates",
+    "problem_scan",
+    "detail_attach",
+    "reconcile"
+  ],
+  "buildMode": "template_multi_pass_offline",
+  "builtAt": "2026-07-01T22:49:38Z",
+  "concepts": [
+    {
+      "name": "wiring the brain",
+      "details": [
+        "Lecture 7_wiring the brain"
+      ]
+    },
+    {
+      "name": "motor systems",
+      "details": [
+        "Lecture 12_motor systems"
+      ]
+    },
+    {
+      "name": "113 neurons cannot",
+      "details": []
+    },
+    {
+      "name": "electrical properties I resting membrane potential",
+      "details": [
+        "Lecture 2_electrical properties I resting membrane potential"
+      ]
+    },
+    {
+      "name": "synaptic transmission I presynaptic electrical chemical",
+      "details": [
+        "Lecture 4_synaptic transmission I presynaptic electrical chemical"
+      ]
+    },
+    {
+      "name": "synaptic transmission II postsynaptic neurotransmitters",
+      "details": [
+        "Lecture 5_synaptic transmission II postsynaptic neurotransmitters"
+      ]
+    },
+    {
+      "name": "dendritic integration_structure of the nervous system",
+      "details": [
+        "Lecture 6_dendritic integration_structure of the nervous system"
+      ]
+    },
+    {
+      "name": "chemical control of brain_behavior",
+      "details": [
+        "Lecture 13_chemical control of brain_behavior"
+      ]
+    },
+    {
+      "name": "Problem 78",
+      "details": []
+    },
+    {
+      "name": "Problem 79",
+      "details": []
+    },
+    {
+      "name": "Problem 80",
+      "details": []
+    },
+    {
+      "name": "Problem 81",
+      "details": []
+    },
+    {
+      "name": "Problem 84",
+      "details": []
+    },
+    {
+      "name": "Problem 85",
+      "details": []
+    },
+    {
+      "name": "Problem 87",
+      "details": []
+    },
+    {
+      "name": "emotion and sleep_EEG_epilepsy",
+      "details": [
+        "Lecture 15_emotion and sleep_EEG_epilepsy"
+      ]
+    },
+    {
+      "name": "Problem 89",
+      "details": []
+    },
+    {
+      "name": "Problem 90",
+      "details": []
+    },
+    {
+      "name": "Problem 91",
+      "details": []
+    },
+    {
+      "name": "Problem 92",
+      "details": []
+    },
+    {
+      "name": "Problem 93",
+      "details": []
+    },
+    {
+      "name": "Problem 94",
+      "details": []
+    },
+    {
+      "name": "Problem 95",
+      "details": []
+    },
+    {
+      "name": "Problem 96",
+      "details": []
+    },
+    {
+      "name": "Problem 97",
+      "details": []
+    },
+    {
+      "name": "Problem 98",
+      "details": []
+    },
+    {
+      "name": "Problem 99",
+      "details": []
+    },
+    {
+      "name": "102. Short term memories can involve all of the following processes EXCEPT",
+      "details": []
+    },
+    {
+      "name": "123. Learning, to a neuron, is characterized by",
+      "details": []
+    },
+    {
+      "name": "affective anxiety and mood disorders schizophrenia depression",
+      "details": [
+        "Lecture 19_affective anxiety and mood disorders schizophrenia depression"
+      ]
+    },
+    {
+      "name": "unit 1",
+      "details": []
+    },
+    {
+      "name": "cellular neuroanatomy",
+      "details": [
+        "Lecture 1_cellular neuroanatomy"
+      ]
+    },
+    {
+      "name": "membrane is permeable to",
+      "details": []
+    },
+    {
+      "name": "electrical properties ii action potentials",
+      "details": [
+        "Lecture 3_electrical properties II action potentials"
+      ]
+    },
+    {
+      "name": "unit 2",
+      "details": []
+    },
+    {
+      "name": "visual system i the eye",
+      "details": [
+        "Lecture 8_ visual system I the eye"
+      ]
+    },
+    {
+      "name": "visual system ii central processing and faces",
+      "details": [
+        "Lecture 9_ visual system II central processing and faces"
+      ]
+    },
+    {
+      "name": "chemosensory",
+      "details": [
+        "Lecture 10_chemosensory"
+      ]
+    },
+    {
+      "name": "auditory and vestibular systems and language",
+      "details": [
+        "Lecture 11_auditory and vestibular systems and language"
+      ]
+    },
+    {
+      "name": "unit 3",
+      "details": []
+    },
+    {
+      "name": "name some biological benefits of sleep.",
+      "details": [
+        "95. Short answer: Name some biological benefits of sleep."
+      ]
+    },
+    {
+      "name": "habituation learning memory",
+      "details": [
+        "Lecture 16_habituation learning memory"
+      ]
+    },
+    {
+      "name": "e) none of the above",
+      "details": []
+    },
+    {
+      "name": "cellular substrates of plasticity",
+      "details": [
+        "Lecture 17_cellular substrates of plasticity"
+      ]
+    },
+    {
+      "name": "blocking nmdars prevents ltp.",
+      "details": [
+        "134. True/False: Blocking NMDARs prevents LTP."
+      ]
+    },
+    {
+      "name": "developmental disorders",
+      "details": [
+        "Lecture 18_developmental disorders"
+      ]
+    },
+    {
+      "name": "degeneration and regeneration",
+      "details": [
+        "Lecture 20_degeneration and regeneration"
+      ]
+    }
+  ],
+  "conceptCount": 47,
+  "detailCount": 21,
+  "events": [],
+  "problems": [
+    "Problem 78",
+    "Problem 79",
+    "Problem 80",
+    "Problem 81",
+    "Problem 84",
+    "Problem 85",
+    "Problem 87",
+    "Problem 89",
+    "Problem 90",
+    "Problem 91",
+    "Problem 92",
+    "Problem 93",
+    "Problem 94",
+    "Problem 95",
+    "Problem 96",
+    "Problem 97",
+    "Problem 98",
+    "Problem 99"
+  ],
+  "sections": [
+    "1",
+    "cellular neuroanatomy",
+    "electrical properties I resting membrane potential",
+    "electrical properties II action potentials",
+    "synaptic transmission I presynaptic electrical chemical",
+    "synaptic transmission II postsynaptic neurotransmitters",
+    "dendritic integration_structure of the nervous system",
+    "wiring the brain",
+    "2",
+    "visual system I the eye",
+    "visual system II central processing and faces",
+    "chemosensory",
+    "auditory and vestibular systems and language",
+    "motor systems",
+    "3",
+    "chemical control of brain_behavior",
+    "motivation addiction76. True/False: The periventricular hypothalamus is required for motivated, somatic motor action.",
+    "Problem 78",
+    "Problem 79",
+    "Problem 80",
+    "Problem 81",
+    "Problem 84",
+    "Problem 85",
+    "Problem 87",
+    "emotion and sleep_EEG_epilepsy",
+    "Problem 89",
+    "Problem 90",
+    "Problem 91",
+    "Problem 92",
+    "Problem 93",
+    "Problem 94",
+    "Problem 95",
+    "Problem 96",
+    "Problem 97",
+    "Problem 98",
+    "Problem 99",
+    "habituation learning memory",
+    "102. Short term memories can involve all of the following processes EXCEPT",
+    "113 Neurons cannot",
+    "cellular substrates of plasticity"
+  ],
+  "deepseekPasses": 1,
+  "expectsPass2": false,
+  "gtProvenance": {
+    "typeSource": "heuristic_high",
+    "typeConfidence": 0.84,
+    "offlinePassAudit": {
+      "extract_pages": {
+        "localPdf": true,
+        "pageCount": 19,
+        "pdfPath": "C:\\Allen\\nucleus\\canvasfiles\\3477977"
+      },
+      "heuristic_classify": {
+        "expectedFileType": "lecture_slides",
+        "source": "heuristic_high",
+        "confidence": 0.84
+      },
+      "teaching_units": {
+        "sectionCount": 44
+      },
+      "type_structure": {
+        "slideRows": 28,
+        "readingSections": 0,
+        "syllabusWeeks": 0
+      },
+      "concept_candidates": {
+        "candidateCount": 47
+      },
+      "problem_scan": {
+        "problemCount": 18
+      },
+      "detail_attach": {
+        "conceptKeysWithDetails": 31,
+        "detailCount": 31
+      },
+      "reconcile": {
+        "inputTitles": 47,
+        "accepted": 47,
+        "capped": 0,
+        "detailAttached": 21
+      }
+    },
+    "reconcileStats": {
+      "inputTitles": 47,
+      "accepted": 47,
+      "capped": 0,
+      "detailAttached": 21
+    }
+  }
+}

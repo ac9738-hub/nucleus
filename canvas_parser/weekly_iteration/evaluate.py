@@ -8,7 +8,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from .course_match import GroundTruthSpec, find_snapshot_for_ground_truth, parse_ground_truth_filename
+from .course_match import (
+    GroundTruthSpec,
+    find_snapshot_for_ground_truth,
+    gt_course_id_map,
+    iter_ground_truth_files,
+    parse_ground_truth_filename,
+)
 from .format import format_course_snapshot
 from .fetch import fetch_all_courses, load_snapshots
 
@@ -26,6 +32,7 @@ WEEKLY_ONLY_WEIGHTS = {
 }
 
 
+from .availability import weekly_item_is_evaluable
 from .match_utils import names_match, normalize_name
 
 
@@ -179,18 +186,25 @@ def _match_weekly_schedule(
     actual_weeks: list[dict[str, Any]],
     *,
     strict_weeks: bool = False,
-) -> tuple[int, int, list[str]]:
+    snapshot: dict[str, Any] | None = None,
+    unlocked_only: bool = False,
+) -> tuple[int, int, list[str], int]:
     matched = 0
     total = 0
     misses: list[str] = []
+    skipped_locked = 0
 
     for expected_week in expected_weeks or []:
         expected_start = normalize_date(expected_week.get('start_date') or '')
         actual_week = _find_matching_week(expected_week, actual_weeks, strict_weeks=strict_weeks)
         for bucket_key in ('files', 'assignments', 'events'):
             for expected_item in expected_week.get(bucket_key) or []:
-                total += 1
                 expected_name = expected_item.get('name') or ''
+                if unlocked_only and snapshot is not None:
+                    if not weekly_item_is_evaluable(snapshot, expected_name, bucket_key):
+                        skipped_locked += 1
+                        continue
+                total += 1
                 if not actual_week:
                     if strict_weeks:
                         misses.append(f'{expected_week.get("name")}:{bucket_key}:{expected_name}')
@@ -214,7 +228,7 @@ def _match_weekly_schedule(
                 else:
                     misses.append(f'{expected_week.get("name")}:{bucket_key}:{expected_name}')
 
-    return matched, total, misses
+    return matched, total, misses, skipped_locked
 
 
 @dataclass
@@ -223,6 +237,7 @@ class SectionScore:
     matched: int = 0
     total: int = 0
     misses: list[str] = field(default_factory=list)
+    skipped_locked: int = 0
 
     @property
     def accuracy(self) -> float:
@@ -253,7 +268,15 @@ class CourseScore:
         return weighted / weight_total
 
 
-def score_parsed_course(parsed: dict[str, Any], ground_truth: dict[str, Any], *, weekly_only: bool = False, strict_weekly: bool = False) -> CourseScore:
+def score_parsed_course(
+    parsed: dict[str, Any],
+    ground_truth: dict[str, Any],
+    *,
+    weekly_only: bool = False,
+    strict_weekly: bool = False,
+    snapshot: dict[str, Any] | None = None,
+    unlocked_only: bool = False,
+) -> CourseScore:
     score = CourseScore(ground_truth_file='', course_label='')
     if not weekly_only:
         for section_name in ('assignments', 'discussions', 'participation'):
@@ -274,12 +297,15 @@ def score_parsed_course(parsed: dict[str, Any], ground_truth: dict[str, Any], *,
             score.sections['modules'] = SectionScore('modules', matched, total, misses)
 
     if 'weekly_schedule' in ground_truth:
-        matched, total, misses = _match_weekly_schedule(
+        matched, total, misses, skipped_locked = _match_weekly_schedule(
             ground_truth.get('weekly_schedule') or [],
             parsed.get('weekly_schedule') or [],
             strict_weeks=strict_weekly,
+            snapshot=snapshot,
+            unlocked_only=unlocked_only,
         )
-        score.sections['weekly_schedule'] = SectionScore('weekly_schedule', matched, total, misses)
+        section = SectionScore('weekly_schedule', matched, total, misses, skipped_locked)
+        score.sections['weekly_schedule'] = section
 
     if weekly_only:
         score._section_weights = WEEKLY_ONLY_WEIGHTS
@@ -294,8 +320,17 @@ def compare_to_ground_truth(
     course_label: str = '',
     weekly_only: bool = False,
     strict_weekly: bool = False,
+    snapshot: dict[str, Any] | None = None,
+    unlocked_only: bool = False,
 ) -> CourseScore:
-    result = score_parsed_course(parsed, ground_truth, weekly_only=weekly_only, strict_weekly=strict_weekly)
+    result = score_parsed_course(
+        parsed,
+        ground_truth,
+        weekly_only=weekly_only,
+        strict_weekly=strict_weekly,
+        snapshot=snapshot,
+        unlocked_only=unlocked_only,
+    )
     result.ground_truth_file = ground_truth_file
     result.course_label = course_label
     return result
@@ -310,11 +345,17 @@ def evaluate_snapshots(
     use_llm_weekly: bool = False,
     weekly_only: bool = True,
     strict_weekly: bool = False,
+    unlocked_only: bool = False,
 ) -> list[CourseScore]:
+    course_ids = gt_course_id_map(ground_truth_dir)
     results: list[CourseScore] = []
-    for gt_path in sorted(ground_truth_dir.glob('*.json')):
+    for gt_path in iter_ground_truth_files(ground_truth_dir):
         spec = parse_ground_truth_filename(gt_path.name)
-        snapshot = find_snapshot_for_ground_truth(snapshots, spec)
+        snapshot = find_snapshot_for_ground_truth(
+            snapshots,
+            spec,
+            course_id=course_ids.get(gt_path.name),
+        )
         ground_truth = json.loads(gt_path.read_text(encoding='utf-8'))
         if not snapshot:
             results.append(CourseScore(
@@ -338,6 +379,8 @@ def evaluate_snapshots(
             course_label=str(label),
             weekly_only=weekly_only,
             strict_weekly=strict_weekly,
+            snapshot=snapshot,
+            unlocked_only=unlocked_only,
         )
         results.append(result)
     return results

@@ -1,0 +1,494 @@
+{
+  "version": 1,
+  "courseId": "15237",
+  "fileId": "3457518",
+  "filename": "A brief history of unit 3.pdf",
+  "expectedFileType": "lecture_slides",
+  "passPlan": {
+    "courseId": "15237",
+    "fileId": "3457518",
+    "filename": "A brief history of unit 3.pdf",
+    "resolvedType": "lecture_slides",
+    "heuristicConfidence": 0.82,
+    "neededPasses": [
+      "extract_pages",
+      "heuristic_classify",
+      "llm_pass1",
+      "finalize"
+    ],
+    "skippedPasses": [
+      "llm_classify",
+      "llm_pass2"
+    ],
+    "estLlmCalls": 1,
+    "estRealisticLlmCalls": 1.0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "needed": true,
+        "reason": "Required local PDF/HTML extraction; no LLM.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "heuristic_classify",
+        "needed": true,
+        "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_classify",
+        "needed": false,
+        "reason": "Heuristic confidence 0.82 sufficient; skip flash classify call.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_pass1",
+        "needed": true,
+        "reason": "Type lecture_slides: pass1 extracts concepts=True, problems=True, events=False.",
+        "llmCall": true,
+        "estCostTier": "high"
+      },
+      {
+        "pass": "llm_pass2",
+        "needed": false,
+        "reason": "Type lecture_slides disables pass2 (single-pass type-specific or link-only profile).",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "finalize",
+        "needed": true,
+        "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+        "llmCall": false,
+        "estCostTier": "free"
+      }
+    ]
+  },
+  "passAudit": {
+    "plan": {
+      "courseId": "15237",
+      "fileId": "3457518",
+      "filename": "A brief history of unit 3.pdf",
+      "resolvedType": "lecture_slides",
+      "heuristicConfidence": 0.82,
+      "neededPasses": [
+        "extract_pages",
+        "heuristic_classify",
+        "llm_pass1",
+        "finalize"
+      ],
+      "skippedPasses": [
+        "llm_classify",
+        "llm_pass2"
+      ],
+      "estLlmCalls": 1,
+      "estRealisticLlmCalls": 1.0,
+      "steps": [
+        {
+          "pass": "extract_pages",
+          "needed": true,
+          "reason": "Required local PDF/HTML extraction; no LLM.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "heuristic_classify",
+          "needed": true,
+          "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_classify",
+          "needed": false,
+          "reason": "Heuristic confidence 0.82 sufficient; skip flash classify call.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_pass1",
+          "needed": true,
+          "reason": "Type lecture_slides: pass1 extracts concepts=True, problems=True, events=False.",
+          "llmCall": true,
+          "estCostTier": "high"
+        },
+        {
+          "pass": "llm_pass2",
+          "needed": false,
+          "reason": "Type lecture_slides disables pass2 (single-pass type-specific or link-only profile).",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "finalize",
+          "needed": true,
+          "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+          "llmCall": false,
+          "estCostTier": "free"
+        }
+      ]
+    },
+    "actualType": "lecture_slides",
+    "deepseekPasses": 1,
+    "conceptCount": 54,
+    "detailCount": 4,
+    "totalLlmTokens": 0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "ran": true,
+        "useful": true,
+        "verdict": "required",
+        "note": "Local I/O; pages present means extract succeeded."
+      },
+      {
+        "pass": "heuristic_classify",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "Routed to lecture_slides (free)."
+      },
+      {
+        "pass": "llm_classify",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Skipped; heuristic confidence sufficient.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass1",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "No pass1 tool trace.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass2",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Correctly skipped: profile disables pass2, type-specific pass1 only, or no log_* tools.",
+        "tokens": 0
+      },
+      {
+        "pass": "finalize",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "logged_details promoted to concept details."
+      }
+    ],
+    "cutCandidates": [],
+    "recommendations": [
+      "Pass2 correctly skipped for this type/pass1 tool pattern."
+    ]
+  },
+  "passes": [
+    "extract_pages",
+    "heuristic_classify",
+    "teaching_units",
+    "type_structure",
+    "concept_candidates",
+    "problem_scan",
+    "detail_attach",
+    "reconcile"
+  ],
+  "buildMode": "template_multi_pass_offline",
+  "builtAt": "2026-07-01T22:49:35Z",
+  "concepts": [
+    {
+      "name": "lecture 13",
+      "details": []
+    },
+    {
+      "name": "1 - rewatch the lecture",
+      "details": []
+    },
+    {
+      "name": "2 - post on ed for more immediate clarification while watching",
+      "details": []
+    },
+    {
+      "name": "lecture 14",
+      "details": []
+    },
+    {
+      "name": "lecture 15",
+      "details": []
+    },
+    {
+      "name": "lecture 16",
+      "details": []
+    },
+    {
+      "name": "lecture 17",
+      "details": []
+    },
+    {
+      "name": "lecture 18",
+      "details": []
+    },
+    {
+      "name": "lecture 19",
+      "details": []
+    },
+    {
+      "name": "Goals",
+      "details": []
+    },
+    {
+      "name": "Neuromodulators are neurotransmitters with special features",
+      "details": []
+    },
+    {
+      "name": "effects are diverse and overlapping",
+      "details": []
+    },
+    {
+      "name": "functions/effects of 4 main neuromodulators",
+      "details": []
+    },
+    {
+      "name": "examples given in class",
+      "details": []
+    },
+    {
+      "name": "s given in class",
+      "details": [
+        "Examples given in class:"
+      ]
+    },
+    {
+      "name": "hypothalamus and pituitary",
+      "details": []
+    },
+    {
+      "name": "autonomic nervous system",
+      "details": []
+    },
+    {
+      "name": "pavlovian and operant conditioning",
+      "details": []
+    },
+    {
+      "name": "two stimuli are paired",
+      "details": [
+        "Pavlovian: two stimuli are paired"
+      ]
+    },
+    {
+      "name": "thirst and feeding",
+      "details": []
+    },
+    {
+      "name": "vasopressin is an antidiuretic (see lecture 13)",
+      "details": []
+    },
+    {
+      "name": "feeding",
+      "details": []
+    },
+    {
+      "name": "role of leptin",
+      "details": []
+    },
+    {
+      "name": "role of lateral and periventricular hypothalamus",
+      "details": []
+    },
+    {
+      "name": "role of alpha-msh and npy/agrp",
+      "details": []
+    },
+    {
+      "name": "addiction / reward circuits",
+      "details": []
+    },
+    {
+      "name": "reward prediction error",
+      "details": []
+    },
+    {
+      "name": "unexpected reward",
+      "details": []
+    },
+    {
+      "name": "expected reward",
+      "details": []
+    },
+    {
+      "name": "unexpected punishment",
+      "details": []
+    },
+    {
+      "name": "expected punishment",
+      "details": []
+    },
+    {
+      "name": "fear learning",
+      "details": []
+    },
+    {
+      "name": "aggression",
+      "details": []
+    },
+    {
+      "name": "sleep",
+      "details": []
+    },
+    {
+      "name": "slides 17-19aggression: slides 22-27sleep: slides 30-70",
+      "details": [
+        "Fear: slides 17-19Aggression: slides 22-27Sleep: slides 30-70"
+      ]
+    },
+    {
+      "name": "necessity",
+      "details": []
+    },
+    {
+      "name": "sufficiency",
+      "details": []
+    },
+    {
+      "name": "correlation",
+      "details": []
+    },
+    {
+      "name": "cycles",
+      "details": []
+    },
+    {
+      "name": "rhythms",
+      "details": []
+    },
+    {
+      "name": "created by thalamocortical rhythms",
+      "details": []
+    },
+    {
+      "name": "brain regions",
+      "details": [
+        "Sleep: brain regions"
+      ]
+    },
+    {
+      "name": "types of memory",
+      "details": []
+    },
+    {
+      "name": "habituation and sensitization",
+      "details": []
+    },
+    {
+      "name": "ltp/ltd",
+      "details": []
+    },
+    {
+      "name": "memory consolidation",
+      "details": []
+    },
+    {
+      "name": "synaptic scaling and metaplasticity",
+      "details": []
+    },
+    {
+      "name": "neurodevelopmental disorders",
+      "details": []
+    },
+    {
+      "name": "anxiety disorders",
+      "details": []
+    },
+    {
+      "name": "affect / mood disorders",
+      "details": []
+    },
+    {
+      "name": "schizophrenia",
+      "details": []
+    },
+    {
+      "name": "monoamine hypothesis",
+      "details": []
+    },
+    {
+      "name": "treatments",
+      "details": []
+    },
+    {
+      "name": "gaba agonistsssrisglutamate antagonist",
+      "details": []
+    }
+  ],
+  "conceptCount": 54,
+  "detailCount": 4,
+  "events": [],
+  "problems": [],
+  "sections": [
+    "Goals",
+    "13",
+    "Neuromodulators are neurotransmitters with special features",
+    "s given in class",
+    "If you are in the 1-2 range",
+    "14",
+    "15",
+    "16",
+    "17",
+    "18",
+    "19"
+  ],
+  "deepseekPasses": 1,
+  "expectsPass2": false,
+  "gtProvenance": {
+    "typeSource": "heuristic_high",
+    "typeConfidence": 0.88,
+    "offlinePassAudit": {
+      "extract_pages": {
+        "localPdf": true,
+        "pageCount": 33,
+        "pdfPath": "C:\\Allen\\nucleus\\canvasfiles\\3457518"
+      },
+      "heuristic_classify": {
+        "expectedFileType": "lecture_slides",
+        "source": "heuristic_high",
+        "confidence": 0.88
+      },
+      "teaching_units": {
+        "sectionCount": 11
+      },
+      "type_structure": {
+        "slideRows": 58,
+        "readingSections": 0,
+        "syllabusWeeks": 0
+      },
+      "concept_candidates": {
+        "candidateCount": 54
+      },
+      "problem_scan": {
+        "problemCount": 0
+      },
+      "detail_attach": {
+        "conceptKeysWithDetails": 14,
+        "detailCount": 14
+      },
+      "reconcile": {
+        "inputTitles": 54,
+        "accepted": 54,
+        "capped": 0,
+        "detailAttached": 4
+      }
+    },
+    "reconcileStats": {
+      "inputTitles": 54,
+      "accepted": 54,
+      "capped": 0,
+      "detailAttached": 4
+    }
+  }
+}

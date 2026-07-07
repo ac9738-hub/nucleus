@@ -2,12 +2,9 @@ const fs = require('fs')
 const path = require('path')
 const { readGradescopeAuth } = require('./auth')
 const { syncGradescopeCourses } = require('./client')
+const { normalizeName } = require('../../../lib/normalize-name')
 
 const GRADESCOPE_STATE_PATH = path.join(__dirname, '..', '..', '..', 'gradescope_state.json')
-
-function normalizeName(value) {
-  return String(value || '').trim().toLowerCase().replace(/\s+/g, ' ')
-}
 
 function matchCanvasAssignmentToGradescope(canvasAssignment, gradescopeAssignments) {
   const canvasName = normalizeName(canvasAssignment.name || canvasAssignment.title)

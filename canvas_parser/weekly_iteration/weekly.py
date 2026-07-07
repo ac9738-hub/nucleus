@@ -112,7 +112,7 @@ def enrich_weekly_with_graph(
     if not weekly or not graph:
         return weekly
 
-    from .format import _infer_default_year
+    from .format import _infer_default_year, _exam_event_display_name
 
     default_year = _infer_default_year(snapshot)
     course_id = str((snapshot.get('course') or {}).get('id') or '')
@@ -135,7 +135,7 @@ def enrich_weekly_with_graph(
             continue
         date_text = event.get('startdate') or event.get('enddate') or ''
         candidates.append({
-            'name': _canonical_event_name(name),
+            'name': _exam_event_display_name(_canonical_event_name(name)),
             'date': date_text,
         })
 
@@ -149,7 +149,7 @@ def enrich_weekly_with_graph(
             name = str(getattr(logged, 'eventname', '') or getattr(logged, 'name', '') or '').strip()
             date_text = getattr(logged, 'startdate', '') or getattr(logged, 'enddate', '') or ''
         if name:
-            candidates.append({'name': _canonical_event_name(name), 'date': str(date_text or '')})
+            candidates.append({'name': _exam_event_display_name(_canonical_event_name(name)), 'date': str(date_text or '')})
 
     for candidate in candidates:
         parsed = _parse_graph_date(candidate.get('date') or '', default_year)
@@ -165,5 +165,133 @@ def enrich_weekly_with_graph(
         if not name or _event_already_present(week, name):
             continue
         week.setdefault('events', []).append({'name': name, 'files': []})
+
+    weekly = _enrich_weekly_files_from_chunk_edges(weekly, graph, course_id)
+    weekly = _enrich_weekly_events_from_exam_assignments(weekly, graph, course_id, default_year)
+    weekly = _enrich_final_exam_from_graph_prose(weekly, snapshot, graph, default_year)
+
+    return weekly
+
+
+def _enrich_final_exam_from_graph_prose(
+    weekly: list[dict[str, Any]],
+    snapshot: dict[str, Any],
+    graph: dict[str, Any],
+    default_year: int | None,
+) -> list[dict[str, Any]]:
+    """Add Final Exam from syllabus PDF text indexed in the parser graph."""
+    if not weekly or not graph:
+        return weekly
+
+    from canvas_parser.graph.events import build_graph_exam_text, extract_prose_exam_hints
+    from .format import _exam_event_display_name
+
+    course_id = str((snapshot.get('course') or {}).get('id') or '')
+    if not course_id:
+        return weekly
+
+    week_by_start = {_week_key(week): week for week in weekly if _week_key(week)}
+    prose_text = build_graph_exam_text(graph, course_id)
+    for hint in extract_prose_exam_hints(prose_text):
+        label = str(hint.get('name') or '')
+        if 'final' not in label.lower():
+            continue
+        parsed = _parse_graph_date(hint.get('date_text') or '', default_year)
+        if not parsed:
+            continue
+        week_start = _format_week_start(parsed, default_year)
+        week = week_by_start.get(week_start)
+        if not week:
+            continue
+        display = _exam_event_display_name(_canonical_event_name(label))
+        if _event_already_present(week, display):
+            continue
+        week.setdefault('events', []).append({'name': display, 'files': []})
+    return weekly
+
+
+def _enrich_weekly_events_from_exam_assignments(
+    weekly: list[dict[str, Any]],
+    graph: dict[str, Any],
+    course_id: str,
+    default_year: int | None,
+) -> list[dict[str, Any]]:
+    """Promote dated exam-like syllabus assignments into weekly event buckets."""
+    if not weekly or not graph or not course_id:
+        return weekly
+
+    from .format import _exam_event_display_name
+
+    week_by_start = {_week_key(week): week for week in weekly if _week_key(week)}
+    syllabi = graph.get('syllabi') or {}
+    syllabus = syllabi.get(course_id) or syllabi.get(int(course_id) if str(course_id).isdigit() else course_id) or {}
+    for assignment in syllabus.get('assignments') or []:
+        if not isinstance(assignment, dict):
+            continue
+        name = str(assignment.get('name') or '').strip()
+        if not name:
+            continue
+        event_type = normalize_event_type('', name)
+        if event_type not in {'test', 'review', 'presentation'}:
+            continue
+        parsed = _parse_graph_date(
+            assignment.get('duedate') or assignment.get('due_at') or '',
+            default_year,
+        )
+        if not parsed:
+            continue
+        week_start = _format_week_start(parsed, default_year)
+        week = week_by_start.get(week_start)
+        if not week:
+            continue
+        canonical = _exam_event_display_name(_canonical_event_name(name))
+        if _event_already_present(week, canonical):
+            continue
+        week.setdefault('events', []).append({'name': canonical, 'files': []})
+    return weekly
+
+
+def _enrich_weekly_files_from_chunk_edges(
+    weekly: list[dict[str, Any]],
+    graph: dict[str, Any],
+    course_id: str,
+) -> list[dict[str, Any]]:
+    """Promote graph file nodes with weekly-item chunk edges into weekly file buckets."""
+    if not weekly or not graph or not course_id:
+        return weekly
+
+    week_by_start = {_week_key(week): week for week in weekly if _week_key(week)}
+    week_by_label = {
+        str(week.get('weekLabel') or week.get('name') or ''): week
+        for week in weekly
+        if str(week.get('weekLabel') or week.get('name') or '')
+    }
+
+    for file_node in ((graph.get('files') or {}).get(course_id) or {}).values():
+        if not isinstance(file_node, dict):
+            continue
+        fname = str(file_node.get('name') or '').strip()
+        if not fname:
+            continue
+        promoted_weeks: set[str] = set()
+        for chunk in file_node.get('textChunks') or []:
+            if not isinstance(chunk, dict):
+                continue
+            for edge in chunk.get('edges') or []:
+                if not isinstance(edge, dict) or edge.get('type') != 'weekly-item':
+                    continue
+                week = week_by_start.get(str(edge.get('weekStart') or ''))
+                if week is None:
+                    week = week_by_label.get(str(edge.get('weekLabel') or ''))
+                if week is None:
+                    continue
+                week_key = _week_key(week)
+                if week_key in promoted_weeks:
+                    continue
+                promoted_weeks.add(week_key)
+                existing = week.setdefault('files', [])
+                if any(names_match(fname, item.get('name') or '') for item in existing if isinstance(item, dict)):
+                    continue
+                existing.append({'name': fname})
 
     return weekly

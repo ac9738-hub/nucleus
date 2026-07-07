@@ -1,0 +1,648 @@
+{
+  "version": 1,
+  "courseId": "15237",
+  "fileId": "3203750",
+  "filename": "Lecture 0_intro logistics_slides.pdf",
+  "expectedFileType": "lecture_slides",
+  "passPlan": {
+    "courseId": "15237",
+    "fileId": "3203750",
+    "filename": "Lecture 0_intro logistics_slides.pdf",
+    "resolvedType": "lecture_slides",
+    "heuristicConfidence": 0.92,
+    "neededPasses": [
+      "extract_pages",
+      "heuristic_classify",
+      "llm_pass1",
+      "finalize"
+    ],
+    "skippedPasses": [
+      "llm_classify",
+      "llm_pass2"
+    ],
+    "estLlmCalls": 1,
+    "estRealisticLlmCalls": 1.0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "needed": true,
+        "reason": "Required local PDF/HTML extraction; no LLM.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "heuristic_classify",
+        "needed": true,
+        "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_classify",
+        "needed": false,
+        "reason": "Heuristic confidence 0.92 sufficient; skip flash classify call.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_pass1",
+        "needed": true,
+        "reason": "Type lecture_slides: pass1 extracts concepts=True, problems=True, events=False.",
+        "llmCall": true,
+        "estCostTier": "high"
+      },
+      {
+        "pass": "llm_pass2",
+        "needed": false,
+        "reason": "Type lecture_slides disables pass2 (single-pass type-specific or link-only profile).",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "finalize",
+        "needed": true,
+        "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+        "llmCall": false,
+        "estCostTier": "free"
+      }
+    ]
+  },
+  "passAudit": {
+    "plan": {
+      "courseId": "15237",
+      "fileId": "3203750",
+      "filename": "Lecture 0_intro logistics_slides.pdf",
+      "resolvedType": "lecture_slides",
+      "heuristicConfidence": 0.92,
+      "neededPasses": [
+        "extract_pages",
+        "heuristic_classify",
+        "llm_pass1",
+        "finalize"
+      ],
+      "skippedPasses": [
+        "llm_classify",
+        "llm_pass2"
+      ],
+      "estLlmCalls": 1,
+      "estRealisticLlmCalls": 1.0,
+      "steps": [
+        {
+          "pass": "extract_pages",
+          "needed": true,
+          "reason": "Required local PDF/HTML extraction; no LLM.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "heuristic_classify",
+          "needed": true,
+          "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_classify",
+          "needed": false,
+          "reason": "Heuristic confidence 0.92 sufficient; skip flash classify call.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_pass1",
+          "needed": true,
+          "reason": "Type lecture_slides: pass1 extracts concepts=True, problems=True, events=False.",
+          "llmCall": true,
+          "estCostTier": "high"
+        },
+        {
+          "pass": "llm_pass2",
+          "needed": false,
+          "reason": "Type lecture_slides disables pass2 (single-pass type-specific or link-only profile).",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "finalize",
+          "needed": true,
+          "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+          "llmCall": false,
+          "estCostTier": "free"
+        }
+      ]
+    },
+    "actualType": "lecture_slides",
+    "deepseekPasses": 1,
+    "conceptCount": 80,
+    "detailCount": 30,
+    "totalLlmTokens": 0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "ran": true,
+        "useful": true,
+        "verdict": "required",
+        "note": "Local I/O; pages present means extract succeeded."
+      },
+      {
+        "pass": "heuristic_classify",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "Routed to lecture_slides (free)."
+      },
+      {
+        "pass": "llm_classify",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Skipped; heuristic confidence sufficient.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass1",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "No pass1 tool trace.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass2",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Correctly skipped: profile disables pass2, type-specific pass1 only, or no log_* tools.",
+        "tokens": 0
+      },
+      {
+        "pass": "finalize",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "logged_details promoted to concept details."
+      }
+    ],
+    "cutCandidates": [],
+    "recommendations": [
+      "Pass2 correctly skipped for this type/pass1 tool pattern."
+    ]
+  },
+  "passes": [
+    "extract_pages",
+    "heuristic_classify",
+    "teaching_units",
+    "type_structure",
+    "concept_candidates",
+    "problem_scan",
+    "detail_attach",
+    "reconcile"
+  ],
+  "buildMode": "template_multi_pass_offline",
+  "builtAt": "2026-07-01T22:49:36Z",
+  "concepts": [
+    {
+      "name": "Lecture 0_intro logistics_slides",
+      "details": []
+    },
+    {
+      "name": "most cells of the body",
+      "details": []
+    },
+    {
+      "name": "Quiz 1: 10/1(midterms week = 10/7-10/11)Quiz 2: 10/29Quiz 3: 12/5",
+      "details": []
+    },
+    {
+      "name": "Problem 1",
+      "details": []
+    },
+    {
+      "name": "Problem 2",
+      "details": []
+    },
+    {
+      "name": "Welcome to NEU 201!Next lecture",
+      "details": []
+    },
+    {
+      "name": "depression",
+      "details": []
+    },
+    {
+      "name": "cerebral palsy",
+      "details": []
+    },
+    {
+      "name": "spinal paralysis",
+      "details": []
+    },
+    {
+      "name": "schizophrenia",
+      "details": []
+    },
+    {
+      "name": "multiple sclerosis",
+      "details": []
+    },
+    {
+      "name": "epilepsy",
+      "details": []
+    },
+    {
+      "name": "dementia",
+      "details": []
+    },
+    {
+      "name": "stroke",
+      "details": []
+    },
+    {
+      "name": "drug abuse and addiction",
+      "details": []
+    },
+    {
+      "name": "from cells and synapsesto sensation, memory and action",
+      "details": [
+        "This class: from cells and synapsesto sensation, memory and action"
+      ]
+    },
+    {
+      "name": "course goals",
+      "details": []
+    },
+    {
+      "name": "professor of neuroscience, uc san diego, 2004",
+      "details": []
+    },
+    {
+      "name": "neu 201neu 447 neu 501/502 (graduate)",
+      "details": [
+        "Princeton classes I teach: NEU 201NEU 447 NEU 501/502 (graduate)"
+      ]
+    },
+    {
+      "name": "neuro-immune interactions in brain development, plasticity, and disease",
+      "details": [
+        "Research: Neuro-immune interactions in brain development, plasticity, and disease"
+      ]
+    },
+    {
+      "name": "isha goredaisy danmartyna czarnik",
+      "details": []
+    },
+    {
+      "name": "lindsay collins",
+      "details": []
+    },
+    {
+      "name": "i want to do research on the brain",
+      "details": []
+    },
+    {
+      "name": "how to do well in neu 201",
+      "details": []
+    },
+    {
+      "name": "things on this list",
+      "details": []
+    },
+    {
+      "name": "things not on this list",
+      "details": []
+    },
+    {
+      "name": "class schedule",
+      "details": []
+    },
+    {
+      "name": "precepts start next week",
+      "details": []
+    },
+    {
+      "name": "reviewing problem setsreviewing lecture materialsfour precepts: bonus activities",
+      "details": [
+        "Format: Reviewing problem setsReviewing lecture materialsFour precepts: bonus activities"
+      ]
+    },
+    {
+      "name": "watch lecture asynchronously if you need to",
+      "details": []
+    },
+    {
+      "name": "eddiscussion",
+      "details": []
+    },
+    {
+      "name": "research participation assignment",
+      "details": []
+    },
+    {
+      "name": "iclicker",
+      "details": []
+    },
+    {
+      "name": "start using next class",
+      "details": []
+    },
+    {
+      "name": "textbook",
+      "details": []
+    },
+    {
+      "name": "exploring the brain by bear, connors, and paradiso4th edition",
+      "details": [
+        "Neuroscience: Exploring the Brain by Bear, Connors, and Paradiso4th edition"
+      ]
+    },
+    {
+      "name": "problem sets",
+      "details": []
+    },
+    {
+      "name": "link to google form",
+      "details": [
+        "Posted Thursdays after class: link to Google form"
+      ]
+    },
+    {
+      "name": "30 am, before first precept of the week",
+      "details": [
+        "Due Mondays at 10:30 am, before first precept of the week"
+      ]
+    },
+    {
+      "name": "part of precept grade(graded for completion only)",
+      "details": []
+    },
+    {
+      "name": "three in-class quizzes, one cumulative final",
+      "details": []
+    },
+    {
+      "name": "10/1(midterms week = 10/7-10/11)quiz 2: 10/29quiz 3: 12/5",
+      "details": [
+        "Quiz 1: 10/1(midterms week = 10/7-10/11)Quiz 2: 10/29Quiz 3: 12/5"
+      ]
+    },
+    {
+      "name": "week of 12/14 – 12/20(date, time, location tba)",
+      "details": [
+        "Final: week of 12/14 – 12/20(date, time, location TBA)"
+      ]
+    },
+    {
+      "name": "coffee hour",
+      "details": []
+    },
+    {
+      "name": "via eddiscussion(fastest: reaches more people)",
+      "details": [
+        "Contact all of us: Via EdDiscussion(fastest: reaches more people)"
+      ]
+    },
+    {
+      "name": "3 modules",
+      "details": [
+        "Course Content: 3 modules"
+      ]
+    },
+    {
+      "name": "cellular neuroscience",
+      "details": [
+        "Module I:Cellular Neuroscience"
+      ]
+    },
+    {
+      "name": "sensory and motor systems",
+      "details": [
+        "Module II:Sensory and Motor Systems"
+      ]
+    },
+    {
+      "name": "brain and behavior",
+      "details": [
+        "Module III: Brain and Behavior"
+      ]
+    },
+    {
+      "name": "stretching and question break",
+      "details": []
+    },
+    {
+      "name": "heart = seat of mind and soul, memories",
+      "details": [
+        "Ancient Egypt: heart = seat of mind and soul, memories"
+      ]
+    },
+    {
+      "name": "scoop out and toss",
+      "details": [
+        "Brain: scoop out and toss"
+      ]
+    },
+    {
+      "name": "eyes and their connections are light-bearing",
+      "details": [
+        "Anatomical dissections: eyes and their connections are light-bearing"
+      ]
+    },
+    {
+      "name": "brain is in charge (sensation, intelligence)",
+      "details": [
+        "Hippocrates (425 B.C.E.): brain is in charge (sensation, intelligence)"
+      ]
+    },
+    {
+      "name": "heart is in charge",
+      "details": [
+        "Aristotle (335 B.C.E): heart is in charge"
+      ]
+    },
+    {
+      "name": "emphasized the importance of the brain",
+      "details": []
+    },
+    {
+      "name": "physician to the gladiators",
+      "details": []
+    },
+    {
+      "name": "brain is like new hydraulic machines",
+      "details": [
+        "1600’s: brain is like new hydraulic machines"
+      ]
+    },
+    {
+      "name": "electricity causes twitch",
+      "details": [
+        "Galvani: electricity causes twitch"
+      ]
+    },
+    {
+      "name": "input / output lines",
+      "details": [
+        "Bell / Magendie: Input / output lines"
+      ]
+    },
+    {
+      "name": "mary shelley’s frankenstein",
+      "details": [
+        "1818: Mary Shelley’s Frankenstein"
+      ]
+    },
+    {
+      "name": "phineas gage",
+      "details": []
+    },
+    {
+      "name": "• normal mental function, understoodlanguage",
+      "details": [
+        "Patient:• Normal mental function, understoodlanguage"
+      ]
+    },
+    {
+      "name": "brain lesion in left frontal lobe",
+      "details": [
+        "• Autopsy: brain lesion in left frontal lobe"
+      ]
+    },
+    {
+      "name": "stimulation of specific brain regionssufficient to elicit behavior",
+      "details": [
+        "1870’s: stimulation of specific brain regionssufficient to elicit behavior"
+      ]
+    },
+    {
+      "name": "golgi staining",
+      "details": [
+        "Camillo Golgi: Golgi staining"
+      ]
+    },
+    {
+      "name": "human studies on localization of function",
+      "details": []
+    },
+    {
+      "name": "levels of analysis",
+      "details": [
+        "Neuroscience: levels of analysis"
+      ]
+    },
+    {
+      "name": "molecular",
+      "details": []
+    },
+    {
+      "name": "cellular",
+      "details": []
+    },
+    {
+      "name": "circuit / systems",
+      "details": []
+    },
+    {
+      "name": "behavioral",
+      "details": []
+    },
+    {
+      "name": "cognitive",
+      "details": []
+    },
+    {
+      "name": "society for neuroscience (sfn) founded 1970",
+      "details": [
+        "Relatively young:Society for Neuroscience (SFN) founded 1970"
+      ]
+    },
+    {
+      "name": "current sfn membership ~36,000",
+      "details": [
+        "Rapidly expanding:Current SFN membership ~36,000"
+      ]
+    },
+    {
+      "name": "neuroscience as a field of study",
+      "details": []
+    },
+    {
+      "name": "neuro - immune interactionsin health and disease",
+      "details": []
+    },
+    {
+      "name": "mhc class i in the immune system",
+      "details": []
+    },
+    {
+      "name": "t cell",
+      "details": []
+    },
+    {
+      "name": "medical immunology (textbook)",
+      "details": []
+    }
+  ],
+  "conceptCount": 80,
+  "detailCount": 30,
+  "events": [],
+  "problems": [
+    "Problem 1",
+    "Problem 2"
+  ],
+  "sections": [
+    "Also posted",
+    "Quiz 1: 10/1(midterms week = 10/7-10/11)Quiz 2: 10/29Quiz 3: 12/5",
+    "To reduce MHC class I levels",
+    "Problem 1",
+    "Problem 2",
+    "Welcome to NEU 201!Next lecture"
+  ],
+  "deepseekPasses": 1,
+  "expectsPass2": false,
+  "gtProvenance": {
+    "typeSource": "heuristic_high",
+    "typeConfidence": 0.92,
+    "offlinePassAudit": {
+      "extract_pages": {
+        "localPdf": true,
+        "pageCount": 88,
+        "pdfPath": "C:\\Allen\\nucleus\\canvasfiles\\3203750"
+      },
+      "heuristic_classify": {
+        "expectedFileType": "lecture_slides",
+        "source": "heuristic_high",
+        "confidence": 0.92
+      },
+      "teaching_units": {
+        "sectionCount": 6
+      },
+      "type_structure": {
+        "slideRows": 99,
+        "readingSections": 0,
+        "syllabusWeeks": 0
+      },
+      "concept_candidates": {
+        "candidateCount": 80
+      },
+      "problem_scan": {
+        "problemCount": 2
+      },
+      "detail_attach": {
+        "conceptKeysWithDetails": 35,
+        "detailCount": 35
+      },
+      "reconcile": {
+        "inputTitles": 80,
+        "accepted": 80,
+        "capped": 0,
+        "detailAttached": 30
+      }
+    },
+    "reconcileStats": {
+      "inputTitles": 80,
+      "accepted": 80,
+      "capped": 0,
+      "detailAttached": 30
+    }
+  }
+}

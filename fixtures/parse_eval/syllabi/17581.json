@@ -1,0 +1,395 @@
+{
+  "courseId": "17581",
+  "syllabi": {
+    "17581": {
+      "courseid": "17581",
+      "classtimes": "",
+      "assignments": [
+        {
+          "name": "Research Engagement Assignment (Subject Pool)",
+          "assignmentid": "8ea4c29a3ddde4cf",
+          "unlockdate": "2025-01-23T18:00:00Z",
+          "duedate": "2025-04-26T03:59:59Z",
+          "gradepercentage": null,
+          "description": "I have attached the instructions pertaining to the Research Engagement Assignment. This assignment will commence on February 13th and end on April 25th. Please read the instructions in their entirety before signing up for any studies. Thank you, RoseMarie Stevenson RESEARCH ENGAGEMENT ASSIGNMENT INSTRUCTIONS FOR STUDENTS-SPRING 2025.docx",
+          "embedded": {},
+          "problems": [],
+          "downloadurl": "https://princeton.instructure.com/courses/17581/assignments/147306",
+          "canvaspreviewurl": "https://princeton.instructure.com/courses/17581/assignments/147306",
+          "filechildren": [
+            "3557835"
+          ],
+          "lookingfor": [
+            "instructions in their entirety"
+          ],
+          "submissionTypes": [
+            "not_graded"
+          ],
+          "submissionLinks": [
+            {
+              "url": "https://princeton.instructure.com/courses/17581/files/3557835?wrap=1",
+              "label": "RESEARCH ENGAGEMENT ASSIGNMENT INSTRUCTIONS FOR STUDENTS-SPRING 2025.docx",
+              "platform": "canvas"
+            }
+          ],
+          "submissionDependencies": [
+            {
+              "type": "file",
+              "fileId": "3557835"
+            }
+          ],
+          "conceptRequirements": [],
+          "canvasAssignmentId": "147306"
+        },
+        {
+          "name": "Quiz 1: Parker Article",
+          "assignmentid": "cc677ed1ff245dbd",
+          "unlockdate": "",
+          "duedate": "2025-02-10T21:00:00Z",
+          "gradepercentage": null,
+          "description": "",
+          "embedded": {},
+          "problems": [],
+          "downloadurl": "https://princeton.instructure.com/courses/17581/assignments/150645",
+          "canvaspreviewurl": "https://princeton.instructure.com/courses/17581/assignments/150645",
+          "filechildren": [],
+          "lookingfor": [],
+          "submissionTypes": [
+            "online_quiz"
+          ],
+          "submissionLinks": [],
+          "submissionDependencies": [],
+          "conceptRequirements": [],
+          "canvasAssignmentId": "150645"
+        },
+        {
+          "name": "Python Notebook 1: Upload Figure",
+          "assignmentid": "6859b26d3e4cbc13",
+          "unlockdate": "",
+          "duedate": "2025-02-17T04:59:59Z",
+          "gradepercentage": null,
+          "description": "Hello! Once you've gone through the Python notebook assignment and generated the figure as described in the final section of the notebook, please download it to your computer (right click it, or drag it straight to your desktop), and then upload it here. This is due Sunday the 16th before midnight (same time as the quiz deadline).",
+          "embedded": {},
+          "problems": [],
+          "downloadurl": "https://princeton.instructure.com/courses/17581/assignments/151007",
+          "canvaspreviewurl": "https://princeton.instructure.com/courses/17581/assignments/151007",
+          "filechildren": [],
+          "lookingfor": [],
+          "submissionTypes": [
+            "online_upload"
+          ],
+          "submissionLinks": [],
+          "submissionDependencies": [],
+          "conceptRequirements": [],
+          "canvasAssignmentId": "151007"
+        },
+        {
+          "name": "Quiz 2: Parvizi Article & Cog Neuro Methods",
+          "assignmentid": "74ad9fed285fb808",
+          "unlockdate": "",
+          "duedate": "2025-02-23T04:59:00Z",
+          "gradepercentage": null,
+          "description": "",
+          "embedded": {},
+          "problems": [],
+          "downloadurl": "https://princeton.instructure.com/courses/17581/assignments/151479",
+          "canvaspreviewurl": "https://princeton.instructure.com/courses/17581/assignments/151479",
+          "filechildren": [],
+          "lookingfor": [],
+          "submissionTypes": [
+            "online_quiz"
+          ],
+          "submissionLinks": [],
+          "submissionDependencies": [],
+          "conceptRequirements": [],
+          "canvasAssignmentId": "151479"
+        },
+        {
+          "name": "Python Notebook 2: Figure Upload",
+          "assignmentid": "26f8604f9d76c7b0",
+          "unlockdate": "",
+          "duedate": "2025-02-25T04:59:59Z",
+          "gradepercentage": null,
+          "description": "Please upload the final figure produced by the python workbook.",
+          "embedded": {},
+          "problems": [],
+          "downloadurl": "https://princeton.instructure.com/courses/17581/assignments/151958",
+          "canvaspreviewurl": "https://princeton.instructure.com/courses/17581/assignments/151958",
+          "filechildren": [],
+          "lookingfor": [],
+          "submissionTypes": [
+            "online_upload"
+          ],
+          "submissionLinks": [],
+          "submissionDependencies": [],
+          "conceptRequirements": [],
+          "canvasAssignmentId": "151958"
+        },
+        {
+          "name": "Quiz 3: Harvey Article, Sensation & Perception",
+          "assignmentid": "5c13029cdaf23298",
+          "unlockdate": "",
+          "duedate": "2025-02-25T04:59:00Z",
+          "gradepercentage": null,
+          "description": "",
+          "embedded": {},
+          "problems": [],
+          "downloadurl": "https://princeton.instructure.com/courses/17581/assignments/152120",
+          "canvaspreviewurl": "https://princeton.instructure.com/courses/17581/assignments/152120",
+          "filechildren": [],
+          "lookingfor": [],
+          "submissionTypes": [
+            "online_quiz"
+          ],
+          "submissionLinks": [],
+          "submissionDependencies": [],
+          "conceptRequirements": [],
+          "canvasAssignmentId": "152120"
+        },
+        {
+          "name": "Quiz 4: Gomez Article + Object Recognition",
+          "assignmentid": "00e2f507bc806b13",
+          "unlockdate": "",
+          "duedate": "2025-03-04T04:59:12Z",
+          "gradepercentage": null,
+          "description": "",
+          "embedded": {},
+          "problems": [],
+          "downloadurl": "https://princeton.instructure.com/courses/17581/assignments/152492",
+          "canvaspreviewurl": "https://princeton.instructure.com/courses/17581/assignments/152492",
+          "filechildren": [],
+          "lookingfor": [],
+          "submissionTypes": [
+            "online_quiz"
+          ],
+          "submissionLinks": [],
+          "submissionDependencies": [],
+          "conceptRequirements": [],
+          "canvasAssignmentId": "152492"
+        },
+        {
+          "name": "Quiz 5: Baldauf article & Attention",
+          "assignmentid": "10531e8cbf7777d9",
+          "unlockdate": "",
+          "duedate": "2025-03-25T03:59:00Z",
+          "gradepercentage": null,
+          "description": "",
+          "embedded": {},
+          "problems": [],
+          "downloadurl": "https://princeton.instructure.com/courses/17581/assignments/154098",
+          "canvaspreviewurl": "https://princeton.instructure.com/courses/17581/assignments/154098",
+          "filechildren": [],
+          "lookingfor": [],
+          "submissionTypes": [
+            "online_quiz"
+          ],
+          "submissionLinks": [],
+          "submissionDependencies": [],
+          "conceptRequirements": [],
+          "canvasAssignmentId": "154098"
+        },
+        {
+          "name": "Quiz 6: Choi article & Action",
+          "assignmentid": "36e4aac5954bb45e",
+          "unlockdate": "",
+          "duedate": "2025-04-01T03:59:00Z",
+          "gradepercentage": null,
+          "description": "",
+          "embedded": {},
+          "problems": [],
+          "downloadurl": "https://princeton.instructure.com/courses/17581/assignments/154595",
+          "canvaspreviewurl": "https://princeton.instructure.com/courses/17581/assignments/154595",
+          "filechildren": [],
+          "lookingfor": [],
+          "submissionTypes": [
+            "online_quiz"
+          ],
+          "submissionLinks": [],
+          "submissionDependencies": [],
+          "conceptRequirements": [],
+          "canvasAssignmentId": "154595"
+        },
+        {
+          "name": "Quiz 7: Memory",
+          "assignmentid": "8cd087a4b1d42150",
+          "unlockdate": "",
+          "duedate": "2025-04-09T03:59:00Z",
+          "gradepercentage": null,
+          "description": "",
+          "embedded": {},
+          "problems": [],
+          "downloadurl": "https://princeton.instructure.com/courses/17581/assignments/155077",
+          "canvaspreviewurl": "https://princeton.instructure.com/courses/17581/assignments/155077",
+          "filechildren": [],
+          "lookingfor": [],
+          "submissionTypes": [
+            "online_quiz"
+          ],
+          "submissionLinks": [],
+          "submissionDependencies": [],
+          "conceptRequirements": [],
+          "canvasAssignmentId": "155077"
+        },
+        {
+          "name": "Python Notebook 3: Upload Figure",
+          "assignmentid": "b03ef6aa5ce457c5",
+          "unlockdate": "",
+          "duedate": "2025-04-12T03:59:59Z",
+          "gradepercentage": null,
+          "description": "Please upload the final figure output from the third Python Notebook on the GLM. This is due April 11th before midnight (I made it a mistake in my last announcement saying that it was due April 6th, I meant to give you more time to complete this assignment than written).",
+          "embedded": {},
+          "problems": [],
+          "downloadurl": "https://princeton.instructure.com/courses/17581/assignments/155080",
+          "canvaspreviewurl": "https://princeton.instructure.com/courses/17581/assignments/155080",
+          "filechildren": [],
+          "lookingfor": [],
+          "submissionTypes": [
+            "online_upload"
+          ],
+          "submissionLinks": [],
+          "submissionDependencies": [],
+          "conceptRequirements": [],
+          "canvasAssignmentId": "155080"
+        },
+        {
+          "name": "Quiz 8: Emotion",
+          "assignmentid": "150d558b8cebb2cd",
+          "unlockdate": "",
+          "duedate": "2025-04-17T03:59:00Z",
+          "gradepercentage": null,
+          "description": "",
+          "embedded": {},
+          "problems": [],
+          "downloadurl": "https://princeton.instructure.com/courses/17581/assignments/155386",
+          "canvaspreviewurl": "https://princeton.instructure.com/courses/17581/assignments/155386",
+          "filechildren": [],
+          "lookingfor": [],
+          "submissionTypes": [
+            "online_quiz"
+          ],
+          "submissionLinks": [],
+          "submissionDependencies": [],
+          "conceptRequirements": [],
+          "canvasAssignmentId": "155386"
+        },
+        {
+          "name": "Precept Grade",
+          "assignmentid": "8ce55ea7e7bd9f47",
+          "unlockdate": "",
+          "duedate": "",
+          "gradepercentage": null,
+          "description": "This details your grade for precept attendance and participation for the first 7 precepts. We will update this score at the end of the semester once all precepts have met. If you have a question about your grade, please contact your TA.",
+          "embedded": {},
+          "problems": [],
+          "downloadurl": "https://princeton.instructure.com/courses/17581/assignments/155732",
+          "canvaspreviewurl": "https://princeton.instructure.com/courses/17581/assignments/155732",
+          "filechildren": [],
+          "lookingfor": [],
+          "submissionTypes": [
+            "none"
+          ],
+          "submissionLinks": [],
+          "submissionDependencies": [],
+          "conceptRequirements": [],
+          "canvasAssignmentId": "155732"
+        },
+        {
+          "name": "Quiz 9: Lerner Article & Language",
+          "assignmentid": "e75fbaca22f38ef5",
+          "unlockdate": "",
+          "duedate": "2025-04-26T03:59:00Z",
+          "gradepercentage": null,
+          "description": "",
+          "embedded": {},
+          "problems": [],
+          "downloadurl": "https://princeton.instructure.com/courses/17581/assignments/155861",
+          "canvaspreviewurl": "https://princeton.instructure.com/courses/17581/assignments/155861",
+          "filechildren": [],
+          "lookingfor": [],
+          "submissionTypes": [
+            "online_quiz"
+          ],
+          "submissionLinks": [],
+          "submissionDependencies": [],
+          "conceptRequirements": [],
+          "canvasAssignmentId": "155861"
+        },
+        {
+          "name": "Final Homework",
+          "assignmentid": "2cb75be90a7404a1",
+          "unlockdate": "",
+          "duedate": "2025-05-07T03:59:59Z",
+          "gradepercentage": null,
+          "description": "In the lectures regarding social cognition, we learned about some of the many ways that humans regulate their own behavior, think about the minds of others, and convey social information to others. While not discussed during lectures, humor seems to be a defining feature of cognition within higher-order primates which scaffolds many social interactions. With this in mind, for the final homework assignment, I would like you to make a meme about something you learned this semester from cognitive neuroscience. Your primary goal should be to make it as funny as possible. Below I've made some bullet points of things to consider. Some things to consider : 1. It should be funny; the funnier the better (see related point 3). 2. I won't police your language, but it shouldn't be overly offensive or explicit. I'll ask permission for the 3-5 funniest submissions to be posted on BlueSky to share with the field (when twitter was a thing, these memes were usually pretty widely shared). So just keep that in mind. I'm not going to be offended or upset if it's a little edgy, but it should be something you would be comfortable sharing publicly. 3. If you make a genuine effort to make something humorous, you'll get full credit. I understand that not everyone is an expert at comedy, so I'm not going to give middling grades because something didn't make me laugh out loud, so don't be too worried. I'm mostly interested in making sure you demonstrate that you understood a certain concept . If a submission doesn't make sense to the extent that I suspect you didn't understand the neuroscience concept you're trying to make a joke about, then some points might get taken off. But the vast majority of you will likely get full credit for making a good attempt. 4. The format of the submission is relatively broad; in the past most students have uploaded image files, but some uploaded video recordings of Tik Toks, sound files, et cetera. Please upload only one thing (don't upload three separate memes because you can't decide between them, just pick one ). 5. It doesn't necessarily have to follow meme formats you've seen in past, but it certainly can. I don't want you to feel constrained, it just needs to be humorous. There are some \"make a meme\" websites with templates you're welcome to use, but I encourage you to be creative and to something unique if you can. 6. Making fun of me is totally acceptable. I'm only writing this because I usually get emails asking if it's okay. Some of my favorite submissions from the past were reads or jests about me or my research. But there are many topics we covered in class, so I'd like to see some diversity in topics. 7. I often get asked \"how much time should I put into this assignment\" and there's no good answer. Some of my favorite submissions in the past look like they took 1 minute to make, and other favorites were ridiculous tik toks that probably took a few hours to get right. Both types got full credit. So it's up to you! Again, the only criteria is that it makes sense and made a genuine attempt to be funny. If you feel like you can achieve that in 5 minutes, awesome. If you want to go over the top, go for it. The assignment is due May 6th before midnight. Have fun!",
+          "embedded": {},
+          "problems": [],
+          "downloadurl": "https://princeton.instructure.com/courses/17581/assignments/156192",
+          "canvaspreviewurl": "https://princeton.instructure.com/courses/17581/assignments/156192",
+          "filechildren": [],
+          "lookingfor": [
+            "make a meme",
+            "how much time should I put into this assignment",
+            "related point 3"
+          ],
+          "submissionTypes": [
+            "online_upload"
+          ],
+          "submissionLinks": [],
+          "submissionDependencies": [],
+          "conceptRequirements": [],
+          "canvasAssignmentId": "156192"
+        }
+      ],
+      "other": "",
+      "filechildren": [],
+      "downloadurl": "",
+      "canvaspreviewurl": "",
+      "embedded": {},
+      "participationgrade": null
+    }
+  },
+  "concepts": [],
+  "events": [
+    {
+      "name": "Quiz",
+      "eventid": "Quizeventid",
+      "startdate": "2025-02-10T21:00:00Z",
+      "enddate": "",
+      "gradepercentage": null,
+      "description": "Inferred from assignment: Quiz 1: Parker Article",
+      "type": "test",
+      "embedded": {},
+      "dependencies": [],
+      "coveredConcepts": [],
+      "courseid": "17581"
+    },
+    {
+      "name": "Final",
+      "eventid": "Finaleventid",
+      "startdate": "2025-05-07T03:59:59Z",
+      "enddate": "",
+      "gradepercentage": null,
+      "description": "Inferred from assignment: Final Homework",
+      "type": "test",
+      "embedded": {},
+      "dependencies": [],
+      "coveredConcepts": [],
+      "courseid": "17581"
+    },
+    {
+      "name": "Exam",
+      "eventid": "Exameventid",
+      "startdate": "",
+      "enddate": "",
+      "gradepercentage": null,
+      "description": "Inferred from study material: example_exam_answers_2025.docx",
+      "type": "test",
+      "embedded": {},
+      "dependencies": [],
+      "coveredConcepts": [],
+      "courseid": "17581"
+    }
+  ],
+  "problems": [],
+  "files": {}
+}

@@ -17,7 +17,24 @@ def _load_json(path: str | None) -> dict:
     return json.loads(raw) if raw.strip() else {}
 
 
+def _configure_stdout_utf8() -> None:
+    if hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(encoding='utf-8')
+
+
+def _write_json_stdout(payload) -> None:
+    text = json.dumps(payload, ensure_ascii=False)
+    buffer = getattr(sys.stdout, 'buffer', None)
+    if buffer is not None:
+        buffer.write(text.encode('utf-8'))
+        buffer.flush()
+        return
+    sys.stdout.write(text)
+    sys.stdout.flush()
+
+
 def main(argv: list[str] | None = None) -> int:
+    _configure_stdout_utf8()
     parser = argparse.ArgumentParser(description='Build weekly schedules from Canvas app data.')
     parser.add_argument(
         '--canvas-data',
@@ -44,7 +61,7 @@ def main(argv: list[str] | None = None) -> int:
             graph = json.loads(graph_path.read_text(encoding='utf-8'))
 
     schedules = build_weekly_schedules(canvas_data, graph, use_graph=not args.no_graph and graph is not None)
-    json.dump(schedules, sys.stdout, ensure_ascii=False)
+    _write_json_stdout(schedules)
     return 0
 
 

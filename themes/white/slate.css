@@ -1,13 +1,9 @@
 /*
   Slate overlay theme layer (Frost / light). Injected by main.js over the base
-  slate.css during Canvas navigation. Edit the colors here; add per-theme slide
-  animation overrides below if you want this theme to move differently.
+  slate.css during Canvas navigation. Background fill comes from palette
+  canvas-gradient via buildCanvasSlateThemeCss; add per-theme slide animation
+  overrides below if you want this theme to move differently.
 */
-:root {
-  --slate-bg: #eef1f7;
-  --slate-surface: #ffffff;
-  --slate-edge: rgba(30, 45, 90, 0.26);
-}
 
 /*
   Per-theme animation slot. The base slide keyframes live in slate.css; override

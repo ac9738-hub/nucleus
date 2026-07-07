@@ -1,9 +1,31 @@
-const http = require('http')
 const fs = require('fs')
 const path = require('path')
 const { google } = require('googleapis')
 const { BrowserWindow } = require('electron')
-const { classifyInboxMessage, NON_ACADEMIC } = require('./classify')
+const {
+    classifyInboxMessage,
+    heuristicClassify,
+    HEURISTIC_LLM_THRESHOLD,
+    NON_ACADEMIC,
+    CAMPUS_EVENTS,
+    ACADEMIC,
+    normalizeClassificationLabel,
+    isInboxSplitFolder
+} = require('./classify')
+const {
+    getCachedInboxCategory,
+    setCachedInboxCategory,
+    getCachedMessageDetail,
+    setCachedMessageDetail,
+    getCachedThread,
+    setCachedThread,
+    shouldRefreshMessage
+} = require('./cache')
+const {
+    heuristicExtractEvents,
+    extractMailEvents,
+    messageLikelyHasEvents
+} = require('./events')
 const { getThemeRuntime, readThemeCss } = require('../../theme-manager')
 const { escapeHtml } = require('../../lib/dom-utils')
 const { FOLDER_LABELS, MAIL_FOLDERS } = require('../../lib/mail-folders')
@@ -15,8 +37,11 @@ const GMAIL_BASE = 'https://www.googleapis.com/gmail/v1/users/me'
 
 let token = null
 let cachedMailCss = null
-const MAIL_CLASSIFICATION_LOG_PATH = path.join(__dirname, '..', '..', 'mail_classification_log.json')
-let mailClassificationById = null
+const MAIL_EVENTS_LOG_PATH = path.join(__dirname, '..', '..', 'mail_events_log.json')
+let mailEventsById = null
+const backgroundClassificationQueue = new Set()
+const backgroundClassificationInflight = new Set()
+const backgroundClassificationSummaries = new Map()
 
 const GMAIL_MAX_CONCURRENT = 6
 const GMAIL_METADATA_BATCH_SIZE = 20
@@ -25,45 +50,118 @@ const GMAIL_METADATA_HEADERS = ['From', 'To', 'Subject', 'Date', 'Cc', 'Message-
 let gmailInFlight = 0
 const gmailWaitQueue = []
 
-function loadMailClassificationLog() {
-    if (mailClassificationById) return mailClassificationById
-    try {
-        if (!fs.existsSync(MAIL_CLASSIFICATION_LOG_PATH)) {
-            mailClassificationById = {}
-            return mailClassificationById
-        }
-        const parsed = JSON.parse(fs.readFileSync(MAIL_CLASSIFICATION_LOG_PATH, 'utf8'))
-        mailClassificationById = parsed && typeof parsed === 'object' ? parsed : {}
-    } catch (_) {
-        mailClassificationById = {}
-    }
-    return mailClassificationById
+function getLoggedInboxCategory(messageId) {
+    const category = getCachedInboxCategory(messageId)
+    return category ? normalizeClassificationLabel(category) : null
 }
 
-function saveMailClassificationLog() {
+function logInboxCategory(message, category, meta = {}) {
+    if (!message || !message.id) return
+    setCachedInboxCategory(message.id, {
+        category: normalizeClassificationLabel(category),
+        date: message.date || '',
+        receivedAtMs: Number(message.receivedAtMs) || 0,
+        confidence: Number(meta.confidence) || 0,
+        reason: String(meta.reason || '').slice(0, 120),
+        loggedAt: Date.now()
+    })
+}
+
+function queueBackgroundClassification(message) {
+    if (!message || !message.id || backgroundClassificationQueue.has(message.id)) return
+    backgroundClassificationSummaries.set(message.id, message)
+    backgroundClassificationQueue.add(message.id)
+    void drainBackgroundClassificationQueue()
+}
+
+async function drainBackgroundClassificationQueue() {
+    while (backgroundClassificationQueue.size) {
+        const iterator = backgroundClassificationQueue.values()
+        const messageId = iterator.next().value
+        if (!messageId) break
+        backgroundClassificationQueue.delete(messageId)
+        if (backgroundClassificationInflight.has(messageId)) continue
+        backgroundClassificationInflight.add(messageId)
+        try {
+            const summary = backgroundClassificationSummaries.get(messageId)
+                || getCachedMessageDetail(messageId)
+                || { id: messageId }
+            backgroundClassificationSummaries.delete(messageId)
+            const classification = await classifyInboxMessage(summary)
+            logInboxCategory(summary, classification && classification.label, classification || {})
+        } catch (_) {
+        } finally {
+            backgroundClassificationInflight.delete(messageId)
+        }
+    }
+}
+
+function filterMessagesByInboxFolder(messages, folder) {
+    const list = Array.isArray(messages) ? messages : []
+    if (folder === 'secondary') {
+        return list.filter(message => message && message.inboxCategory === NON_ACADEMIC)
+    }
+    if (folder === 'campus_events') {
+        return list.filter(message => message && message.inboxCategory === CAMPUS_EVENTS)
+    }
+    if (folder === 'inbox') {
+        return list.filter(message => message && message.inboxCategory === ACADEMIC)
+    }
+    return list
+}
+
+function loadMailEventsLog() {
+    if (mailEventsById) return mailEventsById
     try {
-        const map = loadMailClassificationLog()
-        fs.writeFileSync(MAIL_CLASSIFICATION_LOG_PATH, JSON.stringify(map, null, 2), 'utf8')
+        if (!fs.existsSync(MAIL_EVENTS_LOG_PATH)) {
+            mailEventsById = {}
+            return mailEventsById
+        }
+        const parsed = JSON.parse(fs.readFileSync(MAIL_EVENTS_LOG_PATH, 'utf8'))
+        mailEventsById = parsed && typeof parsed === 'object' ? parsed : {}
+    } catch (_) {
+        mailEventsById = {}
+    }
+    return mailEventsById
+}
+
+function saveMailEventsLog() {
+    try {
+        const map = loadMailEventsLog()
+        fs.writeFileSync(MAIL_EVENTS_LOG_PATH, JSON.stringify(map, null, 2), 'utf8')
     } catch (_) {}
 }
 
-function getLoggedInboxCategory(messageId) {
-    const map = loadMailClassificationLog()
+function getLoggedMailEvents(messageId) {
+    const map = loadMailEventsLog()
     const record = map && messageId ? map[messageId] : null
-    if (!record || typeof record !== 'object') return null
-    return record.category === NON_ACADEMIC ? NON_ACADEMIC : 'academic'
+    return record && Array.isArray(record.events) ? record.events : null
 }
 
-function logInboxCategory(message, category) {
+function logMailEvents(message, events) {
     if (!message || !message.id) return
-    const map = loadMailClassificationLog()
+    const map = loadMailEventsLog()
     map[message.id] = {
-        category: category === NON_ACADEMIC ? NON_ACADEMIC : 'academic',
-        date: message.date || '',
-        receivedAtMs: Number(message.receivedAtMs) || 0,
+        events: Array.isArray(events) ? events : [],
         loggedAt: Date.now()
     }
-    saveMailClassificationLog()
+    saveMailEventsLog()
+}
+
+function attachListEvents(message) {
+    if (!message || message.inboxCategory === NON_ACADEMIC) {
+        return { ...message, events: [] }
+    }
+    const cached = getLoggedMailEvents(message.id)
+    if (cached) {
+        return { ...message, events: cached }
+    }
+    if (!messageLikelyHasEvents(message)) {
+        return { ...message, events: [] }
+    }
+    const events = heuristicExtractEvents(message)
+    if (events.length) logMailEvents(message, events)
+    return { ...message, events }
 }
 
 function sleep(ms) {
@@ -150,18 +248,75 @@ function parseBatchMultipartResponse(responseText, responseContentType) {
 }
 
 const MAIL_AUTH_PATH = path.join(__dirname, '..', '..', 'mail_auth.json')
+const MAIL_ENV_PATH = path.join(__dirname, '..', '..', '.env')
+const GMAIL_AUTH_PARTITION = 'persist:nucleus-gmail-oauth'
+const GMAIL_OAUTH_TIMEOUT_MS = 5 * 60 * 1000
+const DEFAULT_GMAIL_CLIENT_ID = '184291192111-g8r7ul70jbvn0jhsv64ums89q47udebb.apps.googleusercontent.com'
+const DEFAULT_GMAIL_CLIENT_SECRET = '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'
+const DEFAULT_GMAIL_REDIRECT_URI = 'http://localhost:3000/callback'
 
-const oauth2Client = new google.auth.OAuth2(
-    '184291192111-g8r7ul70jbvn0jhsv64ums89q47udebb.apps.googleusercontent.com',
-    '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',
-    'http://localhost:3000/callback'
-)
+function parseEnvValue(value) {
+    const text = String(value || '').trim()
+    if (text.length >= 2 && text.startsWith('"') && text.endsWith('"')) {
+        return text.slice(1, -1).replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\\\/g, '\\')
+    }
+    return text
+}
+
+function loadEnvValue(name, fallback = '') {
+    if (process.env[name]) return String(process.env[name]).trim()
+    try {
+        if (!fs.existsSync(MAIL_ENV_PATH)) return fallback
+        const pattern = new RegExp(`^\\s*${name.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\$&')}\\s*=\\s*(.*)\\s*$`)
+        const lines = fs.readFileSync(MAIL_ENV_PATH, 'utf8').split(/\r?\n/)
+        for (const line of lines) {
+            const match = line.match(pattern)
+            if (match) return parseEnvValue(match[1])
+        }
+    } catch (_) {}
+    return fallback
+}
+
+function getGmailRedirectUri() {
+    return loadEnvValue('GMAIL_REDIRECT_URI', DEFAULT_GMAIL_REDIRECT_URI)
+}
+
+function createOAuthClient() {
+    return new google.auth.OAuth2(
+        loadEnvValue('GMAIL_CLIENT_ID', DEFAULT_GMAIL_CLIENT_ID),
+        loadEnvValue('GMAIL_CLIENT_SECRET', DEFAULT_GMAIL_CLIENT_SECRET),
+        getGmailRedirectUri()
+    )
+}
+
+const oauth2Client = createOAuthClient()
+
+function parseOAuthCallbackUrl(callbackUrl, redirectUri = getGmailRedirectUri()) {
+    const url = new URL(String(callbackUrl || ''))
+    const expected = new URL(redirectUri)
+    if (url.origin !== expected.origin || url.pathname !== expected.pathname) {
+        return { error: 'Unexpected Gmail OAuth redirect URL.' }
+    }
+
+    const oauthError = url.searchParams.get('error')
+    if (oauthError) {
+        const description = url.searchParams.get('error_description')
+        return { error: description || oauthError }
+    }
+
+    const code = url.searchParams.get('code')
+    if (!code) {
+        return { error: 'Gmail auth callback did not include an authorization code.' }
+    }
+
+    return { code }
+}
 
 function loadSavedMailAuth() {
     try {
         if (!fs.existsSync(MAIL_AUTH_PATH)) return null
         const parsed = JSON.parse(fs.readFileSync(MAIL_AUTH_PATH, 'utf8'))
-        if (!parsed || !parsed.access_token) return null
+        if (!parsed || (!parsed.access_token && !parsed.refresh_token)) return null
         return parsed
     } catch (_) {
         return null
@@ -169,7 +324,7 @@ function loadSavedMailAuth() {
 }
 
 function saveMailAuth(tokens) {
-    if (!tokens || !tokens.access_token) return
+    if (!tokens || (!tokens.access_token && !tokens.refresh_token)) return
     fs.writeFileSync(MAIL_AUTH_PATH, JSON.stringify(tokens, null, 2), 'utf8')
 }
 
@@ -181,6 +336,14 @@ function clearSavedMailAuth() {
             fs.unlinkSync(MAIL_AUTH_PATH)
         }
     } catch (_) {}
+}
+
+function mergeMailAuthTokens(existing, incoming) {
+    const next = { ...(existing || {}), ...(incoming || {}) }
+    if (!next.refresh_token && existing && existing.refresh_token) {
+        next.refresh_token = existing.refresh_token
+    }
+    return next
 }
 
 function setMailAuthTokens(tokens) {
@@ -195,17 +358,34 @@ function setMailAuthTokens(tokens) {
     return true
 }
 
-oauth2Client.on('tokens', (tokens) => {
-    const next = { ...(token || {}), ...tokens }
-    if (tokens.refresh_token) {
-        next.refresh_token = tokens.refresh_token
+async function refreshMailAccessToken() {
+    const saved = loadSavedMailAuth()
+    if (!saved || !saved.refresh_token) return false
+
+    setMailAuthTokens(saved)
+    try {
+        const { credentials } = await oauth2Client.refreshAccessToken()
+        const merged = mergeMailAuthTokens(saved, credentials)
+        setMailAuthTokens(merged)
+        saveMailAuth(merged)
+        return true
+    } catch (error) {
+        const message = String((error && error.message) || '').toLowerCase()
+        if (message.includes('invalid_grant') || message.includes('token has been expired or revoked')) {
+            clearSavedMailAuth()
+        }
+        return false
     }
+}
+
+oauth2Client.on('tokens', (tokens) => {
+    const next = mergeMailAuthTokens(token || loadSavedMailAuth(), tokens)
     setMailAuthTokens(next)
     saveMailAuth(next)
 })
 
 const savedMailAuth = loadSavedMailAuth()
-if (savedMailAuth) {
+if (savedMailAuth && savedMailAuth.access_token) {
     setMailAuthTokens(savedMailAuth)
 }
 
@@ -317,10 +497,39 @@ function extractBody(payload) {
     return { html, text }
 }
 
+function extractAttachments(payload) {
+    const attachments = []
+
+    function walk(part) {
+        if (!part) return
+        const filename = String(part.filename || '').trim()
+        if (filename && part.body && (part.body.attachmentId || Number(part.body.size) > 0)) {
+            attachments.push({
+                filename,
+                mimeType: String(part.mimeType || ''),
+                size: Number(part.body.size) || 0,
+                attachmentId: part.body.attachmentId || ''
+            })
+        }
+        if (Array.isArray(part.parts)) part.parts.forEach(walk)
+    }
+
+    walk(payload)
+    return attachments
+}
+
+function formatAttachmentSize(bytes) {
+    const size = Number(bytes) || 0
+    if (size < 1024) return `${size} B`
+    if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
+    return `${(size / (1024 * 1024)).toFixed(1)} MB`
+}
+
 function formatMessageSummary(message) {
     const receivedAtMs = Number(message && message.internalDate)
         || Date.parse(getHeader(message, 'Date'))
         || 0
+    const attachments = message && message.payload ? extractAttachments(message.payload) : []
     return {
         id: message.id,
         threadId: message.threadId,
@@ -335,12 +544,15 @@ function formatMessageSummary(message) {
         receivedAtMs,
         unread: hasLabel(message, 'UNREAD'),
         starred: hasLabel(message, 'STARRED'),
+        hasAttachments: attachments.length > 0,
+        attachmentCount: attachments.length,
         inboxCategory: 'academic'
     }
 }
 
 function formatMessageDetail(message) {
     const body = extractBody(message.payload)
+    const attachments = extractAttachments(message.payload)
     return {
         ...formatMessageSummary(message),
         cc: getHeader(message, 'Cc'),
@@ -348,7 +560,11 @@ function formatMessageDetail(message) {
         messageId: getHeader(message, 'Message-ID'),
         references: getHeader(message, 'References'),
         bodyHtml: body.html,
-        bodyText: body.text
+        bodyText: body.text,
+        attachments: attachments.map(item => ({
+            ...item,
+            sizeLabel: formatAttachmentSize(item.size)
+        }))
     }
 }
 
@@ -377,6 +593,9 @@ async function gmailRequest(pathname, options = {}, attempt = 0) {
         const data = await response.json()
         if (!response.ok) {
             const message = data && data.error && data.error.message ? data.error.message : `Gmail API error ${response.status}`
+            if (response.status === 401 && attempt === 0 && await refreshMailAccessToken()) {
+                return gmailRequest(pathname, options, attempt + 1)
+            }
             if (attempt < 3 && isRetryableGmailError(response.status, message)) {
                 await sleep((attempt + 1) * 700 + Math.floor(Math.random() * 250))
                 return gmailRequest(pathname, options, attempt + 1)
@@ -508,7 +727,7 @@ async function listMailMessages(options = {}) {
     const pageToken = options.pageToken || ''
 
     const params = new URLSearchParams({ maxResults: String(maxResults) })
-    const normalizedFolder = folder === 'secondary' ? 'inbox' : folder
+    const normalizedFolder = (folder === 'secondary' || folder === 'campus_events') ? 'inbox' : folder
     const labelId = FOLDER_LABELS[normalizedFolder]
     if (labelId && !q) params.set('labelIds', labelId)
     if (q) params.set('q', q)
@@ -518,15 +737,20 @@ async function listMailMessages(options = {}) {
     const refs = Array.isArray(list.messages) ? list.messages : []
     const ids = refs.map(item => item && item.id).filter(Boolean)
     const messages = ids.length ? await batchGetMessageMetadata(ids) : []
-    let summaries = messages.map(formatMessageSummary).map(message => {
-        const loggedCategory = getLoggedInboxCategory(message && message.id)
-        if (!loggedCategory) return message
-        return { ...message, inboxCategory: loggedCategory }
-    })
-    if (folder === 'secondary' && !q) {
-        summaries = summaries.filter(message => message && message.inboxCategory === NON_ACADEMIC)
-    } else if (folder === 'inbox' && !q) {
-        summaries = summaries.filter(message => message && message.inboxCategory !== NON_ACADEMIC)
+    let summaries = messages.map(formatMessageSummary)
+    if (isInboxSplitFolder(folder) && !q) {
+        summaries = await classifyInboxMessages(summaries)
+    } else {
+        summaries = summaries.map(message => {
+            const loggedCategory = getLoggedInboxCategory(message && message.id)
+            const withCategory = loggedCategory
+                ? { ...message, inboxCategory: loggedCategory }
+                : message
+            return attachListEvents(withCategory)
+        })
+    }
+    if (!q && isInboxSplitFolder(folder)) {
+        summaries = filterMessagesByInboxFolder(summaries, folder)
     }
     summaries.sort((a, b) => (Number(b && b.receivedAtMs) || 0) - (Number(a && a.receivedAtMs) || 0))
     return {
@@ -536,43 +760,127 @@ async function listMailMessages(options = {}) {
     }
 }
 
-async function classifyNewIncomingInboxMessages(messages) {
+async function classifyInboxMessages(messages, options = {}) {
     const list = Array.isArray(messages) ? messages : []
     if (!list.length) return list
-    return mapWithConcurrency(
-        list,
-        async message => {
-            if (!message) return message
-            if (!Array.isArray(message.labelIds) || !message.labelIds.includes('INBOX')) {
-                return { ...message, inboxCategory: 'academic' }
+
+    const classified = list.map(message => {
+        if (!message) return message
+        if (!Array.isArray(message.labelIds) || !message.labelIds.includes('INBOX')) {
+            return { ...message, inboxCategory: ACADEMIC, events: [] }
+        }
+
+        const loggedCategory = getLoggedInboxCategory(message.id)
+        let inboxCategory = loggedCategory
+        if (!inboxCategory) {
+            const heuristic = heuristicClassify(message)
+            inboxCategory = normalizeClassificationLabel(heuristic && heuristic.label)
+            logInboxCategory(message, inboxCategory, heuristic || {})
+            if (!options.skipBackgroundLlm && heuristic.confidence < HEURISTIC_LLM_THRESHOLD) {
+                queueBackgroundClassification(message)
             }
-            const loggedCategory = getLoggedInboxCategory(message.id)
-            if (loggedCategory) {
-                return { ...message, inboxCategory: loggedCategory }
-            }
-            const classification = await classifyInboxMessage(message)
-            const category = classification && classification.label === NON_ACADEMIC ? NON_ACADEMIC : 'academic'
-            logInboxCategory(message, category)
-            return {
-                ...message,
-                inboxCategory: category
-            }
-        },
-        Math.max(1, Math.min(4, GMAIL_MAX_CONCURRENT))
-    )
+        }
+
+        const withCategory = { ...message, inboxCategory }
+        if (inboxCategory === NON_ACADEMIC) {
+            return { ...withCategory, events: [] }
+        }
+        return attachListEvents(withCategory)
+    })
+
+    return classified
 }
 
-async function getMailMessage(id) {
+async function classifyNewIncomingInboxMessages(messages) {
+    return classifyInboxMessages(messages)
+}
+
+async function fetchAndCacheMailMessage(id, options = {}) {
     const message = await gmailRequest(
         `/messages/${id}?format=full&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Subject&metadataHeaders=Date&metadataHeaders=Cc&metadataHeaders=Bcc&metadataHeaders=Message-ID&metadataHeaders=References`
     )
-    return formatMessageDetail(message)
+    const detail = formatMessageDetail(message)
+    const loggedCategory = getLoggedInboxCategory(detail.id)
+    if (loggedCategory) {
+        detail.inboxCategory = loggedCategory
+    } else if (Array.isArray(detail.labelIds) && detail.labelIds.includes('INBOX')) {
+        const heuristic = heuristicClassify(detail)
+        detail.inboxCategory = normalizeClassificationLabel(heuristic && heuristic.label)
+        logInboxCategory(detail, detail.inboxCategory, heuristic || {})
+        if (heuristic.confidence < HEURISTIC_LLM_THRESHOLD) {
+            queueBackgroundClassification(detail)
+        }
+    }
+
+    if (detail.inboxCategory !== NON_ACADEMIC) {
+        const cachedEvents = getLoggedMailEvents(detail.id)
+        if (cachedEvents) {
+            detail.events = cachedEvents
+        } else if (options.skipEvents) {
+            detail.events = messageLikelyHasEvents(detail) ? heuristicExtractEvents(detail) : []
+        } else {
+            detail.events = heuristicExtractEvents(detail)
+            if (detail.events.length) {
+                logMailEvents(detail, detail.events)
+            } else if (messageLikelyHasEvents(detail)) {
+                void extractMailEvents(detail, { allowLlm: true }).then(events => {
+                    if (events.length) logMailEvents(detail, events)
+                }).catch(() => {})
+            }
+        }
+    } else {
+        detail.events = []
+    }
+
+    setCachedMessageDetail(id, detail)
+    return detail
+}
+
+async function getMailMessage(id) {
+    const cached = getCachedMessageDetail(id)
+    if (cached) {
+        if (shouldRefreshMessage(id)) {
+            void fetchAndCacheMailMessage(id, { skipEvents: true }).catch(() => {})
+        }
+        return cached
+    }
+    return fetchAndCacheMailMessage(id)
+}
+
+async function fetchAndCacheMailThread(threadId) {
+    const thread = await gmailRequest(`/threads/${threadId}?format=full`)
+    const messages = Array.isArray(thread.messages) ? thread.messages.map(formatMessageDetail) : []
+    const payload = { id: thread.id, messages }
+    setCachedThread(threadId, payload)
+    messages.forEach(message => {
+        if (message && message.id) {
+            setCachedMessageDetail(message.id, message)
+        }
+    })
+    return payload
 }
 
 async function getMailThread(threadId) {
-    const thread = await gmailRequest(`/threads/${threadId}?format=full`)
-    const messages = Array.isArray(thread.messages) ? thread.messages.map(formatMessageDetail) : []
-    return { id: thread.id, messages }
+    const cached = getCachedThread(threadId)
+    if (cached) {
+        void fetchAndCacheMailThread(threadId).catch(() => {})
+        return cached
+    }
+    return fetchAndCacheMailThread(threadId)
+}
+
+async function prefetchMailMessages(ids = [], options = {}) {
+    const unique = [...new Set((Array.isArray(ids) ? ids : []).filter(Boolean))]
+        .filter(id => !getCachedMessageDetail(id))
+        .slice(0, Number(options.limit) > 0 ? Number(options.limit) : 24)
+    if (!unique.length) return { ok: true, prefetched: 0 }
+
+    await mapWithConcurrency(
+        unique,
+        id => fetchAndCacheMailMessage(id, { skipEvents: true }).catch(() => null),
+        Math.max(1, Math.min(3, GMAIL_MAX_CONCURRENT))
+    )
+    return { ok: true, prefetched: unique.length }
 }
 
 function buildRawEmail({ from, to, cc, bcc, subject, body, inReplyTo, references }) {
@@ -667,7 +975,13 @@ async function getMailViewData(options = {}) {
         labelStats,
         messages: list.messages,
         nextPageToken: list.nextPageToken,
-        resultSizeEstimate: list.resultSizeEstimate
+        resultSizeEstimate: list.resultSizeEstimate,
+        academicEvents: (list.messages || [])
+            .filter(message => message && message.inboxCategory === ACADEMIC)
+            .flatMap(message => (Array.isArray(message.events) ? message.events : [])),
+        campusEvents: (list.messages || [])
+            .filter(message => message && message.inboxCategory === CAMPUS_EVENTS)
+            .flatMap(message => (Array.isArray(message.events) ? message.events : []))
     }
 }
 
@@ -766,57 +1080,132 @@ async function getInboxHtml(options = {}) {
     }
 }
 
-async function creategmailauthview() {
+async function exchangeGmailAuthCode(code) {
     const saved = loadSavedMailAuth()
+    const { tokens } = await oauth2Client.getToken(code)
+    const merged = mergeMailAuthTokens(saved, tokens)
+    if (!merged.access_token && !merged.refresh_token) {
+        throw new Error('Google did not return Gmail tokens.')
+    }
+    setMailAuthTokens(merged)
+    saveMailAuth(merged)
+    return merged
+}
+
+async function runGmailOAuthFlow() {
+    const redirectUri = getGmailRedirectUri()
+    const redirectPrefix = `${new URL(redirectUri).origin}${new URL(redirectUri).pathname}`
+    const saved = loadSavedMailAuth()
+
     const authUrl = oauth2Client.generateAuthUrl({
         access_type: 'offline',
-        ...(!saved || !saved.refresh_token ? { prompt: 'consent' } : {}),
+        include_granted_scopes: true,
         scope: [
             'https://www.googleapis.com/auth/gmail.readonly',
             'https://www.googleapis.com/auth/gmail.send',
             'https://www.googleapis.com/auth/gmail.modify'
-        ]
+        ],
+        ...(!saved || !saved.refresh_token ? { prompt: 'consent' } : { prompt: 'select_account' })
     })
 
-    const authview = new BrowserWindow({
-        width: 800,
-        height: 600,
-        webPreferences: { nodeIntegration: false }
-    })
+    return new Promise((resolve, reject) => {
+        let settled = false
 
-    authview.loadURL(authUrl)
-    token = await startCallbackServer(authview)
-    return token
-}
+        const settle = (handler, value) => {
+            if (settled) return
+            settled = true
+            cleanup()
+            handler(value)
+        }
 
-async function startCallbackServer(authview) {
-    return new Promise((resolve) => {
-        const server = http.createServer(async (req, res) => {
-            const url = new URL(req.url, 'http://localhost:3000/')
-            const code = url.searchParams.get('code')
-            if (!code) return
-
-            const { tokens } = await oauth2Client.getToken(code)
-            setMailAuthTokens(tokens)
-            saveMailAuth(tokens)
-
-            res.end('Auth complete, you can close this window.')
-            server.close()
-            authview.close()
-            resolve(tokens)
+        const authview = new BrowserWindow({
+            width: 520,
+            height: 720,
+            show: true,
+            autoHideMenuBar: true,
+            title: 'Sign in to Gmail',
+            webPreferences: {
+                nodeIntegration: false,
+                contextIsolation: true,
+                partition: GMAIL_AUTH_PARTITION
+            }
         })
 
-        server.listen(3000)
+        const requestFilter = { urls: [`${redirectPrefix}*`] }
+        const onBeforeRequest = (details, callback) => {
+            if (settled) {
+                callback({})
+                return
+            }
+
+            if (!String(details.url || '').startsWith(redirectPrefix)) {
+                callback({})
+                return
+            }
+
+            callback({ cancel: true })
+
+            const parsed = parseOAuthCallbackUrl(details.url, redirectUri)
+            if (parsed.error) {
+                settle(reject, new Error(parsed.error))
+                return
+            }
+
+            exchangeGmailAuthCode(parsed.code)
+                .then(tokens => settle(resolve, tokens))
+                .catch(error => settle(reject, error))
+        }
+
+        const cleanup = () => {
+            clearTimeout(timeoutId)
+            try {
+                authview.webContents.session.webRequest.onBeforeRequest(requestFilter, null)
+            } catch (_) {}
+            if (authview && !authview.isDestroyed()) {
+                authview.removeAllListeners('closed')
+                authview.close()
+            }
+        }
+
+        authview.on('closed', () => {
+            settle(reject, new Error('Gmail sign-in window was closed before authentication finished.'))
+        })
+
+        const timeoutId = setTimeout(() => {
+            settle(reject, new Error('Gmail sign-in timed out. Please try again.'))
+        }, GMAIL_OAUTH_TIMEOUT_MS)
+
+        authview.webContents.session.webRequest.onBeforeRequest(requestFilter, onBeforeRequest)
+        authview.loadURL(authUrl).catch(error => {
+            settle(reject, new Error(error && error.message ? error.message : 'Unable to open Gmail sign-in page.'))
+        })
     })
+}
+
+async function creategmailauthview() {
+    const tokens = await runGmailOAuthFlow()
+    token = tokens
+    return tokens
 }
 
 async function ensureMailAuth() {
-    if (!get_token()) {
-        const saved = loadSavedMailAuth()
-        if (saved) setMailAuthTokens(saved)
-    }
+    const saved = loadSavedMailAuth()
+    if (saved) setMailAuthTokens(saved)
 
     if (get_token()) {
+        try {
+            await getProfile()
+            return true
+        } catch (_) {
+            if (await refreshMailAccessToken()) {
+                try {
+                    await getProfile()
+                    return true
+                } catch (_) {}
+            }
+            clearSavedMailAuth()
+        }
+    } else if (saved && saved.refresh_token && await refreshMailAccessToken()) {
         try {
             await getProfile()
             return true
@@ -826,7 +1215,18 @@ async function ensureMailAuth() {
     }
 
     await creategmailauthview()
-    return Boolean(get_token())
+    if (!get_token()) {
+        throw new Error('Gmail authentication completed without an access token.')
+    }
+
+    try {
+        await getProfile()
+    } catch (error) {
+        clearSavedMailAuth()
+        throw new Error((error && error.message) || 'Gmail authentication failed.')
+    }
+
+    return true
 }
 
 // --- Inbox watcher (Gmail history delta sync) ---
@@ -1013,6 +1413,7 @@ module.exports = {
     getMailViewData,
     getMailMessage,
     getMailThread,
+    prefetchMailMessages,
     sendMailMessage,
     modifyMailMessage,
     trashMailMessage,
@@ -1026,5 +1427,9 @@ module.exports = {
     getmailmeta,
     extractEmail,
     MAIL_FOLDERS,
-    FOLDER_LABELS
+    FOLDER_LABELS,
+    parseOAuthCallbackUrl,
+    getGmailRedirectUri,
+    exchangeGmailAuthCode,
+    classifyInboxMessages
 }

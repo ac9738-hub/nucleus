@@ -37,17 +37,56 @@ function createDataStore({ sendToRenderer, getCanvasProjectGroups, readCanvasDat
 
   const tasks = []
 
-  function getRendererDataSnapshot() {
+  function getBootstrapSnapshot() {
     return {
       tasks,
       workspaces,
-      projectGroups: [...projectGroups, ...getCanvasProjectGroups()],
-      canvasData: readCanvasData()
+      projectGroups: [...projectGroups],
+      canvasData: {}
     }
   }
 
-  function sendCanvasDataUpdate() {
-    sendToRenderer('canvas:update', getRendererDataSnapshot())
+  function getRendererDataSnapshot() {
+    let canvasData = null
+    try {
+      canvasData = readCanvasData()
+    } catch (error) {
+      console.error('Unable to read Canvas data for renderer snapshot:', error)
+    }
+    let canvasProjectGroups = []
+    try {
+      canvasProjectGroups = getCanvasProjectGroups(canvasData)
+    } catch (error) {
+      console.error('Unable to build Canvas project groups for renderer snapshot:', error)
+    }
+    return {
+      tasks,
+      workspaces,
+      projectGroups: [...projectGroups, ...canvasProjectGroups],
+      canvasData: canvasData || {}
+    }
+  }
+
+  function sendCanvasDataUpdate(options = {}) {
+    try {
+      sendToRenderer('tasks:update', tasks)
+    } catch (error) {
+      console.error('Unable to send tasks with Canvas update:', error)
+    }
+    try {
+      const snapshot = getRendererDataSnapshot()
+      if (options.canvasWiped) {
+        snapshot.canvasWiped = true
+        snapshot.canvasData = {}
+        snapshot.projectGroups = [...projectGroups]
+      }
+      sendToRenderer('canvas:update', snapshot)
+    } catch (error) {
+      console.error('Unable to send full Canvas update; sending bootstrap snapshot:', error)
+      const snapshot = getBootstrapSnapshot()
+      if (options.canvasWiped) snapshot.canvasWiped = true
+      sendToRenderer('canvas:update', snapshot)
+    }
   }
 
   function newWorkspace(id, name, description = "") {
@@ -134,13 +173,43 @@ function createDataStore({ sendToRenderer, getCanvasProjectGroups, readCanvasDat
     })
   }
 
+  function applyTaskEntry(taskData) {
+    const taskId = taskData && taskData.id ? String(taskData.id) : ""
+    if (!taskId) return false
+    const existing = tasks.find(task => task.id === taskId)
+    const urls = Array.isArray(taskData.urls) ? taskData.urls.filter(Boolean) : []
+    const normalized = { ...taskData, id: taskId, urls }
+    if (existing) {
+      const preservedWorkspaceId = existing.workspaceId || ""
+      Object.assign(existing, normalized)
+      if (!normalized.workspaceId && preservedWorkspaceId) {
+        existing.workspaceId = preservedWorkspaceId
+      }
+    } else {
+      tasks.push(normalized)
+    }
+    return true
+  }
+
+  function importCanvasTasks(taskEntries = []) {
+    if (!Array.isArray(taskEntries) || !taskEntries.length) {
+      return 0
+    }
+    let applied = 0
+    taskEntries.forEach(entry => {
+      if (applyTaskEntry(entry)) applied += 1
+    })
+    if (!applied) return 0
+    sortTasksSequentially()
+    sendToRenderer('tasks:update', tasks)
+    return applied
+  }
+
   function newTask(title, priority_weight, id = "no task id", workspaceId = "", course = "no course", details = "unspecified task", due = "monday", estimate = "", color = "no color", urls = [], metadata = {}) {
     const taskId = id && id !== "no task id"
       ? String(id)
       : title.toLowerCase().replace(/\s+/g, '-') + '-' + Math.floor(Math.random() * 1000)
-    urls = Array.isArray(urls) ? urls.filter(Boolean) : []
-    const existing = tasks.find(task => task.id === taskId)
-    const taskData = {
+    applyTaskEntry({
       id: taskId,
       workspaceId,
       course,
@@ -152,16 +221,7 @@ function createDataStore({ sendToRenderer, getCanvasProjectGroups, readCanvasDat
       priority_weight,
       urls,
       ...metadata
-    }
-    if (existing) {
-      const preservedWorkspaceId = existing.workspaceId || "";
-      Object.assign(existing, taskData)
-      if (!workspaceId && preservedWorkspaceId) {
-        existing.workspaceId = preservedWorkspaceId
-      }
-    } else {
-      tasks.push(taskData)
-    }
+    })
     sortTasksSequentially()
     sendToRenderer('tasks:update', tasks)
     return "created new task with " + taskId + "," + workspaceId + "," + course + "," + title + "," + details + "," + due + "," + estimate + "," + color + "," + priority_weight + "\n"
@@ -238,17 +298,26 @@ function createDataStore({ sendToRenderer, getCanvasProjectGroups, readCanvasDat
       : 'pending'
   }
 
+  function notifyRendererReady() {
+    sendToRenderer('workspaces:update', workspaces)
+    sendCanvasDataUpdate()
+    return { ok: true, taskCount: tasks.length, workspaceCount: workspaces.length }
+  }
+
   return {
     deleteTask,
     deleteWorkspace,
     getAllWorkspacesForTool,
     getProjectColor,
     getRendererDataSnapshot,
+    getBootstrapSnapshot,
     getTasksSnapshot: () => tasks.map(task => ({ ...task })),
     getWorkspaceIdsByName,
     hasWorkspaceId: id => workspaceids.has(id),
+    importCanvasTasks,
     newTask,
     newWorkspace,
+    notifyRendererReady,
     removeCanvasTasks,
     sendCanvasDataUpdate,
     updateStudySectionProgress

@@ -8,12 +8,18 @@ def _group_logged_items(items, concept_name_key):
     return grouped
 
 
-def resolve_logged_orphans(courseid, logged_details, logged_examples, logged_problems, concept_nodes, add_detail_node, add_example_node, add_problem_node):
-    """Create nodes for pass-1 logged items that never received pass-2 links."""
+def _promote_logged_rows(
+    courseid,
+    concept_nodes,
+    details_by_concept,
+    examples_by_concept,
+    problems_logged,
+    *,
+    add_detail_node,
+    add_example_node,
+    add_problem_node,
+):
     resolved = {'details': 0, 'examples': 0, 'problems': 0}
-    details_by_concept = _group_logged_items(logged_details.get(courseid, []), 'conceptname')
-    examples_by_concept = _group_logged_items(logged_examples.get(courseid, []), 'conceptname')
-    problems_logged = logged_problems.get(courseid, []) or []
 
     for concept in concept_nodes:
         concept_id = concept.conceptid
@@ -67,3 +73,56 @@ def resolve_logged_orphans(courseid, logged_details, logged_examples, logged_pro
         resolved['problems'] += 1
 
     return resolved
+
+
+def resolve_logged_orphans(courseid, logged_details, logged_examples, logged_problems, concept_nodes, add_detail_node, add_example_node, add_problem_node):
+    """Create nodes for pass-1 logged items that never received pass-2 links."""
+    details_by_concept = _group_logged_items(logged_details.get(courseid, []), 'conceptname')
+    examples_by_concept = _group_logged_items(logged_examples.get(courseid, []), 'conceptname')
+    problems_logged = logged_problems.get(courseid, []) or []
+    return _promote_logged_rows(
+        courseid,
+        concept_nodes,
+        details_by_concept,
+        examples_by_concept,
+        problems_logged,
+        add_detail_node=add_detail_node,
+        add_example_node=add_example_node,
+        add_problem_node=add_problem_node,
+    )
+
+
+def promote_logged_teaching_for_file(
+    courseid,
+    file_id,
+    concept_nodes,
+    logged_details,
+    logged_examples,
+    logged_problems,
+    *,
+    add_detail_node,
+    add_example_node,
+    add_problem_node,
+):
+    """Promote pass-1 log_* rows for one file without an LLM pass2."""
+    fid = str(file_id or '')
+
+    def _for_file(items):
+        return [
+            item for item in (items or [])
+            if isinstance(item, dict) and str(item.get('sourceFileId') or '') == fid
+        ]
+
+    details_by_concept = _group_logged_items(_for_file(logged_details.get(courseid, [])), 'conceptname')
+    examples_by_concept = _group_logged_items(_for_file(logged_examples.get(courseid, [])), 'conceptname')
+    problems_logged = _for_file(logged_problems.get(courseid, []))
+    return _promote_logged_rows(
+        courseid,
+        concept_nodes,
+        details_by_concept,
+        examples_by_concept,
+        problems_logged,
+        add_detail_node=add_detail_node,
+        add_example_node=add_example_node,
+        add_problem_node=add_problem_node,
+    )

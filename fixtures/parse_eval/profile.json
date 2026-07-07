@@ -1,0 +1,28 @@
+{
+  "version": 2,
+  "description": "Rotating file-level parse eval with cost-aware GT builds.",
+  "concurrency": 1000,
+  "sourceManifest": "fixtures/heuristic_parse/insample/manifest.json",
+  "thresholds": {
+    "conceptRecallMin": 0.80,
+    "detailRatioMin": 0.65,
+    "fileTypeMatchRequired": true,
+    "pass2RequiredWhenProfilePass2": true
+  },
+  "gtBuild": {
+    "parseMode": "llm-cost",
+    "qualityConcurrency": 4
+  },
+  "eval": {
+    "parseMode": "llm-cost",
+    "note": "Use llm-cost for rotating eval too — same pass profile as GT, with concurrency fan-out."
+  },
+  "passNotes": {
+    "extract_pages": "Always required; local PDF I/O only.",
+    "heuristic_classify": "Always required; free routing to FileTypeProfile.",
+    "llm_classify": "Skip when heuristic confidence >= 0.82 (default parser behavior).",
+    "llm_pass1": "Always for LLM file parse; tool set varies by type.",
+    "llm_pass2": "Skip when profile.pass2=false OR pass1 had no log_* tools (runtime gate).",
+    "finalize": "Must not defer per-file finalize during GT/eval."
+  }
+}

@@ -31,6 +31,7 @@ def upgrade_graph_state(state):
         concept.setdefault('prerequisiteConceptIds', [])
         concept.setdefault('aliases', [])
         concept.setdefault('moduleOrderHints', [])
+        concept.setdefault('documentOrder', {})
 
     for syllabus in (state.get('syllabi', {}) or {}).values():
         for assignment in syllabus.get('assignments', []) or []:

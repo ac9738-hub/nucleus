@@ -1,0 +1,614 @@
+{
+  "version": 1,
+  "courseId": "15237",
+  "fileId": "3457733",
+  "filename": "Lecture 20_degeneration and regeneration.pdf",
+  "expectedFileType": "lecture_slides",
+  "passPlan": {
+    "courseId": "15237",
+    "fileId": "3457733",
+    "filename": "Lecture 20_degeneration and regeneration.pdf",
+    "resolvedType": "lecture_slides",
+    "heuristicConfidence": 0.92,
+    "neededPasses": [
+      "extract_pages",
+      "heuristic_classify",
+      "llm_pass1",
+      "finalize"
+    ],
+    "skippedPasses": [
+      "llm_classify",
+      "llm_pass2"
+    ],
+    "estLlmCalls": 1,
+    "estRealisticLlmCalls": 1.0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "needed": true,
+        "reason": "Required local PDF/HTML extraction; no LLM.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "heuristic_classify",
+        "needed": true,
+        "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_classify",
+        "needed": false,
+        "reason": "Heuristic confidence 0.92 sufficient; skip flash classify call.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_pass1",
+        "needed": true,
+        "reason": "Type lecture_slides: pass1 extracts concepts=True, problems=True, events=False.",
+        "llmCall": true,
+        "estCostTier": "high"
+      },
+      {
+        "pass": "llm_pass2",
+        "needed": false,
+        "reason": "Type lecture_slides disables pass2 (single-pass type-specific or link-only profile).",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "finalize",
+        "needed": true,
+        "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+        "llmCall": false,
+        "estCostTier": "free"
+      }
+    ]
+  },
+  "passAudit": {
+    "plan": {
+      "courseId": "15237",
+      "fileId": "3457733",
+      "filename": "Lecture 20_degeneration and regeneration.pdf",
+      "resolvedType": "lecture_slides",
+      "heuristicConfidence": 0.92,
+      "neededPasses": [
+        "extract_pages",
+        "heuristic_classify",
+        "llm_pass1",
+        "finalize"
+      ],
+      "skippedPasses": [
+        "llm_classify",
+        "llm_pass2"
+      ],
+      "estLlmCalls": 1,
+      "estRealisticLlmCalls": 1.0,
+      "steps": [
+        {
+          "pass": "extract_pages",
+          "needed": true,
+          "reason": "Required local PDF/HTML extraction; no LLM.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "heuristic_classify",
+          "needed": true,
+          "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_classify",
+          "needed": false,
+          "reason": "Heuristic confidence 0.92 sufficient; skip flash classify call.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_pass1",
+          "needed": true,
+          "reason": "Type lecture_slides: pass1 extracts concepts=True, problems=True, events=False.",
+          "llmCall": true,
+          "estCostTier": "high"
+        },
+        {
+          "pass": "llm_pass2",
+          "needed": false,
+          "reason": "Type lecture_slides disables pass2 (single-pass type-specific or link-only profile).",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "finalize",
+          "needed": true,
+          "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+          "llmCall": false,
+          "estCostTier": "free"
+        }
+      ]
+    },
+    "actualType": "lecture_slides",
+    "deepseekPasses": 1,
+    "conceptCount": 73,
+    "detailCount": 29,
+    "totalLlmTokens": 0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "ran": true,
+        "useful": true,
+        "verdict": "required",
+        "note": "Local I/O; pages present means extract succeeded."
+      },
+      {
+        "pass": "heuristic_classify",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "Routed to lecture_slides (free)."
+      },
+      {
+        "pass": "llm_classify",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Skipped; heuristic confidence sufficient.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass1",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "No pass1 tool trace.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass2",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Correctly skipped: profile disables pass2, type-specific pass1 only, or no log_* tools.",
+        "tokens": 0
+      },
+      {
+        "pass": "finalize",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "logged_details promoted to concept details."
+      }
+    ],
+    "cutCandidates": [],
+    "recommendations": [
+      "Pass2 correctly skipped for this type/pass1 tool pattern."
+    ]
+  },
+  "passes": [
+    "extract_pages",
+    "heuristic_classify",
+    "teaching_units",
+    "type_structure",
+    "concept_candidates",
+    "problem_scan",
+    "detail_attach",
+    "reconcile"
+  ],
+  "buildMode": "template_multi_pass_offline",
+  "builtAt": "2026-07-01T22:49:37Z",
+  "concepts": [
+    {
+      "name": "Lecture 20_degeneration and regeneration",
+      "details": []
+    },
+    {
+      "name": "limited regeneration",
+      "details": []
+    },
+    {
+      "name": "111 nfl brains: 110 had physical evidence of cte",
+      "details": []
+    },
+    {
+      "name": "Older adults, e.g.",
+      "details": []
+    },
+    {
+      "name": "Cellular response to injury in the central nervous system",
+      "details": []
+    },
+    {
+      "name": "•Symptoms appear 8-10 years after injuries, in stages",
+      "details": []
+    },
+    {
+      "name": "neurodegeneration and regeneration",
+      "details": [
+        "Final lecture: NEURODEGENERATION AND REGENERATION"
+      ]
+    },
+    {
+      "name": "healthy control",
+      "details": []
+    },
+    {
+      "name": "quiz 3 is thursday",
+      "details": [
+        "Reminder: Quiz 3 is Thursday"
+      ]
+    },
+    {
+      "name": "12/10, 1-3pm, a32exam 12/18, 12:30-3:30, mcdonnell hall a02",
+      "details": [
+        "Final (cumulative)Review session: 12/10, 1-3pm, A32Exam 12/18, 12:30-3:30, McDonnell Hall A02"
+      ]
+    },
+    {
+      "name": "please return loaned books by 12/20",
+      "details": []
+    },
+    {
+      "name": "make a neuro memefor extra credit",
+      "details": [
+        "Reminder: make a neuro memefor extra credit"
+      ]
+    },
+    {
+      "name": "summary of previous lecture",
+      "details": []
+    },
+    {
+      "name": "nerve injury–chronic traumatic encephalopathy (cte)–amyotrophic lateral sclerosis (als)–multiple sclerosis (ms)",
+      "details": [
+        "Younger adults, e.g.:–Nerve injury–Chronic traumatic encephalopathy (CTE)–Amyotrophic lateral sclerosis (ALS)–Multiple sclerosis (MS)"
+      ]
+    },
+    {
+      "name": "outline for today",
+      "details": []
+    },
+    {
+      "name": "chronic traumatic encephalopathy (cte)",
+      "details": []
+    },
+    {
+      "name": "graphic",
+      "details": []
+    },
+    {
+      "name": "macrophagesclear debris",
+      "details": []
+    },
+    {
+      "name": "neuromodulators don’t need to remake specific synapses",
+      "details": [
+        "Synaptic vs volume transmission: neuromodulators don’t need to remake specific synapses"
+      ]
+    },
+    {
+      "name": "nerve injury",
+      "details": []
+    },
+    {
+      "name": "chronic traumatic encephalopathy",
+      "details": []
+    },
+    {
+      "name": "normal",
+      "details": []
+    },
+    {
+      "name": "110 had physical evidence of cte",
+      "details": [
+        "111 NFL brains: 110 had physical evidence of CTE"
+      ]
+    },
+    {
+      "name": "participants suspected of suffering from cte",
+      "details": [
+        "Biased sample: participants suspected of suffering from CTE"
+      ]
+    },
+    {
+      "name": "mild pathology",
+      "details": [
+        "High school players: mild pathology"
+      ]
+    },
+    {
+      "name": "56% college players56% semiprofessional86% professional",
+      "details": [
+        "Severe in:56% college players56% semiprofessional86% professional"
+      ]
+    },
+    {
+      "name": "concussion indicator",
+      "details": [
+        "Fencing response: concussion indicator"
+      ]
+    },
+    {
+      "name": "tua tagovailoa, dolphins qb, 2022",
+      "details": []
+    },
+    {
+      "name": "tom savage, texans qb, 2017",
+      "details": []
+    },
+    {
+      "name": "medial temporal lobe",
+      "details": []
+    },
+    {
+      "name": "normalcte",
+      "details": []
+    },
+    {
+      "name": "what is your name?auguste",
+      "details": [
+        "Alzheimer: What is your name?Auguste"
+      ]
+    },
+    {
+      "name": "last name?auguste",
+      "details": [
+        "Alzheimer: Last name?Auguste"
+      ]
+    },
+    {
+      "name": "what’s your husband’s name?auguste i think",
+      "details": [
+        "Alzheimer: What’s your husband’s name?Auguste I think"
+      ]
+    },
+    {
+      "name": "diagnosed with ad, 19961997",
+      "details": []
+    },
+    {
+      "name": "correlations with protection",
+      "details": [
+        "Alzheimer’s disease (AD): correlations with protection"
+      ]
+    },
+    {
+      "name": "baby boomergeneration",
+      "details": []
+    },
+    {
+      "name": "many tauopathies (including cte)",
+      "details": []
+    },
+    {
+      "name": "specific association with ad",
+      "details": []
+    },
+    {
+      "name": "amyloid plaques and neurofibrillary tangles (nfts)",
+      "details": [
+        "Histopathology of AD: amyloid plaques and neurofibrillary tangles (NFTs)"
+      ]
+    },
+    {
+      "name": "strategies for early diagnosis and prevention",
+      "details": [
+        "Needed: strategies for early diagnosis and prevention"
+      ]
+    },
+    {
+      "name": "aβ40•aβ42: hydrophobic, aggregates",
+      "details": [
+        "•Cleaved by β-secretase•80-90%: Aβ40•Aβ42: hydrophobic, aggregates"
+      ]
+    },
+    {
+      "name": "not linked to adassociated with ad",
+      "details": []
+    },
+    {
+      "name": "2 copies apoe4elevated risk of developing alzheimer’s (~70%)",
+      "details": [
+        "Chris Hemsworth: 2 copies ApoE4Elevated risk of developing Alzheimer’s (~70%)"
+      ]
+    },
+    {
+      "name": "adjacent sections of ad patient brain",
+      "details": []
+    },
+    {
+      "name": "stretching and question break",
+      "details": []
+    },
+    {
+      "name": "clear inheritance pattern (usually caused by a single gene)",
+      "details": [
+        "•Familial AD (FAD): clear inheritance pattern (usually caused by a single gene)"
+      ]
+    },
+    {
+      "name": "more complex cause (e.g. gene x environment, multiple genes)",
+      "details": [
+        "•Sporadic: more complex cause (e.g. gene x environment, multiple genes)"
+      ]
+    },
+    {
+      "name": "autosomal dominantinheritance",
+      "details": []
+    },
+    {
+      "name": "down syndrome and the amyloid hypothesis",
+      "details": []
+    },
+    {
+      "name": "pdapp mouse model of ad",
+      "details": []
+    },
+    {
+      "name": "current theories of ad pathogenesis",
+      "details": []
+    },
+    {
+      "name": "tau hypothesis",
+      "details": []
+    },
+    {
+      "name": "plaques and tanglesprimary age-related tauopathy (part):tangles only",
+      "details": [
+        "AD: plaques and tanglesPrimary Age-Related Tauopathy (PART):tangles only"
+      ]
+    },
+    {
+      "name": "age-related myelin breakdown",
+      "details": [
+        "AD model: age-related myelin breakdown"
+      ]
+    },
+    {
+      "name": "cholinergic hypothesis",
+      "details": [
+        "AD model: Cholinergic hypothesis"
+      ]
+    },
+    {
+      "name": "model",
+      "details": []
+    },
+    {
+      "name": "infection / immune hypothesis",
+      "details": []
+    },
+    {
+      "name": "neuroinflammation has a role in pathogenesis",
+      "details": []
+    },
+    {
+      "name": "frequency in patient brain",
+      "details": []
+    },
+    {
+      "name": "flies, rats, mice, rabbits, canines, non-human primates…",
+      "details": [
+        "• In different species: flies, rats, mice, rabbits, canines, non-human primates…"
+      ]
+    },
+    {
+      "name": "most drugs don’t cross the blood-brain barrier",
+      "details": [
+        "Drug delivery challenge: most drugs don’t cross the blood-brain barrier"
+      ]
+    },
+    {
+      "name": "no definitive proof that stopping plaques would stop cognitive symptoms",
+      "details": [
+        "Scientific challenge: no definitive proof that stopping plaques would stop cognitive symptoms"
+      ]
+    },
+    {
+      "name": "ad drugs in clinical trials (2017)",
+      "details": []
+    },
+    {
+      "name": "many high profile failures",
+      "details": []
+    },
+    {
+      "name": "current therapeutic approaches for ad include",
+      "details": []
+    },
+    {
+      "name": "nmdar blockers (memantine)",
+      "details": []
+    },
+    {
+      "name": "cholinesterase inhibitors (symptoms only)",
+      "details": []
+    },
+    {
+      "name": "immunotheraputics",
+      "details": []
+    },
+    {
+      "name": "summary",
+      "details": [
+        "Alzheimer’s disease (AD): summary"
+      ]
+    },
+    {
+      "name": "3 modules",
+      "details": [
+        "Course Content: 3 modules"
+      ]
+    },
+    {
+      "name": "major take-aways of neu201",
+      "details": []
+    },
+    {
+      "name": "recurring themes of neu201",
+      "details": []
+    }
+  ],
+  "conceptCount": 73,
+  "detailCount": 29,
+  "events": [],
+  "problems": [],
+  "sections": [
+    "Older adults, e.g.",
+    "Cellular response to injury in the central nervous system",
+    "•Symptoms appear 8-10 years after injuries, in stages",
+    "Model",
+    "Current therapeutic approaches for AD include"
+  ],
+  "deepseekPasses": 1,
+  "expectsPass2": false,
+  "gtProvenance": {
+    "typeSource": "heuristic_high",
+    "typeConfidence": 0.92,
+    "offlinePassAudit": {
+      "extract_pages": {
+        "localPdf": true,
+        "pageCount": 74,
+        "pdfPath": "C:\\Allen\\nucleus\\canvasfiles\\3457733"
+      },
+      "heuristic_classify": {
+        "expectedFileType": "lecture_slides",
+        "source": "heuristic_high",
+        "confidence": 0.92
+      },
+      "teaching_units": {
+        "sectionCount": 5
+      },
+      "type_structure": {
+        "slideRows": 75,
+        "readingSections": 0,
+        "syllabusWeeks": 0
+      },
+      "concept_candidates": {
+        "candidateCount": 73
+      },
+      "problem_scan": {
+        "problemCount": 0
+      },
+      "detail_attach": {
+        "conceptKeysWithDetails": 31,
+        "detailCount": 31
+      },
+      "reconcile": {
+        "inputTitles": 73,
+        "accepted": 73,
+        "capped": 0,
+        "detailAttached": 29
+      }
+    },
+    "reconcileStats": {
+      "inputTitles": 73,
+      "accepted": 73,
+      "capped": 0,
+      "detailAttached": 29
+    }
+  }
+}

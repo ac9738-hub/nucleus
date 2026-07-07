@@ -11,8 +11,6 @@ let appIconClickState = {
   timeout: null
 };
 
-let workspaceTabSwitchQueue = Promise.resolve();
-
 function activateAppIcon(card, openApp) {
   if (appIconClickState.target === card) {
     clearTimeout(appIconClickState.timeout);
@@ -43,16 +41,20 @@ function activateAppIcon(card, openApp) {
 // render the top level vertical tabs aka the section panel by toggleing active on or off
 function renderPrimaryTabs() {
   document.querySelectorAll("#primary-tabs button").forEach(button => {
-    button.classList.toggle("active", state.top !== "workspace" && button.dataset.section === state.activeSection);
+    const isActive = state.top !== "workspace" && button.dataset.section === state.activeSection;
+    button.classList.toggle("active", isActive);
+    button.setAttribute("aria-selected", isActive ? "true" : "false");
   });
 }
 
 // render the tabs in the left panel for workspaces ** no container
 function renderWorkspaceTabs() {
   const workspaceTabs = document.getElementById("workspace-tabs");
+  if (!workspaceTabs) return;
+  const workspaceList = Array.isArray(workspaces) ? workspaces : [];
 
   // build html
-  workspaceTabs.innerHTML = workspaces.map(workspace => `
+  workspaceTabs.innerHTML = workspaceList.map(workspace => `
     <button type="button" class="${state.top === 'workspace' && workspace.id === state.activeWorkspaceId ? "active" : ""}" data-workspace="${escapeHtml(workspace.id)}">
       <span class="workspace-tab-main">
         <span>${escapeHtml(workspace.name)}</span>
@@ -115,6 +117,7 @@ function getNativeTabIconKind(tab) {
   if (tab.type === "center") return "center";
   if (tab.type === "mailtab") return "mail";
   if (tab.type === "synapsetab") return "synapse";
+  if (tab.type === "artifacttab") return "artifact";
   if (tab.type === "canvastab" && tab.canvasMode !== "browser") return "canvas";
   return null;
 }
@@ -124,6 +127,9 @@ function renderWorkspaceTabIcon(tab) {
   if (kind) {
     if (kind === "center") {
       return `<span class="workspace-page-tab-icon workspace-page-tab-icon-center">${CENTER_TAB_ICON_SVG}</span>`;
+    }
+    if (kind === "artifact" && window.nucleusArtifactTabs && typeof window.nucleusArtifactTabs.renderArtifactTabIcon === "function") {
+      return window.nucleusArtifactTabs.renderArtifactTabIcon(tab);
     }
     const src = NATIVE_TAB_ICONS[kind];
     return `<span class="workspace-page-tab-icon workspace-page-tab-icon-${kind}"><img src="${escapeHtml(src)}" alt="" draggable="false"></span>`;
@@ -136,9 +142,10 @@ function renderWorkspaceTabIcon(tab) {
 
 function getTabDisplayTitle(tab) {
   if (!tab) return "Tab";
-  if (tab.type === "center") return tab.label || "Project Center";
+  if (tab.type === "center") return tab.label || "Control Center";
   if (tab.type === "mailtab") return "Mail";
   if (tab.type === "synapsetab") return "Synapse";
+  if (tab.type === "artifacttab") return tab.label || "Artifact";
   if (tab.type === "canvastab" && tab.canvasMode !== "browser") {
     if (tab.canvasNativePage === "course") {
       const courseName = getCanvasTabCourseName(tab);
@@ -184,6 +191,321 @@ function tabVisualsMatch(existingVisual, newVisual) {
   return existingVisual.outerHTML === newVisual.outerHTML;
 }
 
+function setViewSwitching(active) {
+  const view = document.getElementById("view");
+  if (!view) return;
+  view.classList.toggle("view-is-switching", Boolean(active));
+  view.classList.toggle("view-is-ready", !active);
+}
+
+function patchOptimisticWorkspaceTabActive(tabId) {
+  const pageTabs = document.getElementById("workspace-page-tabs");
+  if (!pageTabs) return;
+  pageTabs.querySelectorAll(".workspace-page-tab").forEach(btn => {
+    btn.classList.toggle("active", sameTabId(btn.dataset.tabId, tabId));
+  });
+  setViewSwitching(true);
+}
+
+let pendingViewTransition = null;
+
+function getViewTransitionApi() {
+  return window.nucleusViewTransition || null;
+}
+
+function beginPendingViewTransition() {
+  const vt = getViewTransitionApi();
+  pendingViewTransition = vt ? vt.beginTransition() : null;
+  return pendingViewTransition;
+}
+
+function consumePendingViewTransition() {
+  const transition = pendingViewTransition;
+  pendingViewTransition = null;
+  return transition;
+}
+
+function getActiveViewContext() {
+  const activeTab = state.top === "workspace"
+    ? state.tabs.find(tab => sameTabId(tab.id, state.activeTabId)) || {
+        id: ensureWorkspaceCenter(state.activeWorkspaceId),
+        type: "center",
+        workspaceId: state.activeWorkspaceId
+      }
+    : null;
+  return { activeTab };
+}
+
+function composeActiveViewHtml() {
+  const { activeTab } = getActiveViewContext();
+
+  if (state.top !== "workspace") {
+    if (state.activeSection === "home") return renderHomeDashboard();
+    if (state.activeSection === "tasks") return renderSuggestedTasks();
+    return renderCalendarPlaceholder();
+  }
+  if (activeTab.type === "task") return renderTaskWorkspace(activeTab);
+  if (activeTab.type === "canvastab" && activeTab.canvasMode !== "browser") {
+    return window.nucleusCanvasApp
+      ? window.nucleusCanvasApp.renderCanvasApp(activeTab, canvasData)
+      : `<section class="workspace-panel"><div><h2>Canvas</h2><p>The Canvas app script did not load.</p></div></section>`;
+  }
+  if (activeTab.type === "synapsetab") {
+    return window.nucleusSynapseApp
+      ? window.nucleusSynapseApp.renderSynapseApp(activeTab, synapseState)
+      : `<section class="workspace-panel"><div><h2>Synapse</h2><p>The Synapse app script did not load.</p></div></section>`;
+  }
+  if (activeTab.type === "mailtab") {
+    return window.nucleusMailApp
+      ? window.nucleusMailApp.renderMailApp(activeTab, mailState)
+      : `<section class="workspace-panel"><div><h2>Mail</h2><p>The Mail app script did not load.</p></div></section>`;
+  }
+  if (activeTab.type === "artifacttab") {
+    return window.nucleusArtifactTabs
+      ? window.nucleusArtifactTabs.renderArtifactTabView(activeTab)
+      : `<section class="workspace-panel"><div><h2>Artifact</h2><p>The artifact tab script did not load.</p></div></section>`;
+  }
+  if (isWebContentTab(activeTab)) {
+    const diag = window.__nucleusDiag;
+    if (diag && diag.isEnabled("tabs")) {
+      diag.logTabs("flash_risk_empty_shell", {
+        tabId: activeTab.id,
+        tabType: activeTab.type,
+        canvasMode: activeTab.canvasMode || "",
+        loading: Boolean(activeTab.loading),
+        hasSnapshot: Boolean(activeTab.snapshotDataUrl),
+        viewTier: activeTab.viewTier || ""
+      });
+    }
+    if (activeTab.type === "canvastab" && activeTab.canvasMode === "browser") {
+      // #region agent log
+      fetch('http://127.0.0.1:7283/ingest/c1155abf-8302-4940-9722-19bb0cae0569',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'5b3c30'},body:JSON.stringify({sessionId:'5b3c30',location:'renderer/app.js:composeActiveViewHtml',message:'canvas browser empty shell',data:{tabId:activeTab.id,loading:Boolean(activeTab.loading),viewTier:activeTab.viewTier||'',url:activeTab.url||''},timestamp:Date.now(),hypothesisId:'H3'})}).catch(()=>{});
+      // #endregion
+      return "";
+    }
+    if (window.__nucleusDiag && window.__nucleusDiag.isEnabled("render")) {
+      window.__nucleusDiag.logRender("render_view", {
+        kind: "web_content",
+        tabType: activeTab.type,
+        loading: Boolean(activeTab.loading),
+        discarded: Boolean(activeTab.discarded),
+        viewTier: activeTab.viewTier || "",
+        hasSnapshot: Boolean(activeTab.snapshotDataUrl)
+      });
+    }
+    const overlay = window.__nucleusTabSnapshot ? window.__nucleusTabSnapshot.get() : null;
+    const restoreSnapshot =
+      overlay &&
+      overlay.visible &&
+      sameTabId(activeTab.id, overlay.tabId) &&
+      overlay.snapshotDataUrl
+        ? overlay.snapshotDataUrl
+        : "";
+    const loadingSnapshot =
+      activeTab.loading && activeTab.snapshotDataUrl
+        ? activeTab.snapshotDataUrl
+        : "";
+    const placeholderSnapshot = restoreSnapshot || loadingSnapshot;
+    if (placeholderSnapshot) {
+      return `<img class="tab-restore-snapshot" src="${escapeHtml(placeholderSnapshot)}" alt="">`;
+    }
+    return "";
+  }
+  return renderWorkspaceControlCenter(getWorkspace(state.activeWorkspaceId));
+}
+
+function collectNativeCourseDomLinks(root) {
+  const tracker = resolveNativeCanvasTracker()
+  if (!tracker || typeof tracker.collectVisibleCourseLinks !== "function") return []
+  const scope = root || document.getElementById("view")
+  if (!scope) return []
+  const domApi = typeof window !== "undefined" ? window.nucleusCanvasPreloadDom : null
+  return tracker.collectVisibleCourseLinks(scope)
+    .map(entry => entry.url)
+    .filter(url => {
+      if (!url) return false
+      if (domApi && typeof domApi.isCanvasPreloadableUrl === "function") {
+        return domApi.isCanvasPreloadableUrl(url)
+      }
+      return /^https?:\/\/[^/]+\/courses\/\d+\/.+/i.test(String(url))
+    })
+}
+
+let nativeCoursePointerTrackerCleanup = null
+let nativeCoursePointerInstallKey = ""
+let nativePointerTabSyncSent = false
+
+function teardownNativeCoursePointerTracker() {
+  if (typeof nativeCoursePointerTrackerCleanup === "function") {
+    nativeCoursePointerTrackerCleanup()
+    nativeCoursePointerTrackerCleanup = null
+  }
+  nativeCoursePointerInstallKey = ""
+  nativePointerTabSyncSent = false
+}
+
+function ensureNativePointerTabSynced() {
+  if (nativePointerTabSyncSent) return
+  nativePointerTabSyncSent = true
+  if (typeof syncActiveTab === "function") {
+    void syncActiveTab().catch(() => {})
+  }
+}
+
+function resolveNativeCanvasTracker() {
+  if (typeof globalThis !== "undefined" && globalThis.nucleusCanvasNativeTracker) {
+    return globalThis.nucleusCanvasNativeTracker
+  }
+  if (typeof window !== "undefined" && window.nucleusCanvasNativeTracker) {
+    return window.nucleusCanvasNativeTracker
+  }
+  return null
+}
+
+function installNativeCoursePointerTracker(root, tab) {
+  if (!tab || tab.type !== "canvastab" || tab.canvasMode === "browser") {
+    return
+  }
+  if (!tab.courseId || !root) {
+    return
+  }
+
+  const tracker = resolveNativeCanvasTracker()
+  if (!tracker || typeof tracker.installNativeCoursePointerTracker !== "function") {
+    return
+  }
+
+  const installKey = `${String(tab.id || "")}:${String(tab.courseId || "")}:${String(tab.courseSection || "homepage")}`
+  if (installKey === nativeCoursePointerInstallKey && nativeCoursePointerTrackerCleanup) {
+    return
+  }
+
+  teardownNativeCoursePointerTracker()
+  nativeCoursePointerInstallKey = installKey
+
+  nativeCoursePointerTrackerCleanup = tracker.installNativeCoursePointerTracker({
+    root,
+    getTabId() {
+      const active = typeof getActiveTab === "function" ? getActiveTab() : null
+      return active && active.id ? String(active.id) : String(tab && tab.id || "")
+    },
+    onPointerHints(links, meta = {}) {
+      if (!window.nucleus || typeof window.nucleus.canvasPreloadPointerHints !== "function") {
+        return
+      }
+      const active = typeof getActiveTab === "function" ? getActiveTab() : null
+      if (!active || active.type !== "canvastab" || active.canvasMode === "browser") {
+        return
+      }
+      if (!active.courseId) return
+      const hintTabId = String(meta.tabId || (active && active.id) || "")
+      if (!hintTabId || !sameTabId(active.id, hintTabId)) {
+        return
+      }
+      ensureNativePointerTabSynced()
+      const domLinks = Array.isArray(links)
+        ? links.map(entry => entry && entry.url).filter(Boolean)
+        : []
+      window.nucleus.canvasPreloadPointerHints({
+        tabId: active.id,
+        courseId: String(active.courseId),
+        courseSection: active.courseSection || "homepage",
+        source: "native_course",
+        emitReason: meta.emitReason || "",
+        domLinks,
+        links
+      }).catch(() => {})
+    },
+    onLinkMousedown(url) {
+      if (!window.nucleus || typeof window.nucleus.canvasPreloadPlan !== "function") return
+      const active = typeof getActiveTab === "function" ? getActiveTab() : tab
+      if (!active || active.type !== "canvastab" || active.canvasMode === "browser") return
+      window.nucleus.canvasPreloadPlan({
+        tabId: active.id,
+        courseId: active.courseId ? String(active.courseId) : "",
+        courseSection: active.courseSection || "homepage",
+        urls: [url],
+        reason: "link_mousedown"
+      }).catch(() => {})
+    }
+  })
+}
+
+function mountCanvasCourseLinkHandlers(root) {
+  root.querySelectorAll(".course-page a[href]").forEach(link => {
+    link.addEventListener("click", event => {
+      const target = event.currentTarget;
+      const href = target.getAttribute("href");
+      if (!href || href === "#" || href.startsWith("#")) return;
+      event.preventDefault();
+      event.stopPropagation();
+      openCourseLinkInCanvasTab(target);
+    });
+  });
+
+  const viewRoot = document.getElementById("view") || root
+  const tab = typeof getActiveTab === "function" ? getActiveTab() : null
+  installNativeCoursePointerTracker(viewRoot, tab)
+}
+
+function scheduleNativeCanvasSectionPreload(tab) {
+  if (!tab || !window.nucleus || typeof window.nucleus.canvasPreloadPlan !== "function") return
+  if (!tab.courseId) return
+
+  const key = String(tab.id || tab.courseId)
+  const now = Date.now()
+  const last = scheduleNativeCanvasSectionPreload._at.get(key) || 0
+
+  const view = document.getElementById("view")
+  const domLinks = collectNativeCourseDomLinks(view)
+  const domSig = domLinks.slice(0, 8).join("|")
+  const lastSig = scheduleNativeCanvasSectionPreload._domSig.get(key) || ""
+  if (domSig && domSig === lastSig && now - last < 5000) return
+  if (now - last < 3500) return
+  scheduleNativeCanvasSectionPreload._at.set(key, now)
+  if (domSig) scheduleNativeCanvasSectionPreload._domSig.set(key, domSig)
+
+  window.nucleus.canvasPreloadPlan({
+    tabId: tab.id,
+    courseId: String(tab.courseId),
+    courseSection: tab.courseSection || "homepage",
+    domLinks,
+    reason: "native_section"
+  }).catch(() => {})
+}
+scheduleNativeCanvasSectionPreload._at = new Map();
+scheduleNativeCanvasSectionPreload._domSig = new Map();
+
+function patchCanvasCourseSection(view, activeTab, section) {
+  const templates = window.nucleusCourseTemplates;
+  if (!templates || typeof templates.renderCourseSectionHtml !== "function") return false;
+  const coursePage = view.querySelector(".course-page");
+  if (!coursePage || String(coursePage.dataset.courseId) !== String(activeTab.courseId)) return false;
+
+  const html = templates.renderCourseSectionHtml(activeTab.courseId, canvasData, section);
+  if (!html) return false;
+
+  coursePage.querySelectorAll(".course-tabs button").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.courseSection === section);
+  });
+
+  const vt = getViewTransitionApi();
+  const transition = vt ? vt.beginTransition() : null;
+  const mountSection = root => mountCanvasCourseLinkHandlers(root);
+
+  if (vt && transition) {
+    vt.paintViewSection(coursePage, html, {
+      generation: transition.generation,
+      mount: mountSection
+    });
+  } else {
+    const existing = coursePage.querySelector("[data-course-section-page]");
+    if (existing) existing.outerHTML = html;
+    mountSection(coursePage);
+  }
+  return true;
+}
+
 function patchWorkspacePageTabs() {
   const pageTabs = document.getElementById("workspace-page-tabs");
   if (!pageTabs || state.top !== "workspace") return;
@@ -194,6 +516,10 @@ function patchWorkspacePageTabs() {
 
     btn.classList.toggle("active", sameTabId(tab.id, state.activeTabId));
     btn.classList.toggle("is-discarded", Boolean(tab.discarded));
+    btn.classList.toggle(
+      "is-loading",
+      Boolean(tab.loading) && sameTabId(tab.id, state.activeTabId)
+    );
 
     const displayTitle = getTabDisplayTitle(tab);
     const label = btn.querySelector(".workspace-page-tab-label");
@@ -218,6 +544,160 @@ function patchWorkspacePageTabs() {
   });
 }
 
+function renderWorkspaceViewPartial(options = {}) {
+  if (options.shell !== "minimal") {
+    renderWorkspaceSidebarCollapseState();
+    renderPrimaryTabs();
+    renderWorkspaceTabs();
+  }
+  updateWorkspacePageTabs(options);
+  renderBrowserToolbar();
+  renderCanvasToolbar();
+}
+
+function paintActiveView(options = {}) {
+  const view = document.getElementById("view");
+  if (!view) return;
+  const { activeTab } = getActiveViewContext();
+  const html = composeActiveViewHtml();
+  const vt = getViewTransitionApi();
+  let transition = options.transition || null;
+  if (!transition && !options.skipTransition) {
+    transition = consumePendingViewTransition()
+      || (vt && typeof vt.consumeActiveTransition === "function" ? vt.consumeActiveTransition() : null);
+  }
+  const skipCrossfade = Boolean(
+    options.skipTransition
+    || options.fast
+    || (activeTab && isWebContentTab(activeTab) && !html)
+  );
+
+  if (vt && transition && !options.skipTransition) {
+    vt.paintView(view, html, {
+      generation: transition.generation,
+      enabled: transition.enabled,
+      skipCrossfade,
+      mount: root => mountActiveViewHandlers(root, activeTab)
+    });
+  } else {
+    view.innerHTML = html;
+    mountActiveViewHandlers(view, activeTab);
+    if (vt) vt.completeTransition(transition && transition.generation);
+  }
+  restoreActiveCanvasYIndex();
+}
+
+// Fast path: native Canvas is DOM-only — skip full shell render().
+function refreshCanvasNativeView(options = {}) {
+  if (options.pointerOnly) {
+    const activeTab = typeof getActiveTab === "function" ? getActiveTab() : null
+    const view = document.getElementById("view")
+    if (view && activeTab) {
+      installNativeCoursePointerTracker(view, activeTab)
+    }
+    return
+  }
+
+  const useCrossfade = options.useCrossfade === true || options.skipTransition === false
+  const skipTransition = !useCrossfade
+  renderWorkspaceViewPartial({
+    tabBar: options.tabBar || "patch",
+    shell: options.shell || "minimal"
+  });
+  const vt = getViewTransitionApi();
+  const transition = options.transition
+    || (!skipTransition && vt ? vt.beginTransition() : null);
+  paintActiveView({ transition, skipTransition, fast: options.fast });
+  const activeTab = typeof getActiveTab === "function" ? getActiveTab() : null;
+  const view = document.getElementById("view");
+  if (view && activeTab) {
+    installNativeCoursePointerTracker(view, activeTab);
+  }
+  scheduleNativeCanvasSectionPreload(activeTab);
+  if (typeof syncRenderContext === "function") {
+    syncRenderContext();
+  }
+}
+
+function switchWorkspaceTab(nextTabId) {
+  const switchGen = bumpTabSurfaceSyncGeneration();
+  patchOptimisticWorkspaceTabActive(nextTabId);
+
+  try {
+    rememberActiveCanvasYIndex();
+    const nextTab = state.tabs.find(item => sameTabId(item.id, nextTabId));
+    if (!nextTab) {
+      finishTabSurfaceSwitch(switchGen);
+      return;
+    }
+
+    state.activeTabId = nextTabId;
+    state.activeTabByWorkspace[state.activeWorkspaceId] = state.activeTabId;
+    if (nextTab.type !== "center" && typeof recordWorkspaceActivity === "function") {
+      recordWorkspaceActivity(
+        nextTab.workspaceId || state.activeWorkspaceId,
+        "tab_open",
+        `Opened ${nextTab.label || nextTab.type || "tab"}`,
+        { tabId: nextTab.id }
+      );
+    }
+    demoteSiblingWebTabViewTiers(state.activeTabId, state.activeWorkspaceId);
+    if (typeof isWebContentTab === "function" && isWebContentTab(nextTab)) {
+      nextTab.loading = true;
+    } else {
+      nextTab.loading = false;
+    }
+    nextTab.pendingSwitchSlate = !!(
+      nextTab.type === "canvastab" && nextTab.canvasMode === "browser"
+    );
+    nextTab.viewTier = "active";
+
+    if (window.__nucleusTabSnapshot) {
+      window.__nucleusTabSnapshot.clear();
+    }
+    patchWorkspacePageTabs();
+    renderWorkspaceViewPartial({ tabBar: "patch", shell: "minimal" });
+    beginPendingViewTransition();
+    paintActiveView({ fast: true });
+
+    const needsFullTabPush = nextTab.type === "canvastab"
+      || nextTab.type === "mailtab"
+      || nextTab.type === "synapsetab"
+      || nextTab.type === "artifacttab";
+    const revealSurface = () => {
+      if (typeof revealActiveTabSurface !== "function") return Promise.resolve();
+      return revealActiveTabSurface().catch(error => {
+        console.error("Unable to reveal active tab surface:", error);
+      });
+    };
+
+    if (needsFullTabPush && typeof syncTabs === "function") {
+      syncTabs({ deferWebViewEnsure: true })
+        .then(() => revealSurface())
+        .catch(error => {
+          console.error("Unable to sync tabs before reveal:", error);
+          return revealSurface();
+        });
+    } else {
+      revealSurface();
+    }
+
+    if (typeof syncRenderContext === "function") {
+      syncRenderContext();
+    }
+    deferActiveTabSync(switchGen, { surfaceSynced: true });
+  } catch (error) {
+    console.error("Unable to switch workspace tab:", error);
+    const vt = getViewTransitionApi();
+    if (vt) vt.cancelTransition();
+    finishTabSurfaceSwitch(switchGen);
+    const view = document.getElementById("view");
+    if (view) {
+      paintActiveView({ skipTransition: true });
+    }
+  }
+}
+
 let workspacePageTabsRenderFrame = null;
 let workspacePageTabsRenderMode = "patch";
 
@@ -240,7 +720,17 @@ function getWorkspaceTabBarSignature() {
 
 function updateWorkspacePageTabs(options = {}) {
   const pageTabs = document.getElementById("workspace-page-tabs");
+  if (state.top !== "workspace") {
+    if (pageTabs) {
+      pageTabs.classList.add("is-hidden");
+      pageTabs.innerHTML = "";
+    }
+    lastWorkspaceTabBarSignature = "";
+    return;
+  }
+
   const signature = getWorkspaceTabBarSignature();
+  const visibleCount = getVisibleTabs().length;
   const needsFullRebuild = options.tabBar === "full"
     || signature !== lastWorkspaceTabBarSignature
     || !pageTabs
@@ -259,6 +749,7 @@ function updateWorkspacePageTabs(options = {}) {
 // render the workspacepagetabs under the primary tabs ** no container
 function renderWorkspacePageTabs() {
   const pageTabs = document.getElementById("workspace-page-tabs");
+  if (!pageTabs) return;
   const visibleTabs = getVisibleTabs();
 
   pageTabs.classList.toggle("is-hidden", state.top !== "workspace");
@@ -267,10 +758,10 @@ function renderWorkspacePageTabs() {
   pageTabs.innerHTML = state.top === "workspace" ? visibleTabs.map(tab => {
     const displayTitle = getTabDisplayTitle(tab);
     return `
-    <button type="button" class="workspace-page-tab ${sameTabId(tab.id, state.activeTabId) ? "active" : ""}${tab.discarded ? " is-discarded" : ""}" data-tab-id="${escapeHtml(tab.id)}" title="${escapeHtml(displayTitle)}">
+    <button type="button" class="workspace-page-tab ${sameTabId(tab.id, state.activeTabId) ? "active" : ""}${tab.discarded ? " is-discarded" : ""}${tab.loading && sameTabId(tab.id, state.activeTabId) ? " is-loading" : ""}" data-tab-id="${escapeHtml(tab.id)}" title="${escapeHtml(displayTitle)}">
       ${renderWorkspaceTabVisual(tab)}
       <span class="workspace-page-tab-label">${escapeHtml(displayTitle)}</span>
-      ${tab.type !== "center" ? `<span class="close-tab" data-close-tab="${escapeHtml(tab.id)}">x</span>` : ""}
+      ${tab.type !== "center" ? `<span class="close-tab" data-close-tab="${escapeHtml(tab.id)}" aria-label="Close tab">×</span>` : ""}
     </button>
   `;
   }).join("") : "";
@@ -297,26 +788,7 @@ function renderWorkspacePageTabs() {
         closeTab(closeTarget.dataset.closeTab);
         return;
       }
-      workspaceTabSwitchQueue = workspaceTabSwitchQueue.then(async () => {
-        rememberActiveCanvasYIndex();
-        const nextTab = state.tabs.find(item => sameTabId(item.id, tabButton.dataset.tabId));
-        state.activeTabId = tabButton.dataset.tabId;
-        state.activeTabByWorkspace[state.activeWorkspaceId] = state.activeTabId;
-        demoteSiblingWebTabViewTiers(state.activeTabId, state.activeWorkspaceId);
-        if (nextTab) {
-          nextTab.loading = false;
-          nextTab.pendingSwitchSlate = false;
-          nextTab.viewTier = "active";
-        }
-        if (window.__nucleusTabSnapshot) {
-          window.__nucleusTabSnapshot.clear();
-        }
-        render();
-        await syncActiveTab();
-        render();
-      }).catch(error => {
-        console.error("Unable to switch workspace tab:", error);
-      });
+      switchWorkspaceTab(tabButton.dataset.tabId);
     });
   });
   lastWorkspaceTabBarSignature = getWorkspaceTabBarSignature();
@@ -344,14 +816,22 @@ function renderBrowserToolbar() {
   saveHtmlButton.className = "browser-save-html-button";
   saveHtmlButton.title = "Save page HTML";
   saveHtmlButton.textContent = "Save HTML";
-  saveHtmlButton.addEventListener("click", writeActiveBrowserTabHtml);
+  saveHtmlButton.addEventListener("click", () => {
+    if (typeof writeActiveBrowserTabHtml === "function") {
+      writeActiveBrowserTabHtml();
+    }
+  });
 
   const saveFramesButton = document.createElement("button");
   saveFramesButton.type = "button";
   saveFramesButton.className = "browser-save-html-button";
   saveFramesButton.title = "Save page and iframe HTML";
   saveFramesButton.textContent = "Save Frames";
-  saveFramesButton.addEventListener("click", writeActiveBrowserTabFramesHtml);
+  saveFramesButton.addEventListener("click", () => {
+    if (typeof writeActiveBrowserTabFramesHtml === "function") {
+      writeActiveBrowserTabFramesHtml();
+    }
+  });
 
   const form = document.createElement("form");
   form.className = "browser-url-form";
@@ -533,11 +1013,12 @@ function renderTaskCard(task) {
 }
 
 function getTasksForCards() {
+  const sourceTasks = Array.isArray(tasks) ? tasks : [];
   if (window.TaskOptimizer && typeof window.TaskOptimizer.orderTasks === "function") {
-    return window.TaskOptimizer.orderTasks(tasks).map(score => score.task || score);
+    return window.TaskOptimizer.orderTasks(sourceTasks).map(score => score.task || score);
   }
 
-  return tasks;
+  return sourceTasks;
 }
 
 function dueTimestamp(value) {
@@ -648,6 +1129,7 @@ function tabKindLabel(tab) {
   if (tab.type === "canvastab") return tab.canvasMode === "browser" ? "Canvas page" : "Canvas";
   if (tab.type === "synapsetab") return "Synapse";
   if (tab.type === "mailtab") return "Mail";
+  if (tab.type === "artifacttab") return "Artifact";
   if (tab.type === "browsertab") return "Browser";
   if (tab.type === "task") return "Task";
   return "Workspace";
@@ -749,7 +1231,7 @@ function renderHomeDashboard() {
   const continueTasks = getContinueWorkingTasks(orderedTasks, unfinishedTabs);
   const todaysItems = getTodaysDashboardItems(tasks);
   const activeWorkspace = getWorkspace(getBrowserWorkspaceId());
-  const recentWorkspaces = workspaces
+  const recentWorkspaces = (Array.isArray(workspaces) ? workspaces : [])
     .filter(workspace => !activeWorkspace || workspace.id !== activeWorkspace.id)
     .slice(-5)
     .reverse();
@@ -865,12 +1347,12 @@ function renderCalendarPlaceholder() {
   return `
     <header>
       <h1>Calendar</h1>
-      <p>Calendar view placeholder.</p>
+      <p role="status">Calendar is not available yet. Weekly schedules live in each Canvas course for now.</p>
     </header>
-    <section class="workspace-panel">
+    <section class="workspace-panel" aria-labelledby="calendar-coming-soon-title">
       <div>
-        <h2>Calendar</h2>
-        <p>This tab is ready for the calendar UI.</p>
+        <h2 id="calendar-coming-soon-title">Coming soon</h2>
+        <p>A unified calendar across Canvas assignments, mail events, and tasks is planned for a future release.</p>
       </div>
     </section>
   `;
@@ -903,32 +1385,10 @@ function renderWorkspaceApps() {
   `;
 }
 
-//  return the html of the projectcenter tab
-function renderProjectCenter(workspace) {
-  return `
-    <header>
-      <h1>${escapeHtml(workspace.name)} Project Center</h1>
-      <p>${escapeHtml(workspace.description)}</p>
-    </header>
-
-    ${renderWorkspaceApps()}
-
-    <section class="workspace-panel">
-      <div>
-        <h2>Project Center</h2>
-        <p>Workspace tabs appear above this page. Use the Tasks top tab to start suggested work items.</p>
-      </div>
-      <div class="workspace-actions">
-        <button type="button" class="start-task-button" data-open-section="tasks">View tasks</button>
-      </div>
-    </section>
-  `;
-}
-
 // ???
 function renderTaskWorkspace(tab) {
   const task = tasks.find(item => item.id === tab.taskId);
-  if (!task) return renderProjectCenter(getWorkspace(state.activeWorkspaceId));
+  if (!task) return renderWorkspaceControlCenter(getWorkspace(state.activeWorkspaceId));
   const courseName = getCanvasCourseDisplayName(task);
   const dueText = formatTaskDueDisplay(task.due);
 
@@ -950,65 +1410,21 @@ function renderTaskWorkspace(tab) {
 
 // renders the inner view (everything that's not the paneels)
 function renderView() {
-  const activeTab = state.top === "workspace"
-    ? state.tabs.find(tab => sameTabId(tab.id, state.activeTabId)) || {
-        id: ensureWorkspaceCenter(state.activeWorkspaceId),
-        type: "center",
-        workspaceId: state.activeWorkspaceId
-      }
-    : null;
+  paintActiveView();
+}
 
-  const view = document.getElementById("view");
+function mountActiveViewHandlers(view, activeTab) {
+  if (!view) return;
 
-  // injects html to view object based on what pagetype is active
-  if (state.top !== "workspace") {
-    if (state.activeSection === "home") {
-      view.innerHTML = renderHomeDashboard();
-    } else if (state.activeSection === "tasks") {
-      view.innerHTML = renderSuggestedTasks();
-    } else {
-      view.innerHTML = renderCalendarPlaceholder();
-    }
-  } else if (activeTab.type === "task") {
-    view.innerHTML = renderTaskWorkspace(activeTab);
-  } else if (activeTab.type === "canvastab" && activeTab.canvasMode !== "browser") {
-    view.innerHTML = window.nucleusCanvasApp
-      ? window.nucleusCanvasApp.renderCanvasApp(activeTab, canvasData)
-      : `<section class="workspace-panel"><div><h2>Canvas</h2><p>The Canvas app script did not load.</p></div></section>`;
-  } else if (activeTab.type === "synapsetab") {
-    view.innerHTML = window.nucleusSynapseApp
-      ? window.nucleusSynapseApp.renderSynapseApp(activeTab, synapseState)
-      : `<section class="workspace-panel"><div><h2>Synapse</h2><p>The Synapse app script did not load.</p></div></section>`;
-  } else if (activeTab.type === "mailtab") {
-    view.innerHTML = window.nucleusMailApp
-      ? window.nucleusMailApp.renderMailApp(activeTab, mailState)
-      : `<section class="workspace-panel"><div><h2>Mail</h2><p>The Mail app script did not load.</p></div></section>`;
-  } else if (isWebContentTab(activeTab)) {
-    const overlay = window.__nucleusTabSnapshot ? window.__nucleusTabSnapshot.get() : null;
-    const restoreSnapshot =
-      overlay &&
-      overlay.visible &&
-      sameTabId(activeTab.id, overlay.tabId) &&
-      overlay.snapshotDataUrl
-        ? overlay.snapshotDataUrl
-        : "";
-    const transitionSnapshot =
-      activeTab.loading && activeTab.snapshotDataUrl
-        ? activeTab.snapshotDataUrl
-        : "";
-    const placeholderSnapshot = restoreSnapshot || transitionSnapshot;
-    if (placeholderSnapshot) {
-      view.innerHTML = `<img class="tab-restore-snapshot" src="${escapeHtml(placeholderSnapshot)}" alt="">`;
-    } else {
-      view.innerHTML = "";
-    }
-  } else {
-    view.innerHTML = renderProjectCenter(getWorkspace(state.activeWorkspaceId));
+  const onNativeCoursePage = activeTab
+    && activeTab.type === "canvastab"
+    && activeTab.canvasMode !== "browser"
+    && activeTab.courseId
+    && view.querySelector(".course-page");
+  if (!onNativeCoursePage) {
+    teardownNativeCoursePointerTracker();
   }
 
-  restoreActiveCanvasYIndex();
-
-  // attach click listeners to buttons
   view.querySelectorAll("[data-start-task]").forEach(button => {
     button.addEventListener("click", () => startTask(button.dataset.startTask));
   });
@@ -1032,6 +1448,45 @@ function renderView() {
   view.querySelectorAll("[data-open-section]").forEach(button => {
     button.addEventListener("click", () => setActiveSection(button.dataset.openSection));
   });
+
+  if (typeof mountWorkspaceControlCenterHandlers === "function") {
+    mountWorkspaceControlCenterHandlers(view);
+  }
+
+  view.querySelectorAll("[data-artifact-download]").forEach(button => {
+    button.addEventListener("click", async () => {
+      if (!window.nucleus || typeof window.nucleus.downloadArtifact !== "function") return;
+      const artifactId = button.dataset.artifactDownload;
+      if (!artifactId) return;
+      await window.nucleus.downloadArtifact({ id: artifactId });
+    });
+  });
+
+  view.querySelectorAll("[data-artifact-open-lumi]").forEach(button => {
+    button.addEventListener("click", async () => {
+      const artifactId = button.dataset.artifactOpenLumi;
+      if (!artifactId || !window.nucleus || typeof window.nucleus.getArtifact !== "function") return;
+      const result = await window.nucleus.getArtifact({ id: artifactId });
+      if (!result || !result.ok || !result.artifact) return;
+      if (window.nucleusArtifacts && typeof window.nucleusArtifacts.showLumiPreview === "function") {
+        await window.nucleusArtifacts.showLumiPreview(result.artifact);
+      }
+    });
+  });
+
+  view.querySelectorAll("[data-artifact-open-window]").forEach(button => {
+    button.addEventListener("click", async () => {
+      const artifactId = button.dataset.artifactOpenWindow;
+      if (!artifactId || !window.nucleus || typeof window.nucleus.openArtifactExternal !== "function") return;
+      await window.nucleus.openArtifactExternal({ id: artifactId });
+    });
+  });
+
+  if (activeTab && activeTab.type === "artifacttab" && window.nucleusArtifactTabs) {
+    window.nucleusArtifactTabs.mountArtifactTabPreview(view).catch(error => {
+      console.error("Unable to mount artifact tab preview:", error);
+    });
+  }
 
   view.querySelectorAll("[data-home-workspace]").forEach(button => {
     button.addEventListener("click", () => setActiveWorkspace(button.dataset.homeWorkspace));
@@ -1072,23 +1527,28 @@ function renderView() {
         activeTab.courseId = null;
         activeTab.courseSection = "homepage";
         activeTab.yindex = 0;
-        syncTabs();
-        render();
+        refreshCanvasNativeView();
+        queueTabSyncAfterRender();
       }
     });
   });
 
   view.querySelectorAll("[data-course-section]").forEach(button => {
     button.addEventListener("click", () => {
-      const activeTab = getActiveTab();
-      if (!activeTab || activeTab.type !== "canvastab" || activeTab.canvasMode === "browser") return;
+      const tab = getActiveTab();
+      if (!tab || tab.type !== "canvastab" || tab.canvasMode === "browser") return;
       const section = button.dataset.courseSection;
       if (!["homepage", "assignments", "weekly", "modules", "files"].includes(section)) return;
       rememberActiveCanvasYIndex();
-      activeTab.courseSection = section;
-      activeTab.yindex = 0;
-      syncTabs();
-      render();
+      tab.courseSection = section;
+      tab.yindex = 0;
+      const viewEl = document.getElementById("view");
+      if (!patchCanvasCourseSection(viewEl, tab, section)) {
+        refreshCanvasNativeView();
+      } else {
+        scheduleNativeCanvasSectionPreload(tab);
+      }
+      queueTabSyncAfterRender();
     });
   });
 
@@ -1106,20 +1566,7 @@ function renderView() {
   view.querySelectorAll("[data-canvas-course-id]").forEach(card => {
     const openCourse = () => {
       const targetCourseId = card.dataset.canvasCourseId;
-      if (state.top === "workspace") {
-        const activeTab = getActiveTab();
-        if (activeTab && activeTab.type === "canvastab" && activeTab.canvasMode !== "browser") {
-          pushCanvasNativeHistory(activeTab);
-          activeTab.canvasNativePage = "course";
-          activeTab.courseId = targetCourseId;
-          activeTab.courseSection = "homepage";
-          activeTab.yindex = 0;
-          syncTabs();
-          render();
-          return;
-        }
-      }
-      openCanvasAppTab(getBrowserWorkspaceId(), targetCourseId);
+      navigateCanvasNative(targetCourseId, { courseSection: "homepage" });
     };
     card.addEventListener("click", openCourse);
     card.addEventListener("keydown", event => {
@@ -1129,6 +1576,13 @@ function renderView() {
       }
     });
   });
+
+  if (window.nucleusCanvasCourseImages && typeof window.nucleusCanvasCourseImages.hydrateAll === "function") {
+    window.nucleusCanvasCourseImages.hydrateAll(view).catch(error => {
+      console.warn("Canvas course image hydration failed:", error);
+    });
+  }
+
   view.querySelectorAll("[data-open-mail-app]").forEach(card => {
     const openMail = () => openMailAppTab(getBrowserWorkspaceId());
     card.addEventListener("click", () => activateAppIcon(card, openMail));
@@ -1160,12 +1614,23 @@ function renderView() {
     });
   });
 
+  view.querySelectorAll("[data-synapse-learn-course-open]").forEach(button => {
+    const openLearn = () => openSynapseLearnTab(getBrowserWorkspaceId());
+    button.addEventListener("click", openLearn);
+    button.addEventListener("keydown", event => {
+      if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openLearn(); }
+    });
+  });
+
   view.querySelectorAll("[data-synapse-new-conversation]").forEach(card => {
     const open = () => {
       const activeTab = getActiveTab();
       const convo = createSynapseConversation();
       if (activeTab && activeTab.type === "synapsetab") {
         activeTab.conversationId = convo.id;
+        activeTab.synapseMode = "chat";
+        activeTab.label = "Synapse";
+        activeTab.learnSession = null;
         syncTabs();
         render();
       } else {
@@ -1182,6 +1647,9 @@ function renderView() {
       const activeTab = getActiveTab();
       if (activeTab && activeTab.type === "synapsetab") {
         activeTab.conversationId = id;
+        activeTab.synapseMode = "chat";
+        activeTab.label = "Synapse";
+        activeTab.learnSession = null;
         syncTabs();
         render();
       } else {
@@ -1192,35 +1660,48 @@ function renderView() {
     card.addEventListener("keydown", event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); open(); } });
   });
 
-  // linke handlers for canvas. IMPORTANT
-  view.querySelectorAll(".course-page a[href]").forEach(link => {
-    link.addEventListener("click", event => {
-      const href = link.getAttribute("href");
-      if (!href || href === "#" || href.startsWith("#")) return;
-
-      event.preventDefault();
-      openCourseLinkInCanvasTab(link);
-    });
-  });
+  mountCanvasCourseLinkHandlers(view);
 
   // Mount/teardown the Synapse streaming chat controller for this view.
   mountSynapseControllerIfNeeded(view, activeTab);
   if (window.nucleusMailApp && typeof window.nucleusMailApp.mountMailControllerIfNeeded === "function") {
     window.nucleusMailApp.mountMailControllerIfNeeded(view, activeTab);
   }
+  if (typeof syncMailWatchLifecycle === "function") {
+    syncMailWatchLifecycle().catch(error => {
+      console.warn("Unable to sync mail watch lifecycle:", error);
+    });
+  }
 }
 
 // renders whole page
 function render(options = {}) {
+  const reason = options.reason || options.via || "unspecified";
+  const diag = window.__nucleusDiag;
+  if (diag && diag.isEnabled("render")) {
+    diag.logRender("cycle_start", { reason, ui: diag.summarizeUiState() });
+  }
   renderWorkspaceSidebarCollapseState();
   renderPrimaryTabs();
   renderWorkspaceTabs();
   updateWorkspacePageTabs(options);
   renderBrowserToolbar();
   renderCanvasToolbar();
-  renderView();
-  // Push the refreshed UI state + on-screen text into the render-context store.
+
+  const vt = getViewTransitionApi();
+  let transition = null;
+  if (vt && !options.skipTransition) {
+    transition = vt.consumeActiveTransition();
+    if (!transition && vt.isSmoothTabsEnabled()) {
+      transition = vt.beginTransition();
+    }
+  }
+  paintActiveView({ transition, skipTransition: options.skipTransition });
+
   if (typeof syncRenderContext === "function") {
     syncRenderContext();
+  }
+  if (diag && diag.isEnabled("render")) {
+    diag.logRender("cycle_end", { reason });
   }
 }

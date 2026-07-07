@@ -54,6 +54,24 @@ def extract_links_from_html(html, base_url=''):
     return links
 
 
+CANVAS_FILE_ID_PATTERNS = (
+    re.compile(r'/files/(\d+)(?:/download)?', re.IGNORECASE),
+    re.compile(r'[?&]preview=(\d+)', re.IGNORECASE),
+    re.compile(r'data-api-endpoint="[^"]*/files/(\d+)', re.IGNORECASE),
+)
+
+
+def extract_canvas_file_id_from_url(url):
+    source = str(url or '')
+    if not source:
+        return ''
+    for pattern in CANVAS_FILE_ID_PATTERNS:
+        match = pattern.search(source)
+        if match:
+            return str(match.group(1))
+    return ''
+
+
 def extract_canvas_file_ids_from_html(html):
     if not html:
         return []

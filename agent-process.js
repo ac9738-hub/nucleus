@@ -4,7 +4,7 @@
 // Dependencies: child_process.spawn and main.js callbacks for UI text/tool IO.
 const { spawn } = require('child_process')
 
-function createAgentProcess({ scriptPath, onText, onToolCall, onDone = () => {} }) {
+function createAgentProcess({ scriptPath, onText, onToolCall, onDone = () => {}, onReplace = () => {}, onAfterToolBatch = null }) {
   const proc = spawn('python', [scriptPath])
   let stdoutBuffer = ''
 
@@ -34,24 +34,41 @@ function createAgentProcess({ scriptPath, onText, onToolCall, onDone = () => {} 
         return
       }
 
+      if (data && typeof data === 'object' && data.type === 'replace') {
+        onReplace(data.text || '')
+        return
+      }
+
       if (Array.isArray(data)) {
-        data.forEach(item => {
-          if (typeof item === 'string') {
-            onText(item)
-          } else if (typeof item === 'object' && item !== null) {
-            Promise.resolve(onToolCall(item))
-              .then(toolResponse => {
-                proc.stdin.write(JSON.stringify(toolResponse) + "\n")
-              })
-              .catch(error => {
-                proc.stdin.write(JSON.stringify([
-                  'tool_response',
-                  item.id,
-                  error && error.message ? error.message : String(error)
-                ]) + "\n")
-              })
-          }
-        })
+        const toolItems = data.filter(
+          item => typeof item === 'object' && item !== null && item.name && item.id
+        )
+        const textItems = data.filter(item => typeof item === 'string')
+
+        textItems.forEach(item => onText(item))
+
+        if (!toolItems.length) return
+
+        Promise.all(toolItems.map(item => Promise.resolve(onToolCall(item))))
+          .then(responses => {
+            const valid = responses.filter(response => Array.isArray(response))
+            if (!valid.length) return
+            if (valid.length === 1) {
+              proc.stdin.write(JSON.stringify(valid[0]) + '\n')
+            } else {
+              proc.stdin.write(JSON.stringify(['tool_response_batch', valid]) + '\n')
+            }
+            if (typeof onAfterToolBatch === 'function') {
+              onAfterToolBatch(toolItems, valid)
+            }
+          })
+          .catch(error => {
+            proc.stdin.write(JSON.stringify([
+              'tool_response',
+              toolItems[0].id,
+              error && error.message ? error.message : String(error)
+            ]) + '\n')
+          })
       }
     })
   })

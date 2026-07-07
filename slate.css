@@ -1,18 +1,17 @@
 /*
   Canvas slate animation styles.
-  Functionality: themed cover panel that slides over the Canvas WebContentsView
-  during navigation. Forward navigations slide in from the right and the loaded
-  page is revealed on top of the slate (no exit); back navigations slide in from
-  the left and retract left to reveal the page.
-  Dependencies: slate.html markup and main.js slate WebContentsView lifecycle.
+  Functionality: themed cover panel over the Canvas WebContentsView during
+  navigation — fade into slate, load behind it, fade slate out to the new page.
+  Dependencies: slate.html markup and lib/canvas-nav-transition.js lifecycle.
 */
 :root {
-  /* Matches the app shell palette (styles.css --bg / --surface / --accent). */
-  --slate-bg: #050916;
-  --slate-surface: #0c1224;
+  /* --slate-fill / --canvas-gradient are injected from the active theme. */
+  --slate-fill: var(--canvas-gradient, linear-gradient(135deg, #0c1224 0%, #050916 100%));
   --slate-edge: rgba(117, 103, 216, 0.22);
   --slate-duration: 360ms;
+  --slate-fade-duration: 300ms;
   --slate-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --slate-fade-ease: ease-out;
 }
 
 * {
@@ -29,12 +28,17 @@ body {
 }
 
 .slate {
-  background: linear-gradient(135deg, var(--slate-surface) 0%, var(--slate-bg) 100%);
+  background-attachment: fixed;
+  background-color: var(--surface, #050916);
+  background-image: var(--slate-fill);
+  background-position: center top;
+  background-repeat: no-repeat;
+  background-size: cover;
   height: 100%;
   opacity: 0;
-  transform: translateX(100%);
+  transform: none;
   width: 100%;
-  will-change: transform;
+  will-change: opacity;
 }
 
 .slate.show-right {
@@ -69,4 +73,31 @@ body {
   0% { opacity: 1; transform: translateX(0); }
   99% { opacity: 1; transform: translateX(-100%); }
   100% { opacity: 0; transform: translateX(-100%); }
+}
+
+/* Fade navigation cover: transparent shell + page snapshot or themed gradient. */
+.slate.fade-in {
+  animation: slate-fade-in var(--slate-fade-duration) var(--slate-fade-ease) forwards;
+  box-shadow: none;
+  opacity: 0;
+  transform: none;
+  will-change: opacity;
+}
+
+.slate.fade-out {
+  animation: slate-fade-out var(--slate-fade-duration) ease-in forwards;
+  box-shadow: none;
+  opacity: 1;
+  transform: none;
+  will-change: opacity;
+}
+
+@keyframes slate-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slate-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
 }

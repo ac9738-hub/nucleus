@@ -1,0 +1,620 @@
+{
+  "version": 1,
+  "courseId": "15237",
+  "fileId": "3222528",
+  "filename": "Lecture 2_electrical properties I Nernst_slides.pdf",
+  "expectedFileType": "lecture_slides",
+  "passPlan": {
+    "courseId": "15237",
+    "fileId": "3222528",
+    "filename": "Lecture 2_electrical properties I Nernst_slides.pdf",
+    "resolvedType": "lecture_slides",
+    "heuristicConfidence": 0.92,
+    "neededPasses": [
+      "extract_pages",
+      "heuristic_classify",
+      "llm_pass1",
+      "finalize"
+    ],
+    "skippedPasses": [
+      "llm_classify",
+      "llm_pass2"
+    ],
+    "estLlmCalls": 1,
+    "estRealisticLlmCalls": 1.0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "needed": true,
+        "reason": "Required local PDF/HTML extraction; no LLM.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "heuristic_classify",
+        "needed": true,
+        "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_classify",
+        "needed": false,
+        "reason": "Heuristic confidence 0.92 sufficient; skip flash classify call.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_pass1",
+        "needed": true,
+        "reason": "Type lecture_slides: pass1 extracts concepts=True, problems=True, events=False.",
+        "llmCall": true,
+        "estCostTier": "high"
+      },
+      {
+        "pass": "llm_pass2",
+        "needed": false,
+        "reason": "Type lecture_slides disables pass2 (single-pass type-specific or link-only profile).",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "finalize",
+        "needed": true,
+        "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+        "llmCall": false,
+        "estCostTier": "free"
+      }
+    ]
+  },
+  "passAudit": {
+    "plan": {
+      "courseId": "15237",
+      "fileId": "3222528",
+      "filename": "Lecture 2_electrical properties I Nernst_slides.pdf",
+      "resolvedType": "lecture_slides",
+      "heuristicConfidence": 0.92,
+      "neededPasses": [
+        "extract_pages",
+        "heuristic_classify",
+        "llm_pass1",
+        "finalize"
+      ],
+      "skippedPasses": [
+        "llm_classify",
+        "llm_pass2"
+      ],
+      "estLlmCalls": 1,
+      "estRealisticLlmCalls": 1.0,
+      "steps": [
+        {
+          "pass": "extract_pages",
+          "needed": true,
+          "reason": "Required local PDF/HTML extraction; no LLM.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "heuristic_classify",
+          "needed": true,
+          "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_classify",
+          "needed": false,
+          "reason": "Heuristic confidence 0.92 sufficient; skip flash classify call.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_pass1",
+          "needed": true,
+          "reason": "Type lecture_slides: pass1 extracts concepts=True, problems=True, events=False.",
+          "llmCall": true,
+          "estCostTier": "high"
+        },
+        {
+          "pass": "llm_pass2",
+          "needed": false,
+          "reason": "Type lecture_slides disables pass2 (single-pass type-specific or link-only profile).",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "finalize",
+          "needed": true,
+          "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+          "llmCall": false,
+          "estCostTier": "free"
+        }
+      ]
+    },
+    "actualType": "lecture_slides",
+    "deepseekPasses": 1,
+    "conceptCount": 80,
+    "detailCount": 11,
+    "totalLlmTokens": 0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "ran": true,
+        "useful": true,
+        "verdict": "required",
+        "note": "Local I/O; pages present means extract succeeded."
+      },
+      {
+        "pass": "heuristic_classify",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "Routed to lecture_slides (free)."
+      },
+      {
+        "pass": "llm_classify",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Skipped; heuristic confidence sufficient.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass1",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "No pass1 tool trace.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass2",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Correctly skipped: profile disables pass2, type-specific pass1 only, or no log_* tools.",
+        "tokens": 0
+      },
+      {
+        "pass": "finalize",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "logged_details promoted to concept details."
+      }
+    ],
+    "cutCandidates": [],
+    "recommendations": [
+      "Pass2 correctly skipped for this type/pass1 tool pattern."
+    ]
+  },
+  "passes": [
+    "extract_pages",
+    "heuristic_classify",
+    "teaching_units",
+    "type_structure",
+    "concept_candidates",
+    "problem_scan",
+    "detail_attach",
+    "reconcile"
+  ],
+  "buildMode": "template_multi_pass_offline",
+  "builtAt": "2026-07-01T22:49:37Z",
+  "concepts": [
+    {
+      "name": "Lecture 2_electrical properties I Nernst_slides",
+      "details": []
+    },
+    {
+      "name": "helps more than increasing axon diameter",
+      "details": []
+    },
+    {
+      "name": "neurons generally have",
+      "details": []
+    },
+    {
+      "name": "uniform ion concentration",
+      "details": []
+    },
+    {
+      "name": "no net ion flow",
+      "details": []
+    },
+    {
+      "name": "until chemical force is balanced",
+      "details": []
+    },
+    {
+      "name": "by opposing electrical force",
+      "details": []
+    },
+    {
+      "name": "its own equilibrium",
+      "details": []
+    },
+    {
+      "name": "by the membrane potential",
+      "details": []
+    },
+    {
+      "name": "changes in membrane potential",
+      "details": []
+    },
+    {
+      "name": "what we want to understand",
+      "details": []
+    },
+    {
+      "name": "charged relative to the outside",
+      "details": []
+    },
+    {
+      "name": "ion channels",
+      "details": []
+    },
+    {
+      "name": "pumps and cotransporters",
+      "details": []
+    },
+    {
+      "name": "Conductance (relative ability of charge to move)Conductance requires",
+      "details": []
+    },
+    {
+      "name": "Problem 1",
+      "details": []
+    },
+    {
+      "name": "Problem 2",
+      "details": []
+    },
+    {
+      "name": "Problem 3",
+      "details": []
+    },
+    {
+      "name": "electrical properties of neurons i",
+      "details": []
+    },
+    {
+      "name": "ion channels and resting membrane potential",
+      "details": []
+    },
+    {
+      "name": "summary of last lecture",
+      "details": []
+    },
+    {
+      "name": "astrocytes, microglia, ependymal cells,",
+      "details": [
+        "– CNS: astrocytes, microglia, ependymal cells,"
+      ]
+    },
+    {
+      "name": "schwann cells",
+      "details": [
+        "oligodendrocytes– PNS: Schwann cells"
+      ]
+    },
+    {
+      "name": "proteins to synapses",
+      "details": []
+    },
+    {
+      "name": "neuronal geometry",
+      "details": []
+    },
+    {
+      "name": "axon can be meters long",
+      "details": []
+    },
+    {
+      "name": "dendrites",
+      "details": []
+    },
+    {
+      "name": "theoretical",
+      "details": []
+    },
+    {
+      "name": "how is information encoded and",
+      "details": [
+        "Today: how is information encoded and"
+      ]
+    },
+    {
+      "name": "outline of today",
+      "details": []
+    },
+    {
+      "name": "rc circuits have a resistor and a capacitor",
+      "details": []
+    },
+    {
+      "name": "capacitance",
+      "details": []
+    },
+    {
+      "name": "ciricresistorcapacitor",
+      "details": []
+    },
+    {
+      "name": "opposites attractacross thin membrane",
+      "details": []
+    },
+    {
+      "name": "other relevant components of rc circuits",
+      "details": []
+    },
+    {
+      "name": "proteins in membrane allow ions to cross",
+      "details": []
+    },
+    {
+      "name": "passively (channels)- actively (pumps)",
+      "details": []
+    },
+    {
+      "name": "relevant components of rc circuits",
+      "details": []
+    },
+    {
+      "name": "voltage (difference in charge)",
+      "details": []
+    },
+    {
+      "name": "current(movement of charge)",
+      "details": []
+    },
+    {
+      "name": "resistance (relative inability of charge to move)",
+      "details": []
+    },
+    {
+      "name": "ion channels impart conductance",
+      "details": []
+    },
+    {
+      "name": "ciricchannel",
+      "details": []
+    },
+    {
+      "name": "conductances in parallel sum",
+      "details": []
+    },
+    {
+      "name": "forces that influence the movement of ions",
+      "details": []
+    },
+    {
+      "name": "faster if warmer",
+      "details": []
+    },
+    {
+      "name": "opposites attract",
+      "details": []
+    },
+    {
+      "name": "likes repel",
+      "details": []
+    },
+    {
+      "name": "driving force behind the movement of ions",
+      "details": []
+    },
+    {
+      "name": "cl-cl",
+      "details": []
+    },
+    {
+      "name": "not all ions shown",
+      "details": [
+        "Note: not all ions shown"
+      ]
+    },
+    {
+      "name": "ion flow changes the voltage across the membrane",
+      "details": []
+    },
+    {
+      "name": "inside more",
+      "details": []
+    },
+    {
+      "name": "permeable to k+",
+      "details": [
+        "Add channels: permeable to K+"
+      ]
+    },
+    {
+      "name": "membrane permeable to ion",
+      "details": []
+    },
+    {
+      "name": "here ions flow down chemical gradient",
+      "details": []
+    },
+    {
+      "name": "electrochemical equibilibrium",
+      "details": []
+    },
+    {
+      "name": "how do we find equilibrium point",
+      "details": []
+    },
+    {
+      "name": "nernst equation",
+      "details": []
+    },
+    {
+      "name": "each ion has",
+      "details": []
+    },
+    {
+      "name": "potential",
+      "details": []
+    },
+    {
+      "name": "z (96,485c/mol)",
+      "details": []
+    },
+    {
+      "name": "nernst equilibrium",
+      "details": []
+    },
+    {
+      "name": "membrane differently permeable to different ions",
+      "details": [
+        "Also: membrane differently permeable to different ions"
+      ]
+    },
+    {
+      "name": "cell biological and electrical properties",
+      "details": []
+    },
+    {
+      "name": "goldman-hodgkin-katz equation",
+      "details": []
+    },
+    {
+      "name": "80 mvna+: 62 mvcl-: -65mv",
+      "details": [
+        "Nernst potential K+: -80 mVNa+: 62 mVCl-: -65mV"
+      ]
+    },
+    {
+      "name": "[out]/[in]anions (-): [in]/[out]",
+      "details": [
+        "Cations (+): [out]/[in]anions (-): [in]/[out]"
+      ]
+    },
+    {
+      "name": "requires re-derivation and solution via quadratic equation",
+      "details": [
+        "Divalents: requires re-derivation and solution via quadratic equation"
+      ]
+    },
+    {
+      "name": "depolarizinghyperpolarizing",
+      "details": []
+    },
+    {
+      "name": "values",
+      "details": []
+    },
+    {
+      "name": "cl-flowing in",
+      "details": []
+    },
+    {
+      "name": "less negative charge in the cell",
+      "details": [
+        "Depolarization: LESS negative charge in the cell"
+      ]
+    },
+    {
+      "name": "more negative charge in the cell",
+      "details": [
+        "Hyperpolarization: MORE negative charge in the cell"
+      ]
+    },
+    {
+      "name": "astrocytes help buffer and diffuse",
+      "details": []
+    },
+    {
+      "name": "death by lethal injection",
+      "details": []
+    },
+    {
+      "name": "between the nernst potential",
+      "details": []
+    },
+    {
+      "name": "direction and magnitude of ion flow is determined",
+      "details": []
+    },
+    {
+      "name": "stretching and question break",
+      "details": []
+    },
+    {
+      "name": "studying membrane potential in brain slices",
+      "details": []
+    }
+  ],
+  "conceptCount": 80,
+  "detailCount": 11,
+  "events": [],
+  "problems": [
+    "Problem 1",
+    "Problem 2",
+    "Problem 3"
+  ],
+  "sections": [
+    "Conductance (relative ability of charge to move)Conductance requires",
+    "Problem 1",
+    "Forces that influence the movement of ions",
+    "Problem 2",
+    "Driving force behind the movement of ions",
+    "uniform ion concentration",
+    "by opposing electrical force",
+    "For a given ion",
+    "Goldman-Hodgkin-Katz equation",
+    "Studying membrane potential in brain slices",
+    "Problem 3",
+    "Electrical properties of neurons",
+    "Ion fluxes are determined by two things",
+    "In the neuronal RC circuit, ion channels impart",
+    "Genetic channelopathies"
+  ],
+  "deepseekPasses": 1,
+  "expectsPass2": false,
+  "gtProvenance": {
+    "typeSource": "heuristic_high",
+    "typeConfidence": 0.92,
+    "offlinePassAudit": {
+      "extract_pages": {
+        "localPdf": true,
+        "pageCount": 84,
+        "pdfPath": "C:\\Allen\\nucleus\\canvasfiles\\3222528"
+      },
+      "heuristic_classify": {
+        "expectedFileType": "lecture_slides",
+        "source": "heuristic_high",
+        "confidence": 0.92
+      },
+      "teaching_units": {
+        "sectionCount": 15
+      },
+      "type_structure": {
+        "slideRows": 150,
+        "readingSections": 0,
+        "syllabusWeeks": 0
+      },
+      "concept_candidates": {
+        "candidateCount": 80
+      },
+      "problem_scan": {
+        "problemCount": 3
+      },
+      "detail_attach": {
+        "conceptKeysWithDetails": 21,
+        "detailCount": 21
+      },
+      "reconcile": {
+        "inputTitles": 80,
+        "accepted": 80,
+        "capped": 0,
+        "detailAttached": 11
+      }
+    },
+    "reconcileStats": {
+      "inputTitles": 80,
+      "accepted": 80,
+      "capped": 0,
+      "detailAttached": 11
+    }
+  }
+}

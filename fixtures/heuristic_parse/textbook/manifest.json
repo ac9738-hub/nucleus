@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "courseId": "textbook_manual",
+  "chapters": [
+    {
+      "chapterId": "ch01_placeholder",
+      "path": "fixtures/heuristic_parse/textbook/ch01_placeholder.txt",
+      "charCount": 390,
+      "ready": false,
+      "expectedSections": [],
+      "notes": "Add expectedSections after pasting chapter text (e.g. 1.1 Introduction, 1.2 ...)."
+    },
+    {
+      "chapterId": "ch02_placeholder",
+      "path": "fixtures/heuristic_parse/textbook/ch02_placeholder.txt",
+      "charCount": 144,
+      "ready": false,
+      "expectedSections": [],
+      "notes": "Add expectedSections after pasting chapter text (e.g. 1.1 Introduction, 1.2 ...)."
+    }
+  ]
+}

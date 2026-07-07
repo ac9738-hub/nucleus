@@ -1,16 +1,14 @@
 // Reactive render-context store (main process).
-// Functionality: holds the live "what is on screen right now" state as a set of
-// independent slices (app, layout, workspaces, tabs, activeTab, surface, screen).
-// Each slice keeps a content hash + version so an update is a no-op when the value
-// is unchanged ("React-like": only the part that actually changes is recomputed and
-// re-broadcast). getSnapshot() assembles a versioned structured-JSON snapshot that
-// is shipped to the sidekick.
-// Dependencies: main.js pushes slice updates from event-driven contributors
-// (renderer UI state, tab registry, per-surface screen-text providers).
+// Functionality: holds live app state as independent slices (navigation, tabs,
+// surface, native index). Each slice keeps a content hash + version so an update
+// is a no-op when the value is unchanged. getSnapshot() assembles the versioned
+// structured JSON shipped to the sidekick (index + UI slices + optional screen chunks).
+// Dependencies: main.js pushes slice updates from renderer UI state, tab registry,
+// and context-index rebuilds.
 
-const SCHEMA_VERSION = 1
+const SCHEMA_VERSION = 2
 
-const SLICE_NAMES = ['app', 'layout', 'workspaces', 'tabs', 'activeTab', 'surface', 'screen']
+const SLICE_NAMES = ['app', 'layout', 'workspaces', 'tabs', 'activeTab', 'surface', 'index', 'screen', 'workspaceSession', 'workspaceContext']
 
 function defaultSliceValue(name) {
   switch (name) {
@@ -26,7 +24,13 @@ function defaultSliceValue(name) {
       return null
     case 'surface':
       return { kind: 'home', description: 'Home / launcher' }
+    case 'index':
+      return { courses: [], tasks: [], dueSoon: [], weekly: {}, focus: null, focusCourseIds: [] }
     case 'screen':
+      return null
+    case 'workspaceSession':
+      return null
+    case 'workspaceContext':
       return null
     default:
       return null
@@ -111,8 +115,8 @@ class ContextStore {
     return versions
   }
 
-  getSnapshot() {
-    return {
+  getSnapshot(options = {}) {
+    const snapshot = {
       schemaVersion: SCHEMA_VERSION,
       capturedAt: new Date().toISOString(),
       versions: this.getVersions(),
@@ -122,8 +126,12 @@ class ContextStore {
       tabs: this.slices.tabs.value,
       activeTab: this.slices.activeTab.value,
       surface: this.slices.surface.value,
-      screen: this.slices.screen.value
+      index: this.slices.index.value,
+      screen: this.slices.screen.value,
+      workspaceSession: this.slices.workspaceSession.value,
+      workspaceContext: this.slices.workspaceContext.value
     }
+    return snapshot
   }
 }
 

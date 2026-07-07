@@ -1,0 +1,178 @@
+/* Shared Mail + Synapse app chrome — token harmonization (Phase 5).
+   Load after theme synapse/mail CSS or before with equal specificity updates. */
+
+.mail-shell,
+.synapse-shell {
+  gap: var(--space-4);
+}
+
+.mail-sidebar,
+.synapse-sidebar {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-3);
+}
+
+.mail-brand-mark,
+.synapse-brand-mark {
+  background: var(--accent-gradient);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  flex: 0 0 28px;
+  height: 28px;
+  width: 28px;
+}
+
+.mail-brand h2,
+.synapse-brand h2,
+.mail-toolbar h1,
+.synapse-chat-header h1 {
+  color: var(--text-primary, var(--text));
+  font-size: var(--font-title);
+  font-weight: var(--weight-semibold, 600);
+}
+
+.mail-eyebrow,
+.synapse-eyebrow,
+.synapse-brand-tagline,
+.mail-account {
+  color: var(--text-tertiary, var(--text-mute));
+  font-size: var(--font-label);
+  font-weight: var(--weight-semibold, 600);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.mail-compose-button,
+.synapse-new-chat-button,
+.synapse-learn-course-button {
+  background: var(--accent-gradient);
+  border: 0;
+  border-radius: 999px;
+  box-shadow: var(--shadow-sm);
+  color: var(--text-on-accent);
+  font-size: var(--font-body);
+  font-weight: var(--weight-semibold, 600);
+  transition: filter var(--motion-fast) var(--ease-out);
+}
+
+.mail-compose-button:hover,
+.synapse-new-chat-button:hover,
+.synapse-learn-course-button:hover {
+  filter: brightness(1.05);
+  transform: none;
+}
+
+.mail-nav-item,
+.synapse-history-item {
+  border-radius: var(--radius);
+  color: var(--text-secondary, var(--text-dim));
+  font-size: var(--font-body);
+  transition:
+    background var(--motion-fast) var(--ease-out),
+    color var(--motion-fast) var(--ease-out);
+}
+
+.mail-nav-item:hover,
+.mail-nav-item:focus-visible,
+.synapse-history-item:hover,
+.synapse-history-item:focus-visible {
+  background: var(--surface-inset);
+  color: var(--text-primary, var(--text));
+  outline: none;
+}
+
+.mail-nav-item.is-active,
+.synapse-history-item.is-active {
+  background: rgba(var(--accent-rgb), 0.10);
+  box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), 0.18);
+  color: var(--text-primary, var(--text));
+}
+
+.mail-main,
+.synapse-chat,
+.synapse-textbook-shell {
+  background: var(--surface-elevated, var(--surface-2));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.mail-toolbar,
+.synapse-chat-header {
+  border-bottom: 1px solid var(--divider, var(--border));
+}
+
+.mail-search,
+.synapse-model-select select {
+  background: var(--surface-inset);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-primary, var(--text));
+}
+
+.mail-search::placeholder {
+  color: var(--text-tertiary, var(--text-mute));
+}
+
+.mail-icon-button,
+.synapse-sidebar-toggle,
+.synapse-sidebar-rail {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary, var(--text-dim));
+  transition:
+    background var(--motion-fast) var(--ease-out),
+    border-color var(--motion-fast) var(--ease-out),
+    color var(--motion-fast) var(--ease-out);
+}
+
+.mail-icon-button:hover,
+.synapse-sidebar-toggle:hover,
+.synapse-sidebar-toggle:focus-visible,
+.synapse-sidebar-rail:hover,
+.synapse-sidebar-rail:focus-visible {
+  background: var(--surface-inset);
+  border-color: rgba(var(--accent-rgb), 0.24);
+  color: var(--text-primary, var(--text));
+  outline: none;
+}
+
+.mail-status {
+  background: rgba(var(--accent-rgb), 0.10);
+  border-bottom: 1px solid var(--divider, var(--border));
+  color: var(--text-secondary, var(--text-dim));
+}
+
+.mail-row.is-unread .mail-row-subject {
+  color: var(--text-primary, var(--text));
+}
+
+.mail-unread-badge {
+  background: rgba(var(--accent-rgb), 0.14);
+  color: var(--accent);
+}
+
+.synapse-msg.user {
+  background: var(--accent-gradient);
+  color: var(--text-on-accent);
+}
+
+.synapse-msg.assistant {
+  background: var(--surface-elevated, var(--surface-2));
+  border: 1px solid var(--border);
+  color: var(--text-primary, var(--text));
+}
+
+.synapse-composer {
+  background: var(--surface-elevated, var(--surface-2));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.synapse-composer:focus-within {
+  border-color: rgba(var(--accent-rgb), 0.32);
+  box-shadow: var(--shadow-focus);
+}

@@ -1,0 +1,669 @@
+{
+  "version": 1,
+  "courseId": "15237",
+  "fileId": "3369200",
+  "filename": "Lecture 13_chemical control of brain_behavior_slides.pdf",
+  "expectedFileType": "lecture_slides",
+  "passPlan": {
+    "courseId": "15237",
+    "fileId": "3369200",
+    "filename": "Lecture 13_chemical control of brain_behavior_slides.pdf",
+    "resolvedType": "lecture_slides",
+    "heuristicConfidence": 0.92,
+    "neededPasses": [
+      "extract_pages",
+      "heuristic_classify",
+      "llm_pass1",
+      "finalize"
+    ],
+    "skippedPasses": [
+      "llm_classify",
+      "llm_pass2"
+    ],
+    "estLlmCalls": 1,
+    "estRealisticLlmCalls": 1.0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "needed": true,
+        "reason": "Required local PDF/HTML extraction; no LLM.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "heuristic_classify",
+        "needed": true,
+        "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_classify",
+        "needed": false,
+        "reason": "Heuristic confidence 0.92 sufficient; skip flash classify call.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_pass1",
+        "needed": true,
+        "reason": "Type lecture_slides: pass1 extracts concepts=True, problems=True, events=False.",
+        "llmCall": true,
+        "estCostTier": "high"
+      },
+      {
+        "pass": "llm_pass2",
+        "needed": false,
+        "reason": "Type lecture_slides disables pass2 (single-pass type-specific or link-only profile).",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "finalize",
+        "needed": true,
+        "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+        "llmCall": false,
+        "estCostTier": "free"
+      }
+    ]
+  },
+  "passAudit": {
+    "plan": {
+      "courseId": "15237",
+      "fileId": "3369200",
+      "filename": "Lecture 13_chemical control of brain_behavior_slides.pdf",
+      "resolvedType": "lecture_slides",
+      "heuristicConfidence": 0.92,
+      "neededPasses": [
+        "extract_pages",
+        "heuristic_classify",
+        "llm_pass1",
+        "finalize"
+      ],
+      "skippedPasses": [
+        "llm_classify",
+        "llm_pass2"
+      ],
+      "estLlmCalls": 1,
+      "estRealisticLlmCalls": 1.0,
+      "steps": [
+        {
+          "pass": "extract_pages",
+          "needed": true,
+          "reason": "Required local PDF/HTML extraction; no LLM.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "heuristic_classify",
+          "needed": true,
+          "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_classify",
+          "needed": false,
+          "reason": "Heuristic confidence 0.92 sufficient; skip flash classify call.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_pass1",
+          "needed": true,
+          "reason": "Type lecture_slides: pass1 extracts concepts=True, problems=True, events=False.",
+          "llmCall": true,
+          "estCostTier": "high"
+        },
+        {
+          "pass": "llm_pass2",
+          "needed": false,
+          "reason": "Type lecture_slides disables pass2 (single-pass type-specific or link-only profile).",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "finalize",
+          "needed": true,
+          "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+          "llmCall": false,
+          "estCostTier": "free"
+        }
+      ]
+    },
+    "actualType": "lecture_slides",
+    "deepseekPasses": 1,
+    "conceptCount": 80,
+    "detailCount": 40,
+    "totalLlmTokens": 0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "ran": true,
+        "useful": true,
+        "verdict": "required",
+        "note": "Local I/O; pages present means extract succeeded."
+      },
+      {
+        "pass": "heuristic_classify",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "Routed to lecture_slides (free)."
+      },
+      {
+        "pass": "llm_classify",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Skipped; heuristic confidence sufficient.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass1",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "No pass1 tool trace.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass2",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Correctly skipped: profile disables pass2, type-specific pass1 only, or no log_* tools.",
+        "tokens": 0
+      },
+      {
+        "pass": "finalize",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "logged_details promoted to concept details."
+      }
+    ],
+    "cutCandidates": [],
+    "recommendations": [
+      "Pass2 correctly skipped for this type/pass1 tool pattern."
+    ]
+  },
+  "passes": [
+    "extract_pages",
+    "heuristic_classify",
+    "teaching_units",
+    "type_structure",
+    "concept_candidates",
+    "problem_scan",
+    "detail_attach",
+    "reconcile"
+  ],
+  "buildMode": "template_multi_pass_offline",
+  "builtAt": "2026-07-01T22:49:36Z",
+  "concepts": [
+    {
+      "name": "Lecture 13_chemical control of brain_behavior_slides",
+      "details": []
+    },
+    {
+      "name": "source of the endocrine hormones",
+      "details": []
+    },
+    {
+      "name": "nervous system",
+      "details": []
+    },
+    {
+      "name": "broadly adjust neuronal excitability, synchrony",
+      "details": []
+    },
+    {
+      "name": "Under conditions of low blood volume or pressure, high salt levels",
+      "details": []
+    },
+    {
+      "name": "•In addition to ACTH, anterior pituitary releases",
+      "details": []
+    },
+    {
+      "name": "chemical control of brain and behavior",
+      "details": []
+    },
+    {
+      "name": "neurosecretory / neuromodulatory systems",
+      "details": []
+    },
+    {
+      "name": "quiz 2",
+      "details": []
+    },
+    {
+      "name": "make a neuro meme",
+      "details": [
+        "Extra credit: make a neuro meme"
+      ]
+    },
+    {
+      "name": "3 modules",
+      "details": [
+        "Course content: 3 modules"
+      ]
+    },
+    {
+      "name": "•controls skeletal muscle fibers•conscious behaviors",
+      "details": [
+        "•Somatic motor system:•Controls skeletal muscle fibers•Conscious behaviors"
+      ]
+    },
+    {
+      "name": "91 neuropeptide-receptor pairs~10x denser than wired connectome",
+      "details": [
+        "C. elegans Wireless:91 neuropeptide-receptor pairs~10x denser than wired connectome"
+      ]
+    },
+    {
+      "name": "302 neurons 7,000 synapses",
+      "details": [
+        "C. elegansWired:302 neurons 7,000 synapses"
+      ]
+    },
+    {
+      "name": "roles in homeostasis",
+      "details": [
+        "Hypothalamus: roles in homeostasis"
+      ]
+    },
+    {
+      "name": "anatomy",
+      "details": []
+    },
+    {
+      "name": "inputs from brainstem, telencephalon (motivation, next lecture)",
+      "details": [
+        "•Lateral, medial: inputs from brainstem, telencephalon (motivation, next lecture)"
+      ]
+    },
+    {
+      "name": "most input is from lateral and medial",
+      "details": [
+        "•Periventricular: most input is from lateral and medial"
+      ]
+    },
+    {
+      "name": "circadian, hormonal, autonomic",
+      "details": [
+        "•3 classes of outputs: circadian, hormonal, autonomic"
+      ]
+    },
+    {
+      "name": "neurosecretory and autonomic",
+      "details": [
+        "Periventricular hypothalamus: neurosecretory and autonomic"
+      ]
+    },
+    {
+      "name": "neurosecretory gateway to brain-body connection",
+      "details": [
+        "The pituitary: neurosecretory gateway to brain-body connection"
+      ]
+    },
+    {
+      "name": "•triggers vasopressin release from posterior pituitary•reduces urine production by kidneys",
+      "details": [
+        "Hypothalamus: •Triggers vasopressin release from posterior pituitary•Reduces urine production by kidneys"
+      ]
+    },
+    {
+      "name": "•trigger generation of angiotensin from liver increase blood pressure•lateral hypothalamus thirst",
+      "details": [
+        "Kidneys:•Trigger generation of angiotensin from liver increase blood pressure•Lateral hypothalamus thirst"
+      ]
+    },
+    {
+      "name": "oxytocin, vasopressin and pair bonding",
+      "details": []
+    },
+    {
+      "name": "prairie voles",
+      "details": []
+    },
+    {
+      "name": "meadow voles",
+      "details": []
+    },
+    {
+      "name": "block vasopressin",
+      "details": []
+    },
+    {
+      "name": "add vasopressin",
+      "details": []
+    },
+    {
+      "name": "correlate with behavior",
+      "details": []
+    },
+    {
+      "name": "parvocellular hypothalamus crh anterior pituitary acth",
+      "details": [
+        "Example: parvocellular hypothalamus CRH anterior pituitary ACTH"
+      ]
+    },
+    {
+      "name": "chronic stress kills (via cortisol?)",
+      "details": [
+        "Sapolsky: chronic stress kills (via cortisol?)"
+      ]
+    },
+    {
+      "name": "excess cortisol",
+      "details": [
+        "Cushing’s disease: excess cortisol"
+      ]
+    },
+    {
+      "name": "anterior pituitary (gland, not brain)",
+      "details": []
+    },
+    {
+      "name": "gigantism (7-9 ft tall)",
+      "details": [
+        "•Soon after puberty: gigantism (7-9 ft tall)"
+      ]
+    },
+    {
+      "name": "acromegaly (enlargement in the extremities and face)",
+      "details": [
+        "•In adults: acromegaly (enlargement in the extremities and face)"
+      ]
+    },
+    {
+      "name": "gigantism and acromegaly",
+      "details": [
+        "Pituitary adenomas: gigantism and acromegaly"
+      ]
+    },
+    {
+      "name": "summary",
+      "details": [
+        "Posterior and anterior pituitary: summary"
+      ]
+    },
+    {
+      "name": "posterior",
+      "details": []
+    },
+    {
+      "name": "anterior",
+      "details": []
+    },
+    {
+      "name": "stretching and question break",
+      "details": []
+    },
+    {
+      "name": "•controls every other innervated tissue, organ•disynaptic (not counting input from",
+      "details": [
+        "•Autonomic nervous system:•Controls every other innervated tissue, organ•Disynaptic (not counting input from"
+      ]
+    },
+    {
+      "name": "periventricularhypothalamus",
+      "details": []
+    },
+    {
+      "name": "•highly coordinated, widespread•automatic (involuntary)•relatively slow onset and end",
+      "details": [
+        "•Behaviors usually:•Highly coordinated, widespread•Automatic (involuntary)•Relatively slow onset and end"
+      ]
+    },
+    {
+      "name": "sympathetic versus parasympathetic",
+      "details": [
+        "Autonomic nervous system: sympathetic versus parasympathetic"
+      ]
+    },
+    {
+      "name": "brain stem, sacral spine•digestion, growth, immunity, energy storage•“rest and digest”",
+      "details": [
+        "•Parasympathetic•Preganglionic neurons: brain stem, sacral spine•Digestion, growth, immunity, energy storage•“Rest and digest”"
+      ]
+    },
+    {
+      "name": "sympathetic",
+      "details": [
+        "Autonomic nervous system: sympathetic"
+      ]
+    },
+    {
+      "name": "pain, vomiting… and a feeling of impending doom",
+      "details": [
+        "Irukandji jellyfish stings: pain, vomiting… and a feeling of impending doom"
+      ]
+    },
+    {
+      "name": "parasympathetic increase, sympathetic decrease",
+      "details": [
+        "•Gut: parasympathetic increase, sympathetic decrease"
+      ]
+    },
+    {
+      "name": "•erection parasympathetic",
+      "details": [
+        "•Penis: •Erection parasympathetic"
+      ]
+    },
+    {
+      "name": "sympathetic increase",
+      "details": [
+        "•Blood vessels, sweat: sympathetic increase"
+      ]
+    },
+    {
+      "name": "parasympathetic increase",
+      "details": [
+        "•Tear glands: parasympathetic increase"
+      ]
+    },
+    {
+      "name": "npy, vip: gpcrs, slow, modulatory",
+      "details": [
+        "•Also released: NPY, VIP: GPCRs, slow, modulatory"
+      ]
+    },
+    {
+      "name": "preganglionic pharmacology of the autonomic",
+      "details": []
+    },
+    {
+      "name": "postganglionic pharmacology of the autonomic",
+      "details": []
+    },
+    {
+      "name": "ach•very local",
+      "details": [
+        "•Parasympathetic: ACh•Very local"
+      ]
+    },
+    {
+      "name": "norepinephrine (ne), aka noradrenaline•spreads, even via blood",
+      "details": [
+        "•Sympathetic: norepinephrine (NE), AKA noradrenaline•Spreads, even via blood"
+      ]
+    },
+    {
+      "name": "autonomic effects of drugs",
+      "details": []
+    },
+    {
+      "name": "autonomic effects of epi-pens",
+      "details": []
+    },
+    {
+      "name": "patterns of communication in the nervous system",
+      "details": []
+    },
+    {
+      "name": "point-to-point",
+      "details": [
+        "Most other systems: point-to-point"
+      ]
+    },
+    {
+      "name": "neurohormones",
+      "details": [
+        "Secretory hypothalamus: neurohormones"
+      ]
+    },
+    {
+      "name": "body-wide networks",
+      "details": [
+        "Autonomic nervous system: body-wide networks"
+      ]
+    },
+    {
+      "name": "massive divergence",
+      "details": [
+        "Diffuse modulatory systems: Massive divergence"
+      ]
+    },
+    {
+      "name": "many psychoactive drugs target neuromodulators",
+      "details": []
+    },
+    {
+      "name": "common features of diffuse modulatory systems",
+      "details": []
+    },
+    {
+      "name": "one axon may",
+      "details": [
+        "•Massive divergence: one axon may"
+      ]
+    },
+    {
+      "name": "norepinephrine / noradrenaline system",
+      "details": []
+    },
+    {
+      "name": "functions",
+      "details": []
+    },
+    {
+      "name": "cellular effects",
+      "details": []
+    },
+    {
+      "name": "disorder",
+      "details": []
+    },
+    {
+      "name": "noradrenergic locus coeruleus",
+      "details": []
+    },
+    {
+      "name": "dopaminergic system",
+      "details": []
+    },
+    {
+      "name": "arvid carlsson•da is also a neurotransmitter!",
+      "details": [
+        "•Nobel, 2000: Arvid Carlsson•DA is also a neurotransmitter!"
+      ]
+    },
+    {
+      "name": "disease",
+      "details": []
+    },
+    {
+      "name": "cholinergic system",
+      "details": []
+    },
+    {
+      "name": "basal forebrain complex",
+      "details": [
+        "Together: basal forebrain complex"
+      ]
+    },
+    {
+      "name": "serotonin system",
+      "details": []
+    },
+    {
+      "name": "ssris (selective serotonin reuptake inhibitors)",
+      "details": []
+    },
+    {
+      "name": "serotonin is synthesized from tryptophan",
+      "details": []
+    },
+    {
+      "name": "tryptophan can promote healthy sleep",
+      "details": []
+    }
+  ],
+  "conceptCount": 80,
+  "detailCount": 40,
+  "events": [],
+  "problems": [],
+  "sections": [
+    "CHEMICAL CONTROL OF BRAIN AND BEHAVIOR",
+    "Quiz 2",
+    "Under conditions of low blood volume or pressure, high salt levels",
+    "parvocellular hypothalamus CRH anterior pituitary ACTH",
+    "Anterior pituitary (gland, not brain)",
+    "•In addition to ACTH, anterior pituitary releases",
+    "Functions",
+    "Cellular effects",
+    "Disorder",
+    "Disease"
+  ],
+  "deepseekPasses": 1,
+  "expectsPass2": false,
+  "gtProvenance": {
+    "typeSource": "heuristic_high",
+    "typeConfidence": 0.92,
+    "offlinePassAudit": {
+      "extract_pages": {
+        "localPdf": true,
+        "pageCount": 71,
+        "pdfPath": "C:\\Allen\\nucleus\\canvasfiles\\3369200"
+      },
+      "heuristic_classify": {
+        "expectedFileType": "lecture_slides",
+        "source": "heuristic_high",
+        "confidence": 0.92
+      },
+      "teaching_units": {
+        "sectionCount": 10
+      },
+      "type_structure": {
+        "slideRows": 99,
+        "readingSections": 0,
+        "syllabusWeeks": 0
+      },
+      "concept_candidates": {
+        "candidateCount": 80
+      },
+      "problem_scan": {
+        "problemCount": 0
+      },
+      "detail_attach": {
+        "conceptKeysWithDetails": 50,
+        "detailCount": 50
+      },
+      "reconcile": {
+        "inputTitles": 80,
+        "accepted": 80,
+        "capped": 0,
+        "detailAttached": 40
+      }
+    },
+    "reconcileStats": {
+      "inputTitles": 80,
+      "accepted": 80,
+      "capped": 0,
+      "detailAttached": 40
+    }
+  }
+}

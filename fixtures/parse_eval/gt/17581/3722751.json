@@ -1,0 +1,499 @@
+{
+  "version": 1,
+  "courseId": "17581",
+  "fileId": "3722751",
+  "filename": "memory2_Ellis_2021.pdf",
+  "expectedFileType": "research_article",
+  "passPlan": {
+    "courseId": "17581",
+    "fileId": "3722751",
+    "filename": "memory2_Ellis_2021.pdf",
+    "resolvedType": "research_article",
+    "heuristicConfidence": 0.86,
+    "neededPasses": [
+      "extract_pages",
+      "heuristic_classify",
+      "llm_pass1",
+      "finalize"
+    ],
+    "skippedPasses": [
+      "llm_classify",
+      "llm_pass2"
+    ],
+    "estLlmCalls": 1,
+    "estRealisticLlmCalls": 1.0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "needed": true,
+        "reason": "Required local PDF/HTML extraction; no LLM.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "heuristic_classify",
+        "needed": true,
+        "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_classify",
+        "needed": false,
+        "reason": "Heuristic confidence 0.86 sufficient; skip flash classify call.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_pass1",
+        "needed": true,
+        "reason": "Type research_article: pass1 extracts concepts=True, problems=False, events=False.",
+        "llmCall": true,
+        "estCostTier": "high"
+      },
+      {
+        "pass": "llm_pass2",
+        "needed": false,
+        "reason": "Type research_article disables pass2 (single-pass type-specific or link-only profile).",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "finalize",
+        "needed": true,
+        "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+        "llmCall": false,
+        "estCostTier": "free"
+      }
+    ]
+  },
+  "passAudit": {
+    "plan": {
+      "courseId": "17581",
+      "fileId": "3722751",
+      "filename": "memory2_Ellis_2021.pdf",
+      "resolvedType": "research_article",
+      "heuristicConfidence": 0.86,
+      "neededPasses": [
+        "extract_pages",
+        "heuristic_classify",
+        "llm_pass1",
+        "finalize"
+      ],
+      "skippedPasses": [
+        "llm_classify",
+        "llm_pass2"
+      ],
+      "estLlmCalls": 1,
+      "estRealisticLlmCalls": 1.0,
+      "steps": [
+        {
+          "pass": "extract_pages",
+          "needed": true,
+          "reason": "Required local PDF/HTML extraction; no LLM.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "heuristic_classify",
+          "needed": true,
+          "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_classify",
+          "needed": false,
+          "reason": "Heuristic confidence 0.86 sufficient; skip flash classify call.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_pass1",
+          "needed": true,
+          "reason": "Type research_article: pass1 extracts concepts=True, problems=False, events=False.",
+          "llmCall": true,
+          "estCostTier": "high"
+        },
+        {
+          "pass": "llm_pass2",
+          "needed": false,
+          "reason": "Type research_article disables pass2 (single-pass type-specific or link-only profile).",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "finalize",
+          "needed": true,
+          "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+          "llmCall": false,
+          "estCostTier": "free"
+        }
+      ]
+    },
+    "actualType": "research_article",
+    "deepseekPasses": 1,
+    "conceptCount": 38,
+    "detailCount": 1,
+    "totalLlmTokens": 0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "ran": true,
+        "useful": true,
+        "verdict": "required",
+        "note": "Local I/O; pages present means extract succeeded."
+      },
+      {
+        "pass": "heuristic_classify",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "Routed to research_article (free)."
+      },
+      {
+        "pass": "llm_classify",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Skipped; heuristic confidence sufficient.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass1",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "No pass1 tool trace.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass2",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Correctly skipped: profile disables pass2, type-specific pass1 only, or no log_* tools.",
+        "tokens": 0
+      },
+      {
+        "pass": "finalize",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "logged_details promoted to concept details."
+      }
+    ],
+    "cutCandidates": [],
+    "recommendations": [
+      "Pass2 correctly skipped for this type/pass1 tool pattern."
+    ]
+  },
+  "passes": [
+    "extract_pages",
+    "heuristic_classify",
+    "teaching_units",
+    "type_structure",
+    "concept_candidates",
+    "problem_scan",
+    "detail_attach",
+    "reconcile"
+  ],
+  "buildMode": "template_multi_pass_offline",
+  "builtAt": "2026-07-01T22:49:39Z",
+  "concepts": [
+    {
+      "name": "report",
+      "details": []
+    },
+    {
+      "name": "evidence of hippocampal learning in human infants",
+      "details": []
+    },
+    {
+      "name": "graphical abstract",
+      "details": []
+    },
+    {
+      "name": "highlights",
+      "details": []
+    },
+    {
+      "name": "authors",
+      "details": []
+    },
+    {
+      "name": "summary",
+      "details": []
+    },
+    {
+      "name": "results",
+      "details": []
+    },
+    {
+      "name": "discussion",
+      "details": []
+    },
+    {
+      "name": "d key resources table",
+      "details": []
+    },
+    {
+      "name": "d resource availability",
+      "details": []
+    },
+    {
+      "name": "b lead contact",
+      "details": []
+    },
+    {
+      "name": "b materials availability",
+      "details": []
+    },
+    {
+      "name": "b data and code availability",
+      "details": []
+    },
+    {
+      "name": "d experimental model and subject details",
+      "details": []
+    },
+    {
+      "name": "b participants",
+      "details": []
+    },
+    {
+      "name": "d method details",
+      "details": []
+    },
+    {
+      "name": "b data acquisition",
+      "details": []
+    },
+    {
+      "name": "b procedure",
+      "details": []
+    },
+    {
+      "name": "b gaze coding",
+      "details": []
+    },
+    {
+      "name": "d quantification and statistical analysis",
+      "details": []
+    },
+    {
+      "name": "b preprocessing",
+      "details": []
+    },
+    {
+      "name": "b regions of interest",
+      "details": []
+    },
+    {
+      "name": "b statistical analysis",
+      "details": []
+    },
+    {
+      "name": "supplemental information",
+      "details": []
+    },
+    {
+      "name": "acknowledgments",
+      "details": []
+    },
+    {
+      "name": "author contributions",
+      "details": []
+    },
+    {
+      "name": "declaration of interests",
+      "details": []
+    },
+    {
+      "name": "inclusion and diversity",
+      "details": []
+    },
+    {
+      "name": "references",
+      "details": []
+    },
+    {
+      "name": "key resources table",
+      "details": []
+    },
+    {
+      "name": "resource availability",
+      "details": []
+    },
+    {
+      "name": "experimental model and subject details",
+      "details": []
+    },
+    {
+      "name": "method details",
+      "details": []
+    },
+    {
+      "name": "reagent or resourcesourceidentifier",
+      "details": []
+    },
+    {
+      "name": "deposited data",
+      "details": []
+    },
+    {
+      "name": "software and algorithms",
+      "details": []
+    },
+    {
+      "name": "//fsl.fmrib.ox.ac.uk/fsl/fslwiki",
+      "details": [
+        "FSL v. 5.0.9FMRIBhttps://fsl.fmrib.ox.ac.uk/fsl/fslwiki"
+      ]
+    },
+    {
+      "name": "quantification and statistical analysis",
+      "details": []
+    }
+  ],
+  "conceptCount": 38,
+  "detailCount": 1,
+  "events": [],
+  "problems": [
+    "Problem 1",
+    "Problem 2",
+    "Problem 3",
+    "Problem 4",
+    "Problem 5",
+    "Problem 6",
+    "Problem 8",
+    "Problem 10",
+    "Problem 11",
+    "Problem 12",
+    "Problem 13",
+    "Problem 14",
+    "Problem 15",
+    "Problem 17",
+    "Problem 18",
+    "Problem 19",
+    "Problem 20",
+    "Problem 22",
+    "Problem 23",
+    "Problem 24",
+    "Problem 25",
+    "Problem 26",
+    "Problem 27",
+    "Problem 28",
+    "Problem 29",
+    "Problem 30",
+    "Problem 31",
+    "Problem 32",
+    "Problem 33",
+    "Problem 34",
+    "Problem 35",
+    "Problem 36",
+    "Problem 37",
+    "Problem 39",
+    "Problem 40",
+    "Problem 41",
+    "Problem 42",
+    "Problem 44",
+    "Problem 45",
+    "Problem 47",
+    "Problem 48",
+    "Problem 49",
+    "Problem 51",
+    "Problem 52",
+    "Problem 55"
+  ],
+  "sections": [
+    "Problem 1",
+    "Problem 2",
+    "Problem 3",
+    "Problem 4",
+    "Problem 5",
+    "Problem 6",
+    "Problem 8",
+    "Problem 10",
+    "Problem 11",
+    "Problem 12",
+    "Problem 13",
+    "Problem 14",
+    "Problem 15",
+    "Problem 17",
+    "Problem 18",
+    "Problem 19",
+    "Problem 20",
+    "Problem 22",
+    "Problem 23",
+    "Problem 24",
+    "Problem 25",
+    "Problem 26",
+    "Problem 27",
+    "Problem 28",
+    "Problem 29",
+    "Problem 30",
+    "Problem 31",
+    "Problem 32",
+    "Problem 33",
+    "Problem 34",
+    "Problem 35",
+    "Problem 36",
+    "Problem 37",
+    "Problem 39",
+    "Problem 40",
+    "Problem 41",
+    "Problem 42",
+    "Problem 44",
+    "Problem 45",
+    "Problem 47"
+  ],
+  "deepseekPasses": 1,
+  "expectsPass2": false,
+  "gtProvenance": {
+    "typeSource": "heuristic_high",
+    "typeConfidence": 0.86,
+    "offlinePassAudit": {
+      "extract_pages": {
+        "localPdf": true,
+        "pageCount": 12,
+        "pdfPath": "C:\\Allen\\nucleus\\canvasfiles\\3722751"
+      },
+      "heuristic_classify": {
+        "expectedFileType": "research_article",
+        "source": "heuristic_high",
+        "confidence": 0.86
+      },
+      "teaching_units": {
+        "sectionCount": 45
+      },
+      "type_structure": {
+        "slideRows": 41,
+        "readingSections": 41,
+        "syllabusWeeks": 0
+      },
+      "concept_candidates": {
+        "candidateCount": 38
+      },
+      "problem_scan": {
+        "problemCount": 45
+      },
+      "detail_attach": {
+        "conceptKeysWithDetails": 2,
+        "detailCount": 2
+      },
+      "reconcile": {
+        "inputTitles": 38,
+        "accepted": 38,
+        "capped": 0,
+        "detailAttached": 1
+      }
+    },
+    "reconcileStats": {
+      "inputTitles": 38,
+      "accepted": 38,
+      "capped": 0,
+      "detailAttached": 1
+    }
+  }
+}

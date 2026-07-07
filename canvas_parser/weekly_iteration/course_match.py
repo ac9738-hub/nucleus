@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 
@@ -99,10 +101,46 @@ def score_course_match(snapshot: dict[str, Any], spec: GroundTruthSpec) -> float
     return code_score
 
 
+def gt_course_id_map(gt_dir: Path) -> dict[str, int]:
+    profile_path = Path(gt_dir) / 'profile.json'
+    if not profile_path.is_file():
+        return {}
+    try:
+        profile = json.loads(profile_path.read_text(encoding='utf-8'))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    mapping: dict[str, int] = {}
+    for row in profile.get('courses') or []:
+        gt_file = row.get('ground_truth_file')
+        course_id = row.get('canvas_course_id')
+        if gt_file and course_id is not None:
+            mapping[str(gt_file)] = int(course_id)
+    return mapping
+
+
+def find_snapshot_by_course_id(
+    snapshots: list[dict[str, Any]],
+    course_id: int,
+) -> dict[str, Any] | None:
+    target = int(course_id)
+    for snapshot in snapshots:
+        course = snapshot.get('course') or {}
+        raw_id = course.get('id')
+        if raw_id is not None and int(raw_id) == target:
+            return snapshot
+    return None
+
+
 def find_snapshot_for_ground_truth(
     snapshots: list[dict[str, Any]],
     spec: GroundTruthSpec,
+    *,
+    course_id: int | None = None,
 ) -> dict[str, Any] | None:
+    if course_id is not None:
+        matched = find_snapshot_by_course_id(snapshots, course_id)
+        if matched:
+            return matched
     best = None
     best_score = 0.0
     for snapshot in snapshots:

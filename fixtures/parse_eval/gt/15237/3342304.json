@@ -1,0 +1,620 @@
+{
+  "version": 1,
+  "courseId": "15237",
+  "fileId": "3342304",
+  "filename": "Lecture 11_auditory and vestibular systems and language_slides.pdf",
+  "expectedFileType": "lecture_slides",
+  "passPlan": {
+    "courseId": "15237",
+    "fileId": "3342304",
+    "filename": "Lecture 11_auditory and vestibular systems and language_slides.pdf",
+    "resolvedType": "lecture_slides",
+    "heuristicConfidence": 0.92,
+    "neededPasses": [
+      "extract_pages",
+      "heuristic_classify",
+      "llm_pass1",
+      "finalize"
+    ],
+    "skippedPasses": [
+      "llm_classify",
+      "llm_pass2"
+    ],
+    "estLlmCalls": 1,
+    "estRealisticLlmCalls": 1.0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "needed": true,
+        "reason": "Required local PDF/HTML extraction; no LLM.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "heuristic_classify",
+        "needed": true,
+        "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_classify",
+        "needed": false,
+        "reason": "Heuristic confidence 0.92 sufficient; skip flash classify call.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_pass1",
+        "needed": true,
+        "reason": "Type lecture_slides: pass1 extracts concepts=True, problems=True, events=False.",
+        "llmCall": true,
+        "estCostTier": "high"
+      },
+      {
+        "pass": "llm_pass2",
+        "needed": false,
+        "reason": "Type lecture_slides disables pass2 (single-pass type-specific or link-only profile).",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "finalize",
+        "needed": true,
+        "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+        "llmCall": false,
+        "estCostTier": "free"
+      }
+    ]
+  },
+  "passAudit": {
+    "plan": {
+      "courseId": "15237",
+      "fileId": "3342304",
+      "filename": "Lecture 11_auditory and vestibular systems and language_slides.pdf",
+      "resolvedType": "lecture_slides",
+      "heuristicConfidence": 0.92,
+      "neededPasses": [
+        "extract_pages",
+        "heuristic_classify",
+        "llm_pass1",
+        "finalize"
+      ],
+      "skippedPasses": [
+        "llm_classify",
+        "llm_pass2"
+      ],
+      "estLlmCalls": 1,
+      "estRealisticLlmCalls": 1.0,
+      "steps": [
+        {
+          "pass": "extract_pages",
+          "needed": true,
+          "reason": "Required local PDF/HTML extraction; no LLM.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "heuristic_classify",
+          "needed": true,
+          "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_classify",
+          "needed": false,
+          "reason": "Heuristic confidence 0.92 sufficient; skip flash classify call.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_pass1",
+          "needed": true,
+          "reason": "Type lecture_slides: pass1 extracts concepts=True, problems=True, events=False.",
+          "llmCall": true,
+          "estCostTier": "high"
+        },
+        {
+          "pass": "llm_pass2",
+          "needed": false,
+          "reason": "Type lecture_slides disables pass2 (single-pass type-specific or link-only profile).",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "finalize",
+          "needed": true,
+          "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+          "llmCall": false,
+          "estCostTier": "free"
+        }
+      ]
+    },
+    "actualType": "lecture_slides",
+    "deepseekPasses": 1,
+    "conceptCount": 80,
+    "detailCount": 14,
+    "totalLlmTokens": 0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "ran": true,
+        "useful": true,
+        "verdict": "required",
+        "note": "Local I/O; pages present means extract succeeded."
+      },
+      {
+        "pass": "heuristic_classify",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "Routed to lecture_slides (free)."
+      },
+      {
+        "pass": "llm_classify",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Skipped; heuristic confidence sufficient.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass1",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "No pass1 tool trace.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass2",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Correctly skipped: profile disables pass2, type-specific pass1 only, or no log_* tools.",
+        "tokens": 0
+      },
+      {
+        "pass": "finalize",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "logged_details promoted to concept details."
+      }
+    ],
+    "cutCandidates": [],
+    "recommendations": [
+      "Pass2 correctly skipped for this type/pass1 tool pattern."
+    ]
+  },
+  "passes": [
+    "extract_pages",
+    "heuristic_classify",
+    "teaching_units",
+    "type_structure",
+    "concept_candidates",
+    "problem_scan",
+    "detail_attach",
+    "reconcile"
+  ],
+  "buildMode": "template_multi_pass_offline",
+  "builtAt": "2026-07-01T22:49:36Z",
+  "concepts": [
+    {
+      "name": "Lecture 11_auditory and vestibular systems and language_slides",
+      "details": []
+    },
+    {
+      "name": "767 miles / hour",
+      "details": []
+    },
+    {
+      "name": "4 69 seconds = 1 mile",
+      "details": []
+    },
+    {
+      "name": "into place code",
+      "details": []
+    },
+    {
+      "name": "into electrical potentials",
+      "details": []
+    },
+    {
+      "name": "8 khz(most hearing people)",
+      "details": []
+    },
+    {
+      "name": "10 khz(under 60)",
+      "details": []
+    },
+    {
+      "name": "17 khz(under 24)",
+      "details": []
+    },
+    {
+      "name": "15 khz(under 40)",
+      "details": []
+    },
+    {
+      "name": "20 khz(under 18)",
+      "details": []
+    },
+    {
+      "name": "during low-intensity sound",
+      "details": []
+    },
+    {
+      "name": "encode frequency (pitch) at low frequencies",
+      "details": []
+    },
+    {
+      "name": "2 left hemisphere areas that affect language, but in different ways",
+      "details": []
+    },
+    {
+      "name": "•Estimate calculation",
+      "details": []
+    },
+    {
+      "name": "While we are very visual creatures, auditory system is good for",
+      "details": []
+    },
+    {
+      "name": "Problem 1",
+      "details": []
+    },
+    {
+      "name": "Problem 2",
+      "details": []
+    },
+    {
+      "name": "• Intensity encoded in",
+      "details": []
+    },
+    {
+      "name": "Problem 3",
+      "details": []
+    },
+    {
+      "name": "mid-term grade estimates posted",
+      "details": []
+    },
+    {
+      "name": "mid-term course grade distribution",
+      "details": []
+    },
+    {
+      "name": "88median: 89stdev: 7.7",
+      "details": [
+        "Average: 88Median: 89StDev: 7.7"
+      ]
+    },
+    {
+      "name": "gustatory systemolfactory system",
+      "details": []
+    },
+    {
+      "name": "pheromone system",
+      "details": []
+    },
+    {
+      "name": "outline for today",
+      "details": []
+    },
+    {
+      "name": "human sensitivity range is large",
+      "details": []
+    },
+    {
+      "name": "rhythmic particle vibrations",
+      "details": [
+        "How sound works: rhythmic particle vibrations"
+      ]
+    },
+    {
+      "name": "(a) true(b) false",
+      "details": [
+        "Clickers: (A) True(B) False"
+      ]
+    },
+    {
+      "name": "hearing frequency ranges",
+      "details": []
+    },
+    {
+      "name": "prey sounds?",
+      "details": [
+        "High frequency hearing: prey sounds?"
+      ]
+    },
+    {
+      "name": "hearing",
+      "details": []
+    },
+    {
+      "name": "sound transduction and amplification",
+      "details": []
+    },
+    {
+      "name": "ear and brain turn vibrations into sounds",
+      "details": []
+    },
+    {
+      "name": "regions of the ear",
+      "details": []
+    },
+    {
+      "name": "brain stemmgnauditory cortex",
+      "details": []
+    },
+    {
+      "name": "initial sound transduction",
+      "details": []
+    },
+    {
+      "name": "eustachian tube (to nasal cavities)",
+      "details": []
+    },
+    {
+      "name": "sound pressure increased in two ways",
+      "details": []
+    },
+    {
+      "name": "oval window smaller than",
+      "details": [
+        "1.Area decrease: oval window smaller than"
+      ]
+    },
+    {
+      "name": "tympanic membrane",
+      "details": []
+    },
+    {
+      "name": "ossicles act as levers between",
+      "details": [
+        "2.Force increase: ossicles act as levers between"
+      ]
+    },
+    {
+      "name": "tympanic membrane and oval window",
+      "details": []
+    },
+    {
+      "name": "pressure = force / area",
+      "details": [
+        "Ossicle amplification of sound: pressure = force / area"
+      ]
+    },
+    {
+      "name": "20x increase in pressurebetween tympanic membrane and oval window",
+      "details": [
+        "Total result: 20x increase in pressurebetween tympanic membrane and oval window"
+      ]
+    },
+    {
+      "name": "allows air movement to move fluid in cochlea",
+      "details": []
+    },
+    {
+      "name": "ear muscles and the attenuation reflex",
+      "details": []
+    },
+    {
+      "name": "organ of corti",
+      "details": []
+    },
+    {
+      "name": "traveling waves of vibration along the cochlea",
+      "details": []
+    },
+    {
+      "name": "start here",
+      "details": []
+    },
+    {
+      "name": "directly stimulate the auditory nerve to treat peripheral deafness",
+      "details": [
+        "Cochlear implants: directly stimulate the auditory nerve to treat peripheral deafness"
+      ]
+    },
+    {
+      "name": "inner hair cells convert movements",
+      "details": []
+    },
+    {
+      "name": "inner hair cells are not neurons",
+      "details": []
+    },
+    {
+      "name": "outer hair cells are also not neurons",
+      "details": []
+    },
+    {
+      "name": "provide amplification (later)",
+      "details": []
+    },
+    {
+      "name": "movement ~ size of large atom (0.3 nm)",
+      "details": [
+        "Softest audible sounds: movement ~ size of large atom (0.3 nm)"
+      ]
+    },
+    {
+      "name": "high-frequency hearing is lost with age",
+      "details": []
+    },
+    {
+      "name": "things that gate ion channels",
+      "details": []
+    },
+    {
+      "name": "ph-gated k+ channel)",
+      "details": [
+        "•pH (sour taste: pH-gated K+ channel)"
+      ]
+    },
+    {
+      "name": "cl-cl",
+      "details": []
+    },
+    {
+      "name": "depolarizing an isolated outer hair cell in vitro",
+      "details": []
+    },
+    {
+      "name": "outerhair cellvibration",
+      "details": []
+    },
+    {
+      "name": "play sound, faint echo returns from acoustic amplifier (outer hair cells)",
+      "details": [
+        "•Normally: play sound, faint echo returns from acoustic amplifier (outer hair cells)"
+      ]
+    },
+    {
+      "name": "outer hair cellvibration",
+      "details": []
+    },
+    {
+      "name": "soundvibration",
+      "details": []
+    },
+    {
+      "name": "sound localization",
+      "details": []
+    },
+    {
+      "name": "inner hair cells send most information",
+      "details": []
+    },
+    {
+      "name": "stretching and question break",
+      "details": []
+    },
+    {
+      "name": "sound processing pathway",
+      "details": [
+        "Overview: sound processing pathway"
+      ]
+    },
+    {
+      "name": "ipsi only",
+      "details": []
+    },
+    {
+      "name": "binaural",
+      "details": []
+    },
+    {
+      "name": "vision modifies hearing",
+      "details": []
+    },
+    {
+      "name": "inner hair cell",
+      "details": []
+    },
+    {
+      "name": "tonotopy represents frequency",
+      "details": [
+        "~200Hz - ~1 kHz: tonotopy represents frequency"
+      ]
+    },
+    {
+      "name": "temporal code) represents sound frequency",
+      "details": []
+    },
+    {
+      "name": "temporal code)",
+      "details": []
+    },
+    {
+      "name": "high frequencies",
+      "details": []
+    },
+    {
+      "name": "time code",
+      "details": []
+    },
+    {
+      "name": "place code",
+      "details": []
+    },
+    {
+      "name": "low frequencies",
+      "details": []
+    },
+    {
+      "name": "frequencies",
+      "details": []
+    }
+  ],
+  "conceptCount": 80,
+  "detailCount": 14,
+  "events": [],
+  "problems": [
+    "Problem 1",
+    "Problem 2",
+    "Problem 3"
+  ],
+  "sections": [
+    "•Estimate calculation",
+    "While we are very visual creatures, auditory system is good for",
+    "Sound pressure increased in two ways",
+    "Problem 1",
+    "Problem 2",
+    "Things that gate ion channels",
+    "• Intensity encoded in",
+    "Problem 3",
+    "Differences suggest"
+  ],
+  "deepseekPasses": 1,
+  "expectsPass2": false,
+  "gtProvenance": {
+    "typeSource": "heuristic_high",
+    "typeConfidence": 0.92,
+    "offlinePassAudit": {
+      "extract_pages": {
+        "localPdf": true,
+        "pageCount": 86,
+        "pdfPath": "C:\\Allen\\nucleus\\canvasfiles\\3342304"
+      },
+      "heuristic_classify": {
+        "expectedFileType": "lecture_slides",
+        "source": "heuristic_high",
+        "confidence": 0.92
+      },
+      "teaching_units": {
+        "sectionCount": 9
+      },
+      "type_structure": {
+        "slideRows": 161,
+        "readingSections": 0,
+        "syllabusWeeks": 0
+      },
+      "concept_candidates": {
+        "candidateCount": 80
+      },
+      "problem_scan": {
+        "problemCount": 3
+      },
+      "detail_attach": {
+        "conceptKeysWithDetails": 60,
+        "detailCount": 60
+      },
+      "reconcile": {
+        "inputTitles": 80,
+        "accepted": 80,
+        "capped": 0,
+        "detailAttached": 14
+      }
+    },
+    "reconcileStats": {
+      "inputTitles": 80,
+      "accepted": 80,
+      "capped": 0,
+      "detailAttached": 14
+    }
+  }
+}

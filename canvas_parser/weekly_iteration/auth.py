@@ -45,6 +45,16 @@ def load_env_file(env_path: Path) -> dict[str, str]:
     return values
 
 
+def apply_env_file(env_path: Path, *, prefix: str = '') -> None:
+    """Copy .env values into os.environ when not already set."""
+    for key, value in load_env_file(env_path).items():
+        if not value or os.getenv(key):
+            continue
+        if prefix and not key.startswith(prefix):
+            continue
+        os.environ[key] = value
+
+
 def _env_value(name: str, env_values: dict[str, str], fallback_names: tuple[str, ...] = ()) -> str:
     value = os.getenv(name) or env_values.get(name, '')
     if value:
@@ -64,9 +74,22 @@ def load_auth_for_profile(root_dir: Path, profile: StudentProfile) -> CanvasAuth
         env_values,
         fallback_names=(primary.base_url_env,),
     ).rstrip('/')
+    cookie = _env_value(
+        profile.auth_cookie_env,
+        env_values,
+        fallback_names=(primary.auth_cookie_env,),
+    )
+    csrf = _env_value(
+        profile.auth_csrf_env,
+        env_values,
+        fallback_names=(primary.auth_csrf_env,),
+    )
+    if not csrf and cookie:
+        from .availability import csrf_token_from_cookie
+        csrf = csrf_token_from_cookie(cookie)
     return CanvasAuth(
-        cookie=_env_value(profile.auth_cookie_env, env_values),
-        csrf=_env_value(profile.auth_csrf_env, env_values),
+        cookie=cookie,
+        csrf=csrf,
         base_url=base_url,
         profile=profile.name,
     )

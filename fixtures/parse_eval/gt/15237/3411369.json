@@ -1,0 +1,660 @@
+{
+  "version": 1,
+  "courseId": "15237",
+  "fileId": "3411369",
+  "filename": "Lecture 17_cellular substrates of plasticity_slides.pdf",
+  "expectedFileType": "lecture_slides",
+  "passPlan": {
+    "courseId": "15237",
+    "fileId": "3411369",
+    "filename": "Lecture 17_cellular substrates of plasticity_slides.pdf",
+    "resolvedType": "lecture_slides",
+    "heuristicConfidence": 0.92,
+    "neededPasses": [
+      "extract_pages",
+      "heuristic_classify",
+      "llm_pass1",
+      "finalize"
+    ],
+    "skippedPasses": [
+      "llm_classify",
+      "llm_pass2"
+    ],
+    "estLlmCalls": 1,
+    "estRealisticLlmCalls": 1.0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "needed": true,
+        "reason": "Required local PDF/HTML extraction; no LLM.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "heuristic_classify",
+        "needed": true,
+        "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_classify",
+        "needed": false,
+        "reason": "Heuristic confidence 0.92 sufficient; skip flash classify call.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_pass1",
+        "needed": true,
+        "reason": "Type lecture_slides: pass1 extracts concepts=True, problems=True, events=False.",
+        "llmCall": true,
+        "estCostTier": "high"
+      },
+      {
+        "pass": "llm_pass2",
+        "needed": false,
+        "reason": "Type lecture_slides disables pass2 (single-pass type-specific or link-only profile).",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "finalize",
+        "needed": true,
+        "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+        "llmCall": false,
+        "estCostTier": "free"
+      }
+    ]
+  },
+  "passAudit": {
+    "plan": {
+      "courseId": "15237",
+      "fileId": "3411369",
+      "filename": "Lecture 17_cellular substrates of plasticity_slides.pdf",
+      "resolvedType": "lecture_slides",
+      "heuristicConfidence": 0.92,
+      "neededPasses": [
+        "extract_pages",
+        "heuristic_classify",
+        "llm_pass1",
+        "finalize"
+      ],
+      "skippedPasses": [
+        "llm_classify",
+        "llm_pass2"
+      ],
+      "estLlmCalls": 1,
+      "estRealisticLlmCalls": 1.0,
+      "steps": [
+        {
+          "pass": "extract_pages",
+          "needed": true,
+          "reason": "Required local PDF/HTML extraction; no LLM.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "heuristic_classify",
+          "needed": true,
+          "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_classify",
+          "needed": false,
+          "reason": "Heuristic confidence 0.92 sufficient; skip flash classify call.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_pass1",
+          "needed": true,
+          "reason": "Type lecture_slides: pass1 extracts concepts=True, problems=True, events=False.",
+          "llmCall": true,
+          "estCostTier": "high"
+        },
+        {
+          "pass": "llm_pass2",
+          "needed": false,
+          "reason": "Type lecture_slides disables pass2 (single-pass type-specific or link-only profile).",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "finalize",
+          "needed": true,
+          "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+          "llmCall": false,
+          "estCostTier": "free"
+        }
+      ]
+    },
+    "actualType": "lecture_slides",
+    "deepseekPasses": 1,
+    "conceptCount": 80,
+    "detailCount": 35,
+    "totalLlmTokens": 0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "ran": true,
+        "useful": true,
+        "verdict": "required",
+        "note": "Local I/O; pages present means extract succeeded."
+      },
+      {
+        "pass": "heuristic_classify",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "Routed to lecture_slides (free)."
+      },
+      {
+        "pass": "llm_classify",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Skipped; heuristic confidence sufficient.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass1",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "No pass1 tool trace.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass2",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Correctly skipped: profile disables pass2, type-specific pass1 only, or no log_* tools.",
+        "tokens": 0
+      },
+      {
+        "pass": "finalize",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "logged_details promoted to concept details."
+      }
+    ],
+    "cutCandidates": [],
+    "recommendations": [
+      "Pass2 correctly skipped for this type/pass1 tool pattern."
+    ]
+  },
+  "passes": [
+    "extract_pages",
+    "heuristic_classify",
+    "teaching_units",
+    "type_structure",
+    "concept_candidates",
+    "problem_scan",
+    "detail_attach",
+    "reconcile"
+  ],
+  "buildMode": "template_multi_pass_offline",
+  "builtAt": "2026-07-01T22:49:37Z",
+  "concepts": [
+    {
+      "name": "Lecture 17_cellular substrates of plasticity_slides",
+      "details": []
+    },
+    {
+      "name": "neuron repeatedly",
+      "details": []
+    },
+    {
+      "name": "siphon repeatedly, continue while",
+      "details": []
+    },
+    {
+      "name": "again when unblocked",
+      "details": []
+    },
+    {
+      "name": "3 properties of long term potentiation (ltp) at ca3ca1 synapses",
+      "details": []
+    },
+    {
+      "name": "10.19 in rodents, spatial learning and memory depend on the hippocampus",
+      "details": []
+    },
+    {
+      "name": "Problem 1",
+      "details": []
+    },
+    {
+      "name": "neural substrates(synaptic plasticity)",
+      "details": [
+        "LEARNING AND MEMORY II: NEURAL SUBSTRATES(SYNAPTIC PLASTICITY)"
+      ]
+    },
+    {
+      "name": "summary of last lecture",
+      "details": []
+    },
+    {
+      "name": "outline for today",
+      "details": []
+    },
+    {
+      "name": "motor learning (supervised learning).",
+      "details": [
+        "Cerebellum: Motor learning (supervised learning)."
+      ]
+    },
+    {
+      "name": "reinforcementlearning.",
+      "details": []
+    },
+    {
+      "name": "persistent change in firing to a given input",
+      "details": []
+    },
+    {
+      "name": "learning modifies synaptic strength (causes plasticity)",
+      "details": [
+        "Hypothesis I: Learning modifies synaptic strength (causes plasticity)"
+      ]
+    },
+    {
+      "name": "robust",
+      "details": []
+    },
+    {
+      "name": "efficient",
+      "details": []
+    },
+    {
+      "name": "changes in synaptic weights (input-output function) can store information",
+      "details": [
+        "Implication: Changes in synaptic weights (input-output function) can store information"
+      ]
+    },
+    {
+      "name": "lessons from aplysia",
+      "details": [
+        "Learning: lessons from Aplysia"
+      ]
+    },
+    {
+      "name": "kandel (nobel, 2000)",
+      "details": []
+    },
+    {
+      "name": "•repeated touch habituation•touch + tail shock sensitization",
+      "details": [
+        "Gill withdrawal (reflex):•Repeated touch habituation•Touch + tail shock sensitization"
+      ]
+    },
+    {
+      "name": "behavior change in response to experience (earlier information)",
+      "details": [
+        "Evidence of learning: behavior change in response to experience (earlier information)"
+      ]
+    },
+    {
+      "name": "stimulate motor",
+      "details": [
+        "Experiment 1: Stimulate motor"
+      ]
+    },
+    {
+      "name": "poke or shock",
+      "details": [
+        "Experiment 2: Poke or shock"
+      ]
+    },
+    {
+      "name": "solution (no aps), and poke",
+      "details": []
+    },
+    {
+      "name": "stimulate sensory",
+      "details": [
+        "Experiment 3: Stimulate sensory"
+      ]
+    },
+    {
+      "name": "normally caused by tail shock",
+      "details": []
+    },
+    {
+      "name": "repeated sensory neuron stim",
+      "details": []
+    },
+    {
+      "name": "smaller psp in motor neuron(habituation)",
+      "details": []
+    },
+    {
+      "name": "shock tail or apply 5-ht",
+      "details": []
+    },
+    {
+      "name": "larger psp in motor neuron(sensitization)",
+      "details": []
+    },
+    {
+      "name": "only long-term memory was blocked by",
+      "details": []
+    },
+    {
+      "name": "preventing protein synthesis",
+      "details": []
+    },
+    {
+      "name": "add protein synthesis inhibitor",
+      "details": []
+    },
+    {
+      "name": "short-term facilitation",
+      "details": []
+    },
+    {
+      "name": "long-term facilitation",
+      "details": []
+    },
+    {
+      "name": "synaptic plasticity thought to be",
+      "details": [
+        "Unifying theme: synaptic plasticity thought to be"
+      ]
+    },
+    {
+      "name": "discovered hippocampal role in memory storage (with h.m.)",
+      "details": [
+        "Brenda Milner: discovered hippocampal role in memory storage (with H.M.)"
+      ]
+    },
+    {
+      "name": "entorhinal cortex dentate gyrusdentateca3ca3ca1",
+      "details": [
+        "Basic circuit: Entorhinal cortex dentate gyrusDentateCA3CA3CA1"
+      ]
+    },
+    {
+      "name": "synapse weakens (long-term depression, or ltd)",
+      "details": [
+        "Asynchronous: synapse weakens (long-term depression, or LTD)"
+      ]
+    },
+    {
+      "name": "other inputs onto the same neuron are not",
+      "details": []
+    },
+    {
+      "name": "beforeafter",
+      "details": []
+    },
+    {
+      "name": "time (minutes)",
+      "details": []
+    },
+    {
+      "name": "synaptic strength(epsp amplitude, mv)",
+      "details": []
+    },
+    {
+      "name": "high frequencystimulation",
+      "details": []
+    },
+    {
+      "name": "high frequency presynaptic stimulation effectively drives postsynaptic action potentials",
+      "details": [
+        "Result: high frequency presynaptic stimulation effectively drives postsynaptic action potentials"
+      ]
+    },
+    {
+      "name": "quackbarkbird",
+      "details": []
+    },
+    {
+      "name": "stretching and question break",
+      "details": []
+    },
+    {
+      "name": "•may have contributed to generating the postsynaptic spike (ltp)",
+      "details": [
+        "Presynaptic neuron fires first:•may have contributed to generating the postsynaptic spike (LTP)"
+      ]
+    },
+    {
+      "name": "•didn’t contribute to generating the postsynaptic spike (ltd)",
+      "details": [
+        "Presynaptic neurons fires second:•didn’t contribute to generating the postsynaptic spike (LTD)"
+      ]
+    },
+    {
+      "name": "change in synaptic strength",
+      "details": []
+    },
+    {
+      "name": "blocking nmdars prevents ltp",
+      "details": []
+    },
+    {
+      "name": "protein kinase c (pkc) camkii",
+      "details": [
+        "Ca2+ rise activates kinases: Protein kinase C (PKC) CamKII"
+      ]
+    },
+    {
+      "name": "mechanisms of homosynaptic ltd at ca1 synapses",
+      "details": []
+    },
+    {
+      "name": "requires mglurs)",
+      "details": [
+        "(also an NMDAR-independent form: requires mGluRs)"
+      ]
+    },
+    {
+      "name": "half replaced every 15 min",
+      "details": [
+        "Constant AMPAR turnover: half replaced every 15 min"
+      ]
+    },
+    {
+      "name": "“slot proteins” set number of docking sites for ampars",
+      "details": [
+        "Hypothesis: “slot proteins” set number of docking sites for AMPARs"
+      ]
+    },
+    {
+      "name": "more slots, more ampars",
+      "details": [
+        "LTP: more slots, more AMPARs"
+      ]
+    },
+    {
+      "name": "fewer slots, fewer ampars",
+      "details": [
+        "LTD: fewer slots, fewer AMPARs"
+      ]
+    },
+    {
+      "name": "long term potentiation (ltp) vslong term depression (ltd)",
+      "details": [
+        "Summary: Long term potentiation (LTP) vsLong term depression (LTD)"
+      ]
+    },
+    {
+      "name": "presynapticstimpostsynaptic changes",
+      "details": []
+    },
+    {
+      "name": "synaptic plasticity can encode declarative memories",
+      "details": [
+        "Theory: synaptic plasticity can encode declarative memories"
+      ]
+    },
+    {
+      "name": "control",
+      "details": []
+    },
+    {
+      "name": "anti-nmda receptor encephalitis",
+      "details": []
+    },
+    {
+      "name": "metaplasticity (slow)",
+      "details": [
+        "Synaptic homeostasis: metaplasticity (slow)"
+      ]
+    },
+    {
+      "name": "too much activity(harder to get ltp)",
+      "details": []
+    },
+    {
+      "name": "too little activity(easier to get ltp)",
+      "details": []
+    },
+    {
+      "name": "modification threshold (can move)",
+      "details": []
+    },
+    {
+      "name": "changes in nmdar subunit composition (slow)",
+      "details": [
+        "Mechanisms of metaplasticity: changes in NMDAR subunit composition (slow)"
+      ]
+    },
+    {
+      "name": "nr2b fluxes more ca2+: favors ltp",
+      "details": [
+        "NMDAR subunits: NR2B fluxes more Ca2+: favors LTP"
+      ]
+    },
+    {
+      "name": "more nr2a (easier ltd)",
+      "details": [
+        "After high activity (LTP): more NR2A (easier LTD)"
+      ]
+    },
+    {
+      "name": "more nr2b (easier ltp)",
+      "details": [
+        "After low activity (LTD): more NR2B (easier LTP)"
+      ]
+    },
+    {
+      "name": "role in metaplasticity?",
+      "details": [
+        "MHCI immune proteins: role in metaplasticity?"
+      ]
+    },
+    {
+      "name": "synaptic scaling (also slow)",
+      "details": [
+        "Synaptic homeostasis: synaptic scaling (also slow)"
+      ]
+    },
+    {
+      "name": "reduced sensitivity to neurotransmitter",
+      "details": [
+        "Inhibition blocked: reduced sensitivity to neurotransmitter"
+      ]
+    },
+    {
+      "name": "gina turrigiano",
+      "details": []
+    },
+    {
+      "name": "summary",
+      "details": [
+        "Synaptic homeostasis: summary"
+      ]
+    },
+    {
+      "name": "low activity",
+      "details": []
+    },
+    {
+      "name": "high activity",
+      "details": []
+    },
+    {
+      "name": "gateway to persistent memory",
+      "details": [
+        "Memory consolidation: gateway to persistent memory"
+      ]
+    },
+    {
+      "name": "short-term memory long-term memory",
+      "details": []
+    }
+  ],
+  "conceptCount": 80,
+  "detailCount": 35,
+  "events": [],
+  "problems": [
+    "Problem 1"
+  ],
+  "sections": [
+    "Robust",
+    "Efficient",
+    "Kandel (Nobel, 2000)",
+    "Repeated sensory neuron stim",
+    "Shock tail or apply 5-HT",
+    "At this synapse",
+    "3 properties of Long Term Potentiation (LTP) at CA3CA1 synapses",
+    "Problem 1",
+    "10.19 In rodents, spatial learning and memory depend on the hippocampus"
+  ],
+  "deepseekPasses": 1,
+  "expectsPass2": false,
+  "gtProvenance": {
+    "typeSource": "heuristic_high",
+    "typeConfidence": 0.92,
+    "offlinePassAudit": {
+      "extract_pages": {
+        "localPdf": true,
+        "pageCount": 71,
+        "pdfPath": "C:\\Allen\\nucleus\\canvasfiles\\3411369"
+      },
+      "heuristic_classify": {
+        "expectedFileType": "lecture_slides",
+        "source": "heuristic_high",
+        "confidence": 0.92
+      },
+      "teaching_units": {
+        "sectionCount": 9
+      },
+      "type_structure": {
+        "slideRows": 107,
+        "readingSections": 0,
+        "syllabusWeeks": 0
+      },
+      "concept_candidates": {
+        "candidateCount": 80
+      },
+      "problem_scan": {
+        "problemCount": 1
+      },
+      "detail_attach": {
+        "conceptKeysWithDetails": 49,
+        "detailCount": 49
+      },
+      "reconcile": {
+        "inputTitles": 80,
+        "accepted": 80,
+        "capped": 0,
+        "detailAttached": 35
+      }
+    },
+    "reconcileStats": {
+      "inputTitles": 80,
+      "accepted": 80,
+      "capped": 0,
+      "detailAttached": 35
+    }
+  }
+}

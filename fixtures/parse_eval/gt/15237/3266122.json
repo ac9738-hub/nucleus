@@ -1,0 +1,639 @@
+{
+  "version": 1,
+  "courseId": "15237",
+  "fileId": "3266122",
+  "filename": "Lecture 6_dendritic integration_structure of the nervous system_slides.pdf",
+  "expectedFileType": "lecture_slides",
+  "passPlan": {
+    "courseId": "15237",
+    "fileId": "3266122",
+    "filename": "Lecture 6_dendritic integration_structure of the nervous system_slides.pdf",
+    "resolvedType": "lecture_slides",
+    "heuristicConfidence": 0.92,
+    "neededPasses": [
+      "extract_pages",
+      "heuristic_classify",
+      "llm_pass1",
+      "finalize"
+    ],
+    "skippedPasses": [
+      "llm_classify",
+      "llm_pass2"
+    ],
+    "estLlmCalls": 1,
+    "estRealisticLlmCalls": 1.0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "needed": true,
+        "reason": "Required local PDF/HTML extraction; no LLM.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "heuristic_classify",
+        "needed": true,
+        "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_classify",
+        "needed": false,
+        "reason": "Heuristic confidence 0.92 sufficient; skip flash classify call.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_pass1",
+        "needed": true,
+        "reason": "Type lecture_slides: pass1 extracts concepts=True, problems=True, events=False.",
+        "llmCall": true,
+        "estCostTier": "high"
+      },
+      {
+        "pass": "llm_pass2",
+        "needed": false,
+        "reason": "Type lecture_slides disables pass2 (single-pass type-specific or link-only profile).",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "finalize",
+        "needed": true,
+        "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+        "llmCall": false,
+        "estCostTier": "free"
+      }
+    ]
+  },
+  "passAudit": {
+    "plan": {
+      "courseId": "15237",
+      "fileId": "3266122",
+      "filename": "Lecture 6_dendritic integration_structure of the nervous system_slides.pdf",
+      "resolvedType": "lecture_slides",
+      "heuristicConfidence": 0.92,
+      "neededPasses": [
+        "extract_pages",
+        "heuristic_classify",
+        "llm_pass1",
+        "finalize"
+      ],
+      "skippedPasses": [
+        "llm_classify",
+        "llm_pass2"
+      ],
+      "estLlmCalls": 1,
+      "estRealisticLlmCalls": 1.0,
+      "steps": [
+        {
+          "pass": "extract_pages",
+          "needed": true,
+          "reason": "Required local PDF/HTML extraction; no LLM.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "heuristic_classify",
+          "needed": true,
+          "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_classify",
+          "needed": false,
+          "reason": "Heuristic confidence 0.92 sufficient; skip flash classify call.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_pass1",
+          "needed": true,
+          "reason": "Type lecture_slides: pass1 extracts concepts=True, problems=True, events=False.",
+          "llmCall": true,
+          "estCostTier": "high"
+        },
+        {
+          "pass": "llm_pass2",
+          "needed": false,
+          "reason": "Type lecture_slides disables pass2 (single-pass type-specific or link-only profile).",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "finalize",
+          "needed": true,
+          "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+          "llmCall": false,
+          "estCostTier": "free"
+        }
+      ]
+    },
+    "actualType": "lecture_slides",
+    "deepseekPasses": 1,
+    "conceptCount": 80,
+    "detailCount": 19,
+    "totalLlmTokens": 0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "ran": true,
+        "useful": true,
+        "verdict": "required",
+        "note": "Local I/O; pages present means extract succeeded."
+      },
+      {
+        "pass": "heuristic_classify",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "Routed to lecture_slides (free)."
+      },
+      {
+        "pass": "llm_classify",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Skipped; heuristic confidence sufficient.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass1",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "No pass1 tool trace.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass2",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Correctly skipped: profile disables pass2, type-specific pass1 only, or no log_* tools.",
+        "tokens": 0
+      },
+      {
+        "pass": "finalize",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "logged_details promoted to concept details."
+      }
+    ],
+    "cutCandidates": [],
+    "recommendations": [
+      "Pass2 correctly skipped for this type/pass1 tool pattern."
+    ]
+  },
+  "passes": [
+    "extract_pages",
+    "heuristic_classify",
+    "teaching_units",
+    "type_structure",
+    "concept_candidates",
+    "problem_scan",
+    "detail_attach",
+    "reconcile"
+  ],
+  "buildMode": "template_multi_pass_offline",
+  "builtAt": "2026-07-01T22:49:37Z",
+  "concepts": [
+    {
+      "name": "Lecture 6_dendritic integration_structure of the nervous system_slides",
+      "details": []
+    },
+    {
+      "name": "can combine to contribute to spiking",
+      "details": []
+    },
+    {
+      "name": "rm is membrane resistance",
+      "details": []
+    },
+    {
+      "name": "ri is internal (axial) resistance",
+      "details": []
+    },
+    {
+      "name": "ri is internal resistance",
+      "details": []
+    },
+    {
+      "name": "human chimp",
+      "details": []
+    },
+    {
+      "name": "typical microcephalic",
+      "details": []
+    },
+    {
+      "name": "44 broca's area (dominant hemisphere only), producing speech",
+      "details": []
+    },
+    {
+      "name": "4 primary motor (m1)6 premotor",
+      "details": []
+    },
+    {
+      "name": "950 neurons>500k synapses200 undergraduates20,000 hours",
+      "details": []
+    },
+    {
+      "name": "Possible alternate time for students in CHM201 (conflict)",
+      "details": []
+    },
+    {
+      "name": "Problem 1",
+      "details": []
+    },
+    {
+      "name": "Problem 2",
+      "details": []
+    },
+    {
+      "name": "Problem 3",
+      "details": []
+    },
+    {
+      "name": "Problem 4",
+      "details": []
+    },
+    {
+      "name": "Problem 5",
+      "details": []
+    },
+    {
+      "name": "Problem 6",
+      "details": []
+    },
+    {
+      "name": "quiz 1 is in one week (tuesday 10/1)",
+      "details": []
+    },
+    {
+      "name": "ai-lead review session",
+      "details": []
+    },
+    {
+      "name": "monday 9/30, 6-8 pm, pni a32",
+      "details": []
+    },
+    {
+      "name": "coffee hour",
+      "details": []
+    },
+    {
+      "name": "30pmb) thursday 5pmc) friday noon",
+      "details": [
+        "A) Monday 12:30pmB) Thursday 5pmC) Friday noon"
+      ]
+    },
+    {
+      "name": "summary of last lecture",
+      "details": []
+    },
+    {
+      "name": "outline for today",
+      "details": []
+    },
+    {
+      "name": "most cns neurons receive thousands of inputs,",
+      "details": []
+    },
+    {
+      "name": "integrate into one output",
+      "details": []
+    },
+    {
+      "name": "how are synaptic inputs combined",
+      "details": []
+    },
+    {
+      "name": "single channel currents in the dendrites become epsps or ipsps",
+      "details": [
+        "Summation #1: single channel currents in the dendrites become EPSPs or IPSPs"
+      ]
+    },
+    {
+      "name": "single channel",
+      "details": []
+    },
+    {
+      "name": "epsps and ipsps are integrated",
+      "details": [
+        "Summation #2: EPSPs and IPSPs are integrated"
+      ]
+    },
+    {
+      "name": "ipspepspintegrated dendritic psp",
+      "details": []
+    },
+    {
+      "name": "inputs that arrive at different synapses",
+      "details": [
+        "Spatial summation: inputs that arrive at different synapses"
+      ]
+    },
+    {
+      "name": "location, location, location",
+      "details": [
+        "Spatial summation: location, location, location"
+      ]
+    },
+    {
+      "name": "triggering ap",
+      "details": []
+    },
+    {
+      "name": "2 inputs to the same synapse sum",
+      "details": [
+        "Temporal summation: 2 inputs to the same synapse sum"
+      ]
+    },
+    {
+      "name": "determined by passive cable properties",
+      "details": []
+    },
+    {
+      "name": "membranepotential",
+      "details": []
+    },
+    {
+      "name": "d is diameter of the axon",
+      "details": []
+    },
+    {
+      "name": "= sqrt (d*rm/4ri)",
+      "details": [
+        "Length constant:= sqrt (d*rm/4ri)"
+      ]
+    },
+    {
+      "name": "increase",
+      "details": []
+    },
+    {
+      "name": "decrease",
+      "details": []
+    },
+    {
+      "name": "increase these, increase length constant",
+      "details": []
+    },
+    {
+      "name": "myelin increases rm and decreases c",
+      "details": []
+    },
+    {
+      "name": "why is it important?",
+      "details": [
+        "Length constant: why is it important?"
+      ]
+    },
+    {
+      "name": "impacts of length constant",
+      "details": [
+        "Spatial summation: impacts of length constant"
+      ]
+    },
+    {
+      "name": "decays more rapidly•smaller impact on action potential generation",
+      "details": [
+        "•Smaller length constant: decays more rapidly•Smaller impact on action potential generation"
+      ]
+    },
+    {
+      "name": "true for both excitatory and inhibitory inputs",
+      "details": []
+    },
+    {
+      "name": "postsynaptic cell fire an action potential",
+      "details": []
+    },
+    {
+      "name": "lidocaine blocks voltage-gated sodium channels",
+      "details": []
+    },
+    {
+      "name": "small axons (includes pain fibers)",
+      "details": []
+    },
+    {
+      "name": "norepinephrine reduces k+ conductanceincreases membrane resistance",
+      "details": [
+        "E.g.: norepinephrine reduces K+ conductanceincreases membrane resistance"
+      ]
+    },
+    {
+      "name": "l=sqrt (d*rm/4ri)",
+      "details": [
+        "Length constant:L=sqrt (d*rm/4ri)"
+      ]
+    },
+    {
+      "name": "cl-cl",
+      "details": []
+    },
+    {
+      "name": "uniquely human behavior due to expansion of brain size",
+      "details": [
+        "Theory: uniquely human behavior due to expansion of brain size"
+      ]
+    },
+    {
+      "name": "brain mass / neuron density",
+      "details": []
+    },
+    {
+      "name": "human brain evolution",
+      "details": []
+    },
+    {
+      "name": "brain/body mass",
+      "details": []
+    },
+    {
+      "name": "microcephaly",
+      "details": []
+    },
+    {
+      "name": "significantly reduced brain size (and accompanying intellectual impairment)",
+      "details": [
+        "Affected individuals: significantly reduced brain size (and accompanying intellectual impairment)"
+      ]
+    },
+    {
+      "name": "~400 cm3neurotypical adult: 1200–1600 cm3",
+      "details": [
+        "Microcephaly: ~400 cm3neurotypical adult: 1200–1600 cm3"
+      ]
+    },
+    {
+      "name": "no other gross neuropathology",
+      "details": []
+    },
+    {
+      "name": "(a) true(b) false",
+      "details": [
+        "Clickers: (A) True(B) False"
+      ]
+    },
+    {
+      "name": "common features of nervous systems",
+      "details": []
+    },
+    {
+      "name": "divergence vs. convergence",
+      "details": [
+        "Simple neural circuits: divergence vs. convergence"
+      ]
+    },
+    {
+      "name": "rat and human brain",
+      "details": [
+        "Similarities: rat and human brain"
+      ]
+    },
+    {
+      "name": "fold it up!",
+      "details": [
+        "Answer: fold it up!"
+      ]
+    },
+    {
+      "name": "mouse",
+      "details": []
+    },
+    {
+      "name": "marmosetmonkey",
+      "details": []
+    },
+    {
+      "name": "macaquemonkeyhuman",
+      "details": []
+    },
+    {
+      "name": "human",
+      "details": []
+    },
+    {
+      "name": "dolphin",
+      "details": []
+    },
+    {
+      "name": "ipsilateral",
+      "details": []
+    },
+    {
+      "name": "contralateral",
+      "details": []
+    },
+    {
+      "name": "proximal",
+      "details": []
+    },
+    {
+      "name": "distal",
+      "details": []
+    },
+    {
+      "name": "terms of anatomical reference",
+      "details": []
+    },
+    {
+      "name": "planes of section",
+      "details": []
+    },
+    {
+      "name": "anteriorposterior",
+      "details": []
+    },
+    {
+      "name": "dorsal",
+      "details": []
+    },
+    {
+      "name": "ventral",
+      "details": []
+    }
+  ],
+  "conceptCount": 80,
+  "detailCount": 19,
+  "events": [],
+  "problems": [
+    "Problem 1",
+    "Problem 2",
+    "Problem 3",
+    "Problem 4",
+    "Problem 5",
+    "Problem 6"
+  ],
+  "sections": [
+    "Quiz 1 is in one week (Tuesday 10/1)",
+    "AI-lead review session",
+    "Possible alternate time for students in CHM201 (conflict)",
+    "To increase length constant faster propagation",
+    "Small axons (includes pain fibers)",
+    "Common features of nervous systems",
+    "Problem 1",
+    "Problem 2",
+    "Problem 3",
+    "Problem 4",
+    "Problem 5",
+    "Problem 6",
+    "Viral variants",
+    "Which is CORRECT",
+    "Next lecture"
+  ],
+  "deepseekPasses": 1,
+  "expectsPass2": false,
+  "gtProvenance": {
+    "typeSource": "heuristic_high",
+    "typeConfidence": 0.92,
+    "offlinePassAudit": {
+      "extract_pages": {
+        "localPdf": true,
+        "pageCount": 90,
+        "pdfPath": "C:\\Allen\\nucleus\\canvasfiles\\3266122"
+      },
+      "heuristic_classify": {
+        "expectedFileType": "lecture_slides",
+        "source": "heuristic_high",
+        "confidence": 0.92
+      },
+      "teaching_units": {
+        "sectionCount": 15
+      },
+      "type_structure": {
+        "slideRows": 158,
+        "readingSections": 0,
+        "syllabusWeeks": 0
+      },
+      "concept_candidates": {
+        "candidateCount": 80
+      },
+      "problem_scan": {
+        "problemCount": 6
+      },
+      "detail_attach": {
+        "conceptKeysWithDetails": 61,
+        "detailCount": 61
+      },
+      "reconcile": {
+        "inputTitles": 80,
+        "accepted": 80,
+        "capped": 0,
+        "detailAttached": 19
+      }
+    },
+    "reconcileStats": {
+      "inputTitles": 80,
+      "accepted": 80,
+      "capped": 0,
+      "detailAttached": 19
+    }
+  }
+}

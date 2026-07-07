@@ -11,6 +11,10 @@ from .paths import (
     default_report_path,
     default_snapshot_path,
     fixture_snapshot_path,
+    harvard_fixture_snapshot_path,
+    harvard_ground_truth_dir,
+    harvard_report_path,
+    harvard_snapshot_path,
     holdout_fixture_snapshot_path,
     holdout_ground_truth_dir,
     holdout_report_path,
@@ -76,9 +80,24 @@ def holdout_profile(root: Path) -> StudentProfile:
     )
 
 
+def harvard_profile(root: Path) -> StudentProfile:
+    return StudentProfile(
+        name='harvard',
+        auth_env_suffix='HARVARD',
+        ground_truth_dir=harvard_ground_truth_dir(root),
+        snapshot_path=harvard_snapshot_path(root),
+        fixture_snapshot_path=harvard_fixture_snapshot_path(root),
+        report_path=harvard_report_path(root),
+        graph_cache_path=cache_dir(root) / 'graph_eval_harvard.json',
+        canvas_course_ids=(143716, 161543, 161797, 160377),
+    )
+
+
 def get_profile(root: Path, name: str) -> StudentProfile:
     if name == 'holdout':
         return holdout_profile(root)
+    if name == 'harvard':
+        return harvard_profile(root)
     if name in {'primary', 'default', ''}:
         return primary_profile(root)
     raise ValueError(f'Unknown student profile: {name}')

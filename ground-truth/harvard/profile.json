@@ -1,0 +1,31 @@
+{
+  "profile": "harvard",
+  "description": "Harvard Canvas weekly schedule eval set (Andrew Chen Spring 2026).",
+  "auth_env": {
+    "cookie": "CANVAS_AUTH_COOKIE_HARVARD",
+    "csrf": "CANVAS_AUTH_CSRF_HARVARD",
+    "base_url": "CANVAS_BASE_URL_HARVARD"
+  },
+  "courses": [
+    {
+      "ground_truth_file": "ECON10B_S2026.json",
+      "canvas_course_id": 143716,
+      "label": "ECON 10B Spring 2026"
+    },
+    {
+      "ground_truth_file": "APMTH105_S2026.json",
+      "canvas_course_id": 161543,
+      "label": "APMTH 105 Spring 2026"
+    },
+    {
+      "ground_truth_file": "CHNSEBB_S2026.json",
+      "canvas_course_id": 161797,
+      "label": "CHNSE BB Spring 2026"
+    },
+    {
+      "ground_truth_file": "EAFM123_S2026.json",
+      "canvas_course_id": 160377,
+      "label": "EAFM 123 Spring 2026"
+    }
+  ]
+}

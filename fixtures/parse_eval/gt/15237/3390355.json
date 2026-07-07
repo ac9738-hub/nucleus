@@ -1,0 +1,656 @@
+{
+  "version": 1,
+  "courseId": "15237",
+  "fileId": "3390355",
+  "filename": "Lecture 15_emotion and sleep_EEG_epilepsy_slides.pdf",
+  "expectedFileType": "lecture_slides",
+  "passPlan": {
+    "courseId": "15237",
+    "fileId": "3390355",
+    "filename": "Lecture 15_emotion and sleep_EEG_epilepsy_slides.pdf",
+    "resolvedType": "lecture_slides",
+    "heuristicConfidence": 0.92,
+    "neededPasses": [
+      "extract_pages",
+      "heuristic_classify",
+      "llm_pass1",
+      "finalize"
+    ],
+    "skippedPasses": [
+      "llm_classify",
+      "llm_pass2"
+    ],
+    "estLlmCalls": 1,
+    "estRealisticLlmCalls": 1.0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "needed": true,
+        "reason": "Required local PDF/HTML extraction; no LLM.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "heuristic_classify",
+        "needed": true,
+        "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_classify",
+        "needed": false,
+        "reason": "Heuristic confidence 0.92 sufficient; skip flash classify call.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_pass1",
+        "needed": true,
+        "reason": "Type lecture_slides: pass1 extracts concepts=True, problems=True, events=False.",
+        "llmCall": true,
+        "estCostTier": "high"
+      },
+      {
+        "pass": "llm_pass2",
+        "needed": false,
+        "reason": "Type lecture_slides disables pass2 (single-pass type-specific or link-only profile).",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "finalize",
+        "needed": true,
+        "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+        "llmCall": false,
+        "estCostTier": "free"
+      }
+    ]
+  },
+  "passAudit": {
+    "plan": {
+      "courseId": "15237",
+      "fileId": "3390355",
+      "filename": "Lecture 15_emotion and sleep_EEG_epilepsy_slides.pdf",
+      "resolvedType": "lecture_slides",
+      "heuristicConfidence": 0.92,
+      "neededPasses": [
+        "extract_pages",
+        "heuristic_classify",
+        "llm_pass1",
+        "finalize"
+      ],
+      "skippedPasses": [
+        "llm_classify",
+        "llm_pass2"
+      ],
+      "estLlmCalls": 1,
+      "estRealisticLlmCalls": 1.0,
+      "steps": [
+        {
+          "pass": "extract_pages",
+          "needed": true,
+          "reason": "Required local PDF/HTML extraction; no LLM.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "heuristic_classify",
+          "needed": true,
+          "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_classify",
+          "needed": false,
+          "reason": "Heuristic confidence 0.92 sufficient; skip flash classify call.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_pass1",
+          "needed": true,
+          "reason": "Type lecture_slides: pass1 extracts concepts=True, problems=True, events=False.",
+          "llmCall": true,
+          "estCostTier": "high"
+        },
+        {
+          "pass": "llm_pass2",
+          "needed": false,
+          "reason": "Type lecture_slides disables pass2 (single-pass type-specific or link-only profile).",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "finalize",
+          "needed": true,
+          "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+          "llmCall": false,
+          "estCostTier": "free"
+        }
+      ]
+    },
+    "actualType": "lecture_slides",
+    "deepseekPasses": 1,
+    "conceptCount": 80,
+    "detailCount": 36,
+    "totalLlmTokens": 0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "ran": true,
+        "useful": true,
+        "verdict": "required",
+        "note": "Local I/O; pages present means extract succeeded."
+      },
+      {
+        "pass": "heuristic_classify",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "Routed to lecture_slides (free)."
+      },
+      {
+        "pass": "llm_classify",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Skipped; heuristic confidence sufficient.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass1",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "No pass1 tool trace.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass2",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Correctly skipped: profile disables pass2, type-specific pass1 only, or no log_* tools.",
+        "tokens": 0
+      },
+      {
+        "pass": "finalize",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "logged_details promoted to concept details."
+      }
+    ],
+    "cutCandidates": [],
+    "recommendations": [
+      "Pass2 correctly skipped for this type/pass1 tool pattern."
+    ]
+  },
+  "passes": [
+    "extract_pages",
+    "heuristic_classify",
+    "teaching_units",
+    "type_structure",
+    "concept_candidates",
+    "problem_scan",
+    "detail_attach",
+    "reconcile"
+  ],
+  "buildMode": "template_multi_pass_offline",
+  "builtAt": "2026-07-01T22:49:36Z",
+  "concepts": [
+    {
+      "name": "Lecture 15_emotion and sleep_EEG_epilepsy_slides",
+      "details": []
+    },
+    {
+      "name": "•Cycle repeats ~ every 90 minutes",
+      "details": []
+    },
+    {
+      "name": "emotions and sleep",
+      "details": []
+    },
+    {
+      "name": "outline of today",
+      "details": []
+    },
+    {
+      "name": "emotion and mood",
+      "details": [
+        "Affective neuroscience: emotion and mood"
+      ]
+    },
+    {
+      "name": "expression and experience",
+      "details": [
+        "Two aspects of emotion: expression and experience"
+      ]
+    },
+    {
+      "name": "emotions expand behavior beyond stereotypical, brainstem-driven responses",
+      "details": [
+        "Theory: emotions expand behavior beyond stereotypical, brainstem-driven responses"
+      ]
+    },
+    {
+      "name": "anger",
+      "details": []
+    },
+    {
+      "name": "emotional expression in robots",
+      "details": []
+    },
+    {
+      "name": "which comes first?",
+      "details": [
+        "Emotional expression vs. experience: which comes first?"
+      ]
+    },
+    {
+      "name": "heart rate acceleration causes anxiety-like behavior",
+      "details": [
+        "Support for James-Lange:heart rate acceleration causes anxiety-like behavior"
+      ]
+    },
+    {
+      "name": "amygdalatriggers autonomic response",
+      "details": []
+    },
+    {
+      "name": "pair angry face with loud noise or shock",
+      "details": [
+        "Training: pair angry face with loud noise or shock"
+      ]
+    },
+    {
+      "name": "fast, imperceptible flash of angry face",
+      "details": [
+        "Test: fast, imperceptible flash of angry face"
+      ]
+    },
+    {
+      "name": "one proposed “emotion system”",
+      "details": [
+        "The Papez circuit: one proposed “emotion system”"
+      ]
+    },
+    {
+      "name": "damage to cortex can alter emotional expression (e.g., phineas gage?)",
+      "details": [
+        "Support: damage to cortex can alter emotional expression (e.g., Phineas Gage?)"
+      ]
+    },
+    {
+      "name": "controls ansincludes limbic structures",
+      "details": []
+    },
+    {
+      "name": "there are multiple, overlapping, non-dedicated emotion systems",
+      "details": [
+        "Current theory: there are multiple, overlapping, non-dedicated emotion systems"
+      ]
+    },
+    {
+      "name": "emotions can influence memory formation (later)",
+      "details": []
+    },
+    {
+      "name": "expression vs experience",
+      "details": []
+    },
+    {
+      "name": "temporal lobe damage and emotional changes",
+      "details": [
+        "Patient S.M.: temporal lobe damage and emotional changes"
+      ]
+    },
+    {
+      "name": "•impaired fear learning •impaired social judgment•victim of numerous crimes",
+      "details": [
+        "Fearless? Yes, but:•Impaired fear learning •Impaired social judgment•Victim of numerous crimes"
+      ]
+    },
+    {
+      "name": "proposed neural basis for fear learning",
+      "details": []
+    },
+    {
+      "name": "memories associated with fear •form quickly•long-lasting (e.g., ptsd)",
+      "details": [
+        "Fear learning: memories associated with fear •form quickly•long-lasting (e.g., PTSD)"
+      ]
+    },
+    {
+      "name": "stronger amygdala response to tone",
+      "details": [
+        "•Result: stronger amygdala response to tone"
+      ]
+    },
+    {
+      "name": "•better recall•cause physiological changes (heart rate, sweating…)",
+      "details": [
+        "Pleasant / aversive images: •better recall•cause physiological changes (heart rate, sweating…)"
+      ]
+    },
+    {
+      "name": "anger is a basic emotion",
+      "details": []
+    },
+    {
+      "name": "frustration, hurt feelings, stress…",
+      "details": [
+        "•Can result from: frustration, hurt feelings, stress…"
+      ]
+    },
+    {
+      "name": "anabolic steroids mimic testosterone",
+      "details": [
+        "“’roid rage”: anabolic steroids mimic testosterone"
+      ]
+    },
+    {
+      "name": "types of aggression",
+      "details": []
+    },
+    {
+      "name": "lateral and posterior hypothalamus",
+      "details": [
+        "Predatory (for food): lateral and posterior hypothalamus"
+      ]
+    },
+    {
+      "name": "orbitofrontal, anterior cingulate",
+      "details": []
+    },
+    {
+      "name": "threatlateral: predatory",
+      "details": [
+        "Medial / posterior: threatLateral: predatory"
+      ]
+    },
+    {
+      "name": "serotonin changes may contribute to aggression",
+      "details": []
+    },
+    {
+      "name": "no serotonin change, no aggression change",
+      "details": [
+        "•females: no serotonin change, no aggression change"
+      ]
+    },
+    {
+      "name": "rabies",
+      "details": []
+    },
+    {
+      "name": "infections that modify fear and aggression",
+      "details": []
+    },
+    {
+      "name": "toxoplasma gondii",
+      "details": []
+    },
+    {
+      "name": "infected rodents",
+      "details": []
+    },
+    {
+      "name": "(a) true(b) false",
+      "details": [
+        "Clickers: (A) True(B) False"
+      ]
+    },
+    {
+      "name": "sleep",
+      "details": []
+    },
+    {
+      "name": "biological benefits of sleep",
+      "details": []
+    },
+    {
+      "name": "stretching and question break",
+      "details": []
+    },
+    {
+      "name": "electroencephalogram (eeg)",
+      "details": [
+        "Monitoring neuronal population activity: electroencephalogram (EEG)"
+      ]
+    },
+    {
+      "name": "diagnosis (epilepsy)research (sleep, cognition…)",
+      "details": [
+        "Uses: Diagnosis (epilepsy)Research (sleep, cognition…)"
+      ]
+    },
+    {
+      "name": "cortex",
+      "details": []
+    },
+    {
+      "name": "how many neurons? how synchronous?",
+      "details": [
+        "–Amplitude: How many neurons? How synchronous?"
+      ]
+    },
+    {
+      "name": "fmri>meg>eegtemporal resolution: meg & eeg faster than fmri & pet",
+      "details": [
+        "Spatial resolution: fMRI>MEG>EEGTemporal resolution: MEG & EEG faster than fMRI & PET"
+      ]
+    },
+    {
+      "name": "eeg, megmeasure metabolism / blood flow: fmri, pet",
+      "details": [
+        "Directly measure neuronal activity: EEG, MEGMeasure metabolism / blood flow: fMRI, PET"
+      ]
+    },
+    {
+      "name": "not what you’re thinking, but if",
+      "details": [
+        "Normal EEG: not what you’re thinking, but if"
+      ]
+    },
+    {
+      "name": "generally",
+      "details": []
+    },
+    {
+      "name": "eeg rhythms similar across species",
+      "details": []
+    },
+    {
+      "name": "may exist,not measured",
+      "details": []
+    },
+    {
+      "name": "central pacemaker",
+      "details": []
+    },
+    {
+      "name": "mutual excitation / inhibition",
+      "details": []
+    },
+    {
+      "name": "some spinal interneurons are intrinsic oscillators",
+      "details": [
+        "ARecall from motor systems: some spinal interneurons are intrinsic oscillators"
+      ]
+    },
+    {
+      "name": "one- and two-neuron oscillators",
+      "details": [
+        "Simple rhythm generators: one- and two-neuron oscillators"
+      ]
+    },
+    {
+      "name": "one-neuron oscillator(voltage-gated channels)",
+      "details": []
+    },
+    {
+      "name": "•constant excitatory drive•feedback connections•excitation / inhibition",
+      "details": [
+        "Common features of oscillators: •Constant excitatory drive•Feedback connections•Excitation / inhibition"
+      ]
+    },
+    {
+      "name": "thalamic rhythms create sleep spindles",
+      "details": []
+    },
+    {
+      "name": "•disconnect cortex from sensory input (thalamus rhythms)",
+      "details": [
+        "Theories: •Disconnect cortex from sensory input (thalamus rhythms)"
+      ]
+    },
+    {
+      "name": "pathologicalsynchronous activity",
+      "details": [
+        "Epilepsy: pathologicalsynchronous activity"
+      ]
+    },
+    {
+      "name": "causes and treatments",
+      "details": [
+        "Epilepsy: causes and treatments"
+      ]
+    },
+    {
+      "name": "idiopathic epilepsy",
+      "details": []
+    },
+    {
+      "name": "mostly geneticmostly acquired",
+      "details": []
+    },
+    {
+      "name": "patterns of rem and non-rem sleep",
+      "details": [
+        "Sleep cycle: patterns of REM and non-REM sleep"
+      ]
+    },
+    {
+      "name": "different body functions in rem vs non-rem sleep",
+      "details": []
+    },
+    {
+      "name": "heart and respiration increase but irregular",
+      "details": []
+    },
+    {
+      "name": "low brain firing rates",
+      "details": []
+    },
+    {
+      "name": "not all animals that sleep seem to dream",
+      "details": []
+    },
+    {
+      "name": "maybe",
+      "details": []
+    },
+    {
+      "name": "same sequences observed during sleep",
+      "details": []
+    },
+    {
+      "name": "place cells fire at a given location",
+      "details": []
+    },
+    {
+      "name": "diffuse modulatory systems",
+      "details": []
+    },
+    {
+      "name": "hcrt receptor 2 kos",
+      "details": [
+        "Mouse, dog: HCRT receptor 2 KOs"
+      ]
+    },
+    {
+      "name": "narcolepsy (type i)",
+      "details": []
+    },
+    {
+      "name": "wake, rem, non-remeach associated with different brain activation",
+      "details": [
+        "PET scans: wake, REM, non-REMeach associated with different brain activation"
+      ]
+    },
+    {
+      "name": "less active in remmore active in rem",
+      "details": []
+    },
+    {
+      "name": "rem atonia (mostly elderly men)",
+      "details": []
+    },
+    {
+      "name": "more sleep questions",
+      "details": []
+    }
+  ],
+  "conceptCount": 80,
+  "detailCount": 36,
+  "events": [],
+  "problems": [],
+  "sections": [
+    "Infected rodents",
+    "Generally",
+    "•Cycle repeats ~ every 90 minutes",
+    "More sleep questions",
+    "NEXT LECTURE"
+  ],
+  "deepseekPasses": 1,
+  "expectsPass2": false,
+  "gtProvenance": {
+    "typeSource": "heuristic_high",
+    "typeConfidence": 0.92,
+    "offlinePassAudit": {
+      "extract_pages": {
+        "localPdf": true,
+        "pageCount": 70,
+        "pdfPath": "C:\\Allen\\nucleus\\canvasfiles\\3390355"
+      },
+      "heuristic_classify": {
+        "expectedFileType": "lecture_slides",
+        "source": "heuristic_high",
+        "confidence": 0.92
+      },
+      "teaching_units": {
+        "sectionCount": 5
+      },
+      "type_structure": {
+        "slideRows": 93,
+        "readingSections": 0,
+        "syllabusWeeks": 0
+      },
+      "concept_candidates": {
+        "candidateCount": 80
+      },
+      "problem_scan": {
+        "problemCount": 0
+      },
+      "detail_attach": {
+        "conceptKeysWithDetails": 39,
+        "detailCount": 39
+      },
+      "reconcile": {
+        "inputTitles": 80,
+        "accepted": 80,
+        "capped": 0,
+        "detailAttached": 36
+      }
+    },
+    "reconcileStats": {
+      "inputTitles": 80,
+      "accepted": 80,
+      "capped": 0,
+      "detailAttached": 36
+    }
+  }
+}

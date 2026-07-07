@@ -1,0 +1,423 @@
+{
+  "version": 1,
+  "courseId": "15237",
+  "fileId": "3380687",
+  "filename": "Copy of MMC Precept 8 Nov 4 - 8_ Student.pdf",
+  "expectedFileType": "humanities_reading",
+  "passPlan": {
+    "courseId": "15237",
+    "fileId": "3380687",
+    "filename": "Copy of MMC Precept 8 Nov 4 - 8_ Student.pdf",
+    "resolvedType": "humanities_reading",
+    "heuristicConfidence": 0.85,
+    "neededPasses": [
+      "extract_pages",
+      "heuristic_classify",
+      "llm_pass1",
+      "finalize"
+    ],
+    "skippedPasses": [
+      "llm_classify",
+      "llm_pass2"
+    ],
+    "estLlmCalls": 1,
+    "estRealisticLlmCalls": 1.0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "needed": true,
+        "reason": "Required local PDF/HTML extraction; no LLM.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "heuristic_classify",
+        "needed": true,
+        "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_classify",
+        "needed": false,
+        "reason": "Heuristic confidence 0.85 sufficient; skip flash classify call.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_pass1",
+        "needed": true,
+        "reason": "Type humanities_reading: pass1 link/file_node only (no concept extraction profile).",
+        "llmCall": true,
+        "estCostTier": "low"
+      },
+      {
+        "pass": "llm_pass2",
+        "needed": false,
+        "reason": "Type humanities_reading disables pass2 (single-pass type-specific or link-only profile).",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "finalize",
+        "needed": true,
+        "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+        "llmCall": false,
+        "estCostTier": "free"
+      }
+    ]
+  },
+  "passAudit": {
+    "plan": {
+      "courseId": "15237",
+      "fileId": "3380687",
+      "filename": "Copy of MMC Precept 8 Nov 4 - 8_ Student.pdf",
+      "resolvedType": "humanities_reading",
+      "heuristicConfidence": 0.85,
+      "neededPasses": [
+        "extract_pages",
+        "heuristic_classify",
+        "llm_pass1",
+        "finalize"
+      ],
+      "skippedPasses": [
+        "llm_classify",
+        "llm_pass2"
+      ],
+      "estLlmCalls": 1,
+      "estRealisticLlmCalls": 1.0,
+      "steps": [
+        {
+          "pass": "extract_pages",
+          "needed": true,
+          "reason": "Required local PDF/HTML extraction; no LLM.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "heuristic_classify",
+          "needed": true,
+          "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_classify",
+          "needed": false,
+          "reason": "Heuristic confidence 0.85 sufficient; skip flash classify call.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_pass1",
+          "needed": true,
+          "reason": "Type humanities_reading: pass1 link/file_node only (no concept extraction profile).",
+          "llmCall": true,
+          "estCostTier": "low"
+        },
+        {
+          "pass": "llm_pass2",
+          "needed": false,
+          "reason": "Type humanities_reading disables pass2 (single-pass type-specific or link-only profile).",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "finalize",
+          "needed": true,
+          "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+          "llmCall": false,
+          "estCostTier": "free"
+        }
+      ]
+    },
+    "actualType": "humanities_reading",
+    "deepseekPasses": 1,
+    "conceptCount": 34,
+    "detailCount": 8,
+    "totalLlmTokens": 0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "ran": true,
+        "useful": true,
+        "verdict": "required",
+        "note": "Local I/O; pages present means extract succeeded."
+      },
+      {
+        "pass": "heuristic_classify",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "Routed to humanities_reading (free)."
+      },
+      {
+        "pass": "llm_classify",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Skipped; heuristic confidence sufficient.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass1",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "No pass1 tool trace.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass2",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Correctly skipped: profile disables pass2, type-specific pass1 only, or no log_* tools.",
+        "tokens": 0
+      },
+      {
+        "pass": "finalize",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "logged_details promoted to concept details."
+      }
+    ],
+    "cutCandidates": [],
+    "recommendations": [
+      "Pass2 correctly skipped for this type/pass1 tool pattern."
+    ]
+  },
+  "passes": [
+    "extract_pages",
+    "heuristic_classify",
+    "teaching_units",
+    "type_structure",
+    "concept_candidates",
+    "problem_scan",
+    "detail_attach",
+    "reconcile"
+  ],
+  "buildMode": "template_multi_pass_offline",
+  "builtAt": "2026-07-01T22:49:36Z",
+  "concepts": [
+    {
+      "name": "neu 201 - precept 8",
+      "details": []
+    },
+    {
+      "name": "problem set 5",
+      "details": []
+    },
+    {
+      "name": "studying",
+      "details": []
+    },
+    {
+      "name": "everything is related!",
+      "details": [
+        "-Concept mapping: everything is related!"
+      ]
+    },
+    {
+      "name": "find the common theme",
+      "details": []
+    },
+    {
+      "name": "how is everything related?",
+      "details": [
+        "-The big picture: how is everything related?"
+      ]
+    },
+    {
+      "name": "neuro-hormone",
+      "details": []
+    },
+    {
+      "name": "fshlhacthoxytocinvasopressintsh",
+      "details": []
+    },
+    {
+      "name": "secreted in",
+      "details": []
+    },
+    {
+      "name": "function",
+      "details": []
+    },
+    {
+      "name": "target sites",
+      "details": []
+    },
+    {
+      "name": "core concepts",
+      "details": []
+    },
+    {
+      "name": "periventricular zone of hypothalamus",
+      "details": []
+    },
+    {
+      "name": "posterior pituitary",
+      "details": [
+        "1.Hypothalamus2.PituitaryVocabulary: Posterior pituitary"
+      ]
+    },
+    {
+      "name": "oxytocin-vasopressin/adhanterior pituitary",
+      "details": []
+    },
+    {
+      "name": "fsh, lh, tsh, acth, gh, prolactin",
+      "details": []
+    },
+    {
+      "name": "sex, childbirth, lactation, social and sexual interactions",
+      "details": [
+        "Oxytocin: sex, childbirth, lactation, social and sexual interactions"
+      ]
+    },
+    {
+      "name": "anterior pituitary",
+      "details": []
+    },
+    {
+      "name": "lactation",
+      "details": []
+    },
+    {
+      "name": "metabolism",
+      "details": [
+        "Thyroid Stimulating Hormone (TSH): metabolism"
+      ]
+    },
+    {
+      "name": "cell growth/regeneration",
+      "details": [
+        "Growth Hormone (GH): cell growth/regeneration"
+      ]
+    },
+    {
+      "name": "released from hypothalamus, triggers release for acth",
+      "details": [
+        "Corticotropin-releasing hormone (CRH): released from hypothalamus, triggers release for ACTH"
+      ]
+    },
+    {
+      "name": "gh from anterior pituitary",
+      "details": []
+    },
+    {
+      "name": "sympatheticparasympatheticpreganglionic pharmacologypostganglionic pharmacology",
+      "details": [
+        "Vocabulary: SympatheticParasympatheticPreganglionic pharmacologyPostganglionic pharmacology"
+      ]
+    },
+    {
+      "name": "norepinephrine/noradrenaline",
+      "details": []
+    },
+    {
+      "name": "locus coeruleusdopamine",
+      "details": []
+    },
+    {
+      "name": "basal forebrainserotonin",
+      "details": []
+    },
+    {
+      "name": "raphe nuclei",
+      "details": []
+    },
+    {
+      "name": "neuromodulatorsnorepinephrinedopamineachserotonin",
+      "details": []
+    },
+    {
+      "name": "source",
+      "details": []
+    },
+    {
+      "name": "relevant disease",
+      "details": []
+    },
+    {
+      "name": "sympathetic",
+      "details": []
+    },
+    {
+      "name": "parasympathetic",
+      "details": []
+    },
+    {
+      "name": "tested on material from pset",
+      "details": []
+    }
+  ],
+  "conceptCount": 34,
+  "detailCount": 8,
+  "events": [],
+  "problems": [
+    "Problem 1",
+    "Problem 2",
+    "Problem 6",
+    "Problem 4",
+    "Problem 5"
+  ],
+  "sections": [
+    "Problem 1",
+    "Problem 2",
+    "Studying",
+    "Problem 6",
+    "Problem 4",
+    "Problem 5"
+  ],
+  "deepseekPasses": 1,
+  "expectsPass2": false,
+  "gtProvenance": {
+    "typeSource": "heuristic_high",
+    "typeConfidence": 0.85,
+    "offlinePassAudit": {
+      "extract_pages": {
+        "localPdf": true,
+        "pageCount": 36,
+        "pdfPath": "C:\\Allen\\nucleus\\canvasfiles\\3380687"
+      },
+      "heuristic_classify": {
+        "expectedFileType": "humanities_reading",
+        "source": "heuristic_high",
+        "confidence": 0.85
+      },
+      "teaching_units": {
+        "sectionCount": 6
+      },
+      "type_structure": {
+        "slideRows": 35,
+        "readingSections": 35,
+        "syllabusWeeks": 0
+      },
+      "concept_candidates": {
+        "candidateCount": 34
+      },
+      "problem_scan": {
+        "problemCount": 5
+      },
+      "detail_attach": {
+        "conceptKeysWithDetails": 9,
+        "detailCount": 9
+      },
+      "reconcile": {
+        "inputTitles": 34,
+        "accepted": 34,
+        "capped": 0,
+        "detailAttached": 8
+      }
+    },
+    "reconcileStats": {
+      "inputTitles": 34,
+      "accepted": 34,
+      "capped": 0,
+      "detailAttached": 8
+    }
+  }
+}

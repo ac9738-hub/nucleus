@@ -1,9 +1,7 @@
 """Full parser re-run from cached Canvas snapshots (GT + holdout).
 
-Deletes canvas_graph.json, feeds parser.py all batches from enriched/holdout
-snapshots, and waits for parser completion. Backs up the previous graph first.
-
-Requires DEEP_SEEK_API_KEY (parser LLM) and OPENAI_API_KEY (embed pass).
+Prefer `python scripts/run_full_reparse_canvas_data.py` for app canvas_data.json
+(Princeton scope, --mode heuristic|llm|llm-fast).
 """
 from __future__ import annotations
 
@@ -134,6 +132,13 @@ def full_reparse(
     after = count_graph_nodes(root / 'canvas_graph.json')
     print(f'Full reparse finished in {elapsed / 60:.1f} min.')
     print('Graph after:', after)
+    try:
+        from scripts.post_parse_graph_quality import main as post_parse_quality  # noqa: WPS433
+
+        print('Running post-parse graph quality pass...')
+        post_parse_quality(['--write-graph', '--restore-if-empty'])
+    except Exception as error:
+        print(f'Post-parse quality pass failed: {error}', file=sys.stderr)
     return 0
 
 

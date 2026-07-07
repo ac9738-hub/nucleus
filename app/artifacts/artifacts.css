@@ -1,0 +1,325 @@
+/* Artifact surfaces — LUMI preview dropdown, workspace tab, workspace picker.
+   Functionality: layout for artifact preview UI; buttons use lib/nucleus-ui.css.
+   Dependencies: :root tokens from themes/<name>/styles.css. */
+
+/* ----- LUMI preview dropdown ----- */
+.ai-artifact-preview {
+  border-bottom: 1px solid rgba(var(--border-rgb), 0.14);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  min-height: 0;
+}
+
+.ai-artifact-preview.is-hidden {
+  display: none;
+}
+
+.ai-artifact-preview-toggle-copy {
+  min-width: 0;
+}
+
+.ai-artifact-preview-eyebrow {
+  color: var(--text-mute);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  margin: 0 0 2px;
+  text-transform: uppercase;
+}
+
+.ai-artifact-preview-title {
+  color: var(--text);
+  display: block;
+  font-size: 13px;
+  font-weight: 650;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-artifact-preview-meta {
+  color: var(--text-dim);
+  display: block;
+  font-size: 11px;
+  margin: 2px 0 0;
+}
+
+.ai-artifact-preview-chevron {
+  border-right: 2px solid var(--text-mute);
+  border-top: 2px solid var(--text-mute);
+  flex-shrink: 0;
+  height: 7px;
+  margin-top: 4px;
+  transform: rotate(135deg);
+  transition: transform 0.16s ease;
+  width: 7px;
+}
+
+.ai-artifact-preview.is-expanded .ai-artifact-preview-chevron {
+  margin-top: 8px;
+  transform: rotate(-45deg);
+}
+
+.ai-artifact-preview-body {
+  display: none;
+  flex-direction: column;
+  max-height: 38vh;
+  min-height: 0;
+}
+
+.ai-artifact-preview.is-expanded .ai-artifact-preview-body {
+  display: flex;
+}
+
+.ai-artifact-preview-toolbar {
+  padding: 8px 12px;
+}
+
+.ai-artifact-preview-frame {
+  background: var(--surface);
+  border: 0;
+  border-top: 1px solid rgba(var(--border-rgb), 0.12);
+  flex: 1;
+  min-height: 180px;
+  width: 100%;
+}
+
+/* ----- Chat artifact chips / cards ----- */
+.artifact-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  width: 100%;
+}
+
+.artifact-card {
+  background: rgba(var(--surface-rgb, 18, 22, 40), 0.72);
+  border: 1px solid rgba(var(--border-rgb), 0.18);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 100%;
+  padding: 12px 14px;
+  width: 100%;
+}
+
+.artifact-card-head {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.artifact-card-title {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 650;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.artifact-card-type {
+  background: rgba(var(--accent-rgb, 127, 119, 221), 0.14);
+  border-radius: 999px;
+  color: var(--accent);
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 3px 8px;
+  text-transform: uppercase;
+}
+
+.artifact-card-actions {
+  flex-wrap: wrap;
+}
+
+.artifact-card-preview {
+  display: none;
+  min-height: 0;
+  position: relative;
+}
+
+.artifact-card-preview.is-expanded {
+  display: block;
+}
+
+.artifact-card-preview.is-loading::after {
+  animation: artifact-preview-spin 0.8s linear infinite;
+  border: 2px solid rgba(var(--accent-rgb, 127, 119, 221), 0.25);
+  border-radius: 50%;
+  border-top-color: var(--accent);
+  content: "";
+  height: 22px;
+  left: 50%;
+  margin: -11px 0 0 -11px;
+  position: absolute;
+  top: 50%;
+  width: 22px;
+  z-index: 1;
+}
+
+.artifact-card-frame,
+.ai-artifact-preview-frame,
+.artifact-tab-frame {
+  background: var(--surface);
+}
+
+.artifact-card-preview.is-expanded .artifact-card-frame {
+  border: 1px solid rgba(var(--border-rgb), 0.14);
+  border-radius: 8px;
+  display: block;
+  height: 240px;
+  width: 100%;
+}
+
+.artifact-tab-frame-shell.is-loading,
+.ai-artifact-preview-body.is-loading {
+  position: relative;
+}
+
+.artifact-tab-frame-shell.is-loading::after,
+.ai-artifact-preview-body.is-loading::after {
+  animation: artifact-preview-spin 0.8s linear infinite;
+  border: 2px solid rgba(var(--accent-rgb, 127, 119, 221), 0.25);
+  border-radius: 50%;
+  border-top-color: var(--accent);
+  content: "";
+  height: 28px;
+  left: 50%;
+  margin: -14px 0 0 -14px;
+  position: absolute;
+  top: 50%;
+  width: 28px;
+  z-index: 2;
+}
+
+@keyframes artifact-preview-spin {
+  to { transform: rotate(360deg); }
+}
+
+.synapse-artifact-chips {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 10px 0 6px;
+  width: 100%;
+}
+
+.synapse-artifact-chips .artifact-card {
+  background: rgba(var(--surface-rgb, 18, 22, 40), 0.55);
+}
+
+/* ----- Workspace artifact tab ----- */
+.artifact-tab-view {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: calc(100vh - var(--webcontent-top, 124px) - 40px);
+}
+
+.artifact-tab-header {
+  align-items: flex-start;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  padding: 20px 22px;
+}
+
+.artifact-tab-header h1 {
+  font-size: 22px;
+  margin: 0 0 6px;
+}
+
+.artifact-tab-meta {
+  color: var(--text-dim);
+  font-size: 13px;
+  margin: 0;
+}
+
+.artifact-tab-frame-shell {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  flex: 1;
+  min-height: 520px;
+  overflow: hidden;
+}
+
+.artifact-tab-frame {
+  background: var(--surface);
+  border: 0;
+  display: block;
+  height: 100%;
+  min-height: 520px;
+  width: 100%;
+}
+
+.workspace-page-tab-icon-artifact {
+  color: var(--accent);
+}
+
+/* ----- Workspace picker ----- */
+.artifact-workspace-picker-overlay {
+  align-items: center;
+  background: rgba(var(--bg-rgb), 0.62);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  position: fixed;
+  z-index: 80;
+}
+
+.artifact-workspace-picker {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 24px 60px -20px rgba(var(--shadow-rgb), 0.7);
+  display: flex;
+  flex-direction: column;
+  max-height: 80vh;
+  max-width: 440px;
+  overflow: hidden;
+  width: calc(100% - 32px);
+}
+
+.artifact-workspace-picker-header {
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  padding: 16px 18px;
+}
+
+.artifact-workspace-picker-header h3 {
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.artifact-workspace-picker-body {
+  overflow-y: auto;
+  padding: 18px;
+}
+
+.artifact-workspace-picker-body p {
+  color: var(--text-mute);
+  font-size: 12px;
+  margin: 0 0 14px;
+}
+
+.artifact-workspace-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}

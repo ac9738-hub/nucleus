@@ -29,6 +29,18 @@ from parser import (
     syllabusNode,
 )
 from openai import OpenAI
+from canvas_parser.content.chunk_graph import (  # noqa: E402
+    chunks_from_file_node,
+    select_chunks_for_query,
+)
+from canvas_parser.content.teaching_blocks import teaching_labels_match  # noqa: E402
+from canvas_parser.content.file_retrieval_index import load_weekly_schedule  # noqa: E402
+from canvas_parser.content.text_chunks import format_retrieval_chunks_for_grounding  # noqa: E402
+from canvas_parser.content.type_extraction_retrieval import (  # noqa: E402
+    type_extraction_query_boost,
+    type_extraction_search_text,
+    week_match_boost_from_type_extractions,
+)
 
 load_dotenv()
 openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -214,9 +226,70 @@ FUZZY_STOPWORDS = {
 RETRIEVAL_SEMANTIC_SCORE_CUTOFF = 0.45
 BROWSER_INTERNAL_SCORE_CUTOFF = RETRIEVAL_SEMANTIC_SCORE_CUTOFF
 BROWSER_RETRIEVAL_CANDIDATES = 12
+AGENT_FAST_MAX_RANK_NODES = 1400
+AGENT_FAST_MAX_HEAP_POPS = 120
+AGENT_FAST_MAX_COURSES = 3
+AGENT_BROAD_POOL_MAX_COURSES = 2
+AGENT_FOCUS_MAX_RANK_NODES = 8000
+AGENT_FOCUS_MAX_HEAP_POPS = 400
+AGENT_FOCUS_EMBED_PREFILTER = 280
+AGENT_FOCUS_QUICK_CANDIDATES = 420
+AGENT_FOCUS_FULL_FUZZY_REFINE = 220
+AGENT_FOCUS_MAX_QUICK_SCAN_SINGLE = 750
+AGENT_FOCUS_MAX_QUICK_SCAN_DUAL = 1200
+VECTOR_PREFILTER_CANDIDATES = 560
+VECTOR_RERANK_CANDIDATES = 120
+UNEMBEDDED_FUZZY_CANDIDATES = 96
+VECTOR_PREFILTER_FUZZY_WEIGHT = 0.42
+AGENT_FAST_FUZZY_FLOOR = 0.06
+AGENT_FOCUS_FUZZY_FLOOR = 0.11
+AGENT_FOCUS_SCHEDULE_FUZZY_FLOOR = 0.04
+AGENT_FAST_COURSE_FLOOR = 0.22
+RETRIEVAL_VERBOSE = os.getenv("NUCLEUS_RETRIEVAL_VERBOSE") == "1"
+QUERY_EMBED_CACHE_MAX = 128
+RETRIEVAL_RESULT_CACHE_MAX = 64
+BROWSER_RANK_NODE_TYPES = frozenset({"file", "assignment", "syllabus", "event"})
 COURSE_SEMANTIC_FUZZY_STRONG_THRESHOLD = 1.3
 COURSE_SEMANTIC_FUZZY_POOL_THRESHOLD = 0.35
 GLOBAL_COURSE_BUCKET_KEY = "__global__"
+
+_QUERY_EMBED_CACHE = {}
+_RETRIEVAL_RESULT_CACHE = {}
+
+
+def retrieval_cache_key(query, *, k=3, mode="agent", fast=False, grounded=False, problem_query=False, focus_course_ids=None):
+    focus = ",".join(sorted(str(course_id) for course_id in (focus_course_ids or []) if course_id))
+    normalized = normalize_academic_query(query).lower()
+    return f"{mode}|{k}|{int(bool(fast))}|{int(bool(grounded))}|{int(bool(problem_query))}|{focus}|{normalized}"
+
+
+def get_cached_retrieval(cache_key):
+    entry = _RETRIEVAL_RESULT_CACHE.get(cache_key)
+    if not entry:
+        return None
+    return entry["startpoints"]
+
+
+def store_cached_retrieval(cache_key, startpoints):
+    _RETRIEVAL_RESULT_CACHE[cache_key] = {"startpoints": startpoints}
+    if len(_RETRIEVAL_RESULT_CACHE) > RETRIEVAL_RESULT_CACHE_MAX:
+        _RETRIEVAL_RESULT_CACHE.pop(next(iter(_RETRIEVAL_RESULT_CACHE)))
+
+
+def get_query_embedding_vector(embedding_text):
+    cache_key = str(embedding_text or "").strip().lower()
+    cached = _QUERY_EMBED_CACHE.get(cache_key)
+    if cached is not None:
+        return cached, True
+    qv = openai_client.embeddings.create(
+        input=embedding_text,
+        model="text-embedding-3-small",
+    )
+    embedded = np.array(qv.data[0].embedding, dtype=np.float32)
+    _QUERY_EMBED_CACHE[cache_key] = embedded
+    if len(_QUERY_EMBED_CACHE) > QUERY_EMBED_CACHE_MAX:
+        _QUERY_EMBED_CACHE.pop(next(iter(_QUERY_EMBED_CACHE)))
+    return embedded, False
 
 PREFIX_PATTERN = re.compile(
     r"^(?:" + "|".join(re.escape(prefix) for prefix in QUERY_PREFIXES) + r")\s+",
@@ -409,6 +482,10 @@ def query_ranking_adjustment(query, intent, nodetype, node, mode):
                 adjustment += 0.24
         elif query_requests_assignment(query):
             adjustment += 0.08
+        if query_requests_assignment(query) and assignment_pset_like(name):
+            if not PSET_NUMBER_QUERY_PATTERN.search(lowered_query):
+                if re.search(r"\b(?:pset|problem set)\s*1\b", lowered_name, re.I):
+                    adjustment += 0.18
         if assignment_final_draft_noise(name) and query_requests_exam(query):
             adjustment -= 0.42
         if intent in {"exam", "deadline"} and query_requests_exam(query):
@@ -468,6 +545,26 @@ def query_ranking_adjustment(query, intent, nodetype, node, mode):
             adjustment += 0.22
         if query_requests_assignment(query) and "solutions" in lowered_query and is_course_homepage_file(node):
             adjustment += 0.62
+        type_store = type_extractions_for_node("file", node)
+        if type_store:
+            adjustment += type_extraction_query_boost(
+                query, "file", node, type_extractions=type_store,
+            )
+            adjustment += week_match_boost_from_type_extractions(query, type_store)
+
+    if nodetype == "syllabus":
+        type_store = type_extractions_for_node("syllabus", node)
+        if type_store:
+            adjustment += type_extraction_query_boost(
+                query, "syllabus", node,
+                academic_file_type="syllabus",
+                type_extractions=type_store,
+            )
+            adjustment += week_match_boost_from_type_extractions(query, type_store)
+        if intent in {"deadline", "exam"} and (
+            "homework" in lowered_query or "reading" in lowered_query
+        ):
+            adjustment += 0.45
 
     if nodetype == "event" and intent in {"exam", "deadline", "syllabus"}:
         if query_requests_review_material(query) and "review" in lowered_name:
@@ -480,12 +577,6 @@ def query_ranking_adjustment(query, intent, nodetype, node, mode):
             adjustment -= 0.22
         if "office hour" in lowered_query and "office hour" in lowered_name:
             adjustment += 0.1
-
-    if nodetype == "syllabus":
-        if intent in {"deadline", "exam"} and (
-            "homework" in lowered_query or "reading" in lowered_query
-        ):
-            adjustment += 0.45
 
     return adjustment
 
@@ -534,6 +625,11 @@ def node_ranking_text(nodetype, node, courseid=None):
             catalog_entry.get("keyword_name", ""),
             "problem set solutions course homepage materials",
         ])
+    if nodetype in {"file", "syllabus"}:
+        type_store = type_extractions_for_node(nodetype, node)
+        extraction_text = type_extraction_search_text(type_store)
+        if extraction_text:
+            parts.append(extraction_text)
     event_type = getattr(node, "type", "")
     if event_type:
         parts.append(str(event_type))
@@ -575,6 +671,9 @@ def week_query_file_boost(query, nodetype, node):
     name = str(getattr(node, "name", "") or "").lower()
     week_markers = (f"week {week_num}", f"week{week_num}", f"w{week_num}", f"_w{week_num}")
     if any(marker in name for marker in week_markers):
+        return 0.2
+    type_store = type_extractions_for_node("file", node)
+    if week_match_boost_from_type_extractions(query, type_store) > 0:
         return 0.2
     return 0.0
 
@@ -708,7 +807,13 @@ def combine_retrieval_scores(embedding_similarity, fuzzy_similarity, course_simi
     return embedding_similarity + fuzzy_similarity + float(course_similarity or 0.0)
 
 
+def canvas_disk_recovery_disabled():
+    return os.getenv('NUCLEUS_DISABLE_CANVAS_DISK_RECOVERY', '').strip().casefold() in {'1', 'true', 'yes', 'on'}
+
+
 def load_course_lookup(path=CANVAS_DATA_PATH):
+    if canvas_disk_recovery_disabled():
+        return {}
     if not path.exists():
         return {}
     try:
@@ -734,6 +839,49 @@ def load_course_lookup(path=CANVAS_DATA_PATH):
 
 
 COURSE_LOOKUP = load_course_lookup()
+WEEKLY_SCHEDULE = {} if canvas_disk_recovery_disabled() else load_weekly_schedule(
+    CANVAS_DATA_PATH if CANVAS_DATA_PATH.exists() else None
+)
+_raw_graph_cache = None
+
+
+def empty_graph_nodes():
+    return {
+        "concepts": [],
+        "problems": [],
+        "events": [],
+        "syllabi": {},
+        "files": {},
+        "learningBlocks": {},
+        "edges": [],
+        "logged_details": {},
+        "logged_examples": {},
+        "logged_problems": {},
+        "logged_assignments": {},
+        "logged_events": {},
+    }
+
+
+def load_raw_graph(path=CANVAS_GRAPH_PATH):
+    global _raw_graph_cache
+    if canvas_disk_recovery_disabled():
+        return {}
+    if _raw_graph_cache is None:
+        graph_path = Path(path)
+        if not graph_path.is_file():
+            _raw_graph_cache = {}
+        else:
+            try:
+                with open(graph_path, 'r', encoding='utf-8') as handle:
+                    _raw_graph_cache = json.load(handle)
+            except (OSError, json.JSONDecodeError) as error:
+                print(
+                    f'vector retrieval: could not load {graph_path}: {error}',
+                    file=sys.stderr,
+                    flush=True,
+                )
+                _raw_graph_cache = {}
+    return _raw_graph_cache
 
 
 def get_course_name(courseid):
@@ -869,7 +1017,35 @@ def reconstruct_file(data):
     node.examples = data.get("examples", []) or []
     node.problems = data.get("problems", []) or []
     node.embedded = vectorize_embedded(data.get("embedded", {}))
+    node.pages = data.get("pages", []) or []
+    node.textChunks = data.get("textChunks", []) or []
+    node.typeExtractions = data.get("typeExtractions", {}) or {}
+    node.academicFileType = str(data.get("academicFileType", "") or "")
     return node
+
+
+def type_extractions_for_node(nodetype, node, files_store=None):
+    """Resolve typeExtractions for a graph node (file directly; syllabus from course file)."""
+    store = getattr(node, "typeExtractions", None) if node is not None else None
+    if isinstance(store, dict) and store:
+        return store
+    if nodetype != "syllabus" or node is None:
+        return {}
+    courseid = str(getattr(node, "courseid", "") or "")
+    if not courseid:
+        return {}
+    files = files_store if files_store is not None else (allnodes.get("files") or {}).get(courseid, {})
+    for file_node in (files or {}).values():
+        candidate = getattr(file_node, "typeExtractions", None) or {}
+        if not isinstance(candidate, dict):
+            continue
+        if candidate.get("syllabus"):
+            return candidate
+        academic = str(getattr(file_node, "academicFileType", "") or "")
+        name = str(getattr(file_node, "name", "") or "").lower()
+        if academic == "syllabus" or "syllabus" in name:
+            return candidate
+    return {}
 
 
 def reconstruct_event(data):
@@ -890,8 +1066,21 @@ def reconstruct_event(data):
 
 
 def reconstruct_nodes(path=CANVAS_GRAPH_PATH):
-    with open(path, 'r', encoding='utf-8') as f:
-        data = json.load(f)
+    if canvas_disk_recovery_disabled():
+        return empty_graph_nodes()
+    graph_path = Path(path)
+    if not graph_path.is_file():
+        return empty_graph_nodes()
+    try:
+        with open(graph_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError) as error:
+        print(
+            f'vector retrieval: could not load {graph_path}: {error}',
+            file=sys.stderr,
+            flush=True,
+        )
+        return empty_graph_nodes()
 
     concepts = [reconstruct_concept(item) for item in data.get("concepts", []) or []]
     problems = [reconstruct_problem(item) for item in data.get("problems", []) or []]
@@ -1025,6 +1214,309 @@ def build_course_buckets(allnodes_ref=None):
 COURSE_CATALOG = build_course_catalog()
 COURSE_NAMES_LIST = build_course_names_list(COURSE_CATALOG)
 COURSE_BUCKETS = build_course_buckets()
+_RETRIEVAL_INDEX = None
+_RETRIEVAL_EMBED_DIM = 0
+
+
+def _embedding_vector(embedded, key, embed_dim, zero):
+    value = (embedded or {}).get(key)
+    if value is None:
+        return zero
+    if isinstance(value, np.ndarray):
+        return value
+    return np.array(value, dtype=np.float32)
+
+
+def _resolve_embed_dim_for_bucket(bucket, fallback_dim=None):
+    for _nodetype, node, _cid in bucket:
+        embedded = getattr(node, "embedded", None) or {}
+        for key in ("name", "description"):
+            vec = embedded.get(key)
+            if vec is not None:
+                return len(vec)
+    return fallback_dim
+
+
+def build_retrieval_index(allnodes_ref=None, buckets_ref=None):
+    """Pre-stack node embeddings and ranking text for vector-first retrieval."""
+    buckets = buckets_ref or COURSE_BUCKETS
+    indices = {}
+    embed_dim = None
+
+    for course_id, bucket in buckets.items():
+        entries = []
+        name_rows = []
+        desc_rows = []
+        ranking_texts = []
+        has_embedding = []
+
+        bucket_embed_dim = _resolve_embed_dim_for_bucket(bucket, embed_dim)
+
+        for nodetype, node, cid in bucket:
+            embedded = getattr(node, "embedded", None) or {}
+            if bucket_embed_dim is None:
+                node_has_embedding = False
+            else:
+                if embed_dim is None:
+                    embed_dim = bucket_embed_dim
+                zero = np.zeros(bucket_embed_dim, dtype=np.float32)
+                name_rows.append(_embedding_vector(embedded, "name", bucket_embed_dim, zero))
+                desc_rows.append(_embedding_vector(embedded, "description", bucket_embed_dim, zero))
+                node_has_embedding = (
+                    (embedded.get("name") is not None)
+                    or (embedded.get("description") is not None)
+                )
+            entries.append((nodetype, node, cid))
+            ranking_texts.append(node_ranking_text(nodetype, node, cid))
+            has_embedding.append(node_has_embedding)
+
+        if not entries:
+            continue
+
+        if bucket_embed_dim is not None and len(name_rows) == len(entries):
+            indices[str(course_id)] = {
+                "entries": entries,
+                "ranking_texts": ranking_texts,
+                "has_embedding": np.array(has_embedding, dtype=bool),
+                "name_matrix": np.stack(name_rows),
+                "desc_matrix": np.stack(desc_rows),
+            }
+        else:
+            indices[str(course_id)] = {
+                "entries": entries,
+                "ranking_texts": ranking_texts,
+                "has_embedding": np.array(has_embedding, dtype=bool),
+                "name_matrix": None,
+                "desc_matrix": None,
+            }
+
+    return indices, embed_dim or 0
+
+
+def get_retrieval_index():
+    global _RETRIEVAL_INDEX, _RETRIEVAL_EMBED_DIM
+    if _RETRIEVAL_INDEX is None:
+        _RETRIEVAL_INDEX, _RETRIEVAL_EMBED_DIM = build_retrieval_index()
+    return _RETRIEVAL_INDEX
+
+
+def _course_ids_for_pool(course_pool, course_order=None):
+    if course_pool is None:
+        return list(COURSE_BUCKETS.keys())
+    ordered = [
+        str(course_id)
+        for course_id in (course_order or [])
+        if str(course_id) in course_pool
+    ]
+    seen = set(ordered)
+    for course_id in course_pool:
+        cid = str(course_id)
+        if cid not in seen:
+            ordered.append(cid)
+            seen.add(cid)
+    return ordered
+
+
+def collect_pool_retrieval_rows(course_pool, course_order=None, browser_rank_types=None):
+    indices = get_retrieval_index()
+    entries = []
+    ranking_texts = []
+    name_rows = []
+    desc_rows = []
+    has_embedding = []
+    has_matrix = False
+
+    for course_id in _course_ids_for_pool(course_pool, course_order):
+        bucket_index = indices.get(str(course_id))
+        if not bucket_index:
+            continue
+        for index, (nodetype, node, cid) in enumerate(bucket_index["entries"]):
+            if browser_rank_types is not None and nodetype not in browser_rank_types:
+                continue
+            entries.append((nodetype, node, cid))
+            ranking_texts.append(bucket_index["ranking_texts"][index])
+            has_embedding.append(bool(bucket_index["has_embedding"][index]))
+            if bucket_index["name_matrix"] is not None:
+                name_rows.append(bucket_index["name_matrix"][index])
+                desc_rows.append(bucket_index["desc_matrix"][index])
+                has_matrix = True
+
+    if not entries:
+        return {
+            "entries": [],
+            "ranking_texts": [],
+            "has_embedding": np.array([], dtype=bool),
+            "name_matrix": None,
+            "desc_matrix": None,
+        }
+
+    if has_matrix and name_rows and len(name_rows) == len(entries):
+        return {
+            "entries": entries,
+            "ranking_texts": ranking_texts,
+            "has_embedding": np.array(has_embedding, dtype=bool),
+            "name_matrix": np.stack(name_rows),
+            "desc_matrix": np.stack(desc_rows),
+        }
+
+    if has_matrix and name_rows and len(name_rows) != len(entries):
+        print(
+            f"vector retrieval: matrix row mismatch entries={len(entries)} "
+            f"matrix={len(name_rows)}; falling back to non-matrix rank",
+            file=sys.stderr,
+            flush=True,
+        )
+
+    return {
+        "entries": entries,
+        "ranking_texts": ranking_texts,
+        "has_embedding": np.array(has_embedding, dtype=bool),
+        "name_matrix": None,
+        "desc_matrix": None,
+    }
+
+
+def vector_prefilter_limit(fast, mode, pool_mode, course_pool):
+    pool_size = len(course_pool) if course_pool else len(COURSE_BUCKETS)
+    if mode == "browser":
+        return min(VECTOR_PREFILTER_CANDIDATES, max(240, pool_size * 40))
+    if fast and pool_mode in {"focus", "course_code"}:
+        return min(VECTOR_PREFILTER_CANDIDATES, max(160, pool_size * 80))
+    if fast:
+        return VECTOR_PREFILTER_CANDIDATES
+    return min(800, max(VECTOR_PREFILTER_CANDIDATES, pool_size * 60))
+
+
+def batch_quick_fuzzy_scores(query_terms, ranking_texts, indices=None):
+    if not query_terms:
+        size = len(indices) if indices is not None else len(ranking_texts or [])
+        return np.zeros(size, dtype=np.float32)
+    if indices is None:
+        target_texts = ranking_texts
+    else:
+        target_texts = [ranking_texts[index] for index in indices]
+    if not target_texts:
+        return np.array([], dtype=np.float32)
+    return np.array(
+        [
+            quick_fuzzy_prefilter_score(query_terms, ranking_text)
+            for ranking_text in target_texts
+        ],
+        dtype=np.float32,
+    )
+
+
+def select_vector_prefilter_indices(
+    semantic_sims,
+    has_embedding,
+    *,
+    prefilter_limit,
+    query_terms=(),
+    ranking_texts=(),
+    unembedded_limit=UNEMBEDDED_FUZZY_CANDIDATES,
+):
+    total = len(semantic_sims)
+    if total == 0:
+        return []
+
+    selected = set()
+    if prefilter_limit > 0:
+        limit = min(prefilter_limit, total)
+        if limit == total:
+            vector_indices = np.arange(total, dtype=np.int32)
+        else:
+            vector_indices = np.argpartition(semantic_sims, -limit)[-limit:]
+        selected.update(int(index) for index in vector_indices)
+
+    unembedded_indices = [
+        index
+        for index, embedded in enumerate(has_embedding)
+        if not embedded
+    ]
+    if unembedded_indices and query_terms and ranking_texts:
+        quick_scores = batch_quick_fuzzy_scores(query_terms, ranking_texts, unembedded_indices)
+        ranked_unembedded = sorted(
+            zip(unembedded_indices, quick_scores),
+            key=lambda item: (-float(item[1]), item[0]),
+        )
+        for index, score in ranked_unembedded[:unembedded_limit]:
+            if score > 0:
+                selected.add(int(index))
+
+    return sorted(selected, key=lambda index: (-float(semantic_sims[index]), index))
+
+
+def rank_nodes_vector_first(
+    embeddedq,
+    query,
+    query_terms,
+    course_score_by_id,
+    pool_rows,
+    *,
+    fast,
+    mode,
+    pool_mode,
+    intent,
+    grounded,
+    rerank_limit=VECTOR_RERANK_CANDIDATES,
+    prefilter_limit=VECTOR_PREFILTER_CANDIDATES,
+    rank_node_embed_from_scores,
+    should_skip_fast_rank_fn=None,
+):
+    skip_fast_rank = should_skip_fast_rank_fn or should_skip_fast_rank
+    entries = pool_rows["entries"]
+    ranking_texts = pool_rows["ranking_texts"]
+    has_embedding = pool_rows["has_embedding"]
+    total = len(entries)
+    if total == 0:
+        return 0, 0, 0
+
+    if pool_rows["name_matrix"] is not None and len(embeddedq):
+        name_sims = pool_rows["name_matrix"] @ embeddedq
+        desc_sims = pool_rows["desc_matrix"] @ embeddedq
+        semantic_sims = np.maximum(name_sims, desc_sims)
+    else:
+        semantic_sims = np.zeros(total, dtype=np.float32)
+
+    candidate_indices = select_vector_prefilter_indices(
+        semantic_sims,
+        has_embedding,
+        prefilter_limit=prefilter_limit,
+        query_terms=query_terms,
+        ranking_texts=ranking_texts,
+    )
+    if not candidate_indices:
+        candidate_indices = list(range(min(total, prefilter_limit)))
+
+    rerank_indices = candidate_indices[:rerank_limit]
+
+    ranked_count = 0
+    for index in rerank_indices:
+        nodetype, node, courseid = entries[index]
+        resolved_courseid = str(courseid or getattr(node, "courseid", "") or "")
+        course_match = course_score_by_id.get(resolved_courseid, {})
+        course_similarity = course_match.get("semantic_fuzzy", 0.0)
+        fuzzy_similarity = fuzzy_name_similarity(query_terms, ranking_texts[index])
+        if skip_fast_rank(
+            fast,
+            mode,
+            fuzzy_similarity,
+            course_similarity,
+            pool_mode=pool_mode,
+            intent=intent,
+            single_course_pool=len({str(cid) for _, _, cid in entries}) == 1,
+        ):
+            continue
+        rank_node_embed_from_scores(
+            fuzzy_similarity,
+            course_similarity,
+            float(semantic_sims[index]),
+            nodetype,
+            node,
+        )
+        ranked_count += 1
+
+    return total, len(candidate_indices), ranked_count
 
 
 def build_edge_lookup(edges):
@@ -1114,6 +1606,173 @@ def score_courses_for_query(query, query_terms, embeddedq, catalog=None, course_
     return scored
 
 
+def narrow_course_pool(course_pool, focus_course_ids, *, pool_mode=""):
+    """Prefer the student's focused course(s) to shrink agent retrieval search."""
+    focus_set = {str(course_id) for course_id in (focus_course_ids or []) if course_id}
+    if not focus_set:
+        return course_pool, pool_mode
+    if course_pool:
+        narrowed = {str(course_id) for course_id in course_pool if str(course_id) in focus_set}
+        if narrowed:
+            return narrowed, "focus"
+    return focus_set, "focus"
+
+
+def should_skip_fast_rank(
+    fast,
+    mode,
+    fuzzy_similarity,
+    course_similarity,
+    *,
+    pool_mode=None,
+    intent=None,
+    single_course_pool=False,
+):
+    if not fast or mode != "agent":
+        return False
+    fuzzy = float(fuzzy_similarity or 0.0)
+    course = float(course_similarity or 0.0)
+    narrow_pool = (
+        single_course_pool
+        or pool_mode in {"focus", "course_code"}
+    )
+    if narrow_pool:
+        floor = (
+            AGENT_FOCUS_SCHEDULE_FUZZY_FLOOR
+            if intent in {"deadline", "syllabus", "exam"}
+            else AGENT_FOCUS_FUZZY_FLOOR
+        )
+        return fuzzy < floor
+    return fuzzy < AGENT_FAST_FUZZY_FLOOR and course < AGENT_FAST_COURSE_FLOOR
+
+
+def focus_prefilter_label(nodetype, node):
+    name = str(getattr(node, "name", "") or "")
+    description = str(getattr(node, "description", "") or "")[:160]
+    phrase = NODE_TYPE_SEARCH_PHRASES.get(nodetype, "")
+    parts = [name, description, phrase]
+    return " ".join(part for part in parts if part)
+
+
+def quick_fuzzy_prefilter_score(query_terms, label):
+    name_terms = split_fuzzy_keywords(label)
+    if not query_terms or not name_terms:
+        return 0.0
+    return keyword_set_similarity(query_terms, name_terms)
+
+
+def batch_node_embedding_similarities(embeddedq, nodes):
+    if not nodes:
+        return np.array([], dtype=np.float32)
+    dim = len(embeddedq)
+    zero = np.zeros(dim, dtype=np.float32)
+    name_rows = []
+    desc_rows = []
+    for node in nodes:
+        embedded = getattr(node, "embedded", None) or {}
+        name_rows.append(embedded.get("name") if embedded.get("name") is not None else zero)
+        desc_rows.append(embedded.get("description") if embedded.get("description") is not None else zero)
+    name_sims = np.stack(name_rows) @ embeddedq
+    desc_sims = np.stack(desc_rows) @ embeddedq
+    return np.maximum(name_sims, desc_sims)
+
+
+def push_top_fuzzy_candidate(top_heap, score, counter, payload, limit):
+    if len(top_heap) < limit:
+        heapq.heappush(top_heap, (score, counter, payload))
+        return
+    if score > top_heap[0][0]:
+        heapq.heapreplace(top_heap, (score, counter, payload))
+
+
+def focus_scan_type_order(intent, grounded=False):
+    if intent in {"deadline", "exam"}:
+        return (
+            "event", "assignment", "syllabus", "concept", "detail",
+            "example", "problem", "file",
+        )
+    if intent == "syllabus":
+        return (
+            "event", "syllabus", "assignment", "file", "concept",
+            "detail", "example", "problem",
+        )
+    if grounded:
+        return (
+            "concept", "detail", "example", "problem", "file",
+            "event", "syllabus", "assignment",
+        )
+    return (
+        "concept", "detail", "example", "problem", "event",
+        "file", "syllabus", "assignment",
+    )
+
+
+def focus_quick_scan_limit(course_pool):
+    if not course_pool:
+        return None
+    if len(course_pool) == 1:
+        return AGENT_FOCUS_MAX_QUICK_SCAN_SINGLE
+    if len(course_pool) <= 2:
+        return AGENT_FOCUS_MAX_QUICK_SCAN_DUAL
+    return None
+
+
+def should_stop_focus_quick_scan(nodes_scanned, quick_heap, scan_limit):
+    if scan_limit is None or nodes_scanned < scan_limit:
+        return False
+    return len(quick_heap) >= max(AGENT_FOCUS_QUICK_CANDIDATES // 3, 80)
+
+
+def iter_bucket_nodes_prioritized(course_pool, course_order=None, type_order=()):
+    type_rank = {nodetype: index for index, nodetype in enumerate(type_order)}
+    default_rank = len(type_rank) + 1
+
+    def prioritized(entries):
+        return sorted(
+            entries,
+            key=lambda item: (
+                type_rank.get(item[0], default_rank),
+                str(getattr(item[1], "name", "") or "").lower(),
+            ),
+        )
+
+    if course_pool is None:
+        for entries in COURSE_BUCKETS.values():
+            yield from prioritized(entries)
+        return
+
+    ordered = [
+        str(course_id)
+        for course_id in (course_order or [])
+        if str(course_id) in course_pool
+    ]
+    seen = set()
+    for courseid in ordered:
+        seen.add(courseid)
+        yield from prioritized(COURSE_BUCKETS.get(courseid, []))
+    for courseid in course_pool:
+        cid = str(courseid)
+        if cid in seen:
+            continue
+        yield from prioritized(COURSE_BUCKETS.get(cid, []))
+
+
+def focus_embed_prefilter_enabled(fast, mode, course_pool, pool_mode):
+    if not (fast and mode == "agent" and course_pool):
+        return False
+    if len(course_pool) == 1 and pool_mode in {"focus", "course_code"}:
+        return True
+    return len(course_pool) <= 2 and pool_mode in {"focus", "moderate", "strong", "course_code"}
+
+
+def fast_rank_limits(pool_mode, course_pool, fast, mode):
+    if not fast or mode != "agent":
+        return None, None
+    if pool_mode == "focus" or (course_pool and len(course_pool) <= 2):
+        return AGENT_FOCUS_MAX_RANK_NODES, AGENT_FOCUS_MAX_HEAP_POPS
+    return AGENT_FAST_MAX_RANK_NODES, AGENT_FAST_MAX_HEAP_POPS
+
+
 def select_course_search_pool(course_scores, query=""):
     code_matches = [
         item for item in course_scores
@@ -1150,14 +1809,26 @@ def select_course_search_pool(course_scores, query=""):
     return None, "all", course_scores
 
 
-def iter_bucket_nodes(course_pool=None):
+def iter_bucket_nodes(course_pool=None, course_order=None):
     if course_pool is None:
         for entries in COURSE_BUCKETS.values():
             yield from entries
         return
 
+    ordered = [
+        str(course_id)
+        for course_id in (course_order or [])
+        if str(course_id) in course_pool
+    ]
+    seen = set()
+    for courseid in ordered:
+        seen.add(courseid)
+        yield from COURSE_BUCKETS.get(courseid, [])
     for courseid in course_pool:
-        yield from COURSE_BUCKETS.get(str(courseid), [])
+        cid = str(courseid)
+        if cid in seen:
+            continue
+        yield from COURSE_BUCKETS.get(cid, [])
 
 
 def node_identity(nodetype, node):
@@ -1712,23 +2383,60 @@ def expand_startpoints(startpoints, mode, intent="general", query=""):
     return finalize_retrieval_results(results, mode, intent, query)
 
 
-def retreive(query, k = 3, mode = "agent"):
+def retreive(query, k=3, mode="agent", fast=False, grounded=False, problem_query=False, focus_course_ids=None, use_cache=True):
+    import time
+
+    cache_key = retrieval_cache_key(
+        query,
+        k=k,
+        mode=mode,
+        fast=fast,
+        grounded=grounded,
+        problem_query=problem_query,
+        focus_course_ids=focus_course_ids,
+    )
+    if use_cache:
+        cached = get_cached_retrieval(cache_key)
+        if cached is not None:
+            print(
+                json.dumps({"retrievalCache": {"hit": True, "key": cache_key[:80], "resultCount": len(cached)}}),
+                file=sys.stderr,
+                flush=True,
+            )
+            return cached
+
+    started = time.perf_counter()
+    embed_ms = rank_ms = expand_ms = 0
+    embed_cache_hit = False
 
     startpoints = []
     heap = []
     heap_counter = 0
     
     newquery = prepare_query_for_embedding(query)
-    qv = openai_client.embeddings.create(
-        input=newquery["embedding_text"],
-        model="text-embedding-3-small"
-    )
-    embeddedq = np.array(qv.data[0].embedding, dtype=np.float32)
+    embed_started = time.perf_counter()
+    embeddedq, embed_cache_hit = get_query_embedding_vector(newquery["embedding_text"])
+    embed_ms = int((time.perf_counter() - embed_started) * 1000)
     query_terms = fuzzy_query_terms(query)
     course_embeddings = get_course_embeddings()
     course_scores = score_courses_for_query(query, query_terms, embeddedq, course_embeddings=course_embeddings)
     course_pool, pool_mode, matched_courses = select_course_search_pool(course_scores, query=query)
+    if fast and mode == "agent" and course_pool and pool_mode in {"moderate", "all"}:
+        course_cap = (
+            AGENT_FAST_MAX_COURSES
+            if extract_course_codes_from_query(query)
+            else AGENT_BROAD_POOL_MAX_COURSES
+        )
+        ordered_ids = [item["courseid"] for item in matched_courses if item.get("courseid")]
+        if ordered_ids:
+            trimmed = ordered_ids[:course_cap]
+            course_pool = {courseid for courseid in trimmed if courseid in course_pool} or course_pool
+        elif len(course_pool) > course_cap:
+            course_pool = set(list(course_pool)[:course_cap])
+    course_pool, pool_mode = narrow_course_pool(course_pool, focus_course_ids, pool_mode=pool_mode)
+    _, max_heap_pops = fast_rank_limits(pool_mode, course_pool, fast, mode)
     course_score_by_id = {item["courseid"]: item for item in course_scores}
+    browser_rank_types = BROWSER_RANK_NODE_TYPES if mode == "browser" else None
 
     print(
         "Course pool: "
@@ -1765,22 +2473,18 @@ def retreive(query, k = 3, mode = "agent"):
             cutoff_score=cutoff_score,
         )
 
-    def rank_node(nodetype, node, courseid=None):
-        embedded = getattr(node, "embedded", None) or {}
-        name_similarity = 0.0
-        description_similarity = 0.0
-        if embedded:
-            if "name" in embedded:
-                name_similarity = float(np.dot(embeddedq, embedded.get("name", [])))
-            if "description" in embedded:
-                description_similarity = float(np.dot(embeddedq, embedded.get("description", [])))
-        embedding_similarity = max(name_similarity, description_similarity)
-        ranking_text = node_ranking_text(nodetype, node, courseid)
-        fuzzy_similarity = fuzzy_name_similarity(query_terms, ranking_text)
-        resolved_courseid = str(courseid or getattr(node, "courseid", "") or "")
-        course_match = course_score_by_id.get(resolved_courseid, {})
-        course_similarity = course_match.get("semantic_fuzzy", 0.0)
+    def rank_node_embed_from_scores(
+        fuzzy_similarity,
+        course_similarity,
+        embedding_similarity,
+        nodetype,
+        node,
+    ):
         adjustment = intent_type_adjustment(newquery["intent"], nodetype, node, query=query, mode=mode)
+        if problem_query and mode == "agent" and nodetype in {"concept", "detail", "example", "problem"}:
+            adjustment += 0.16 if nodetype == "concept" else 0.1
+        elif grounded and mode == "agent" and nodetype in {"concept", "detail", "example", "problem", "file"}:
+            adjustment += 0.12 if nodetype == "concept" else 0.08
         if mode == "browser":
             adjustment += browser_file_query_boost(query, nodetype)
             adjustment += browser_syllabus_query_boost(query, nodetype)
@@ -1788,25 +2492,61 @@ def retreive(query, k = 3, mode = "agent"):
         elif nodetype == "file":
             adjustment += week_query_file_boost(query, nodetype, node)
         overall_similarity = (
-            combine_retrieval_scores(embedding_similarity, fuzzy_similarity, course_similarity)
+            combine_retrieval_scores(float(embedding_similarity), fuzzy_similarity, course_similarity)
             + adjustment
         )
-        push_node(overall_similarity, embedding_similarity, fuzzy_similarity, course_similarity, nodetype, node)
-
-    for nodetype, node, courseid in iter_bucket_nodes(course_pool):
-        rank_node(nodetype, node, courseid)
-
-    candidate_count = BROWSER_RETRIEVAL_CANDIDATES if mode == "browser" else k
-    cutoff_score = BROWSER_INTERNAL_SCORE_CUTOFF
-    while heap and len(startpoints) < candidate_count:
-        similarity, _, nodetype, node, semantic_score, fuzzy_score, course_score = heapq.heappop(heap)
-        score = -similarity
-        print(
-            f"Type: {nodetype}, Name: {getattr(node, 'name', 'N/A')}, "
-            f"Similarity: {score:.4f}, Semantic: {semantic_score:.4f}, "
-            f"Fuzzy: {fuzzy_score:.4f}, Course: {course_score:.4f}",
-            file=sys.stderr
+        push_node(
+            overall_similarity,
+            float(embedding_similarity),
+            fuzzy_similarity,
+            course_similarity,
+            nodetype,
+            node,
         )
+
+    ranked_count = 0
+    nodes_scanned = 0
+    vector_prefilter_count = 0
+    rank_started = time.perf_counter()
+    course_order = [item["courseid"] for item in matched_courses if item.get("courseid")]
+    pool_rows = collect_pool_retrieval_rows(
+        course_pool,
+        course_order=course_order if fast else None,
+        browser_rank_types=browser_rank_types,
+    )
+    prefilter_limit = vector_prefilter_limit(fast, mode, pool_mode, course_pool)
+    nodes_scanned, vector_prefilter_count, ranked_count = rank_nodes_vector_first(
+        embeddedq,
+        query,
+        query_terms,
+        course_score_by_id,
+        pool_rows,
+        fast=fast,
+        mode=mode,
+        pool_mode=pool_mode,
+        intent=newquery["intent"],
+        grounded=grounded,
+        prefilter_limit=prefilter_limit,
+        rank_node_embed_from_scores=rank_node_embed_from_scores,
+    )
+    rank_ms = int((time.perf_counter() - rank_started) * 1000)
+
+    candidate_count = BROWSER_RETRIEVAL_CANDIDATES if mode == "browser" else max(int(k or 3), 1)
+    cutoff_score = BROWSER_INTERNAL_SCORE_CUTOFF
+    heap_pops = 0
+    while heap and len(startpoints) < candidate_count:
+        if max_heap_pops is not None and heap_pops >= max_heap_pops:
+            break
+        similarity, _, nodetype, node, semantic_score, fuzzy_score, course_score = heapq.heappop(heap)
+        heap_pops += 1
+        score = -similarity
+        if RETRIEVAL_VERBOSE:
+            print(
+                f"Type: {nodetype}, Name: {getattr(node, 'name', 'N/A')}, "
+                f"Similarity: {score:.4f}, Semantic: {semantic_score:.4f}, "
+                f"Fuzzy: {fuzzy_score:.4f}, Course: {course_score:.4f}",
+                file=sys.stderr
+            )
         if passes_semantic_cutoff(semantic_score, fuzzy_score, course_score, nodetype, node):
             startpoints.append({
                 'type': nodetype,
@@ -1816,15 +2556,229 @@ def retreive(query, k = 3, mode = "agent"):
                 'fuzzy_similarity': fuzzy_score,
                 'course_similarity': course_score
             })
-    return expand_startpoints(startpoints, mode, intent=newquery["intent"], query=query)
+    expand_started = time.perf_counter()
+    expanded = expand_startpoints(startpoints, mode, intent=newquery["intent"], query=query)
+    expand_ms = int((time.perf_counter() - expand_started) * 1000)
+    total_ms = int((time.perf_counter() - started) * 1000)
+    if fast and mode == "agent":
+        print(
+            json.dumps({
+                "retrievalTiming": {
+                    "mode": mode,
+                    "fast": fast,
+                    "grounded": grounded,
+                    "poolMode": pool_mode,
+                    "coursePoolSize": len(course_pool) if course_pool else 0,
+                    "nodesRanked": ranked_count,
+                    "nodesScanned": nodes_scanned,
+                    "vectorPrefilterCount": vector_prefilter_count,
+                    "heapPops": heap_pops,
+                    "resultCount": len(expanded),
+                    "embedMs": embed_ms,
+                    "embedCacheHit": embed_cache_hit,
+                    "rankMs": rank_ms,
+                    "expandMs": expand_ms,
+                    "totalMs": total_ms,
+                }
+            }),
+            file=sys.stderr,
+            flush=True,
+        )
+    if use_cache:
+        store_cached_retrieval(cache_key, expanded)
+    return expanded
 
-def serialize_startpoint(startpoint):
+def _file_node_payload(node):
+    if isinstance(node, dict):
+        return node
+    return {
+        "fileid": getattr(node, "fileid", ""),
+        "courseid": getattr(node, "courseid", ""),
+        "name": getattr(node, "name", "") or "",
+        "pages": getattr(node, "pages", []) or [],
+        "textChunks": getattr(node, "textChunks", []) or [],
+        "typeExtractions": getattr(node, "typeExtractions", {}) or {},
+        "academicFileType": getattr(node, "academicFileType", "") or "",
+    }
+
+
+def _lookup_file_node(courseid, fileid):
+    fileid = str(fileid or "")
+    courseid = str(courseid or "")
+    files = allnodes.get("files") or {}
+    if courseid and fileid and fileid in (files.get(courseid) or {}):
+        return files[courseid][fileid], courseid
+    for candidate_course, course_files in files.items():
+        if fileid in (course_files or {}):
+            return course_files[fileid], str(candidate_course)
+    return None, courseid
+
+
+def _resolve_source_file_id_from_page_nodes(nodetype, node, courseid=""):
+    """Map a graph node to its source PDF via page.nodes refs on indexed file pages."""
+    courseid = str(courseid or getattr(node, "courseid", "") or "")
+    if not courseid or nodetype not in {"concept", "detail", "example", "problem"}:
+        return ""
+
+    name = str(getattr(node, "name", "") or "").strip()
+    node_id = ""
+    if nodetype == "concept":
+        node_id = str(getattr(node, "conceptid", "") or "")
+    elif nodetype == "detail":
+        node_id = str(getattr(node, "detailid", "") or "")
+
+    course_files = (allnodes.get("files") or {}).get(courseid) or {}
+    for file_id, file_node in course_files.items():
+        for page in getattr(file_node, "pages", None) or []:
+            if not isinstance(page, dict):
+                continue
+            for ref in page.get("nodes") or []:
+                if not isinstance(ref, dict) or str(ref.get("type") or "") != nodetype:
+                    continue
+                ref_id = str(ref.get("id") or "")
+                ref_name = str(ref.get("name") or "")
+                if node_id and ref_id and ref_id == node_id:
+                    return str(file_id)
+                if name and ref_name and teaching_labels_match(name, ref_name):
+                    return str(file_id)
+    return ""
+
+
+def resolve_source_file_id(nodetype, node, courseid=""):
+    courseid = str(courseid or getattr(node, "courseid", "") or "")
+    name = str(getattr(node, "name", "") or "").strip()
+    if nodetype == "file":
+        return str(getattr(node, "fileid", "") or "")
+
+    if nodetype in {"concept", "detail", "example"} and name:
+        for entry in (allnodes.get("logged_details") or {}).get(courseid, []) or []:
+            detail_name = str(entry.get("detailname") or "")
+            concept_name = str(entry.get("conceptname") or "")
+            if nodetype == "detail" and detail_name and teaching_labels_match(name, detail_name):
+                return str(entry.get("sourceFileId") or "")
+            if nodetype == "concept" and concept_name and teaching_labels_match(name, concept_name):
+                return str(entry.get("sourceFileId") or "")
+        if nodetype == "example":
+            for entry in (allnodes.get("logged_examples") or {}).get(courseid, []) or []:
+                example_name = str(entry.get("examplename") or "")
+                if example_name and teaching_labels_match(name, example_name):
+                    return str(entry.get("sourceFileId") or "")
+        if nodetype == "concept":
+            concept = find_concept_by_name(name, courseid=courseid)
+            if concept:
+                for detail in getattr(concept, "details", []) or []:
+                    detail_name = str(getattr(detail, "name", "") or "")
+                    for entry in (allnodes.get("logged_details") or {}).get(courseid, []) or []:
+                        if detail_name and teaching_labels_match(detail_name, str(entry.get("detailname") or "")):
+                            file_id = str(entry.get("sourceFileId") or "")
+                            if file_id:
+                                return file_id
+
+    if nodetype == "problem" and name:
+        for entry in (allnodes.get("logged_problems") or {}).get(courseid, []) or []:
+            problem_name = str(entry.get("problemname") or "")
+            if problem_name and teaching_labels_match(name, problem_name):
+                return str(entry.get("sourceFileId") or "")
+
+    source_pages = getattr(node, "sourcePages", None) or []
+    for page in source_pages:
+        file_id = str((page or {}).get("fileid") or "")
+        if file_id:
+            return file_id
+
+    file_id = _resolve_source_file_id_from_page_nodes(nodetype, node, courseid=courseid)
+    if file_id:
+        return file_id
+    return ""
+
+
+def retrieval_chunks_for_startpoint(startpoint, query="", max_chunks=6):
+    nodetype = startpoint.get("type")
+    node = startpoint.get("node")
+    courseid = str(getattr(node, "courseid", "") or "")
+    file_id = resolve_source_file_id(nodetype, node, courseid=courseid)
+    if nodetype == "file" and not file_id:
+        file_id = str(getattr(node, "fileid", "") or "")
+    if not file_id:
+        return []
+
+    file_node, resolved_course = _lookup_file_node(courseid, file_id)
+    if not file_node:
+        return []
+
+    payload = _file_node_payload(file_node)
+    resolved_course = str(payload.get("courseid") or resolved_course or courseid)
+    chunks = chunks_from_file_node(
+        payload,
+        courseid=resolved_course,
+        fileid=str(payload.get("fileid") or file_id),
+        graph=load_raw_graph(),
+        weekly_schedule=WEEKLY_SCHEDULE,
+    )
+    query_embedding = None
+    if query:
+        query_embedding, _cache_hit = get_query_embedding_vector(str(query))
+    return select_chunks_for_query(
+        chunks,
+        query=query,
+        max_chunks=max_chunks,
+        query_embedding=query_embedding,
+    )
+
+
+def _format_problem_steps(steps):
+    formatted = []
+    for index, step in enumerate(steps or [], start=1):
+        if isinstance(step, dict):
+            text = str(step.get("text") or step.get("description") or step.get("step") or "").strip()
+        else:
+            text = str(step or "").strip()
+        if text:
+            formatted.append(f"{index}. {text}")
+    return formatted
+
+
+def problem_context_fields(node):
+    """Serialize graph-linked problem metadata for agent grounding."""
+    courseid = str(getattr(node, "courseid", "") or "")
+    concept_ids = list(dict.fromkeys(
+        (getattr(node, "incomingConceptNodeIds", []) or [])
+        + (getattr(node, "outgoingConceptNodeIds", []) or [])
+    ))
+    related_concepts = []
+    for conceptid in concept_ids:
+        concept = find_concept(conceptid)
+        if not concept:
+            continue
+        related_concepts.append({
+            "conceptid": str(getattr(concept, "conceptid", "") or conceptid),
+            "name": str(getattr(concept, "name", "") or ""),
+        })
+
+    related_assignments = []
+    for assignmentid in getattr(node, "assignmentNodeIds", []) or []:
+        assignment = find_assignment(assignmentid)
+        if assignment:
+            related_assignments.append(str(getattr(assignment, "name", "") or ""))
+
+    answer = str(getattr(node, "answer", "None") or "None").strip()
+    return {
+        "steps": _format_problem_steps(getattr(node, "steps", []) or []),
+        "relatedConcepts": related_concepts,
+        "relatedAssignments": [name for name in related_assignments if name],
+        "hasOfficialAnswer": bool(answer and answer.lower() != "none"),
+    }
+
+
+def serialize_startpoint(startpoint, query=""):
     node = startpoint["node"]
     downloadurl = getattr(node, "downloadurl", "") or ""
     canvaspreviewurl = getattr(node, "canvaspreviewurl", "") or ""
     courseid = getattr(node, "courseid", "")
     coursename = get_course_name(courseid)
-    return {
+    chunks = retrieval_chunks_for_startpoint(startpoint, query=query)
+    chunk_text = format_retrieval_chunks_for_grounding(chunks) if chunks else ""
+    payload = {
         "type": startpoint["type"],
         "name": getattr(node, "name", ""),
         "description": getattr(node, "description", ""),
@@ -1841,6 +2795,8 @@ def serialize_startpoint(startpoint):
         "fuzzy_similarity": startpoint.get("fuzzy_similarity", None),
         "course_similarity": startpoint.get("course_similarity", None),
         "source": startpoint.get("source", None),
+        "chunks": chunks,
+        "chunkText": chunk_text,
         "id": (
             getattr(node, "conceptid", None) or
             getattr(node, "problemid", None) or
@@ -1850,12 +2806,26 @@ def serialize_startpoint(startpoint):
             getattr(node, "courseid", "")
         )
     }
+    if startpoint["type"] == "problem":
+        payload.update(problem_context_fields(node))
+    return payload
 
 def print_retrieval_results(results):
     for result in results:
         nodetype = result['type']
         node = result['node']
         print(f"Type: {nodetype}, Name: {getattr(node, 'name', 'N/A')}, description: {getattr(node, 'description', 'N/A')[:100]}...")
+
+
+def warm_retrieval():
+    """Preload course embedding vectors and retrieval index for first user query."""
+    course_embeddings = get_course_embeddings()
+    get_retrieval_index()
+    return {
+        "ok": True,
+        "courses": len(course_embeddings),
+        "catalog": len(COURSE_CATALOG),
+    }
 
 
 def run_service():
@@ -1865,16 +2835,43 @@ def run_service():
             continue
         try:
             payload = json.loads(rawline)
+            if isinstance(payload, list) and payload and payload[0] == "warm":
+                print(json.dumps(warm_retrieval(), ensure_ascii=False), flush=True)
+                continue
             query = payload[1] if isinstance(payload, list) and len(payload) > 1 else payload.get("query", "")
+            options = {}
             if isinstance(payload, list):
                 mode = payload[2].get("mode", "agent") if len(payload) > 2 and isinstance(payload[2], dict) else "agent"
+                options = payload[2] if len(payload) > 2 and isinstance(payload[2], dict) else {}
             else:
                 mode = payload.get("mode", "agent")
-            print(f"vector retrieval received query: {query}", file=sys.stderr, flush=True)
-            startpoints = retreive(query, mode=mode)
+                options = payload
+            fast = bool(options.get("fast"))
+            grounded = bool(options.get("grounded"))
+            problem_query = bool(options.get("problem_query") or options.get("problemQuery"))
+            k = int(options.get("k") or 3)
+            focus_course_ids = options.get("focusCourseIds") or options.get("focus_course_ids") or []
+            use_cache = not bool(options.get("skipCache"))
+            print(
+                f"vector retrieval received query: {query} mode={mode} fast={fast} grounded={grounded} "
+                f"problem_query={problem_query} k={k} "
+                f"focus={focus_course_ids[:3]} cache={use_cache}",
+                file=sys.stderr,
+                flush=True,
+            )
+            startpoints = retreive(
+                query,
+                k=k,
+                mode=mode,
+                fast=fast,
+                grounded=grounded,
+                problem_query=problem_query,
+                focus_course_ids=focus_course_ids,
+                use_cache=use_cache,
+            )
             print(json.dumps({
                 "query": query,
-                "startpoints": [serialize_startpoint(startpoint) for startpoint in startpoints]
+                "startpoints": [serialize_startpoint(startpoint, query=query) for startpoint in startpoints]
             }, ensure_ascii=False), flush=True)
         except Exception as error:
             print(json.dumps({

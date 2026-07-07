@@ -1,0 +1,354 @@
+{
+  "version": 1,
+  "courseId": "15237",
+  "fileId": "3356264",
+  "filename": "Precept 7 Oct 28 - Nov 1.pdf",
+  "expectedFileType": "humanities_reading",
+  "passPlan": {
+    "courseId": "15237",
+    "fileId": "3356264",
+    "filename": "Precept 7 Oct 28 - Nov 1.pdf",
+    "resolvedType": "humanities_reading",
+    "heuristicConfidence": 0.85,
+    "neededPasses": [
+      "extract_pages",
+      "heuristic_classify",
+      "llm_pass1",
+      "finalize"
+    ],
+    "skippedPasses": [
+      "llm_classify",
+      "llm_pass2"
+    ],
+    "estLlmCalls": 1,
+    "estRealisticLlmCalls": 1.0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "needed": true,
+        "reason": "Required local PDF/HTML extraction; no LLM.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "heuristic_classify",
+        "needed": true,
+        "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_classify",
+        "needed": false,
+        "reason": "Heuristic confidence 0.85 sufficient; skip flash classify call.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_pass1",
+        "needed": true,
+        "reason": "Type humanities_reading: pass1 link/file_node only (no concept extraction profile).",
+        "llmCall": true,
+        "estCostTier": "low"
+      },
+      {
+        "pass": "llm_pass2",
+        "needed": false,
+        "reason": "Type humanities_reading disables pass2 (single-pass type-specific or link-only profile).",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "finalize",
+        "needed": true,
+        "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+        "llmCall": false,
+        "estCostTier": "free"
+      }
+    ]
+  },
+  "passAudit": {
+    "plan": {
+      "courseId": "15237",
+      "fileId": "3356264",
+      "filename": "Precept 7 Oct 28 - Nov 1.pdf",
+      "resolvedType": "humanities_reading",
+      "heuristicConfidence": 0.85,
+      "neededPasses": [
+        "extract_pages",
+        "heuristic_classify",
+        "llm_pass1",
+        "finalize"
+      ],
+      "skippedPasses": [
+        "llm_classify",
+        "llm_pass2"
+      ],
+      "estLlmCalls": 1,
+      "estRealisticLlmCalls": 1.0,
+      "steps": [
+        {
+          "pass": "extract_pages",
+          "needed": true,
+          "reason": "Required local PDF/HTML extraction; no LLM.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "heuristic_classify",
+          "needed": true,
+          "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_classify",
+          "needed": false,
+          "reason": "Heuristic confidence 0.85 sufficient; skip flash classify call.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_pass1",
+          "needed": true,
+          "reason": "Type humanities_reading: pass1 link/file_node only (no concept extraction profile).",
+          "llmCall": true,
+          "estCostTier": "low"
+        },
+        {
+          "pass": "llm_pass2",
+          "needed": false,
+          "reason": "Type humanities_reading disables pass2 (single-pass type-specific or link-only profile).",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "finalize",
+          "needed": true,
+          "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+          "llmCall": false,
+          "estCostTier": "free"
+        }
+      ]
+    },
+    "actualType": "humanities_reading",
+    "deepseekPasses": 1,
+    "conceptCount": 19,
+    "detailCount": 7,
+    "totalLlmTokens": 0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "ran": true,
+        "useful": true,
+        "verdict": "required",
+        "note": "Local I/O; pages present means extract succeeded."
+      },
+      {
+        "pass": "heuristic_classify",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "Routed to humanities_reading (free)."
+      },
+      {
+        "pass": "llm_classify",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Skipped; heuristic confidence sufficient.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass1",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "No pass1 tool trace.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass2",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Correctly skipped: profile disables pass2, type-specific pass1 only, or no log_* tools.",
+        "tokens": 0
+      },
+      {
+        "pass": "finalize",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "logged_details promoted to concept details."
+      }
+    ],
+    "cutCandidates": [],
+    "recommendations": [
+      "Pass2 correctly skipped for this type/pass1 tool pattern."
+    ]
+  },
+  "passes": [
+    "extract_pages",
+    "heuristic_classify",
+    "teaching_units",
+    "type_structure",
+    "concept_candidates",
+    "problem_scan",
+    "detail_attach",
+    "reconcile"
+  ],
+  "buildMode": "template_multi_pass_offline",
+  "builtAt": "2026-07-01T22:49:38Z",
+  "concepts": [
+    {
+      "name": "Precept 7 Oct 28 - Nov 1",
+      "details": []
+    },
+    {
+      "name": "Vocabulary: In the cochlea",
+      "details": []
+    },
+    {
+      "name": "Vocabulary:Components of the pathway",
+      "details": []
+    },
+    {
+      "name": "neu 201 - precept 7",
+      "details": []
+    },
+    {
+      "name": "muscle activity",
+      "details": []
+    },
+    {
+      "name": "pinnatympanic membraneossiclesoval windowcochlea",
+      "details": [
+        "Vocabulary: PinnaTympanic membraneOssiclesOval windowCochlea"
+      ]
+    },
+    {
+      "name": "auditory system",
+      "details": [
+        "Core concepts: Auditory System"
+      ]
+    },
+    {
+      "name": "stereocilia",
+      "details": []
+    },
+    {
+      "name": "other things to know",
+      "details": []
+    },
+    {
+      "name": "components of the pathway",
+      "details": [
+        "Vocabulary:Components of the pathway:"
+      ]
+    },
+    {
+      "name": "interaural timing differencedelay line",
+      "details": []
+    },
+    {
+      "name": "circuit features for encoding sounds",
+      "details": []
+    },
+    {
+      "name": "tonotopyfrequency codingphase locking",
+      "details": []
+    },
+    {
+      "name": "vestibular system",
+      "details": []
+    },
+    {
+      "name": "otolith organssemicircular canals",
+      "details": [
+        "Vocabulary:Otolith organsSemicircular canals"
+      ]
+    },
+    {
+      "name": "otoconiahair cellsvestibulo-ocular reflex",
+      "details": [
+        "Vocabulary:OtoconiaHair cellsVestibulo-ocular reflex"
+      ]
+    },
+    {
+      "name": "motor system",
+      "details": []
+    },
+    {
+      "name": "autonomic vs. somatic nervous systemmuscle fibers/cellsmyofibrilssarcomeresexcitation-contraction coupling",
+      "details": [
+        "Vocabulary:Autonomic vs. somatic nervous systemMuscle fibers/cellsMyofibrilsSarcomeresExcitation-contraction coupling"
+      ]
+    },
+    {
+      "name": "corticospinal tractneural tuningprimary motor cortexsupplementary motor cortex/areapremotor cortex/areabasal gangliacere",
+      "details": [
+        "Vocabulary:Corticospinal tractNeural tuningPrimary motor cortexSupplementary motor cortex/areaPremotor cortex/areaBasal gangliaCerebellum"
+      ]
+    }
+  ],
+  "conceptCount": 19,
+  "detailCount": 7,
+  "events": [],
+  "problems": [],
+  "sections": [
+    "Vocabulary: In the cochlea",
+    "On hair cells",
+    "Other things to know",
+    "Vocabulary:Components of the pathway",
+    "Circuit features for encoding sounds"
+  ],
+  "deepseekPasses": 1,
+  "expectsPass2": false,
+  "gtProvenance": {
+    "typeSource": "heuristic_high",
+    "typeConfidence": 0.85,
+    "offlinePassAudit": {
+      "extract_pages": {
+        "localPdf": true,
+        "pageCount": 9,
+        "pdfPath": "C:\\Allen\\nucleus\\canvasfiles\\3356264"
+      },
+      "heuristic_classify": {
+        "expectedFileType": "humanities_reading",
+        "source": "heuristic_high",
+        "confidence": 0.85
+      },
+      "teaching_units": {
+        "sectionCount": 5
+      },
+      "type_structure": {
+        "slideRows": 19,
+        "readingSections": 20,
+        "syllabusWeeks": 0
+      },
+      "concept_candidates": {
+        "candidateCount": 19
+      },
+      "problem_scan": {
+        "problemCount": 0
+      },
+      "detail_attach": {
+        "conceptKeysWithDetails": 8,
+        "detailCount": 8
+      },
+      "reconcile": {
+        "inputTitles": 19,
+        "accepted": 19,
+        "capped": 0,
+        "detailAttached": 7
+      }
+    },
+    "reconcileStats": {
+      "inputTitles": 19,
+      "accepted": 19,
+      "capped": 0,
+      "detailAttached": 7
+    }
+  }
+}

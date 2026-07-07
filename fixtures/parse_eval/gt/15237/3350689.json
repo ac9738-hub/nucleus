@@ -1,0 +1,429 @@
+{
+  "version": 1,
+  "courseId": "15237",
+  "fileId": "3350689",
+  "filename": "Precept 6_IG.pptx",
+  "expectedFileType": "discussion_prompt",
+  "passPlan": {
+    "courseId": "15237",
+    "fileId": "3350689",
+    "filename": "Precept 6_IG.pptx",
+    "resolvedType": "discussion_prompt",
+    "heuristicConfidence": 0.82,
+    "neededPasses": [
+      "extract_pages",
+      "heuristic_classify",
+      "llm_pass1",
+      "finalize"
+    ],
+    "skippedPasses": [
+      "llm_classify",
+      "llm_pass2"
+    ],
+    "estLlmCalls": 1,
+    "estRealisticLlmCalls": 1.0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "needed": true,
+        "reason": "Required local PDF/HTML extraction; no LLM.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "heuristic_classify",
+        "needed": true,
+        "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_classify",
+        "needed": false,
+        "reason": "Heuristic confidence 0.82 sufficient; skip flash classify call.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_pass1",
+        "needed": true,
+        "reason": "Type discussion_prompt: pass1 link/file_node only (no concept extraction profile).",
+        "llmCall": true,
+        "estCostTier": "low"
+      },
+      {
+        "pass": "llm_pass2",
+        "needed": false,
+        "reason": "Type discussion_prompt disables pass2 (single-pass type-specific or link-only profile).",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "finalize",
+        "needed": true,
+        "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+        "llmCall": false,
+        "estCostTier": "free"
+      }
+    ]
+  },
+  "passAudit": {
+    "plan": {
+      "courseId": "15237",
+      "fileId": "3350689",
+      "filename": "Precept 6_IG.pptx",
+      "resolvedType": "discussion_prompt",
+      "heuristicConfidence": 0.82,
+      "neededPasses": [
+        "extract_pages",
+        "heuristic_classify",
+        "llm_pass1",
+        "finalize"
+      ],
+      "skippedPasses": [
+        "llm_classify",
+        "llm_pass2"
+      ],
+      "estLlmCalls": 1,
+      "estRealisticLlmCalls": 1.0,
+      "steps": [
+        {
+          "pass": "extract_pages",
+          "needed": true,
+          "reason": "Required local PDF/HTML extraction; no LLM.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "heuristic_classify",
+          "needed": true,
+          "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_classify",
+          "needed": false,
+          "reason": "Heuristic confidence 0.82 sufficient; skip flash classify call.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_pass1",
+          "needed": true,
+          "reason": "Type discussion_prompt: pass1 link/file_node only (no concept extraction profile).",
+          "llmCall": true,
+          "estCostTier": "low"
+        },
+        {
+          "pass": "llm_pass2",
+          "needed": false,
+          "reason": "Type discussion_prompt disables pass2 (single-pass type-specific or link-only profile).",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "finalize",
+          "needed": true,
+          "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+          "llmCall": false,
+          "estCostTier": "free"
+        }
+      ]
+    },
+    "actualType": "discussion_prompt",
+    "deepseekPasses": 1,
+    "conceptCount": 39,
+    "detailCount": 2,
+    "totalLlmTokens": 0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "ran": true,
+        "useful": true,
+        "verdict": "required",
+        "note": "Local I/O; pages present means extract succeeded."
+      },
+      {
+        "pass": "heuristic_classify",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "Routed to discussion_prompt (free)."
+      },
+      {
+        "pass": "llm_classify",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Skipped; heuristic confidence sufficient.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass1",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "No pass1 tool trace.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass2",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Correctly skipped: profile disables pass2, type-specific pass1 only, or no log_* tools.",
+        "tokens": 0
+      },
+      {
+        "pass": "finalize",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "logged_details promoted to concept details."
+      }
+    ],
+    "cutCandidates": [],
+    "recommendations": [
+      "Pass2 correctly skipped for this type/pass1 tool pattern."
+    ]
+  },
+  "passes": [
+    "extract_pages",
+    "heuristic_classify",
+    "teaching_units",
+    "type_structure",
+    "concept_candidates",
+    "problem_scan",
+    "detail_attach",
+    "reconcile"
+  ],
+  "buildMode": "template_multi_pass_offline",
+  "builtAt": "2026-07-01T22:49:38Z",
+  "concepts": [
+    {
+      "name": "Precept 6_IG",
+      "details": []
+    },
+    {
+      "name": "5 taste qualities",
+      "details": []
+    },
+    {
+      "name": "Our view of the main idea of this whole unit",
+      "details": []
+    },
+    {
+      "name": "Problem 3",
+      "details": []
+    },
+    {
+      "name": "neu 201 - precept 6",
+      "details": []
+    },
+    {
+      "name": "pset 4 (oct 8 & oct 10)",
+      "details": []
+    },
+    {
+      "name": "sensory and motor",
+      "details": []
+    },
+    {
+      "name": "fall break",
+      "details": [
+        "Last week: Fall Break"
+      ]
+    },
+    {
+      "name": "core concepts",
+      "details": []
+    },
+    {
+      "name": "vision",
+      "details": []
+    },
+    {
+      "name": "vocabulary",
+      "details": []
+    },
+    {
+      "name": "lateral inhibition",
+      "details": []
+    },
+    {
+      "name": "lgn, primary visual cortex",
+      "details": []
+    },
+    {
+      "name": "simple cells, complex cells",
+      "details": []
+    },
+    {
+      "name": "dorsal stream, ventral stream",
+      "details": []
+    },
+    {
+      "name": "faces/ face region of it",
+      "details": []
+    },
+    {
+      "name": "horizontal cells inhibit bipolar cells",
+      "details": []
+    },
+    {
+      "name": "lateral inhibition occurs",
+      "details": []
+    },
+    {
+      "name": "lateral inhibition continued",
+      "details": []
+    },
+    {
+      "name": "less glutamate released onto center bipolar cell",
+      "details": []
+    },
+    {
+      "name": "off bipolar cell hyperpolarized",
+      "details": []
+    },
+    {
+      "name": "remember, bipolar cells directly excite rgcs",
+      "details": []
+    },
+    {
+      "name": "principle of lateralization & partial decussation",
+      "details": []
+    },
+    {
+      "name": "visual field deficits",
+      "details": []
+    },
+    {
+      "name": "concept check central processing",
+      "details": []
+    },
+    {
+      "name": "dorsal vs ventral stream",
+      "details": []
+    },
+    {
+      "name": "class",
+      "details": []
+    },
+    {
+      "name": "taste/gustation",
+      "details": []
+    },
+    {
+      "name": "papille, taste buds, taste receptors",
+      "details": []
+    },
+    {
+      "name": "smell/olfaction",
+      "details": []
+    },
+    {
+      "name": "olfactory bulb",
+      "details": []
+    },
+    {
+      "name": "taste vs. olfaction vs. light",
+      "details": [
+        "Transduction Cascades: taste vs. olfaction vs. light"
+      ]
+    },
+    {
+      "name": "neural computation",
+      "details": []
+    },
+    {
+      "name": "parallel processing",
+      "details": []
+    },
+    {
+      "name": "labelled line theory",
+      "details": []
+    },
+    {
+      "name": "population encoding",
+      "details": []
+    },
+    {
+      "name": "quiz in class on oct 29th",
+      "details": []
+    },
+    {
+      "name": "no problem set this week",
+      "details": []
+    },
+    {
+      "name": "activity in precept next week",
+      "details": []
+    }
+  ],
+  "conceptCount": 39,
+  "detailCount": 2,
+  "events": [],
+  "problems": [
+    "Problem 3"
+  ],
+  "sections": [
+    "Our view of the main idea of this whole unit",
+    "Vocabulary",
+    "Horizontal cells inhibit bipolar cells",
+    "Lateral inhibition occurs",
+    "On-center bipolar cells fire more action potentials",
+    "On-center ganglion cells fire more action potentials",
+    "Problem 3",
+    "In the visual system"
+  ],
+  "deepseekPasses": 1,
+  "expectsPass2": false,
+  "gtProvenance": {
+    "typeSource": "heuristic_high",
+    "typeConfidence": 0.82,
+    "offlinePassAudit": {
+      "extract_pages": {
+        "localPdf": true,
+        "pageCount": 11,
+        "pdfPath": "C:\\Allen\\nucleus\\canvasfiles\\3350689"
+      },
+      "heuristic_classify": {
+        "expectedFileType": "discussion_prompt",
+        "source": "heuristic_high",
+        "confidence": 0.82
+      },
+      "teaching_units": {
+        "sectionCount": 8
+      },
+      "type_structure": {
+        "slideRows": 42,
+        "readingSections": 0,
+        "syllabusWeeks": 0
+      },
+      "concept_candidates": {
+        "candidateCount": 39
+      },
+      "problem_scan": {
+        "problemCount": 1
+      },
+      "detail_attach": {
+        "conceptKeysWithDetails": 4,
+        "detailCount": 4
+      },
+      "reconcile": {
+        "inputTitles": 39,
+        "accepted": 39,
+        "capped": 0,
+        "detailAttached": 2
+      }
+    },
+    "reconcileStats": {
+      "inputTitles": 39,
+      "accepted": 39,
+      "capped": 0,
+      "detailAttached": 2
+    }
+  }
+}

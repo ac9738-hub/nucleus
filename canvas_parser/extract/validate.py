@@ -64,6 +64,128 @@ def validate_graph_state(state, edge_store=None):
     return warnings
 
 
+def assess_graph_retrieval_completeness(state) -> dict:
+    """Summarize sequencing, learning-block, and chunk-edge coverage for post-parse QA."""
+    metrics = {
+        'coursesWithConcepts': 0,
+        'coursesWithLearningBlocks': 0,
+        'coursesWithModuleOrderHints': 0,
+        'conceptsWithDocumentOrder': 0,
+        'conceptsWithPrerequisites': 0,
+        'learningBlocksWithNext': 0,
+        'filesWithPages': 0,
+        'filesWithTextChunks': 0,
+        'filesMissingChunks': 0,
+        'textChunks': 0,
+        'chunksWithTeachingUnit': 0,
+        'chunksWithGraphNode': 0,
+        'chunksWithWeeklyItem': 0,
+        'chunksWithTypeExtraction': 0,
+        'sequenceEdges': 0,
+        'learningBlockNextEdges': 0,
+    }
+
+    concept_courses = set()
+    for concept in state.get('concepts') or []:
+        if not isinstance(concept, dict):
+            continue
+        cid = str(concept.get('courseid') or '')
+        if cid:
+            concept_courses.add(cid)
+        if concept.get('documentOrder') is not None:
+            metrics['conceptsWithDocumentOrder'] += 1
+        if concept.get('prerequisites'):
+            metrics['conceptsWithPrerequisites'] += 1
+
+    metrics['coursesWithConcepts'] = len(concept_courses)
+
+    module_hints = state.get('moduleOrderHints') or {}
+    if isinstance(module_hints, dict):
+        metrics['coursesWithModuleOrderHints'] = sum(
+            1 for entries in module_hints.values() if entries
+        )
+
+    learning_blocks = state.get('learningBlocks') or {}
+    if isinstance(learning_blocks, dict):
+        metrics['coursesWithLearningBlocks'] = sum(
+            1 for blocks in learning_blocks.values() if blocks
+        )
+        for blocks in learning_blocks.values():
+            for block in blocks or []:
+                if isinstance(block, dict) and block.get('nextBlockId'):
+                    metrics['learningBlocksWithNext'] += 1
+
+    for edge in state.get('edges') or []:
+        if not isinstance(edge, dict):
+            continue
+        relation = str(edge.get('relation') or edge.get('type') or '')
+        if relation in {'follows', 'document_order', 'precedes', 'prerequisite'}:
+            metrics['sequenceEdges'] += 1
+        if edge.get('fromType') == 'learningBlock' and relation == 'next':
+            metrics['learningBlockNextEdges'] += 1
+
+    chunks_with_teaching = 0
+    chunks_with_graph = 0
+    chunks_with_weekly = 0
+    chunks_with_type = 0
+    for course_files in (state.get('files') or {}).values():
+        for file_node in (course_files or {}).values():
+            if not isinstance(file_node, dict):
+                continue
+            pages = file_node.get('pages') if isinstance(file_node.get('pages'), list) else []
+            if pages:
+                metrics['filesWithPages'] += 1
+            chunks = file_node.get('textChunks') if isinstance(file_node.get('textChunks'), list) else []
+            if chunks:
+                metrics['filesWithTextChunks'] += 1
+            elif pages:
+                metrics['filesMissingChunks'] += 1
+            for chunk in chunks:
+                if not isinstance(chunk, dict):
+                    continue
+                metrics['textChunks'] += 1
+                edge_types = {
+                    str(edge.get('type') or '')
+                    for edge in (chunk.get('edges') or [])
+                    if isinstance(edge, dict)
+                }
+                if 'teaching-unit' in edge_types:
+                    chunks_with_teaching += 1
+                if 'graph-node' in edge_types:
+                    chunks_with_graph += 1
+                if 'weekly-item' in edge_types:
+                    chunks_with_weekly += 1
+                if 'type-extraction' in edge_types:
+                    chunks_with_type += 1
+
+    metrics['chunksWithTeachingUnit'] = chunks_with_teaching
+    metrics['chunksWithGraphNode'] = chunks_with_graph
+    metrics['chunksWithWeeklyItem'] = chunks_with_weekly
+    metrics['chunksWithTypeExtraction'] = chunks_with_type
+
+    if metrics['textChunks']:
+        total = metrics['textChunks']
+        metrics['teachingUnitRate'] = round(chunks_with_teaching / total, 4)
+        metrics['graphNodeRate'] = round(chunks_with_graph / total, 4)
+        metrics['weeklyItemRate'] = round(chunks_with_weekly / total, 4)
+        metrics['typeExtractionRate'] = round(chunks_with_type / total, 4)
+    else:
+        metrics['teachingUnitRate'] = 0.0
+        metrics['graphNodeRate'] = 0.0
+        metrics['weeklyItemRate'] = 0.0
+        metrics['typeExtractionRate'] = 0.0
+
+    if metrics['filesWithPages']:
+        metrics['chunkIndexRate'] = round(
+            metrics['filesWithTextChunks'] / metrics['filesWithPages'],
+            4,
+        )
+    else:
+        metrics['chunkIndexRate'] = 0.0
+
+    return metrics
+
+
 def normalize_event_type_for_validation(eventtype='', name=''):
     from canvas_parser.graph.events import normalize_event_type
 

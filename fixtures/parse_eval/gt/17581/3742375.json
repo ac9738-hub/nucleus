@@ -1,0 +1,410 @@
+{
+  "version": 1,
+  "courseId": "17581",
+  "fileId": "3742375",
+  "filename": "example_exam_answers_2025.docx",
+  "expectedFileType": "exam_solution",
+  "passPlan": {
+    "courseId": "17581",
+    "fileId": "3742375",
+    "filename": "example_exam_answers_2025.docx",
+    "resolvedType": "exam_solution",
+    "heuristicConfidence": 0.88,
+    "neededPasses": [
+      "extract_pages",
+      "heuristic_classify",
+      "llm_pass1",
+      "finalize"
+    ],
+    "skippedPasses": [
+      "llm_classify",
+      "llm_pass2"
+    ],
+    "estLlmCalls": 1,
+    "estRealisticLlmCalls": 1.0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "needed": true,
+        "reason": "Required local PDF/HTML extraction; no LLM.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "heuristic_classify",
+        "needed": true,
+        "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_classify",
+        "needed": false,
+        "reason": "Heuristic confidence 0.88 sufficient; skip flash classify call.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_pass1",
+        "needed": true,
+        "reason": "Type exam_solution: pass1 link/file_node only (no concept extraction profile).",
+        "llmCall": true,
+        "estCostTier": "low"
+      },
+      {
+        "pass": "llm_pass2",
+        "needed": false,
+        "reason": "Type exam_solution disables pass2 (single-pass type-specific or link-only profile).",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "finalize",
+        "needed": true,
+        "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+        "llmCall": false,
+        "estCostTier": "free"
+      }
+    ]
+  },
+  "passAudit": {
+    "plan": {
+      "courseId": "17581",
+      "fileId": "3742375",
+      "filename": "example_exam_answers_2025.docx",
+      "resolvedType": "exam_solution",
+      "heuristicConfidence": 0.88,
+      "neededPasses": [
+        "extract_pages",
+        "heuristic_classify",
+        "llm_pass1",
+        "finalize"
+      ],
+      "skippedPasses": [
+        "llm_classify",
+        "llm_pass2"
+      ],
+      "estLlmCalls": 1,
+      "estRealisticLlmCalls": 1.0,
+      "steps": [
+        {
+          "pass": "extract_pages",
+          "needed": true,
+          "reason": "Required local PDF/HTML extraction; no LLM.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "heuristic_classify",
+          "needed": true,
+          "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_classify",
+          "needed": false,
+          "reason": "Heuristic confidence 0.88 sufficient; skip flash classify call.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_pass1",
+          "needed": true,
+          "reason": "Type exam_solution: pass1 link/file_node only (no concept extraction profile).",
+          "llmCall": true,
+          "estCostTier": "low"
+        },
+        {
+          "pass": "llm_pass2",
+          "needed": false,
+          "reason": "Type exam_solution disables pass2 (single-pass type-specific or link-only profile).",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "finalize",
+          "needed": true,
+          "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+          "llmCall": false,
+          "estCostTier": "free"
+        }
+      ]
+    },
+    "actualType": "exam_solution",
+    "deepseekPasses": 1,
+    "conceptCount": 32,
+    "detailCount": 3,
+    "totalLlmTokens": 0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "ran": true,
+        "useful": true,
+        "verdict": "required",
+        "note": "Local I/O; pages present means extract succeeded."
+      },
+      {
+        "pass": "heuristic_classify",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "Routed to exam_solution (free)."
+      },
+      {
+        "pass": "llm_classify",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Skipped; heuristic confidence sufficient.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass1",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "No pass1 tool trace.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass2",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Correctly skipped: profile disables pass2, type-specific pass1 only, or no log_* tools.",
+        "tokens": 0
+      },
+      {
+        "pass": "finalize",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "logged_details promoted to concept details."
+      }
+    ],
+    "cutCandidates": [],
+    "recommendations": [
+      "Pass2 correctly skipped for this type/pass1 tool pattern."
+    ]
+  },
+  "passes": [
+    "extract_pages",
+    "heuristic_classify",
+    "teaching_units",
+    "type_structure",
+    "concept_candidates",
+    "problem_scan",
+    "detail_attach",
+    "reconcile"
+  ],
+  "buildMode": "template_multi_pass_offline",
+  "builtAt": "2026-07-01T22:49:39Z",
+  "concepts": [
+    {
+      "name": "Problem 1",
+      "details": []
+    },
+    {
+      "name": "Problem 4",
+      "details": []
+    },
+    {
+      "name": "Problem 5",
+      "details": []
+    },
+    {
+      "name": "Problem 6",
+      "details": []
+    },
+    {
+      "name": "Problem 7",
+      "details": []
+    },
+    {
+      "name": "Problem 8",
+      "details": []
+    },
+    {
+      "name": "Problem 12",
+      "details": []
+    },
+    {
+      "name": "Problem 14",
+      "details": []
+    },
+    {
+      "name": "group 2",
+      "details": []
+    },
+    {
+      "name": "group 3",
+      "details": []
+    },
+    {
+      "name": "group 1",
+      "details": []
+    },
+    {
+      "name": "v4 (or hv4) because of its role in color perception",
+      "details": [
+        "Group 1: V4 (or hV4) because of its role in color perception"
+      ]
+    },
+    {
+      "name": "ots-limbs (of limb/body-selective region in ventraltemporal cortex)",
+      "details": [
+        "Group 2: OTS-limbs (of limb/body-selective region in ventraltemporal cortex)"
+      ]
+    },
+    {
+      "name": "v1, whose simple cells respond to oriented lines",
+      "details": [
+        "Group 3: V1, whose simple cells respond to oriented lines"
+      ]
+    },
+    {
+      "name": "question 4 (8pts)",
+      "details": []
+    },
+    {
+      "name": "question 5 (12pts)",
+      "details": []
+    },
+    {
+      "name": "question 6 (8pts)",
+      "details": []
+    },
+    {
+      "name": "question 7 (6pts)",
+      "details": []
+    },
+    {
+      "name": "question 8 (6pts)",
+      "details": []
+    },
+    {
+      "name": "left vof",
+      "details": []
+    },
+    {
+      "name": "right vof",
+      "details": []
+    },
+    {
+      "name": "left arcuate",
+      "details": []
+    },
+    {
+      "name": "right",
+      "details": []
+    },
+    {
+      "name": "arcuate",
+      "details": []
+    },
+    {
+      "name": "left optic nerve",
+      "details": []
+    },
+    {
+      "name": "right optic nerve",
+      "details": []
+    },
+    {
+      "name": "patient y",
+      "details": []
+    },
+    {
+      "name": "patient x",
+      "details": []
+    },
+    {
+      "name": "patient z",
+      "details": []
+    },
+    {
+      "name": "question 12",
+      "details": []
+    },
+    {
+      "name": "question 14 (5pts)",
+      "details": []
+    },
+    {
+      "name": "single-cell recording (stereo-eeg, utah array)",
+      "details": []
+    }
+  ],
+  "conceptCount": 32,
+  "detailCount": 3,
+  "events": [],
+  "problems": [
+    "Problem 1",
+    "Problem 4",
+    "Problem 5",
+    "Problem 6",
+    "Problem 7",
+    "Problem 8",
+    "Problem 12",
+    "Problem 14"
+  ],
+  "sections": [
+    "Problem 1",
+    "Problem 4",
+    "Problem 5",
+    "Problem 6",
+    "Problem 7",
+    "Problem 8",
+    "Problem 12",
+    "Problem 14"
+  ],
+  "deepseekPasses": 1,
+  "expectsPass2": false,
+  "gtProvenance": {
+    "typeSource": "heuristic_high",
+    "typeConfidence": 0.88,
+    "offlinePassAudit": {
+      "extract_pages": {
+        "localPdf": true,
+        "pageCount": 17,
+        "pdfPath": "C:\\Allen\\nucleus\\canvasfiles\\3742375"
+      },
+      "heuristic_classify": {
+        "expectedFileType": "exam_solution",
+        "source": "heuristic_high",
+        "confidence": 0.88
+      },
+      "teaching_units": {
+        "sectionCount": 8
+      },
+      "type_structure": {
+        "slideRows": 33,
+        "readingSections": 0,
+        "syllabusWeeks": 0
+      },
+      "concept_candidates": {
+        "candidateCount": 32
+      },
+      "problem_scan": {
+        "problemCount": 8
+      },
+      "detail_attach": {
+        "conceptKeysWithDetails": 7,
+        "detailCount": 7
+      },
+      "reconcile": {
+        "inputTitles": 32,
+        "accepted": 32,
+        "capped": 0,
+        "detailAttached": 3
+      }
+    },
+    "reconcileStats": {
+      "inputTitles": 32,
+      "accepted": 32,
+      "capped": 0,
+      "detailAttached": 3
+    }
+  }
+}

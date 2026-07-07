@@ -1,0 +1,7 @@
+PASTE_CHAPTER_TEXT_HERE
+
+Replace this file with plain text from a textbook chapter (no PDF required).
+After pasting, add expected section headings to fixtures/heuristic_parse/textbook/manifest.json
+under this chapter's expectedSections — e.g. "1.1 Introduction", "1.2 Atoms and Molecules".
+
+Heuristic extractors should detect numbered sections (1.1, 2.3), CHAPTER N, and Section N patterns.

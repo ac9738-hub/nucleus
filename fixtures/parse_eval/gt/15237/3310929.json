@@ -1,0 +1,652 @@
+{
+  "version": 1,
+  "courseId": "15237",
+  "fileId": "3310929",
+  "filename": "Lecture 9_ visual system II central processing and faces_slides.pdf",
+  "expectedFileType": "lecture_slides",
+  "passPlan": {
+    "courseId": "15237",
+    "fileId": "3310929",
+    "filename": "Lecture 9_ visual system II central processing and faces_slides.pdf",
+    "resolvedType": "lecture_slides",
+    "heuristicConfidence": 0.92,
+    "neededPasses": [
+      "extract_pages",
+      "heuristic_classify",
+      "llm_pass1",
+      "finalize"
+    ],
+    "skippedPasses": [
+      "llm_classify",
+      "llm_pass2"
+    ],
+    "estLlmCalls": 1,
+    "estRealisticLlmCalls": 1.0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "needed": true,
+        "reason": "Required local PDF/HTML extraction; no LLM.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "heuristic_classify",
+        "needed": true,
+        "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_classify",
+        "needed": false,
+        "reason": "Heuristic confidence 0.92 sufficient; skip flash classify call.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_pass1",
+        "needed": true,
+        "reason": "Type lecture_slides: pass1 extracts concepts=True, problems=True, events=False.",
+        "llmCall": true,
+        "estCostTier": "high"
+      },
+      {
+        "pass": "llm_pass2",
+        "needed": false,
+        "reason": "Type lecture_slides disables pass2 (single-pass type-specific or link-only profile).",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "finalize",
+        "needed": true,
+        "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+        "llmCall": false,
+        "estCostTier": "free"
+      }
+    ]
+  },
+  "passAudit": {
+    "plan": {
+      "courseId": "15237",
+      "fileId": "3310929",
+      "filename": "Lecture 9_ visual system II central processing and faces_slides.pdf",
+      "resolvedType": "lecture_slides",
+      "heuristicConfidence": 0.92,
+      "neededPasses": [
+        "extract_pages",
+        "heuristic_classify",
+        "llm_pass1",
+        "finalize"
+      ],
+      "skippedPasses": [
+        "llm_classify",
+        "llm_pass2"
+      ],
+      "estLlmCalls": 1,
+      "estRealisticLlmCalls": 1.0,
+      "steps": [
+        {
+          "pass": "extract_pages",
+          "needed": true,
+          "reason": "Required local PDF/HTML extraction; no LLM.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "heuristic_classify",
+          "needed": true,
+          "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_classify",
+          "needed": false,
+          "reason": "Heuristic confidence 0.92 sufficient; skip flash classify call.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_pass1",
+          "needed": true,
+          "reason": "Type lecture_slides: pass1 extracts concepts=True, problems=True, events=False.",
+          "llmCall": true,
+          "estCostTier": "high"
+        },
+        {
+          "pass": "llm_pass2",
+          "needed": false,
+          "reason": "Type lecture_slides disables pass2 (single-pass type-specific or link-only profile).",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "finalize",
+          "needed": true,
+          "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+          "llmCall": false,
+          "estCostTier": "free"
+        }
+      ]
+    },
+    "actualType": "lecture_slides",
+    "deepseekPasses": 1,
+    "conceptCount": 80,
+    "detailCount": 29,
+    "totalLlmTokens": 0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "ran": true,
+        "useful": true,
+        "verdict": "required",
+        "note": "Local I/O; pages present means extract succeeded."
+      },
+      {
+        "pass": "heuristic_classify",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "Routed to lecture_slides (free)."
+      },
+      {
+        "pass": "llm_classify",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Skipped; heuristic confidence sufficient.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass1",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "No pass1 tool trace.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass2",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Correctly skipped: profile disables pass2, type-specific pass1 only, or no log_* tools.",
+        "tokens": 0
+      },
+      {
+        "pass": "finalize",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "logged_details promoted to concept details."
+      }
+    ],
+    "cutCandidates": [],
+    "recommendations": [
+      "Pass2 correctly skipped for this type/pass1 tool pattern."
+    ]
+  },
+  "passes": [
+    "extract_pages",
+    "heuristic_classify",
+    "teaching_units",
+    "type_structure",
+    "concept_candidates",
+    "problem_scan",
+    "detail_attach",
+    "reconcile"
+  ],
+  "buildMode": "template_multi_pass_offline",
+  "builtAt": "2026-07-01T22:49:38Z",
+  "concepts": [
+    {
+      "name": "1 million retinal axons (“1 megapixel”)",
+      "details": []
+    },
+    {
+      "name": "right side of the world",
+      "details": []
+    },
+    {
+      "name": "45 y o man, implanted electrodes to localize medication-resistant seizures",
+      "details": []
+    },
+    {
+      "name": "Other causes of “seeing stars” (spontaneous activity in visual pathways)",
+      "details": []
+    },
+    {
+      "name": "Problem 1",
+      "details": []
+    },
+    {
+      "name": "Problem 2",
+      "details": []
+    },
+    {
+      "name": "Problem 3",
+      "details": []
+    },
+    {
+      "name": "Problem 4",
+      "details": []
+    },
+    {
+      "name": "Problem 5",
+      "details": []
+    },
+    {
+      "name": "Which two are the same? A and",
+      "details": []
+    },
+    {
+      "name": "central visual processing and face recognition",
+      "details": [
+        "Vision II:Central visual processing and face recognition"
+      ]
+    },
+    {
+      "name": "special coffee hour option this week",
+      "details": []
+    },
+    {
+      "name": "email me to schedule if interested",
+      "details": []
+    },
+    {
+      "name": "email me if interested",
+      "details": []
+    },
+    {
+      "name": "summary of last lecture",
+      "details": []
+    },
+    {
+      "name": "3, opsins (gpcrs) sensitive to different wavelengths",
+      "details": [
+        "–Cones: 3, opsins (GPCRs) sensitive to different wavelengths"
+      ]
+    },
+    {
+      "name": "what we want to understand",
+      "details": [
+        "The retina: what we want to understand"
+      ]
+    },
+    {
+      "name": "horizontal cells",
+      "details": []
+    },
+    {
+      "name": "key features",
+      "details": []
+    },
+    {
+      "name": "most input to horizontal cells",
+      "details": []
+    },
+    {
+      "name": "outline for today",
+      "details": []
+    },
+    {
+      "name": "right visual field processed by left lgn",
+      "details": [
+        "Result: right visual field processed by left LGN"
+      ]
+    },
+    {
+      "name": "right visual field",
+      "details": []
+    },
+    {
+      "name": "left lgn",
+      "details": []
+    },
+    {
+      "name": "central binocularity",
+      "details": [
+        "Effect of partial decussation: central binocularity"
+      ]
+    },
+    {
+      "name": "dominant eyeidentification",
+      "details": []
+    },
+    {
+      "name": "increased decussation (crossing), reduced binocularity",
+      "details": [
+        "Albinism: increased decussation (crossing), reduced binocularity"
+      ]
+    },
+    {
+      "name": "typicalalbinism",
+      "details": []
+    },
+    {
+      "name": "blind in entire right visual field",
+      "details": []
+    },
+    {
+      "name": "four main targets of retinal ganglion cells",
+      "details": []
+    },
+    {
+      "name": "conscious visual perception",
+      "details": [
+        "• Lateral geniculate nucleus: – conscious visual perception"
+      ]
+    },
+    {
+      "name": "autosomal dominant compelling helio-ophthalmic outburst syndrome (achoo)",
+      "details": [
+        "AKA: Autosomal Dominant Compelling Helio-Ophthalmic Outburst Syndrome (ACHOO)"
+      ]
+    },
+    {
+      "name": "(a) true(b) false",
+      "details": [
+        "Clickers: (A) True(B) False"
+      ]
+    },
+    {
+      "name": "visual cortex",
+      "details": [
+        "Main target of LGN: visual cortex"
+      ]
+    },
+    {
+      "name": "primary visual cortex",
+      "details": [
+        "Main input to LGN: primary visual cortex"
+      ]
+    },
+    {
+      "name": "most lgn neurons project toprimary visual cortex",
+      "details": []
+    },
+    {
+      "name": "(brodmann) area 17 – v1 – striate cortex",
+      "details": [
+        "Synonyms:– (Brodmann) area 17 – V1 – striate cortex"
+      ]
+    },
+    {
+      "name": "visual cortex is a layered structure",
+      "details": []
+    },
+    {
+      "name": "spiny stellate cells (local)",
+      "details": []
+    },
+    {
+      "name": "pyramidal cells (projection)",
+      "details": []
+    },
+    {
+      "name": "six layers",
+      "details": [
+        "•Most of neocortex: six layers"
+      ]
+    },
+    {
+      "name": "nine!",
+      "details": [
+        "•Striate cortex: nine!"
+      ]
+    },
+    {
+      "name": "v1 (visual cortex)",
+      "details": [
+        "NOTE: V1 (visual cortex)"
+      ]
+    },
+    {
+      "name": "radial connectionshorizontal connections",
+      "details": []
+    },
+    {
+      "name": "outputs",
+      "details": []
+    },
+    {
+      "name": "retinotopy (map) in visual cortex",
+      "details": []
+    },
+    {
+      "name": "ocular dominance columns in layer ivc",
+      "details": []
+    },
+    {
+      "name": "binocularity begins in layer iii",
+      "details": []
+    },
+    {
+      "name": "less response•perpendicular is the worst",
+      "details": [
+        "•Orientation-selective•Other orientations: less response•Perpendicular is the worst"
+      ]
+    },
+    {
+      "name": "neighboring neurons have receptive fields with similar preferred orientations",
+      "details": [
+        "Orientation columns: neighboring neurons have receptive fields with similar preferred orientations"
+      ]
+    },
+    {
+      "name": "analysis of object shape",
+      "details": []
+    },
+    {
+      "name": "analysis of object motion",
+      "details": []
+    },
+    {
+      "name": "retina",
+      "details": []
+    },
+    {
+      "name": "hubel-wiesel model",
+      "details": []
+    },
+    {
+      "name": "evidence of two separate streams",
+      "details": []
+    },
+    {
+      "name": "form without motion (dorsal stream damage?)",
+      "details": [
+        "Akinetopsia: Form without motion (dorsal stream damage?)"
+      ]
+    },
+    {
+      "name": "motion without form (ventral stream damage?)",
+      "details": [
+        "Blindsight: Motion without form (ventral stream damage?)"
+      ]
+    },
+    {
+      "name": "neurons in area mt (v5) sensitive to motion direction",
+      "details": [
+        "“Where” pathway: neurons in Area MT (V5) sensitive to motion direction"
+      ]
+    },
+    {
+      "name": "250 fps vs our 60 fps",
+      "details": [
+        "Flies: 250 fps vs our 60 fps"
+      ]
+    },
+    {
+      "name": "direction of perceived motion",
+      "details": []
+    },
+    {
+      "name": "motion strength",
+      "details": []
+    },
+    {
+      "name": "illusory motion also likely arises in mt",
+      "details": []
+    },
+    {
+      "name": "stretching and question break",
+      "details": []
+    },
+    {
+      "name": "large receptive fields",
+      "details": []
+    },
+    {
+      "name": "encode shape and color perception",
+      "details": []
+    },
+    {
+      "name": "area it",
+      "details": [
+        "After V4: area IT"
+      ]
+    },
+    {
+      "name": "“what” pathway atrophy",
+      "details": [
+        "Some degenerative disorders:“what” pathway atrophy"
+      ]
+    },
+    {
+      "name": "faces are special",
+      "details": []
+    },
+    {
+      "name": "newborn infants show preference for faces",
+      "details": []
+    },
+    {
+      "name": "illusory faces also activate face-selective brain regions",
+      "details": [
+        "fMRI : illusory faces also activate face-selective brain regions"
+      ]
+    },
+    {
+      "name": "actual facesillusory faces",
+      "details": []
+    },
+    {
+      "name": "fusiform face area",
+      "details": []
+    },
+    {
+      "name": "occipital face area",
+      "details": []
+    },
+    {
+      "name": "vague faces are cute, almost-faces are creepy",
+      "details": [
+        "The uncanny valley: vague faces are cute, almost-faces are creepy"
+      ]
+    },
+    {
+      "name": "faces much harder to distinguish if upside-down",
+      "details": [
+        "Result: faces much harder to distinguish if upside-down"
+      ]
+    },
+    {
+      "name": "eyebrows are critical to face recognition",
+      "details": []
+    },
+    {
+      "name": "prosopagnosia",
+      "details": [
+        "Face blindness: prosopagnosia"
+      ]
+    },
+    {
+      "name": "congenital, or due to damage",
+      "details": []
+    },
+    {
+      "name": "use to id crooks on cctv",
+      "details": [
+        "Scotland Yard: use to ID crooks on CCTV"
+      ]
+    },
+    {
+      "name": "“super recognizers”",
+      "details": [
+        "Better face recognition:“super recognizers”"
+      ]
+    }
+  ],
+  "conceptCount": 80,
+  "detailCount": 29,
+  "events": [],
+  "problems": [
+    "Problem 1",
+    "Problem 2",
+    "Problem 3",
+    "Problem 4",
+    "Problem 5"
+  ],
+  "sections": [
+    "Key features",
+    "Other causes of “seeing stars” (spontaneous activity in visual pathways)",
+    "Problem 1",
+    "Problem 2",
+    "Problem 3",
+    "Problem 4",
+    "Problem 5",
+    "Which two are the same? A and",
+    "Concepts from vision that extend to other senses"
+  ],
+  "deepseekPasses": 1,
+  "expectsPass2": false,
+  "gtProvenance": {
+    "typeSource": "heuristic_high",
+    "typeConfidence": 0.92,
+    "offlinePassAudit": {
+      "extract_pages": {
+        "localPdf": true,
+        "pageCount": 90,
+        "pdfPath": "C:\\Allen\\nucleus\\canvasfiles\\3310929"
+      },
+      "heuristic_classify": {
+        "expectedFileType": "lecture_slides",
+        "source": "heuristic_high",
+        "confidence": 0.92
+      },
+      "teaching_units": {
+        "sectionCount": 9
+      },
+      "type_structure": {
+        "slideRows": 96,
+        "readingSections": 0,
+        "syllabusWeeks": 0
+      },
+      "concept_candidates": {
+        "candidateCount": 80
+      },
+      "problem_scan": {
+        "problemCount": 5
+      },
+      "detail_attach": {
+        "conceptKeysWithDetails": 37,
+        "detailCount": 37
+      },
+      "reconcile": {
+        "inputTitles": 80,
+        "accepted": 80,
+        "capped": 0,
+        "detailAttached": 29
+      }
+    },
+    "reconcileStats": {
+      "inputTitles": 80,
+      "accepted": 80,
+      "capped": 0,
+      "detailAttached": 29
+    }
+  }
+}

@@ -1,0 +1,299 @@
+{
+  "assignments": [
+    { "name": "Quiz 1: Parker Article", "due_at": "2/10/2025" },
+    { "name": "Python Notebook 1: Upload Figure", "due_at": "2/16/2025" },
+    { "name": "Quiz 2: Parvizi Article & Cog Neuro Methods", "due_at": "2/22/2025" },
+    { "name": "Quiz 3: Harvey Article, Sensation & Perception", "due_at": "2/24/2025" },
+    { "name": "Python Notebook 2: Figure Upload", "due_at": "2/24/2025" },
+    { "name": "Quiz 4: Gomez Article + Object Recognition", "due_at": "3/3/2025" },
+    { "name": "Quiz 5: Baldauf article & Attention", "due_at": "3/24/2025" },
+    { "name": "Quiz 6: Choi article & Action", "due_at": "3/31/2025" },
+    { "name": "Quiz 7: Memory", "due_at": "4/8/2025" },
+    { "name": "Python Notebook 3: Upload Figure", "due_at": "4/11/2025" },
+    { "name": "Quiz 8: Emotion", "due_at": "4/16/2025" },
+    { "name": "Quiz 9: Lerner Article & Language", "due_at": "4/25/2025" },
+    { "name": "Research Engagement Assignment (Subject Pool)", "due_at": "4/25/2025" },
+    { "name": "Final Homework", "due_at": "5/6/2025" }
+  ],
+  "participation": [
+    { "name": "Precept Grade" }
+  ],
+  "modules": [],
+  "file_folders": [
+    {
+      "folder_name": "Lecture Slides",
+      "folder_contents": [
+        { "name": "Week1_part1_Intro_StructureFunction.pdf" },
+        { "name": "Week1_part2_Intro_StructureFunction.pdf" },
+        { "name": "Week2_part1_Methods.pdf" },
+        { "name": "Week2_part2_Methods.pdf" },
+        { "name": "Week3_part1_Sensation.pdf" },
+        { "name": "Week3_part2_Sensation.pdf" },
+        { "name": "Week4_part1_ObjectRecognition.pdf" },
+        { "name": "Week4_part2_ObjectRecognition.pdf" },
+        { "name": "Week5_part1_Attention.pdf" },
+        { "name": "Week5_part2_Attention.pdf" },
+        { "name": "Week6_part1_Action.pdf" },
+        { "name": "Week6_part2_Action.pdf" },
+        { "name": "Week7_part1_Memory.pdf" },
+        { "name": "Week7_part2_Memory.pdf" },
+        { "name": "Week8_part1_Emotion.pdf" },
+        { "name": "Week8_part2_Emotion.pdf" },
+        { "name": "Week9_part1_Language.pdf" },
+        { "name": "Week9_part2_Language.pdf" },
+        { "name": "Week10_part1_SocialCognition.pdf" },
+        { "name": "Week10_part2_SocialCognition.pdf" },
+        { "name": "Week11_part1_BrainDev-1.pdf" },
+        { "name": "Week11_part2_BrainDev-1.pdf" },
+        { "name": "kahoot_questions.pdf" }
+      ]
+    },
+    {
+      "folder_name": "Precept Articles",
+      "folder_contents": [
+        { "name": "Parker_2023.pdf" },
+        { "name": "Parvizi_2012.pdf" },
+        { "name": "Harvey_2013.pdf" },
+        { "name": "Gomez_2019.pdf" },
+        { "name": "Baldauf_2014.pdf" },
+        { "name": "Choi_2020.pdf" },
+        { "name": "memory1_Maguire_2000.pdf" },
+        { "name": "memory2_Ellis_2021.pdf" },
+        { "name": "Wicker_2003.pdf" },
+        { "name": "Lerner_2011.pdf" },
+        { "name": "Parkinson_2018.pdf" }
+      ]
+    },
+    {
+      "folder_name": "Exam Materials",
+      "folder_contents": [
+        { "name": "example_exam_questions_2025.pdf" },
+        { "name": "example_exam_answers_2025.docx" },
+        { "name": "Study-Guide.docx" }
+      ]
+    }
+  ],
+  "weekly_schedule": [
+    {
+      "name": "Week 1",
+      "start_date": "1/27/2025",
+      "end_date": "2/2/2025",
+      "files": [
+        { "name": "neu202_syllabus_Spring2025.pdf" },
+        { "name": "Week1_part1_Intro_StructureFunction.pdf" },
+        { "name": "Week1_part2_Intro_StructureFunction.pdf" },
+        { "name": "Parker_2023.pdf" }
+      ],
+      "assignments": [],
+      "events": []
+    },
+    {
+      "name": "Week 2",
+      "start_date": "2/3/2025",
+      "end_date": "2/9/2025",
+      "files": [
+        { "name": "Week2_part1_Methods.pdf" },
+        { "name": "Week2_part2_Methods.pdf" },
+        { "name": "Parvizi_2012.pdf" }
+      ],
+      "assignments": [],
+      "events": []
+    },
+    {
+      "name": "Week 3",
+      "start_date": "2/10/2025",
+      "end_date": "2/16/2025",
+      "files": [
+        { "name": "Week3_part1_Sensation.pdf" },
+        { "name": "Week3_part2_Sensation.pdf" },
+        { "name": "Harvey_2013.pdf" }
+      ],
+      "assignments": [
+        { "name": "Quiz 1: Parker Article", "files": [{ "name": "Parker_2023.pdf" }] },
+        { "name": "Python Notebook 1: Upload Figure", "files": [] }
+      ],
+      "events": []
+    },
+    {
+      "name": "Week 4",
+      "start_date": "2/17/2025",
+      "end_date": "2/23/2025",
+      "files": [
+        { "name": "Week4_part1_ObjectRecognition.pdf" },
+        { "name": "Week4_part2_ObjectRecognition.pdf" },
+        { "name": "Gomez_2019.pdf" }
+      ],
+      "assignments": [
+        { "name": "Quiz 2: Parvizi Article & Cog Neuro Methods", "files": [{ "name": "Parvizi_2012.pdf" }] }
+      ],
+      "events": []
+    },
+    {
+      "name": "Week 5",
+      "start_date": "2/24/2025",
+      "end_date": "3/2/2025",
+      "files": [
+        { "name": "Week5_part1_Attention.pdf" },
+        { "name": "Week5_part2_Attention.pdf" },
+        { "name": "Baldauf_2014.pdf" }
+      ],
+      "assignments": [
+        { "name": "Quiz 3: Harvey Article, Sensation & Perception", "files": [{ "name": "Harvey_2013.pdf" }] },
+        { "name": "Python Notebook 2: Figure Upload", "files": [] }
+      ],
+      "events": []
+    },
+    {
+      "name": "Week 6",
+      "start_date": "3/3/2025",
+      "end_date": "3/9/2025",
+      "files": [],
+      "assignments": [
+        { "name": "Quiz 4: Gomez Article + Object Recognition", "files": [{ "name": "Gomez_2019.pdf" }] }
+      ],
+      "events": [
+        { "name": "University Midterm Period", "files": [] }
+      ]
+    },
+    {
+      "name": "Week 7",
+      "start_date": "3/10/2025",
+      "end_date": "3/16/2025",
+      "files": [],
+      "assignments": [],
+      "events": [
+        { "name": "Spring Break", "files": [] }
+      ]
+    },
+    {
+      "name": "Week 8",
+      "start_date": "3/17/2025",
+      "end_date": "3/23/2025",
+      "files": [
+        { "name": "Week6_part1_Action.pdf" },
+        { "name": "Week6_part2_Action.pdf" },
+        { "name": "Choi_2020.pdf" }
+      ],
+      "assignments": [],
+      "events": []
+    },
+    {
+      "name": "Week 9",
+      "start_date": "3/24/2025",
+      "end_date": "3/30/2025",
+      "files": [
+        { "name": "Week7_part1_Memory.pdf" },
+        { "name": "Week7_part2_Memory.pdf" },
+        { "name": "memory1_Maguire_2000.pdf" },
+        { "name": "memory2_Ellis_2021.pdf" }
+      ],
+      "assignments": [
+        { "name": "Quiz 5: Baldauf article & Attention", "files": [{ "name": "Baldauf_2014.pdf" }] }
+      ],
+      "events": []
+    },
+    {
+      "name": "Week 10",
+      "start_date": "3/31/2025",
+      "end_date": "4/6/2025",
+      "files": [
+        { "name": "Week8_part1_Emotion.pdf" },
+        { "name": "Week8_part2_Emotion.pdf" },
+        { "name": "Wicker_2003.pdf" }
+      ],
+      "assignments": [
+        { "name": "Quiz 6: Choi article & Action", "files": [{ "name": "Choi_2020.pdf" }] }
+      ],
+      "events": []
+    },
+    {
+      "name": "Week 11",
+      "start_date": "4/7/2025",
+      "end_date": "4/13/2025",
+      "files": [
+        { "name": "Week9_part1_Language.pdf" },
+        { "name": "Week9_part2_Language.pdf" },
+        { "name": "Lerner_2011.pdf" }
+      ],
+      "assignments": [
+        { "name": "Quiz 7: Memory", "files": [
+          { "name": "memory1_Maguire_2000.pdf" },
+          { "name": "memory2_Ellis_2021.pdf" }
+        ] },
+        { "name": "Python Notebook 3: Upload Figure", "files": [] }
+      ],
+      "events": []
+    },
+    {
+      "name": "Week 12",
+      "start_date": "4/14/2025",
+      "end_date": "4/20/2025",
+      "files": [
+        { "name": "Week10_part1_SocialCognition.pdf" },
+        { "name": "Week10_part2_SocialCognition.pdf" },
+        { "name": "Parkinson_2018.pdf" }
+      ],
+      "assignments": [
+        { "name": "Quiz 8: Emotion", "files": [{ "name": "Wicker_2003.pdf" }] }
+      ],
+      "events": []
+    },
+    {
+      "name": "Week 13",
+      "start_date": "4/21/2025",
+      "end_date": "4/27/2025",
+      "files": [
+        { "name": "Week11_part1_BrainDev-1.pdf" },
+        { "name": "Week11_part2_BrainDev-1.pdf" },
+        { "name": "Study-Guide.docx" }
+      ],
+      "assignments": [
+        { "name": "Quiz 9: Lerner Article & Language", "files": [{ "name": "Lerner_2011.pdf" }] },
+        { "name": "Research Engagement Assignment (Subject Pool)", "files": [] }
+      ],
+      "events": []
+    },
+    {
+      "name": "Week 14",
+      "start_date": "4/28/2025",
+      "end_date": "5/4/2025",
+      "files": [
+        { "name": "kahoot_questions.pdf" },
+        { "name": "example_exam_questions_2025.pdf" },
+        { "name": "example_exam_answers_2025.docx" }
+      ],
+      "assignments": [],
+      "events": [
+        {
+          "name": "Reading Period",
+          "files": [
+            { "name": "Study-Guide.docx" },
+            { "name": "kahoot_questions.pdf" },
+            { "name": "example_exam_questions_2025.pdf" },
+            { "name": "example_exam_answers_2025.docx" }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Week 15",
+      "start_date": "5/5/2025",
+      "end_date": "5/11/2025",
+      "files": [],
+      "assignments": [
+        { "name": "Final Homework", "files": [] }
+      ],
+      "events": [
+        {
+          "name": "Final Exam",
+          "files": [
+            { "name": "Study-Guide.docx" },
+            { "name": "kahoot_questions.pdf" },
+            { "name": "example_exam_questions_2025.pdf" },
+            { "name": "example_exam_answers_2025.docx" }
+          ]
+        }
+      ]
+    }
+  ]
+}

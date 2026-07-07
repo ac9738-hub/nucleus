@@ -14,6 +14,7 @@ assignmenthtml.json
 canvas_data.json
 canvas_graph.json
 canvas_graph.json.*.bak
+canvas_graph_tasks.json
 *.pre_dedupe.bak
 *.pre_full_reparse.bak
 *.weekly_iteration.bak
@@ -26,3 +27,20 @@ frame-html/
 app/canvas/canvas_homepages/
 *.pdf
 .cache/
+
+# Parse eval / quality fixtures (large local course snapshots)
+fixtures/parse_eval/
+fixtures/parse_quality/courses/
+
+# Crawled external reading links (local only)
+outside_sources/
+
+# IDE / agent debug output
+.cursor/debug-*.log
+
+# Local runtime logs
+mail_events_log.json
+test-output.txt
+
+# Embedding cache write temps (in addition to *.tmp)
+.canvas_embedding_cache.json.*.tmp

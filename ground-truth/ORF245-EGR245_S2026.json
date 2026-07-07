@@ -1,0 +1,370 @@
+{
+  "assignments": [
+    { "name": "Homework 1", "due_at": "1/30/2026" },
+    { "name": "Homework 2", "due_at": "2/6/2026" },
+    { "name": "Homework 3", "due_at": "2/20/2026" },
+    { "name": "Homework 4", "due_at": "2/27/2026" },
+    { "name": "Homework 5", "due_at": "3/6/2026" },
+    { "name": "Homework 6", "due_at": "3/27/2026" },
+    { "name": "Homework 7", "due_at": "4/10/2026" },
+    { "name": "Homework 8", "due_at": "4/17/2026" }
+  ],
+  "modules": [
+    {
+      "module_name": "Syllabus",
+      "module_contents": [
+        { "name": "SP26_ORF245_Syllabus.pdf" },
+        { "name": "ORF245_Critical_Values_Charts.pdf" }
+      ]
+    },
+    {
+      "module_name": "Class Notes",
+      "module_contents": [
+        { "name": "0 - Intro, Outline, and Descriptive Statistics.zip" },
+        { "name": "1 - Set Theory.pdf" },
+        { "name": "2 - Introduction to Probability.pdf" },
+        { "name": "3 - Conditional Probability & Bayes' Rule.pdf" },
+        { "name": "4 - Discrete Random Variables I.pdf" },
+        { "name": "5 - Discrete Random Variables II, Continuous Random Variables I.pdf" },
+        { "name": "6 - Continuous Random Variables II, Joint RV's I.pdf" },
+        { "name": "7 - Joint RV's II, Joint Expectations.pdf" },
+        { "name": "8 - Midterm Review & Outline.pdf" },
+        { "name": "9 - Sampling, LLN, and CLT.pdf" },
+        { "name": "10 - Intro to Inferential Stats, Point Estimation I.pdf" },
+        { "name": "11 - Point Estimation II (MLE).pdf" },
+        { "name": "12 - Confidence Sets I.pdf" },
+        { "name": "13 - Confidence Sets II.pdf" },
+        { "name": "14 - Hypothesis Testing I.pdf" },
+        { "name": "15 - Hypothesis Testing II.pdf" },
+        { "name": "16 - Regression I.pdf" },
+        { "name": "17 - Regression II.zip" },
+        { "name": "18 - Regression III.zip" },
+        { "name": "19 - Topics in Biases & Bayesian Inference.zip" },
+        { "name": "20 - Final Review & Outline.pdf" }
+      ]
+    },
+    {
+      "module_name": "Precept Materials",
+      "module_contents": [
+        { "name": "Precept 1.pdf" },
+        { "name": "R-intro.Rmd" },
+        { "name": "Precept 2.pdf" },
+        { "name": "Precept 2 sol.pdf" },
+        { "name": "Precept 3.pdf" },
+        { "name": "Precept 3 sol.pdf" },
+        { "name": "Precept 4 .pdf" },
+        { "name": "Precept 4 sol.pdf" },
+        { "name": "Precept 5.pdf" },
+        { "name": "Precept 5 sol.pdf" },
+        { "name": "Precept 6.pdf" },
+        { "name": "Precept 6 sol.pdf" },
+        { "name": "Precept 7.pdf" },
+        { "name": "Precept 7 sol.pdf" },
+        { "name": "Precept 8.pdf" },
+        { "name": "Precept 8 sol.pdf" },
+        { "name": "Precept 9.pdf" },
+        { "name": "Precept 9 sol.pdf" },
+        { "name": "Precept 10.pdf" },
+        { "name": "Precept 10 sol.pdf" },
+        { "name": "Precept 11.pdf" },
+        { "name": "Precept 11 sol.pdf" }
+      ]
+    },
+    {
+      "module_name": "Assignments",
+      "module_contents": [
+        { "name": "ORF245_SP26_HW1.pdf" },
+        { "name": "ORF245_SP26_HW1_SOL.pdf" },
+        { "name": "ORF245_SP26_HW2.pdf" },
+        { "name": "ORF245_SP26_HW2_SOL.pdf" },
+        { "name": "ORF245_SP26_HW3.pdf" },
+        { "name": "ORF245_SP26_HW3_SOL.pdf" },
+        { "name": "ORF245_SP26_HW4.pdf" },
+        { "name": "ORF245_SP26_HW4_SOL.pdf" },
+        { "name": "ORF245_SP26_HW5.pdf" },
+        { "name": "ORF245_SP26_HW5_SOL.pdf" },
+        { "name": "ORF245_SP26_HW6.pdf" },
+        { "name": "ORF245_SP26_HW6_SOL.pdf" },
+        { "name": "ORF245_SP26_HW7.pdf" },
+        { "name": "ORF245_SP26_HW7_SOL.pdf" },
+        { "name": "ORF245_SP26_HW8.pdf" },
+        { "name": "ORF245_SP26_HW8_SOL.pdf" },
+        { "name": "data.csv" }
+      ]
+    },
+    {
+      "module_name": "Midterm Exam",
+      "module_contents": [
+        { "name": "midterm-orf245-2025-fall.pdf" },
+        { "name": "midterm-orf245-2025-fall-solutions.pdf" },
+        { "name": "midterm-orf245-2025-spring.pdf" },
+        { "name": "midterm-orf245-2025-spring-solutions.pdf" },
+        { "name": "midterm-orf245-2024-fall.pdf" },
+        { "name": "midterm-orf245-2024-fall-solutions.pdf" },
+        { "name": "midterm-orf245-2024-spring.pdf" },
+        { "name": "midterm-orf245-2024-spring-solutions.pdf" },
+        { "name": "midterm-orf245-2023-fall.pdf" },
+        { "name": "midterm-orf245-2023-fall-solutions.pdf" },
+        { "name": "Older ORF245 Midterm Exams (Less Representative).zip" },
+        { "name": "ORF245-SP26-Midterm.pdf" },
+        { "name": "ORF245-SP26-Midterm-Solutions.pdf" }
+      ]
+    },
+    {
+      "module_name": "Final Exam",
+      "module_contents": [
+        { "name": "final-orf245-2023-fall-solutions.pdf" },
+        { "name": "final-orf245-2023-fall.pdf" },
+        { "name": "final-orf245-2023-spring-solutions.pdf" },
+        { "name": "final-orf245-2023-spring.pdf" },
+        { "name": "final-orf245-2024-fall-solutions.pdf" },
+        { "name": "final-orf245-2024-fall.pdf" },
+        { "name": "final-orf245-2024-spring-solutions.pdf" },
+        { "name": "final-orf245-2024-spring.pdf" },
+        { "name": "final-orf245-2025-fall-solutions.pdf" },
+        { "name": "final-orf245-2025-fall.pdf" },
+        { "name": "final-orf245-2025-spring-solutions.pdf" },
+        { "name": "final-orf245-2025-spring.pdf" },
+        { "name": "ORF245-SP26-Final.pdf" },
+        { "name": "ORF245-SP26-Final-SOL.pdf" }
+      ]
+    }
+  ],
+  "weekly_schedule": [
+    {
+      "name": "Week 1",
+      "start_date": "1/26/2026",
+      "end_date": "2/1/2026",
+      "files": [
+        { "name": "SP26_ORF245_Syllabus.pdf" },
+        { "name": "ORF245_Critical_Values_Charts.pdf" },
+        { "name": "0 - Intro, Outline, and Descriptive Statistics.zip" },
+        { "name": "1 - Set Theory.pdf" },
+        { "name": "Precept 1.pdf" },
+        { "name": "R-intro.Rmd" },
+        { "name": "ORF245_SP26_HW1.pdf" }
+      ],
+      "assignments": [
+        { "name": "Homework 1", "files": [{ "name": "ORF245_SP26_HW1.pdf" }] }
+      ],
+      "events": []
+    },
+    {
+      "name": "Week 2",
+      "start_date": "2/2/2026",
+      "end_date": "2/8/2026",
+      "files": [
+        { "name": "2 - Introduction to Probability.pdf" },
+        { "name": "3 - Conditional Probability & Bayes' Rule.pdf" },
+        { "name": "Precept 2.pdf" },
+        { "name": "Precept 2 sol.pdf" },
+        { "name": "ORF245_SP26_HW2.pdf" },
+        { "name": "ORF245_SP26_HW1_SOL.pdf" }
+      ],
+      "assignments": [
+        { "name": "Homework 2", "files": [{ "name": "ORF245_SP26_HW2.pdf" }] }
+      ],
+      "events": []
+    },
+    {
+      "name": "Week 3",
+      "start_date": "2/9/2026",
+      "end_date": "2/15/2026",
+      "files": [
+        { "name": "4 - Discrete Random Variables I.pdf" },
+        { "name": "5 - Discrete Random Variables II, Continuous Random Variables I.pdf" },
+        { "name": "Precept 3.pdf" },
+        { "name": "Precept 3 sol.pdf" },
+        { "name": "ORF245_SP26_HW2_SOL.pdf" },
+        { "name": "ORF245_SP26_HW3.pdf" }
+      ],
+      "assignments": [],
+      "events": []
+    },
+    {
+      "name": "Week 4",
+      "start_date": "2/16/2026",
+      "end_date": "2/22/2026",
+      "files": [
+        { "name": "6 - Continuous Random Variables II, Joint RV's I.pdf" },
+        { "name": "7 - Joint RV's II, Joint Expectations.pdf" },
+        { "name": "Precept 4 .pdf" },
+        { "name": "Precept 4 sol.pdf" },
+        { "name": "ORF245_SP26_HW3_SOL.pdf" },
+        { "name": "ORF245_SP26_HW4.pdf" }
+      ],
+      "assignments": [
+        { "name": "Homework 3", "files": [{ "name": "ORF245_SP26_HW3.pdf" }] }
+      ],
+      "events": []
+    },
+    {
+      "name": "Week 5",
+      "start_date": "2/23/2026",
+      "end_date": "3/1/2026",
+      "files": [
+        { "name": "8 - Midterm Review & Outline.pdf" },
+        { "name": "Precept 5.pdf" },
+        { "name": "Precept 5 sol.pdf" },
+        { "name": "ORF245_SP26_HW4_SOL.pdf" }
+      ],
+      "assignments": [
+        { "name": "Homework 4", "files": [{ "name": "ORF245_SP26_HW4.pdf" }] }
+      ],
+      "events": []
+    },
+    {
+      "name": "Week 6",
+      "start_date": "3/2/2026",
+      "end_date": "3/8/2026",
+      "files": [
+        { "name": "9 - Sampling, LLN, and CLT.pdf" },
+        { "name": "Precept 6.pdf" },
+        { "name": "Precept 6 sol.pdf" },
+        { "name": "ORF245_SP26_HW5.pdf" },
+        { "name": "ORF245-SP26-Midterm.pdf" },
+        { "name": "ORF245-SP26-Midterm-Solutions.pdf" }
+      ],
+      "assignments": [
+        { "name": "Homework 5", "files": [{ "name": "ORF245_SP26_HW5.pdf" }] }
+      ],
+      "events": [
+        {
+          "name": "Midterm Exam",
+          "files": [
+            { "name": "8 - Midterm Review & Outline.pdf" },
+            { "name": "ORF245-SP26-Midterm.pdf" },
+            { "name": "ORF245-SP26-Midterm-Solutions.pdf" }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Week 7",
+      "start_date": "3/9/2026",
+      "end_date": "3/15/2026",
+      "files": [
+        { "name": "10 - Intro to Inferential Stats, Point Estimation I.pdf" },
+        { "name": "11 - Point Estimation II (MLE).pdf" },
+        { "name": "Precept 7.pdf" },
+        { "name": "Precept 7 sol.pdf" },
+        { "name": "ORF245_SP26_HW5_SOL.pdf" },
+        { "name": "ORF245_SP26_HW6.pdf" }
+      ],
+      "assignments": [],
+      "events": []
+    },
+    {
+      "name": "Week 8",
+      "start_date": "3/16/2026",
+      "end_date": "3/22/2026",
+      "files": [
+        { "name": "12 - Confidence Sets I.pdf" },
+        { "name": "13 - Confidence Sets II.pdf" },
+        { "name": "Precept 8.pdf" },
+        { "name": "Precept 8 sol.pdf" }
+      ],
+      "assignments": [],
+      "events": [
+        { "name": "Spring Break", "files": [] }
+      ]
+    },
+    {
+      "name": "Week 9",
+      "start_date": "3/23/2026",
+      "end_date": "3/29/2026",
+      "files": [
+        { "name": "14 - Hypothesis Testing I.pdf" },
+        { "name": "15 - Hypothesis Testing II.pdf" },
+        { "name": "Precept 9.pdf" },
+        { "name": "Precept 9 sol.pdf" },
+        { "name": "ORF245_SP26_HW6_SOL.pdf" }
+      ],
+      "assignments": [
+        { "name": "Homework 6", "files": [{ "name": "ORF245_SP26_HW6.pdf" }] }
+      ],
+      "events": []
+    },
+    {
+      "name": "Week 10",
+      "start_date": "3/30/2026",
+      "end_date": "4/5/2026",
+      "files": [
+        { "name": "16 - Regression I.pdf" },
+        { "name": "17 - Regression II.zip" },
+        { "name": "Precept 10.pdf" },
+        { "name": "Precept 10 sol.pdf" },
+        { "name": "ORF245_SP26_HW7.pdf" },
+        { "name": "data.csv" }
+      ],
+      "assignments": [
+        {
+          "name": "Homework 7",
+          "files": [
+            { "name": "ORF245_SP26_HW7.pdf" },
+            { "name": "data.csv" }
+          ]
+        }
+      ],
+      "events": []
+    },
+    {
+      "name": "Week 11",
+      "start_date": "4/6/2026",
+      "end_date": "4/12/2026",
+      "files": [
+        { "name": "18 - Regression III.zip" },
+        { "name": "19 - Topics in Biases & Bayesian Inference.zip" },
+        { "name": "Precept 11.pdf" },
+        { "name": "Precept 11 sol.pdf" },
+        { "name": "ORF245_SP26_HW7_SOL.pdf" },
+        { "name": "ORF245_SP26_HW8.pdf" }
+      ],
+      "assignments": [
+        { "name": "Homework 8", "files": [{ "name": "ORF245_SP26_HW8.pdf" }] }
+      ],
+      "events": []
+    },
+    {
+      "name": "Week 12",
+      "start_date": "4/13/2026",
+      "end_date": "4/19/2026",
+      "files": [
+        { "name": "20 - Final Review & Outline.pdf" },
+        { "name": "ORF245_SP26_HW8_SOL.pdf" }
+      ],
+      "assignments": [],
+      "events": []
+    },
+    {
+      "name": "Week 13",
+      "start_date": "4/20/2026",
+      "end_date": "4/26/2026",
+      "files": [],
+      "assignments": [],
+      "events": [
+        { "name": "Reading Period", "files": [] }
+      ]
+    },
+    {
+      "name": "Week 14",
+      "start_date": "4/27/2026",
+      "end_date": "5/3/2026",
+      "files": [
+        { "name": "ORF245-SP26-Final.pdf" },
+        { "name": "ORF245-SP26-Final-SOL.pdf" }
+      ],
+      "assignments": [],
+      "events": [
+        {
+          "name": "Final Exam",
+          "files": [
+            { "name": "20 - Final Review & Outline.pdf" },
+            { "name": "ORF245-SP26-Final.pdf" },
+            { "name": "ORF245-SP26-Final-SOL.pdf" }
+          ]
+        }
+      ]
+    }
+  ]
+}

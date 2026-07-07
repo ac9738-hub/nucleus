@@ -16,5 +16,1009 @@
     "date": "Wed, 10 Jun 2026 22:08:59 +0000 (UTC)",
     "receivedAtMs": 1781129339000,
     "loggedAt": 1781133488460
+  },
+  "19ed397fc6eb11b1": {
+    "category": "academic",
+    "date": "Tue, 16 Jun 2026 23:19:51 -0400",
+    "receivedAtMs": 1781666391000,
+    "loggedAt": 1781666430569
+  },
+  "19ed3abf4c761dbc": {
+    "category": "academic",
+    "date": "Tue, 16 Jun 2026 22:41:57 -0500 (CDT)",
+    "receivedAtMs": 1781667717000,
+    "loggedAt": 1781667753823
+  },
+  "19ed7128cb793ec6": {
+    "category": "academic",
+    "date": "Wed, 17 Jun 2026 19:32:52 +0000 (UTC)",
+    "receivedAtMs": 1781724772000,
+    "confidence": 0.9,
+    "reason": "Academic sender domain or role.",
+    "loggedAt": 1781727614831
+  },
+  "19ed6c5c5aa5758d": {
+    "category": "non_academic",
+    "date": "Wed, 17 Jun 2026 18:08:59 +0000 (UTC)",
+    "receivedAtMs": 1781719739000,
+    "confidence": 0.88,
+    "reason": "Marketing or notification sender.",
+    "loggedAt": 1781727614835
+  },
+  "19ed68a6e8222f9e": {
+    "category": "non_academic",
+    "date": "Wed, 17 Jun 2026 10:04:09 -0700",
+    "receivedAtMs": 1781715849000,
+    "confidence": 0.94,
+    "reason": "Gmail Promotions category.",
+    "loggedAt": 1781727614846
+  },
+  "19ed658f86181f00": {
+    "category": "non_academic",
+    "date": "Wed, 17 Jun 2026 16:10:04 +0000 (UTC)",
+    "receivedAtMs": 1781712604000,
+    "confidence": 0.88,
+    "reason": "Marketing or notification sender.",
+    "loggedAt": 1781727614848
+  },
+  "19ed6293fa78bb3e": {
+    "category": "non_academic",
+    "date": "Wed, 17 Jun 2026 08:18:04 -0700",
+    "receivedAtMs": 1781709484000,
+    "confidence": 0.94,
+    "reason": "Gmail Promotions category.",
+    "loggedAt": 1781727614856
+  },
+  "19ed614b93298f10": {
+    "category": "academic",
+    "date": "Wed, 17 Jun 2026 14:55:06 +0000",
+    "receivedAtMs": 1781708106000,
+    "confidence": 0.9,
+    "reason": "Academic sender domain or role.",
+    "loggedAt": 1781727614857
+  },
+  "19ed5ea1c05a2a51": {
+    "category": "non_academic",
+    "date": "Wed, 17 Jun 2026 14:09:02 +0000 (UTC)",
+    "receivedAtMs": 1781705342000,
+    "confidence": 0.88,
+    "reason": "Marketing or notification sender.",
+    "loggedAt": 1781727614868
+  },
+  "19ed5e756f19763f": {
+    "category": "academic",
+    "date": "Wed, 17 Jun 2026 14:05:34 +0000",
+    "receivedAtMs": 1781705134000,
+    "confidence": 0.9,
+    "reason": "Academic sender domain or role.",
+    "loggedAt": 1781727614876
+  },
+  "19ed5c388a538732": {
+    "category": "non_academic",
+    "date": "Wed, 17 Jun 2026 13:26:55 +0000",
+    "receivedAtMs": 1781702815000,
+    "confidence": 0.94,
+    "reason": "Gmail Promotions category.",
+    "loggedAt": 1781727614878
+  },
+  "19ed574909581c44": {
+    "category": "non_academic",
+    "date": "Wed, 17 Jun 2026 12:00:26 +0000",
+    "receivedAtMs": 1781697626000,
+    "confidence": 0.94,
+    "reason": "Gmail Promotions category.",
+    "loggedAt": 1781727614886
+  },
+  "19ed52c1c4a4cb7d": {
+    "category": "academic",
+    "date": "Wed, 17 Jun 2026 10:41:33 +0000 (UTC)",
+    "receivedAtMs": 1781692893000,
+    "confidence": 0.78,
+    "reason": "Academic keyword found.",
+    "loggedAt": 1781727614886
+  },
+  "19ed356d2059a21d": {
+    "category": "non_academic",
+    "date": "Wed, 17 Jun 2026 02:08:58 +0000 (UTC)",
+    "receivedAtMs": 1781662138000,
+    "confidence": 0.9,
+    "reason": "Gmail Social category.",
+    "loggedAt": 1781727614890
+  },
+  "19ed2e902814b4f4": {
+    "category": "non_academic",
+    "date": "Wed, 17 Jun 2026 00:08:59 +0000 (UTC)",
+    "receivedAtMs": 1781654939000,
+    "confidence": 0.9,
+    "reason": "Gmail Social category.",
+    "loggedAt": 1781727614896
+  },
+  "19ed2b51f90e4571": {
+    "category": "non_academic",
+    "date": "Tue, 16 Jun 2026 23:12:00 +0000 (UTC)",
+    "receivedAtMs": 1781651520000,
+    "confidence": 0.9,
+    "reason": "Gmail Social category.",
+    "loggedAt": 1781727614907
+  },
+  "19ed2b2829ec38c4": {
+    "category": "academic",
+    "date": "Tue, 16 Jun 2026 23:09:30 +0000",
+    "receivedAtMs": 1781651370000,
+    "confidence": 0.84,
+    "reason": "Multiple academic keywords found.",
+    "loggedAt": 1781727614918
+  },
+  "19ed280d141dd750": {
+    "category": "campus_events",
+    "date": "Tue, 16 Jun 2026 18:13:38 -0400",
+    "receivedAtMs": 1781648018000,
+    "confidence": 0.8,
+    "reason": "Campus event keyword found.",
+    "loggedAt": 1781727614930
+  },
+  "19ed27b313a52bdb": {
+    "category": "non_academic",
+    "date": "Tue, 16 Jun 2026 22:08:58 +0000 (UTC)",
+    "receivedAtMs": 1781647738000,
+    "confidence": 0.9,
+    "reason": "Gmail Social category.",
+    "loggedAt": 1781727614938
+  },
+  "19ed20d4ea454996": {
+    "category": "non_academic",
+    "date": "Tue, 16 Jun 2026 20:09:01 +0000 (UTC)",
+    "receivedAtMs": 1781640541000,
+    "confidence": 0.88,
+    "reason": "Marketing or notification sender.",
+    "loggedAt": 1781727614940
+  },
+  "19ed1df410881177": {
+    "category": "academic",
+    "date": "Tue, 16 Jun 2026 19:18:15 +0000",
+    "receivedAtMs": 1781637495000,
+    "confidence": 0.9,
+    "reason": "Academic sender domain or role.",
+    "loggedAt": 1781727614949
+  },
+  "19ed1d780926e066": {
+    "category": "non_academic",
+    "date": "Tue, 16 Jun 2026 19:10:17 +0000",
+    "receivedAtMs": 1781637017000,
+    "confidence": 0.88,
+    "reason": "Marketing or notification sender.",
+    "loggedAt": 1781727614957
+  },
+  "19ed1c70cd16db32": {
+    "category": "non_academic",
+    "date": "Tue, 16 Jun 2026 11:52:20 -0700",
+    "receivedAtMs": 1781635940000,
+    "confidence": 0.88,
+    "reason": "Marketing or notification sender.",
+    "loggedAt": 1781727614958
+  },
+  "19ed1a4bfcf46f9d": {
+    "category": "academic",
+    "date": "Tue, 16 Jun 2026 18:14:17 +0000",
+    "receivedAtMs": 1781633657000,
+    "confidence": 0.9,
+    "reason": "Academic sender domain or role.",
+    "loggedAt": 1781727614958
+  },
+  "19ed19fa2b2fc472": {
+    "category": "non_academic",
+    "date": "Tue, 16 Jun 2026 18:09:08 +0000 (UTC)",
+    "receivedAtMs": 1781633348000,
+    "confidence": 0.88,
+    "reason": "Marketing or notification sender.",
+    "loggedAt": 1781727614970
+  },
+  "19ed1329f6185d26": {
+    "category": "non_academic",
+    "date": "Tue, 16 Jun 2026 16:10:11 +0000 (UTC)",
+    "receivedAtMs": 1781626211000,
+    "confidence": 0.88,
+    "reason": "Marketing or notification sender.",
+    "loggedAt": 1781727614978
+  },
+  "19ed0c3e44f59b20": {
+    "category": "non_academic",
+    "date": "Tue, 16 Jun 2026 14:09:14 +0000 (UTC)",
+    "receivedAtMs": 1781618954000,
+    "confidence": 0.88,
+    "reason": "Marketing or notification sender.",
+    "loggedAt": 1781727614980
+  },
+  "19ed0a025c48c821": {
+    "category": "academic",
+    "date": "Tue, 16 Jun 2026 13:30:12 +0000",
+    "receivedAtMs": 1781616612000,
+    "confidence": 0.9,
+    "reason": "Academic sender domain or role.",
+    "loggedAt": 1781727614988
+  },
+  "19ed055dfda40cd3": {
+    "category": "non_academic",
+    "date": "Tue, 16 Jun 2026 12:09:03 +0000 (UTC)",
+    "receivedAtMs": 1781611743000,
+    "confidence": 0.9,
+    "reason": "Gmail Social category.",
+    "loggedAt": 1781727614999
+  },
+  "19ed04e2fc95b59e": {
+    "category": "academic",
+    "date": "Tue, 16 Jun 2026 12:00:15 +0000",
+    "receivedAtMs": 1781611215000,
+    "confidence": 0.9,
+    "reason": "Academic sender domain or role.",
+    "loggedAt": 1781727615000
+  },
+  "19ece3fd8ce9a8e1": {
+    "category": "non_academic",
+    "date": "Tue, 16 Jun 2026 02:25:45 +0000 (UTC)",
+    "receivedAtMs": 1781576745000,
+    "confidence": 0.88,
+    "reason": "Marketing or notification sender.",
+    "loggedAt": 1781727615015
+  },
+  "19ecd8e8b61a5f6b": {
+    "category": "non_academic",
+    "date": "Mon, 15 Jun 2026 23:12:06 +0000 (UTC)",
+    "receivedAtMs": 1781565126000,
+    "confidence": 0.9,
+    "reason": "Gmail Social category.",
+    "loggedAt": 1781727615021
+  },
+  "19ecd54cf7fc6c4f": {
+    "category": "non_academic",
+    "date": "Mon, 15 Jun 2026 22:08:57 +0000 (UTC)",
+    "receivedAtMs": 1781561337000,
+    "confidence": 0.9,
+    "reason": "Gmail Social category.",
+    "loggedAt": 1781727615023
+  },
+  "19ecd129fd17e066": {
+    "category": "academic",
+    "date": "Mon, 15 Jun 2026 20:56:17 +0000",
+    "receivedAtMs": 1781556977000,
+    "confidence": 0.9,
+    "reason": "Academic sender domain or role.",
+    "loggedAt": 1781727615032
+  },
+  "19ecce71aafce532": {
+    "category": "non_academic",
+    "date": "Mon, 15 Jun 2026 20:09:11 +0000 (UTC)",
+    "receivedAtMs": 1781554151000,
+    "confidence": 0.88,
+    "reason": "Marketing or notification sender.",
+    "loggedAt": 1781727615041
+  },
+  "19ecc9485743ee7b": {
+    "category": "non_academic",
+    "date": "Mon, 15 Jun 2026 18:39:00 +0000",
+    "receivedAtMs": 1781548740000,
+    "confidence": 0.88,
+    "reason": "Marketing or notification sender.",
+    "loggedAt": 1781727615042
+  },
+  "19ecc79049324bea": {
+    "category": "non_academic",
+    "date": "Mon, 15 Jun 2026 18:08:58 +0000 (UTC)",
+    "receivedAtMs": 1781546938000,
+    "confidence": 0.88,
+    "reason": "Marketing or notification sender.",
+    "loggedAt": 1781727615051
+  },
+  "19ecc64d6368c972": {
+    "category": "non_academic",
+    "date": "Mon, 15 Jun 2026 17:46:55 +0000",
+    "receivedAtMs": 1781545615000,
+    "confidence": 0.94,
+    "reason": "Gmail Promotions category.",
+    "loggedAt": 1781727615063
+  },
+  "19ecc0b8fee78c5f": {
+    "category": "non_academic",
+    "date": "Mon, 15 Jun 2026 16:09:17 +0000 (UTC)",
+    "receivedAtMs": 1781539757000,
+    "confidence": 0.88,
+    "reason": "Marketing or notification sender.",
+    "loggedAt": 1781727615064
+  },
+  "19ecb9d88611d946": {
+    "category": "non_academic",
+    "date": "Mon, 15 Jun 2026 14:09:11 +0000 (UTC)",
+    "receivedAtMs": 1781532551000,
+    "confidence": 0.88,
+    "reason": "Marketing or notification sender.",
+    "loggedAt": 1781727615074
+  },
+  "19ecb96300de7e6a": {
+    "category": "non_academic",
+    "date": "Mon, 15 Jun 2026 14:00:52 +0000",
+    "receivedAtMs": 1781532052000,
+    "confidence": 0.94,
+    "reason": "Gmail Promotions category.",
+    "loggedAt": 1781727615075
+  },
+  "19ecadde215ab109": {
+    "category": "non_academic",
+    "date": "Mon, 15 Jun 2026 10:39:53 +0000",
+    "receivedAtMs": 1781519993000,
+    "confidence": 0.94,
+    "reason": "Gmail Promotions category.",
+    "loggedAt": 1781727615085
+  },
+  "19ec8325af1167da": {
+    "category": "academic",
+    "date": "Sun, 14 Jun 2026 22:13:18 +0000",
+    "receivedAtMs": 1781475198000,
+    "confidence": 0.84,
+    "reason": "Multiple academic keywords found.",
+    "loggedAt": 1781727615096
+  },
+  "19ec82e664731d6c": {
+    "category": "non_academic",
+    "date": "Sun, 14 Jun 2026 22:08:58 +0000 (UTC)",
+    "receivedAtMs": 1781474938000,
+    "confidence": 0.9,
+    "reason": "Gmail Social category.",
+    "loggedAt": 1781727615110
+  },
+  "19ec82d1c2650836": {
+    "category": "non_academic",
+    "date": "Sun, 14 Jun 2026 22:07:08 +0000",
+    "receivedAtMs": 1781474828000,
+    "confidence": 0.94,
+    "reason": "Gmail Promotions category.",
+    "loggedAt": 1781727615111
+  },
+  "19ec7c086680a587": {
+    "category": "non_academic",
+    "date": "Sun, 14 Jun 2026 20:08:58 +0000 (UTC)",
+    "receivedAtMs": 1781467738000,
+    "confidence": 0.88,
+    "reason": "Marketing or notification sender.",
+    "loggedAt": 1781727615119
+  },
+  "19ec7af50b404c8c": {
+    "category": "academic",
+    "date": "Sun, 14 Jun 2026 19:49:38 +0000",
+    "receivedAtMs": 1781466578000,
+    "confidence": 0.9,
+    "reason": "Academic sender domain or role.",
+    "loggedAt": 1781727615120
+  },
+  "19ed25fa8056deb9": {
+    "category": "campus_events",
+    "date": "Tue, 16 Jun 2026 21:38:56 +0000",
+    "receivedAtMs": 1781645936000,
+    "confidence": 0.9,
+    "reason": "Cursor is almost ready to test its changes and send you videos of its work!",
+    "loggedAt": 1781727730056
+  },
+  "19ed16b320a364ad": {
+    "category": "campus_events",
+    "date": "Tue, 16 Jun 2026 17:11:59 +0000",
+    "receivedAtMs": 1781629919000,
+    "confidence": 0.9,
+    "reason": "Handshake is a student employment platform used by many colleges and universities, including Princeton.",
+    "loggedAt": 1781727738246
+  },
+  "19ed1ecafadbc7d4": {
+    "category": "non_academic",
+    "date": "Tue, 16 Jun 2026 19:33:25 +0000",
+    "receivedAtMs": 1781638405000,
+    "confidence": 0.9,
+    "reason": "Brave Search API login attempt",
+    "loggedAt": 1781727723885
+  },
+  "19edc0766d82eb53": {
+    "category": "non_academic",
+    "date": "Thu, 18 Jun 2026 18:38:43 +0000",
+    "receivedAtMs": 1781807923000,
+    "confidence": 0.88,
+    "reason": "Marketing or notification sender.",
+    "loggedAt": 1781808987185
+  },
+  "19edbec294555382": {
+    "category": "non_academic",
+    "date": "Thu, 18 Jun 2026 18:09:02 +0000 (UTC)",
+    "receivedAtMs": 1781806142000,
+    "confidence": 0.88,
+    "reason": "Marketing or notification sender.",
+    "loggedAt": 1781808987187
+  },
+  "19edbcf673cc4aed": {
+    "category": "non_academic",
+    "date": "Thu, 18 Jun 2026 17:37:37 +0000",
+    "receivedAtMs": 1781804257000,
+    "confidence": 0.94,
+    "reason": "Gmail Promotions category.",
+    "loggedAt": 1781808987188
+  },
+  "19edbaab260110bc": {
+    "category": "academic",
+    "date": "Thu, 18 Jun 2026 12:57:16 -0400",
+    "receivedAtMs": 1781801836000,
+    "confidence": 0.78,
+    "reason": "Academic keyword found.",
+    "loggedAt": 1781808987190
+  },
+  "19edb91ea74ac87a": {
+    "category": "non_academic",
+    "date": "Thu, 18 Jun 2026 16:30:26 +0000 (UTC)",
+    "receivedAtMs": 1781800226000,
+    "confidence": 0.88,
+    "reason": "Marketing or notification sender.",
+    "loggedAt": 1781808987196
+  },
+  "19edb823f0083390": {
+    "category": "academic",
+    "date": "Thu, 18 Jun 2026 16:13:21 +0000",
+    "receivedAtMs": 1781799201000,
+    "confidence": 0.78,
+    "reason": "Academic keyword found.",
+    "loggedAt": 1781808987208
+  },
+  "19edb2419e77f46f": {
+    "category": "non_academic",
+    "date": "Thu, 18 Jun 2026 14:30:28 +0000 (UTC)",
+    "receivedAtMs": 1781793028000,
+    "confidence": 0.88,
+    "reason": "Marketing or notification sender.",
+    "loggedAt": 1781808987225
+  },
+  "19edaa288a0465ad": {
+    "category": "non_academic",
+    "date": "Thu, 18 Jun 2026 12:08:59 +0000 (UTC)",
+    "receivedAtMs": 1781784539000,
+    "confidence": 0.9,
+    "reason": "Gmail Social category.",
+    "loggedAt": 1781808987241
+  },
+  "19ed84a7c5cfcef1": {
+    "category": "academic",
+    "date": "Thu, 18 Jun 2026 01:13:09 +0000",
+    "receivedAtMs": 1781745189000,
+    "confidence": 0.9,
+    "reason": "Academic sender domain or role.",
+    "loggedAt": 1781808987245
+  },
+  "19ed812145417bdc": {
+    "category": "non_academic",
+    "date": "Thu, 18 Jun 2026 00:11:59 +0000 (UTC)",
+    "receivedAtMs": 1781741519000,
+    "confidence": 0.9,
+    "reason": "Gmail Social category.",
+    "loggedAt": 1781808987259
+  },
+  "19ed80f70f8e19ce": {
+    "category": "non_academic",
+    "date": "Thu, 18 Jun 2026 00:09:05 +0000 (UTC)",
+    "receivedAtMs": 1781741345000,
+    "confidence": 0.9,
+    "reason": "Gmail Social category.",
+    "loggedAt": 1781808987276
+  },
+  "19ed96c170cf4d1d": {
+    "category": "campus_events",
+    "date": "Thu, 18 Jun 2026 02:29:37 -0400",
+    "receivedAtMs": 1781764177000,
+    "confidence": 0.9,
+    "reason": "Meeting invitation from Princeton.edu user",
+    "loggedAt": 1781809010715
+  },
+  "19edc5a0434a92bc": {
+    "category": "non_academic",
+    "date": "Thu, 18 Jun 2026 20:09:03 +0000 (UTC)",
+    "receivedAtMs": 1781813343000,
+    "confidence": 0.88,
+    "reason": "Marketing or notification sender.",
+    "loggedAt": 1781819270763
+  },
+  "19edc44d2b3f7cd3": {
+    "category": "campus_events",
+    "date": "Thu, 18 Jun 2026 19:45:53 +0000",
+    "receivedAtMs": 1781811953000,
+    "confidence": 0.9,
+    "reason": "Handshake job posting from a company affiliated with Princeton University",
+    "loggedAt": 1781819296720
+  },
+  "19edc5c221c13462": {
+    "category": "campus_events",
+    "date": "Thu, 18 Jun 2026 20:11:22 +0000",
+    "receivedAtMs": 1781813482000,
+    "confidence": 0.9,
+    "reason": "Handshake recruitment message from a recruiter",
+    "loggedAt": 1781819308400
+  },
+  "19ef0daf2d5ff952": {
+    "category": "academic",
+    "date": "Mon, 22 Jun 2026 15:42:16 -0400",
+    "receivedAtMs": 1782157336000,
+    "confidence": 0.9,
+    "reason": "Academic sender domain or role.",
+    "loggedAt": 1782157488754
+  },
+  "19ef0be5567c0f0c": {
+    "category": "non_academic",
+    "date": "Mon, 22 Jun 2026 19:10:57 +0000 (UTC)",
+    "receivedAtMs": 1782155457000,
+    "confidence": 0.88,
+    "reason": "Marketing or notification sender.",
+    "loggedAt": 1782157488763
+  },
+  "19ef085d898fc573": {
+    "category": "non_academic",
+    "date": "Mon, 22 Jun 2026 18:09:17 +0000 (UTC)",
+    "receivedAtMs": 1782151757000,
+    "confidence": 0.88,
+    "reason": "Marketing or notification sender.",
+    "loggedAt": 1782157488780
+  },
+  "19ef072132948c29": {
+    "category": "academic",
+    "date": "Mon, 22 Jun 2026 13:47:40 -0400",
+    "receivedAtMs": 1782150460000,
+    "confidence": 0.9,
+    "reason": "Academic sender domain or role.",
+    "loggedAt": 1782157488800
+  },
+  "19ef07016ad453ab": {
+    "category": "academic",
+    "date": "Mon, 22 Jun 2026 17:45:31 +0000",
+    "receivedAtMs": 1782150331000,
+    "confidence": 0.78,
+    "reason": "Academic keyword found.",
+    "loggedAt": 1782157488802
+  },
+  "19ef0668d0ec8084": {
+    "category": "academic",
+    "date": "Mon, 22 Jun 2026 17:35:09 +0000",
+    "receivedAtMs": 1782149709000,
+    "confidence": 0.9,
+    "reason": "Academic sender domain or role.",
+    "loggedAt": 1782157488821
+  },
+  "19ef062e7084536e": {
+    "category": "academic",
+    "date": "Mon, 22 Jun 2026 17:30:41 +0000",
+    "receivedAtMs": 1782149441000,
+    "confidence": 0.9,
+    "reason": "Academic sender domain or role.",
+    "loggedAt": 1782157488837
+  },
+  "19ef017ba4bf8e1c": {
+    "category": "non_academic",
+    "date": "Mon, 22 Jun 2026 16:09:01 +0000 (UTC)",
+    "receivedAtMs": 1782144541000,
+    "confidence": 0.88,
+    "reason": "Marketing or notification sender.",
+    "loggedAt": 1782157488865
+  },
+  "19eeff4f76c4d482": {
+    "category": "non_academic",
+    "date": "22 Jun 2026 11:31:05 -0400",
+    "receivedAtMs": 1782142265000,
+    "confidence": 0.88,
+    "reason": "Marketing or notification sender.",
+    "loggedAt": 1782157488876
+  },
+  "19eefab7bd3f8bee": {
+    "category": "non_academic",
+    "date": "Mon, 22 Jun 2026 14:10:45 +0000 (UTC)",
+    "receivedAtMs": 1782137445000,
+    "confidence": 0.88,
+    "reason": "Marketing or notification sender.",
+    "loggedAt": 1782157488891
+  },
+  "19eee945d3af3fb5": {
+    "category": "non_academic",
+    "date": "Mon, 22 Jun 2026 09:05:55 +0000",
+    "receivedAtMs": 1782119155000,
+    "confidence": 0.94,
+    "reason": "Gmail Promotions category.",
+    "loggedAt": 1782157488909
+  },
+  "19eedf29552f5520": {
+    "category": "non_academic",
+    "date": "Mon, 22 Jun 2026 06:09:12 +0000 (UTC)",
+    "receivedAtMs": 1782108552000,
+    "confidence": 0.9,
+    "reason": "Gmail Social category.",
+    "loggedAt": 1782157488929
+  },
+  "19eecab801edbea4": {
+    "category": "non_academic",
+    "date": "Mon, 22 Jun 2026 00:11:58 +0000 (UTC)",
+    "receivedAtMs": 1782087118000,
+    "confidence": 0.9,
+    "reason": "Gmail Social category.",
+    "loggedAt": 1782157488947
+  },
+  "19eec3ae82c438d9": {
+    "category": "non_academic",
+    "date": "Sun, 21 Jun 2026 22:08:58 +0000 (UTC)",
+    "receivedAtMs": 1782079738000,
+    "confidence": 0.9,
+    "reason": "Gmail Social category.",
+    "loggedAt": 1782157488969
+  },
+  "19eebcd0fd5db368": {
+    "category": "non_academic",
+    "date": "Sun, 21 Jun 2026 20:08:58 +0000 (UTC)",
+    "receivedAtMs": 1782072538000,
+    "confidence": 0.88,
+    "reason": "Marketing or notification sender.",
+    "loggedAt": 1782157488986
+  },
+  "19eeb5f2c4a7e78d": {
+    "category": "non_academic",
+    "date": "Sun, 21 Jun 2026 18:08:58 +0000 (UTC)",
+    "receivedAtMs": 1782065338000,
+    "confidence": 0.88,
+    "reason": "Marketing or notification sender.",
+    "loggedAt": 1782157489002
+  },
+  "19eeaf15fe2cc462": {
+    "category": "non_academic",
+    "date": "Sun, 21 Jun 2026 16:08:59 +0000 (UTC)",
+    "receivedAtMs": 1782058139000,
+    "confidence": 0.88,
+    "reason": "Marketing or notification sender.",
+    "loggedAt": 1782157489019
+  },
+  "19eea8580f26bdea": {
+    "category": "non_academic",
+    "date": "Sun, 21 Jun 2026 14:11:12 +0000 (UTC)",
+    "receivedAtMs": 1782051072000,
+    "confidence": 0.88,
+    "reason": "Marketing or notification sender.",
+    "loggedAt": 1782157489035
+  },
+  "19eea1e1f6a70861": {
+    "category": "academic",
+    "date": "Sun, 21 Jun 2026 12:18:18 +0000",
+    "receivedAtMs": 1782044298000,
+    "confidence": 0.84,
+    "reason": "Multiple academic keywords found.",
+    "loggedAt": 1782157489053
+  },
+  "19ee78526080747a": {
+    "category": "non_academic",
+    "date": "Sun, 21 Jun 2026 00:11:58 +0000 (UTC)",
+    "receivedAtMs": 1782000718000,
+    "confidence": 0.9,
+    "reason": "Gmail Social category.",
+    "loggedAt": 1782157489072
+  },
+  "19ee7149166224a8": {
+    "category": "non_academic",
+    "date": "Sat, 20 Jun 2026 22:08:59 +0000 (UTC)",
+    "receivedAtMs": 1781993339000,
+    "confidence": 0.9,
+    "reason": "Gmail Social category.",
+    "loggedAt": 1782157489073
+  },
+  "19ee6ba8cd8b60cf": {
+    "category": "campus_events",
+    "date": "Sat, 20 Jun 2026 16:30:00 -0400",
+    "receivedAtMs": 1781987400000,
+    "confidence": 0.8,
+    "reason": "Campus event keyword found.",
+    "loggedAt": 1782157489075
+  },
+  "19ee6b8d31cab4da": {
+    "category": "non_academic",
+    "date": "Sat, 20 Jun 2026 20:28:41 +0000",
+    "receivedAtMs": 1781987321000,
+    "confidence": 0.88,
+    "reason": "Marketing or notification sender.",
+    "loggedAt": 1782157489076
+  },
+  "19ee6a6ca9af9f1d": {
+    "category": "non_academic",
+    "date": "Sat, 20 Jun 2026 20:09:02 +0000 (UTC)",
+    "receivedAtMs": 1781986142000,
+    "confidence": 0.88,
+    "reason": "Marketing or notification sender.",
+    "loggedAt": 1782157489077
+  },
+  "19ee639df9ad3b82": {
+    "category": "non_academic",
+    "date": "Sat, 20 Jun 2026 18:10:06 +0000",
+    "receivedAtMs": 1781979006000,
+    "confidence": 0.94,
+    "reason": "Gmail Promotions category.",
+    "loggedAt": 1782157489078
+  },
+  "19ee638dc91efd8a": {
+    "category": "non_academic",
+    "date": "Sat, 20 Jun 2026 18:08:59 +0000 (UTC)",
+    "receivedAtMs": 1781978939000,
+    "confidence": 0.88,
+    "reason": "Marketing or notification sender.",
+    "loggedAt": 1782157489079
+  },
+  "19ee5caf40474a77": {
+    "category": "non_academic",
+    "date": "Sat, 20 Jun 2026 16:08:59 +0000 (UTC)",
+    "receivedAtMs": 1781971739000,
+    "confidence": 0.88,
+    "reason": "Marketing or notification sender.",
+    "loggedAt": 1782157489094
+  },
+  "19ee5b54d7a27b7e": {
+    "category": "non_academic",
+    "date": "Sat, 20 Jun 2026 15:45:16 +0000 (UTC)",
+    "receivedAtMs": 1781970316000,
+    "confidence": 0.94,
+    "reason": "Gmail Promotions category.",
+    "loggedAt": 1782157489115
+  },
+  "19ee55d5ff42ba1f": {
+    "category": "non_academic",
+    "date": "Sat, 20 Jun 2026 14:09:13 +0000 (UTC)",
+    "receivedAtMs": 1781964553000,
+    "confidence": 0.88,
+    "reason": "Marketing or notification sender.",
+    "loggedAt": 1782157489133
+  },
+  "19ee3a5b7cd2a999": {
+    "category": "non_academic",
+    "date": "Sat, 20 Jun 2026 06:09:00 +0000 (UTC)",
+    "receivedAtMs": 1781935740000,
+    "confidence": 0.9,
+    "reason": "Gmail Social category.",
+    "loggedAt": 1782157489134
+  },
+  "19ee337c15fb7862": {
+    "category": "non_academic",
+    "date": "Sat, 20 Jun 2026 04:08:57 +0000 (UTC)",
+    "receivedAtMs": 1781928537000,
+    "confidence": 0.9,
+    "reason": "Gmail Social category.",
+    "loggedAt": 1782157489136
+  },
+  "19ee2c9f43403973": {
+    "category": "non_academic",
+    "date": "Sat, 20 Jun 2026 02:08:59 +0000 (UTC)",
+    "receivedAtMs": 1781921339000,
+    "confidence": 0.88,
+    "reason": "Marketing or notification sender.",
+    "loggedAt": 1782157489154
+  },
+  "19ee25c354a0ed20": {
+    "category": "non_academic",
+    "date": "Sat, 20 Jun 2026 00:09:07 +0000 (UTC)",
+    "receivedAtMs": 1781914147000,
+    "confidence": 0.9,
+    "reason": "Gmail Social category.",
+    "loggedAt": 1782157489155
+  },
+  "19ee25a226c10589": {
+    "category": "non_academic",
+    "date": "Fri, 19 Jun 2026 17:06:53 -0700",
+    "receivedAtMs": 1781914013000,
+    "confidence": 0.88,
+    "reason": "Marketing or notification sender.",
+    "loggedAt": 1782157489156
+  },
+  "19ee181070a865da": {
+    "category": "non_academic",
+    "date": "Fri, 19 Jun 2026 20:09:44 +0000 (UTC)",
+    "receivedAtMs": 1781899784000,
+    "confidence": 0.88,
+    "reason": "Marketing or notification sender.",
+    "loggedAt": 1782157489157
+  },
+  "19ee13f0b8d208db": {
+    "category": "non_academic",
+    "date": "Fri, 19 Jun 2026 18:57:40 +0000 (UTC)",
+    "receivedAtMs": 1781895460000,
+    "confidence": 0.88,
+    "reason": "Marketing or notification sender.",
+    "loggedAt": 1782157489175
+  },
+  "19ee112ccd465146": {
+    "category": "non_academic",
+    "date": "Fri, 19 Jun 2026 18:09:12 +0000 (UTC)",
+    "receivedAtMs": 1781892552000,
+    "confidence": 0.88,
+    "reason": "Marketing or notification sender.",
+    "loggedAt": 1782157489192
+  },
+  "19ee0b4855607e62": {
+    "category": "non_academic",
+    "date": "Fri, 19 Jun 2026 16:26:19 +0000 (UTC)",
+    "receivedAtMs": 1781886379000,
+    "confidence": 0.88,
+    "reason": "Marketing or notification sender.",
+    "loggedAt": 1782157489212
+  },
+  "19ee06f32423635f": {
+    "category": "academic",
+    "date": "Fri, 19 Jun 2026 15:10:09 +0000",
+    "receivedAtMs": 1781881809000,
+    "confidence": 0.9,
+    "reason": "Academic sender domain or role.",
+    "loggedAt": 1782157489228
+  },
+  "19ee03e3772e741c": {
+    "category": "non_academic",
+    "date": "Fri, 19 Jun 2026 14:17:07 +0000 (UTC)",
+    "receivedAtMs": 1781878627000,
+    "confidence": 0.88,
+    "reason": "Marketing or notification sender.",
+    "loggedAt": 1782157489244
+  },
+  "19ee034bb36316af": {
+    "category": "non_academic",
+    "date": "Fri, 19 Jun 2026 14:03:51 +0000",
+    "receivedAtMs": 1781877831000,
+    "confidence": 0.94,
+    "reason": "Gmail Promotions category.",
+    "loggedAt": 1782157489263
+  },
+  "19ee0220b2efe88e": {
+    "category": "non_academic",
+    "date": "Fri, 19 Jun 2026 13:46:18 +0000 (UTC)",
+    "receivedAtMs": 1781876778000,
+    "confidence": 0.88,
+    "reason": "Marketing or notification sender.",
+    "loggedAt": 1782157489282
+  },
+  "19edde648f8b7a94": {
+    "category": "academic",
+    "date": "Fri, 19 Jun 2026 03:21:31 +0000",
+    "receivedAtMs": 1781839291000,
+    "confidence": 0.9,
+    "reason": "Academic sender domain or role.",
+    "loggedAt": 1782157489299
+  },
+  "19edda3ae8a954a8": {
+    "category": "non_academic",
+    "date": "Fri, 19 Jun 2026 02:09:06 +0000 (UTC)",
+    "receivedAtMs": 1781834946000,
+    "confidence": 0.88,
+    "reason": "Marketing or notification sender.",
+    "loggedAt": 1782157489318
+  },
+  "19edda37b3bc7f1f": {
+    "category": "academic",
+    "date": "Fri, 19 Jun 2026 02:08:33 +0000",
+    "receivedAtMs": 1781834913000,
+    "confidence": 0.9,
+    "reason": "Academic sender domain or role.",
+    "loggedAt": 1782157489331
+  },
+  "19edd97e9eaf6418": {
+    "category": "non_academic",
+    "date": "Fri, 19 Jun 2026 01:56:17 +0000",
+    "receivedAtMs": 1781834177000,
+    "confidence": 0.94,
+    "reason": "Gmail Promotions category.",
+    "loggedAt": 1782157489350
+  },
+  "19edd387c91fc41b": {
+    "category": "non_academic",
+    "date": "Fri, 19 Jun 2026 00:11:58 +0000 (UTC)",
+    "receivedAtMs": 1781827918000,
+    "confidence": 0.9,
+    "reason": "Gmail Social category.",
+    "loggedAt": 1782157489367
+  },
+  "19ef0bc83b1cb366": {
+    "category": "academic",
+    "date": "Mon, 22 Jun 2026 19:09:00 +0000 (UTC)",
+    "receivedAtMs": 1782155340000,
+    "confidence": 0.9,
+    "reason": "MIT PE - No Code and Agentic AI program application confirmation",
+    "loggedAt": 1782157501683
+  },
+  "19ef0b8a1ecdd90e": {
+    "category": "academic",
+    "date": "Mon, 22 Jun 2026 19:04:46 +0000 (UTC)",
+    "receivedAtMs": 1782155086000,
+    "confidence": 0.9,
+    "reason": "MIT Professional Education",
+    "loggedAt": 1782157506421
+  },
+  "19ef0719ff9d6381": {
+    "category": "academic",
+    "date": "Mon, 22 Jun 2026 17:47:11 +0000",
+    "receivedAtMs": 1782150431000,
+    "confidence": 0.8,
+    "reason": "school email from .edu institution",
+    "loggedAt": 1782157510893
+  },
+  "19edd3752b157169": {
+    "category": "academic",
+    "date": "Fri, 19 Jun 2026 00:10:44 +0000",
+    "receivedAtMs": 1781827844000,
+    "confidence": 0.84,
+    "reason": "Multiple academic keywords found.",
+    "loggedAt": 1782157516379
+  },
+  "19edd35d345e1c14": {
+    "category": "non_academic",
+    "date": "Fri, 19 Jun 2026 00:09:01 +0000 (UTC)",
+    "receivedAtMs": 1781827741000,
+    "confidence": 0.9,
+    "reason": "Gmail Social category.",
+    "loggedAt": 1782157516383
+  },
+  "19edcc7db14c0e6f": {
+    "category": "non_academic",
+    "date": "Thu, 18 Jun 2026 22:09:01 +0000 (UTC)",
+    "receivedAtMs": 1781820541000,
+    "confidence": 0.9,
+    "reason": "Gmail Social category.",
+    "loggedAt": 1782157516406
+  },
+  "19ef0f378021e647": {
+    "category": "non_academic",
+    "date": "Mon, 22 Jun 2026 20:09:04 +0000 (UTC)",
+    "receivedAtMs": 1782158944000,
+    "confidence": 0.88,
+    "reason": "Marketing or notification sender.",
+    "loggedAt": 1782175863961
+  },
+  "19ef112e48dcfec0": {
+    "category": "non_academic",
+    "date": "Mon, 22 Jun 2026 20:43:23 +0000",
+    "receivedAtMs": 1782161003000,
+    "confidence": 0.94,
+    "reason": "Gmail Promotions category.",
+    "loggedAt": 1782175863964
+  },
+  "19ef1614d88dec28": {
+    "category": "non_academic",
+    "date": "Mon, 22 Jun 2026 22:08:59 +0000 (UTC)",
+    "receivedAtMs": 1782166139000,
+    "confidence": 0.9,
+    "reason": "Gmail Social category.",
+    "loggedAt": 1782175863966
+  },
+  "19ef194f069afd94": {
+    "category": "non_academic",
+    "date": "Mon, 22 Jun 2026 23:05:26 +0000",
+    "receivedAtMs": 1782169526000,
+    "confidence": 0.94,
+    "reason": "Gmail Promotions category.",
+    "loggedAt": 1782175863968
+  },
+  "19ef1cd48941fb8a": {
+    "category": "non_academic",
+    "date": "Mon, 22 Jun 2026 17:06:59 -0700",
+    "receivedAtMs": 1782173219000,
+    "confidence": 0.88,
+    "reason": "Marketing or notification sender.",
+    "loggedAt": 1782175863990
+  },
+  "19ef1cf4a271358e": {
+    "category": "non_academic",
+    "date": "Tue, 23 Jun 2026 00:09:10 +0000 (UTC)",
+    "receivedAtMs": 1782173350000,
+    "confidence": 0.9,
+    "reason": "Gmail Social category.",
+    "loggedAt": 1782175864008
+  },
+  "19ef1d40bc600964": {
+    "category": "non_academic",
+    "date": "Tue, 23 Jun 2026 00:14:20 +0000 (UTC)",
+    "receivedAtMs": 1782173660000,
+    "confidence": 0.9,
+    "reason": "Gmail Social category.",
+    "loggedAt": 1782175864009
+  },
+  "19ef23d0820bc3bd": {
+    "category": "non_academic",
+    "date": "Tue, 23 Jun 2026 02:09:00 +0000 (UTC)",
+    "receivedAtMs": 1782180540000,
+    "confidence": 0.88,
+    "reason": "Marketing or notification sender.",
+    "loggedAt": 1782180554244
   }
 }

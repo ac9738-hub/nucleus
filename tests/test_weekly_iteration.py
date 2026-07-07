@@ -20,9 +20,39 @@ def _assignment(name, due_at='', submission_types=None, published=True):
     }
 
 
+def test_exam_event_display_name_maps_take_home_midterm():
+    from canvas_parser.weekly_iteration.format import _exam_event_display_name
+
+    assert _exam_event_display_name('Midterm take-home exam') == 'Midterm Exam'
+    assert _exam_event_display_name('Midterm') == 'Midterm'
+
+
+def test_infer_final_exam_week_from_fall_term_end():
+    from canvas_parser.weekly_iteration.format import _infer_final_exam_week, _infer_default_year
+
+    snapshot = {
+        'course': {
+            'name': 'ART102 Fall',
+            'term': {'name': 'Fall 2025', 'end_at': '2026-01-24T05:00:00Z'},
+        },
+        'assignments': [{'name': 'Midterm take-home exam', 'due_at': '2025-10-10T21:00:00Z'}],
+        'files': [],
+    }
+    default_year = _infer_default_year(snapshot)
+    final_week = _infer_final_exam_week(snapshot, default_year=default_year)
+    assert final_week is not None
+    assert final_week.month == 12
+    assert final_week.day == 15
+
+
 def test_names_match_is_fuzzy():
     assert names_match('Problem Set 1', 'problem set 1')
     assert names_match('Exam 1 (Midterm)', 'Midterm Exam') is False
+    assert names_match('6 1 the dome', 'Dome of Florence Cathedral')
+    assert names_match(
+        'brunelleschi s dome florence cathedral',
+        'Dome of Florence Cathedral (Santa Maria del Fiore)',
+    )
 
 
 def test_parse_filename_date_handles_underscore_before_month():
@@ -152,6 +182,15 @@ def test_chunk_parser_batches_splits_large_content():
     assert [len(batch['content']) for batch in chunked] == [50, 50, 25]
 
 
+def test_chunk_parser_batches_reads_env_max_items(monkeypatch):
+    from canvas_parser.weekly_iteration import llm_parse
+
+    monkeypatch.setenv('PARSER_MAX_BATCH_ITEMS', '40')
+    batches = [{'type': 'file', 'content': [{'id': index} for index in range(100)]}]
+    chunked = llm_parse.chunk_parser_batches(batches)
+    assert len(chunked) == 3
+
+
 def test_fetch_paginated_respects_item_cap(monkeypatch):
     from canvas_parser.weekly_iteration.auth import CanvasAuth
     from canvas_parser.weekly_iteration import fetch as fetch_module
@@ -185,3 +224,84 @@ def test_fetch_paginated_respects_item_cap(monkeypatch):
     items = fetch_module.fetch_paginated(auth, 'https://example.test/items', max_pages=10, max_items=150)
     assert len(items) == 150
     assert calls['count'] == 2
+
+
+def test_parse_filename_date_handles_compact_class_stem():
+    from canvas_parser.weekly_iteration.format import _parse_filename_date
+
+    parsed = _parse_filename_date('C01_01262026', 2026)
+    assert parsed is not None
+    assert parsed.month == 1
+    assert parsed.day == 26
+
+
+def test_parse_filename_date_handles_compact_class_suffix():
+    from canvas_parser.weekly_iteration.format import _parse_filename_date
+
+    parsed = _parse_filename_date('C01_01262026_H.pdf', 2026)
+    assert parsed is not None
+    assert parsed.month == 1
+    assert parsed.day == 26
+
+
+def test_parse_assignment_name_date_handles_trailing_md():
+    from canvas_parser.weekly_iteration.format import _parse_assignment_name_date
+
+    parsed = _parse_assignment_name_date('Dictation 1 (L2 Part 1) 2/3', 2026)
+    assert parsed is not None
+    assert parsed.month == 2
+    assert parsed.day == 3
+
+
+def test_parse_assignment_name_date_handles_paren_md():
+    from canvas_parser.weekly_iteration.format import _parse_assignment_name_date
+
+    parsed = _parse_assignment_name_date('Review Quiz 1 (2/25)', 2026)
+    assert parsed is not None
+    assert parsed.month == 2
+    assert parsed.day == 25
+
+
+def test_assignment_entry_parses_due_date_from_name():
+    from canvas_parser.weekly_iteration.format import _assignment_entry
+
+    entry = _assignment_entry(
+        {'name': 'Homework 1 (due 2/2 Mon in class)', 'due_at': None},
+        2026,
+    )
+    assert entry['due_at'] == '2/2/2026'
+
+
+def test_weekly_item_is_evaluable_respects_assignment_lock():
+    from canvas_parser.weekly_iteration.availability import weekly_item_is_evaluable
+
+    snapshot = {
+        'assignments': [{
+            'id': 1,
+            'name': 'Problem Set 1',
+            'published': True,
+            'workflow_state': 'published',
+            'locked_for_user': True,
+        }],
+        'files': [],
+        'modules': [],
+        'module_items': {},
+    }
+    assert weekly_item_is_evaluable(snapshot, 'Problem Set 1', 'assignments') is False
+    snapshot['assignments'][0]['locked_for_user'] = False
+    assert weekly_item_is_evaluable(snapshot, 'Problem Set 1', 'assignments') is True
+
+
+def test_merge_parser_batches_by_type():
+    from canvas_parser.weekly_iteration.llm_parse import merge_parser_batches_by_type
+
+    batches = [
+        {'type': 'assignment', 'content': [{'courseid': '1', 'id': 'a1'}]},
+        {'type': 'file', 'content': [{'courseid': '1', 'id': 'f1'}]},
+        {'type': 'assignment', 'content': [{'courseid': '2', 'id': 'a2'}]},
+        {'type': 'file', 'content': [{'courseid': '2', 'id': 'f2'}]},
+    ]
+    merged = merge_parser_batches_by_type(batches)
+    assert [batch['type'] for batch in merged] == ['assignment', 'file']
+    assert len(merged[0]['content']) == 2
+    assert len(merged[1]['content']) == 2

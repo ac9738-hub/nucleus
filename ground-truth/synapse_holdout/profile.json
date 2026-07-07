@@ -1,0 +1,13 @@
+{
+  "profile": "synapse_holdout",
+  "description": "Held-out courses for Synapse Learn curriculum coverage generalization. Eval-only; not used for in-sample tuning.",
+  "spec_file": "courses.json",
+  "cache": {
+    "report": ".cache/synapse_teaching/coverage_report_holdout.json",
+    "in_sample_report": ".cache/synapse_teaching/coverage_report.json"
+  },
+  "iteration": {
+    "eval": "python scripts/eval_synapse_teaching_holdout.py",
+    "eval_compare": "python scripts/eval_synapse_teaching_holdout.py --compare-in-sample"
+  }
+}

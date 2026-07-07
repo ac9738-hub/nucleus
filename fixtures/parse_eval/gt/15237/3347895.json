@@ -1,0 +1,635 @@
+{
+  "version": 1,
+  "courseId": "15237",
+  "fileId": "3347895",
+  "filename": "Lecture 12_motor systems_slides.pdf",
+  "expectedFileType": "lecture_slides",
+  "passPlan": {
+    "courseId": "15237",
+    "fileId": "3347895",
+    "filename": "Lecture 12_motor systems_slides.pdf",
+    "resolvedType": "lecture_slides",
+    "heuristicConfidence": 0.92,
+    "neededPasses": [
+      "extract_pages",
+      "heuristic_classify",
+      "llm_pass1",
+      "finalize"
+    ],
+    "skippedPasses": [
+      "llm_classify",
+      "llm_pass2"
+    ],
+    "estLlmCalls": 1,
+    "estRealisticLlmCalls": 1.0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "needed": true,
+        "reason": "Required local PDF/HTML extraction; no LLM.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "heuristic_classify",
+        "needed": true,
+        "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_classify",
+        "needed": false,
+        "reason": "Heuristic confidence 0.92 sufficient; skip flash classify call.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_pass1",
+        "needed": true,
+        "reason": "Type lecture_slides: pass1 extracts concepts=True, problems=True, events=False.",
+        "llmCall": true,
+        "estCostTier": "high"
+      },
+      {
+        "pass": "llm_pass2",
+        "needed": false,
+        "reason": "Type lecture_slides disables pass2 (single-pass type-specific or link-only profile).",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "finalize",
+        "needed": true,
+        "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+        "llmCall": false,
+        "estCostTier": "free"
+      }
+    ]
+  },
+  "passAudit": {
+    "plan": {
+      "courseId": "15237",
+      "fileId": "3347895",
+      "filename": "Lecture 12_motor systems_slides.pdf",
+      "resolvedType": "lecture_slides",
+      "heuristicConfidence": 0.92,
+      "neededPasses": [
+        "extract_pages",
+        "heuristic_classify",
+        "llm_pass1",
+        "finalize"
+      ],
+      "skippedPasses": [
+        "llm_classify",
+        "llm_pass2"
+      ],
+      "estLlmCalls": 1,
+      "estRealisticLlmCalls": 1.0,
+      "steps": [
+        {
+          "pass": "extract_pages",
+          "needed": true,
+          "reason": "Required local PDF/HTML extraction; no LLM.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "heuristic_classify",
+          "needed": true,
+          "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_classify",
+          "needed": false,
+          "reason": "Heuristic confidence 0.92 sufficient; skip flash classify call.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_pass1",
+          "needed": true,
+          "reason": "Type lecture_slides: pass1 extracts concepts=True, problems=True, events=False.",
+          "llmCall": true,
+          "estCostTier": "high"
+        },
+        {
+          "pass": "llm_pass2",
+          "needed": false,
+          "reason": "Type lecture_slides disables pass2 (single-pass type-specific or link-only profile).",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "finalize",
+          "needed": true,
+          "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+          "llmCall": false,
+          "estCostTier": "free"
+        }
+      ]
+    },
+    "actualType": "lecture_slides",
+    "deepseekPasses": 1,
+    "conceptCount": 80,
+    "detailCount": 23,
+    "totalLlmTokens": 0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "ran": true,
+        "useful": true,
+        "verdict": "required",
+        "note": "Local I/O; pages present means extract succeeded."
+      },
+      {
+        "pass": "heuristic_classify",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "Routed to lecture_slides (free)."
+      },
+      {
+        "pass": "llm_classify",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Skipped; heuristic confidence sufficient.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass1",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "No pass1 tool trace.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass2",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Correctly skipped: profile disables pass2, type-specific pass1 only, or no log_* tools.",
+        "tokens": 0
+      },
+      {
+        "pass": "finalize",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "logged_details promoted to concept details."
+      }
+    ],
+    "cutCandidates": [],
+    "recommendations": [
+      "Pass2 correctly skipped for this type/pass1 tool pattern."
+    ]
+  },
+  "passes": [
+    "extract_pages",
+    "heuristic_classify",
+    "teaching_units",
+    "type_structure",
+    "concept_candidates",
+    "problem_scan",
+    "detail_attach",
+    "reconcile"
+  ],
+  "buildMode": "template_multi_pass_offline",
+  "builtAt": "2026-07-01T22:49:36Z",
+  "concepts": [
+    {
+      "name": "Lecture 12_motor systems_slides",
+      "details": []
+    },
+    {
+      "name": "1 muscle cell",
+      "details": []
+    },
+    {
+      "name": "send input to spinal cord",
+      "details": []
+    },
+    {
+      "name": "•Autonomic nervous system",
+      "details": []
+    },
+    {
+      "name": "•Somatic motor system",
+      "details": []
+    },
+    {
+      "name": "•“white meat” (fast)",
+      "details": []
+    },
+    {
+      "name": "motor systems",
+      "details": []
+    },
+    {
+      "name": "monday 10/28, 7:30 – 9:30 pm, pni a32",
+      "details": [
+        "AI-lead review session: Monday 10/28, 7:30 – 9:30 pm, PNI A32"
+      ]
+    },
+    {
+      "name": "hearing and languagesound",
+      "details": [
+        "Summary: hearing and languageSOUND"
+      ]
+    },
+    {
+      "name": "hearing and language (con’t)",
+      "details": [
+        "Summary: hearing and language (con’t)"
+      ]
+    },
+    {
+      "name": "vestibular system",
+      "details": []
+    },
+    {
+      "name": "head tilt, linear acceleration•semicircular canals: head rotation, angular acceleration•vor",
+      "details": [
+        "•Otolith: head tilt, linear acceleration•Semicircular canals: head rotation, angular acceleration•VOR"
+      ]
+    },
+    {
+      "name": "language (please review slides on your own)",
+      "details": []
+    },
+    {
+      "name": "charles sherrington, 1924",
+      "details": []
+    },
+    {
+      "name": "started with receptors, worked our way into the brain",
+      "details": [
+        "Chemical senses: started with receptors, worked our way into the brain"
+      ]
+    },
+    {
+      "name": "start with muscles, work our way into the brain",
+      "details": [
+        "Today, movement: start with muscles, work our way into the brain"
+      ]
+    },
+    {
+      "name": "hierarchical organization of motor control",
+      "details": []
+    },
+    {
+      "name": "outline for today",
+      "details": []
+    },
+    {
+      "name": "structure, excitation-contraction coupling",
+      "details": [
+        "• Muscles: structure, excitation-contraction coupling"
+      ]
+    },
+    {
+      "name": "smooth vs striated muscle",
+      "details": []
+    },
+    {
+      "name": "lines digestive tract, arteries…autonomic control",
+      "details": [
+        "Smooth muscle: lines digestive tract, arteries…autonomic control"
+      ]
+    },
+    {
+      "name": "peristalsis, blood pressure…",
+      "details": [
+        "•The visceral motor system: peristalsis, blood pressure…"
+      ]
+    },
+    {
+      "name": "intrinsic beat regulated by autonomic innervation",
+      "details": [
+        "Striated muscle•Cardiac: intrinsic beat regulated by autonomic innervation"
+      ]
+    },
+    {
+      "name": "electrical activity high ca2+ in muscle contraction",
+      "details": [
+        "Excitation-contraction coupling:electrical activity high Ca2+ in muscle contraction"
+      ]
+    },
+    {
+      "name": "steps in a muscle twitch",
+      "details": []
+    },
+    {
+      "name": "most muscle toxins act here",
+      "details": []
+    },
+    {
+      "name": "no atpno release of actin-myosin linkage",
+      "details": [
+        "– Rigor mortis: no ATPno release of actin-myosin linkage"
+      ]
+    },
+    {
+      "name": "sensory",
+      "details": []
+    },
+    {
+      "name": "motormixed",
+      "details": []
+    },
+    {
+      "name": "thoracic",
+      "details": []
+    },
+    {
+      "name": "sacral",
+      "details": []
+    },
+    {
+      "name": "controls leg muscles",
+      "details": []
+    },
+    {
+      "name": "controls arm muscles",
+      "details": []
+    },
+    {
+      "name": "proximal limbmuscles",
+      "details": []
+    },
+    {
+      "name": "distal limb muscles",
+      "details": []
+    },
+    {
+      "name": "axial muscles",
+      "details": []
+    },
+    {
+      "name": "lower mns in ventral horn of spinal cord",
+      "details": []
+    },
+    {
+      "name": "innervate muscles",
+      "details": []
+    },
+    {
+      "name": "upper mns are in brain,",
+      "details": []
+    },
+    {
+      "name": "lots of mitochondria–slow, sustained contraction–fatigue-resistant–leg, torso, flight wing…",
+      "details": [
+        "•“dark meat” (slow): –Lots of mitochondria–Slow, sustained contraction–Fatigue-resistant–Leg, torso, flight wing…"
+      ]
+    },
+    {
+      "name": "local sensory feedbackcauses stretched muscles to contract",
+      "details": [
+        "The stretch reflex: local sensory feedbackcauses stretched muscles to contract"
+      ]
+    },
+    {
+      "name": "rhythmic behaviors",
+      "details": []
+    },
+    {
+      "name": "next slide is graphic)",
+      "details": [
+        "(warning: next slide is graphic)"
+      ]
+    },
+    {
+      "name": "mike the headless chicken (1940s)",
+      "details": []
+    },
+    {
+      "name": "lived 18 months after head cut off",
+      "details": []
+    },
+    {
+      "name": "brainstem intact",
+      "details": []
+    },
+    {
+      "name": "depolarizing",
+      "details": []
+    },
+    {
+      "name": "hyperpolarizingdepolarizing",
+      "details": []
+    },
+    {
+      "name": "help generate spinal motor programs",
+      "details": []
+    },
+    {
+      "name": "forelimb/forelimb & hindlimb/hindlimb inhibition",
+      "details": [
+        "Walking: forelimb/forelimb & hindlimb/hindlimb inhibition"
+      ]
+    },
+    {
+      "name": "forelimb/hindlimb inhibition",
+      "details": [
+        "Running: forelimb/hindlimb inhibition"
+      ]
+    },
+    {
+      "name": "green- excitatory",
+      "details": []
+    },
+    {
+      "name": "red- inhibitory",
+      "details": []
+    },
+    {
+      "name": "used to maintain balance and posture, locomotion",
+      "details": []
+    },
+    {
+      "name": "not voluntary---reflexes",
+      "details": []
+    },
+    {
+      "name": "inputs from neocortex, control",
+      "details": []
+    },
+    {
+      "name": "voluntary movement (next)",
+      "details": []
+    },
+    {
+      "name": "goal and strategy",
+      "details": []
+    },
+    {
+      "name": "stretching and question break",
+      "details": []
+    },
+    {
+      "name": "initiating, suppressing voluntary movements– cerebellum: motor sequences, calibrating movements",
+      "details": [
+        "– Basal ganglia: initiating, suppressing voluntary movements– Cerebellum: motor sequences, calibrating movements"
+      ]
+    },
+    {
+      "name": "motor cortex drives voluntary,",
+      "details": []
+    },
+    {
+      "name": "guided, non-rhythmic movements",
+      "details": []
+    },
+    {
+      "name": "right controls left, and vice-versa",
+      "details": []
+    },
+    {
+      "name": "posture intact",
+      "details": []
+    },
+    {
+      "name": "somewhat reversible",
+      "details": []
+    },
+    {
+      "name": "sensoryand motor information near each other",
+      "details": []
+    },
+    {
+      "name": "area 4 (m1) and 6 (pma/sma)",
+      "details": []
+    },
+    {
+      "name": "areas 1-3(s1)",
+      "details": []
+    },
+    {
+      "name": "maps in cortex to organize motor control",
+      "details": []
+    },
+    {
+      "name": "taking commands directly from motor cortex",
+      "details": [
+        "Brain-machine interfaces: taking commands directly from motor cortex"
+      ]
+    },
+    {
+      "name": "brain-machine interfaces for communication",
+      "details": []
+    },
+    {
+      "name": "electrode array in hand area of motor cortex",
+      "details": []
+    },
+    {
+      "name": "planning complex motor sequences",
+      "details": []
+    },
+    {
+      "name": "planning movement sequences",
+      "details": [
+        "Supplementary motor area (SMA): planning movement sequences"
+      ]
+    },
+    {
+      "name": "intention to move, selection of movements",
+      "details": [
+        "Premotor area (PMA): intention to move, selection of movements"
+      ]
+    },
+    {
+      "name": "mirror neuron response properties(in area 6, pma)",
+      "details": []
+    },
+    {
+      "name": "percentage of correct answers",
+      "details": []
+    },
+    {
+      "name": "autismneurotypical",
+      "details": []
+    },
+    {
+      "name": "(a) true(b) false",
+      "details": [
+        "True!Clickers: (A) True(B) False"
+      ]
+    },
+    {
+      "name": "initiating, suppressing voluntary movements",
+      "details": [
+        "– Basal ganglia: initiating, suppressing voluntary movements"
+      ]
+    }
+  ],
+  "conceptCount": 80,
+  "detailCount": 23,
+  "events": [],
+  "problems": [],
+  "sections": [
+    "•Autonomic nervous system",
+    "•Somatic motor system",
+    "Steps in a muscle twitch",
+    "•“white meat” (fast)",
+    "and strategy",
+    "Is the corticospinal tract",
+    "M1 neuron that is “tuned” to movement of a specific finger",
+    "Basal ganglia include",
+    "HYPOTHESIS",
+    "Each Purkinje cell innervated by"
+  ],
+  "deepseekPasses": 1,
+  "expectsPass2": false,
+  "gtProvenance": {
+    "typeSource": "heuristic_high",
+    "typeConfidence": 0.92,
+    "offlinePassAudit": {
+      "extract_pages": {
+        "localPdf": true,
+        "pageCount": 76,
+        "pdfPath": "C:\\Allen\\nucleus\\canvasfiles\\3347895"
+      },
+      "heuristic_classify": {
+        "expectedFileType": "lecture_slides",
+        "source": "heuristic_high",
+        "confidence": 0.92
+      },
+      "teaching_units": {
+        "sectionCount": 10
+      },
+      "type_structure": {
+        "slideRows": 118,
+        "readingSections": 0,
+        "syllabusWeeks": 0
+      },
+      "concept_candidates": {
+        "candidateCount": 80
+      },
+      "problem_scan": {
+        "problemCount": 0
+      },
+      "detail_attach": {
+        "conceptKeysWithDetails": 41,
+        "detailCount": 41
+      },
+      "reconcile": {
+        "inputTitles": 80,
+        "accepted": 80,
+        "capped": 0,
+        "detailAttached": 23
+      }
+    },
+    "reconcileStats": {
+      "inputTitles": 80,
+      "accepted": 80,
+      "capped": 0,
+      "detailAttached": 23
+    }
+  }
+}

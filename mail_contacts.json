@@ -127,6 +127,34 @@
         "summaryStatus": "ready",
         "direction": "incoming",
         "addedAt": "2026-06-10T02:29:02.806Z"
+      },
+      {
+        "messageId": "19edbaab260110bc",
+        "threadId": "19ea8aad6d3eb8c8",
+        "subject": "Re: Communication thread: Allen and Junming",
+        "from": "Junming Huang <mail@junminghuang.com>",
+        "sender": "Junming Huang",
+        "date": "Thu, 18 Jun 2026 12:57:16 -0400",
+        "dateLabel": "12:57 PM",
+        "snippet": "Hi Allen, PubMed is publicly available, for both batch download and API queries. If they provide PubMed IDs, we could reconstruct the database by checking those IDs in PubMed. Otherwise, please go",
+        "summary": "",
+        "summaryStatus": "pending",
+        "direction": "incoming",
+        "addedAt": "2026-06-18T18:56:50.721Z"
+      },
+      {
+        "messageId": "19f06288756d8c5c",
+        "threadId": "19ea8aad6d3eb8c8",
+        "subject": "Re: Communication thread: Allen and Junming",
+        "from": "Junming Huang <mail@junminghuang.com>",
+        "sender": "Junming Huang",
+        "date": "Fri, 26 Jun 2026 18:58:45 -0400",
+        "dateLabel": "Jun 26",
+        "snippet": "Sorry, my voice input software misspelled your name. Junming Huang Paul and Marcia Wythes Center on Contemporary China at Princeton University http://www.junminghuang.com/ mail@junminghuang.com +1 617-",
+        "summary": "Junming Huang is sending an Excel file of manually verified Chinese scientists to Paul and Marcia Wythes Center on Contemporary China at Princeton University.",
+        "summaryStatus": "ready",
+        "direction": "incoming",
+        "addedAt": "2026-06-29T19:44:22.680Z"
       }
     ]
   }

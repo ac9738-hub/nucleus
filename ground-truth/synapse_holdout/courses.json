@@ -1,0 +1,105 @@
+{
+  "profile": "synapse_holdout",
+  "description": "Held-out Synapse Learn curriculum eval courses. Mix of layout patterns not in weekly-schedule GT iteration.",
+  "courses": [
+    {
+      "canvas_course_id": "20640",
+      "label": "ORF245-EGR245_S2026 Fundamentals of Statistics",
+      "layout": "module-only",
+      "why_holdout": "Module-order fallback; sparse PDF blocks; not in Princeton/Harvard weekly GT sets.",
+      "expected": {
+        "teachable": true,
+        "curriculumSource": "module",
+        "minCurriculumCount": 3,
+        "holisticLessonsMin": 0
+      }
+    },
+    {
+      "canvas_course_id": "20690",
+      "label": "COS217_S2026 Introduction to Programming Systems",
+      "layout": "block-heavy",
+      "why_holdout": "Large block index with concept override; RAG holdout overlap but separate curriculum metric.",
+      "expected": {
+        "teachable": true,
+        "curriculumSource": "concept_override",
+        "minCurriculumCount": 100,
+        "holisticLessonsMin": 0,
+        "minBlocks": 1000
+      }
+    },
+    {
+      "canvas_course_id": "15222",
+      "label": "CHI103_F2024 Intensive Elementary Chinese",
+      "layout": "holistic-links",
+      "why_holdout": "Homepage/module external links drive holistic lessons; not a weekly GT course.",
+      "expected": {
+        "teachable": true,
+        "curriculumSource": "concept",
+        "minCurriculumCount": 5,
+        "holisticLessonsMin": 5,
+        "homepageHydrated": true
+      }
+    },
+    {
+      "canvas_course_id": "153496",
+      "label": "GENED 1071: African Spirituality and the Challenges of Modern Times syllabus",
+      "layout": "syllabus-only",
+      "why_holdout": "Syllabus PDF fallback with no indexed blocks; Harvard-adjacent but not weekly GT.",
+      "expected": {
+        "teachable": true,
+        "curriculumSource": "syllabus",
+        "minCurriculumCount": 5,
+        "holisticLessonsMin": 0
+      }
+    },
+    {
+      "canvas_course_id": "19097",
+      "label": "MAT202_F2025 Linear Algebra with Applications",
+      "layout": "block-heavy",
+      "why_holdout": "Weekly holdout student course; dense lecture PDF blocks with concept override.",
+      "expected": {
+        "teachable": true,
+        "curriculumSource": "concept_override",
+        "minCurriculumCount": 200,
+        "holisticLessonsMin": 0,
+        "minBlocks": 1000
+      }
+    },
+    {
+      "canvas_course_id": "16630",
+      "label": "WRI175-WRI176_F2024 Mythconceptions",
+      "layout": "holistic-links",
+      "why_holdout": "Writing seminar with many outside-source holistic links; not in weekly GT.",
+      "expected": {
+        "teachable": true,
+        "curriculumSource": "concept",
+        "minCurriculumCount": 10,
+        "holisticLessonsMin": 20
+      }
+    },
+    {
+      "canvas_course_id": "20812",
+      "label": "MAT201_S2026 Multivariable Calculus",
+      "layout": "syllabus-fallback",
+      "why_holdout": "Weekly holdout course; syllabus-first with light holistic hydration.",
+      "expected": {
+        "teachable": true,
+        "curriculumSource": "syllabus",
+        "minCurriculumCount": 5,
+        "holisticLessonsMin": 0
+      }
+    },
+    {
+      "canvas_course_id": "18906",
+      "label": "COS126-EGR126_F2025 Computer Science: An Interdisciplinary Approach",
+      "layout": "syllabus-fallback",
+      "why_holdout": "Intro CS with syllabus-driven curriculum; not in weekly or RAG in-sample QUERY_SPECS.",
+      "expected": {
+        "teachable": true,
+        "curriculumSource": "syllabus",
+        "minCurriculumCount": 5,
+        "holisticLessonsMin": 0
+      }
+    }
+  ]
+}

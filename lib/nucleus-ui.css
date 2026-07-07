@@ -1,0 +1,353 @@
+/* Nucleus shared UI primitives.
+   Functionality: theme-token button styles reused across app surfaces.
+   Dependencies: :root tokens from themes/<name>/styles.css (load this after). */
+
+.nui-btn-row {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.nui-btn {
+  align-items: center;
+  background: rgba(var(--surface-2-rgb), 0.72);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-size: var(--font-body, 13px);
+  font-weight: var(--weight-semibold, 600);
+  gap: 6px;
+  justify-content: center;
+  line-height: 1.2;
+  min-height: 36px;
+  padding: 8px 14px;
+  text-decoration: none;
+  transition:
+    background var(--motion-fast, 120ms) var(--ease-out, ease),
+    border-color var(--motion-fast, 120ms) var(--ease-out, ease),
+    color var(--motion-fast, 120ms) var(--ease-out, ease),
+    filter var(--motion-fast, 120ms) var(--ease-out, ease);
+  white-space: nowrap;
+}
+
+.nui-btn:hover {
+  background: rgba(var(--surface-3-rgb), 0.82);
+  border-color: rgba(var(--accent-rgb), 0.28);
+  color: var(--text);
+}
+
+.nui-btn:focus-visible {
+  border-color: rgba(var(--accent-rgb), 0.45);
+  outline: 2px solid rgba(var(--accent-rgb), 0.35);
+  outline-offset: 2px;
+}
+
+.nui-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.nui-btn-primary {
+  background: var(--accent-gradient);
+  border: 1px solid rgba(var(--accent-rgb), 0.2);
+  color: var(--text-on-accent);
+}
+
+.nui-btn-primary:hover {
+  border-color: rgba(var(--accent-rgb), 0.34);
+  color: var(--text-on-accent);
+  filter: brightness(1.04);
+}
+
+.nui-btn-secondary {
+  background: rgba(var(--surface-2-rgb), 0.72);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+}
+
+.nui-btn-secondary:hover {
+  background: rgba(var(--surface-3-rgb), 0.82);
+  border-color: var(--border-solid);
+  color: var(--text);
+}
+
+.nui-btn-ghost {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+}
+
+.nui-btn-ghost:hover {
+  background: rgba(var(--surface-2-rgb), 0.45);
+  color: var(--text);
+}
+
+.nui-btn-compact {
+  font-size: var(--font-meta, 12px);
+  min-height: 30px;
+  padding: 6px 11px;
+}
+
+.nui-btn-block {
+  width: 100%;
+}
+
+.nui-btn-pill {
+  border-radius: 999px;
+  font-size: var(--font-meta, 12px);
+  font-weight: var(--weight-semibold, 600);
+  min-height: 28px;
+  padding: 0 12px;
+}
+
+.nui-btn-pill-accent {
+  background: rgba(var(--accent-rgb), 0.14);
+  border-color: rgba(var(--accent-rgb), 0.28);
+  color: var(--text);
+}
+
+.nui-btn-pill-accent:hover {
+  background: rgba(var(--accent-rgb), 0.2);
+  border-color: rgba(var(--accent-rgb), 0.45);
+  color: var(--text);
+}
+
+.nui-btn-pill.nui-btn-secondary {
+  background: rgba(var(--surface-2-rgb), 0.78);
+  border-color: rgba(var(--border-rgb), 0.22);
+  color: var(--text-dim);
+  font-weight: var(--weight-medium, 500);
+}
+
+.nui-btn-pill.nui-btn-secondary:hover {
+  background: rgba(var(--surface-3-rgb), 0.82);
+  border-color: rgba(var(--accent-rgb), 0.28);
+  color: var(--text);
+}
+
+.nui-btn-disclosure {
+  background:
+    radial-gradient(circle at 18% 0%, rgba(var(--accent-rgb), 0.12), transparent 42%),
+    rgba(var(--surface-2-rgb), 0.72);
+  border: 0;
+  border-bottom: 1px solid rgba(var(--border-rgb), 0.1);
+  border-radius: 0;
+  color: var(--text);
+  font-weight: var(--weight-medium, 500);
+  justify-content: space-between;
+  min-height: 0;
+  padding: 10px 14px;
+  text-align: left;
+  width: 100%;
+}
+
+.nui-btn-disclosure:hover {
+  background:
+    radial-gradient(circle at 18% 0%, rgba(var(--accent-rgb), 0.16), transparent 42%),
+    rgba(var(--surface-2-rgb), 0.9);
+  border-color: rgba(var(--border-rgb), 0.1);
+}
+
+.nui-btn-list {
+  background: rgba(var(--bg-rgb), 0.28);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  font-weight: var(--weight-medium, 500);
+  gap: 4px;
+  justify-content: flex-start;
+  min-height: 0;
+  padding: 12px 14px;
+  text-align: left;
+  width: 100%;
+}
+
+.nui-btn-list:hover {
+  background: rgba(var(--accent-rgb), 0.12);
+  border-color: var(--accent);
+}
+
+.nui-btn-list-title {
+  font-size: 14px;
+  font-weight: var(--weight-semibold, 600);
+}
+
+.nui-btn-list-meta {
+  color: var(--text-dim);
+  font-size: var(--font-meta, 12px);
+  font-weight: var(--weight-medium, 500);
+}
+
+/* Passive surface container — matches shell card recipe */
+.nui-surface {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg, 10px);
+  transition:
+    border-color var(--motion-fast, 120ms) var(--ease-out, ease),
+    box-shadow var(--motion-fast, 120ms) var(--ease-out, ease);
+}
+
+.nui-surface:hover {
+  border-color: rgba(var(--accent-rgb), 0.28);
+  box-shadow: var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.12));
+}
+
+.nui-section-label {
+  color: var(--text-tertiary, var(--text-mute));
+  font-size: var(--font-label);
+  font-weight: var(--weight-semibold, 600);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.nui-card {
+  background: var(--surface-elevated, var(--surface-2));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.nui-card-interactive {
+  cursor: pointer;
+  transition:
+    border-color var(--motion-fast, 120ms) var(--ease-out, ease),
+    box-shadow var(--motion-fast, 120ms) var(--ease-out, ease);
+}
+
+.nui-card-interactive:hover,
+.nui-card-interactive:focus-visible {
+  border-color: rgba(var(--accent-rgb), 0.28);
+  box-shadow: var(--shadow-sm);
+  outline: none;
+}
+
+.nui-badge {
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 10px;
+  font-weight: var(--weight-bold, 700);
+  letter-spacing: 0.04em;
+  line-height: 1;
+  padding: 4px 8px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.nui-badge-track {
+  background: rgba(var(--accent-3-rgb), 0.14);
+  color: var(--accent-3);
+}
+
+.nui-badge-soon {
+  background: rgba(var(--accent-warm-rgb), 0.16);
+  color: var(--accent-warm);
+}
+
+.nui-badge-overdue {
+  background: rgba(220, 80, 80, 0.14);
+  color: #e57373;
+}
+
+.nui-badge-muted {
+  background: var(--surface-inset);
+  color: var(--text-secondary, var(--text-dim));
+}
+
+.nui-segmented {
+  background: var(--surface-inset);
+  border: 1px solid var(--divider, var(--border));
+  border-radius: var(--radius);
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+}
+
+.nui-segmented-btn {
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary, var(--text-dim));
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--font-meta);
+  font-weight: var(--weight-medium, 500);
+  padding: 6px 12px;
+  transition:
+    background var(--motion-fast, 120ms) var(--ease-out, ease),
+    box-shadow var(--motion-fast, 120ms) var(--ease-out, ease),
+    color var(--motion-fast, 120ms) var(--ease-out, ease);
+}
+
+.nui-segmented-btn:hover {
+  color: var(--text-primary, var(--text));
+}
+
+.nui-segmented-btn.is-active {
+  background: var(--surface-elevated, var(--surface-2));
+  box-shadow: var(--shadow-sm);
+  color: var(--text-primary, var(--text));
+  font-weight: var(--weight-semibold, 600);
+}
+
+/* View crossfade layers (ui-iter-16) */
+#view {
+  position: relative;
+}
+
+.view-transition-layer {
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  transition: opacity var(--motion-fast, 120ms) var(--ease-out, ease);
+  width: 100%;
+}
+
+.view-transition-layer.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+  position: relative;
+}
+
+#view .view-transition-incoming:empty,
+#view .view-transition-outgoing:empty {
+  pointer-events: none;
+}
+
+
+.view-transition-layer.is-fading {
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+}
+
+html[data-smooth-tabs="0"] .view-transition-layer,
+html[data-smooth-tabs="0"] #view.view-is-switching,
+html[data-smooth-tabs="0"] #view.view-is-ready {
+  transition-duration: 0ms !important;
+}
+
+html[data-smooth-tabs="0"] .view-transition-layer.is-fading {
+  display: none;
+}
+
+.course-section.view-transition-incoming,
+.course-section.view-transition-outgoing {
+  position: relative;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .view-transition-layer,
+  #view.view-is-switching,
+  #view.view-is-ready {
+    transition-duration: 0ms !important;
+  }
+}

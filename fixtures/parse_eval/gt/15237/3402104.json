@@ -1,0 +1,355 @@
+{
+  "version": 1,
+  "courseId": "15237",
+  "fileId": "3402104",
+  "filename": "MMC copy of Precept 9_StudentVersion.pdf",
+  "expectedFileType": "discussion_prompt",
+  "passPlan": {
+    "courseId": "15237",
+    "fileId": "3402104",
+    "filename": "MMC copy of Precept 9_StudentVersion.pdf",
+    "resolvedType": "discussion_prompt",
+    "heuristicConfidence": 0.82,
+    "neededPasses": [
+      "extract_pages",
+      "heuristic_classify",
+      "llm_pass1",
+      "finalize"
+    ],
+    "skippedPasses": [
+      "llm_classify",
+      "llm_pass2"
+    ],
+    "estLlmCalls": 1,
+    "estRealisticLlmCalls": 1.0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "needed": true,
+        "reason": "Required local PDF/HTML extraction; no LLM.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "heuristic_classify",
+        "needed": true,
+        "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_classify",
+        "needed": false,
+        "reason": "Heuristic confidence 0.82 sufficient; skip flash classify call.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_pass1",
+        "needed": true,
+        "reason": "Type discussion_prompt: pass1 link/file_node only (no concept extraction profile).",
+        "llmCall": true,
+        "estCostTier": "low"
+      },
+      {
+        "pass": "llm_pass2",
+        "needed": false,
+        "reason": "Type discussion_prompt disables pass2 (single-pass type-specific or link-only profile).",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "finalize",
+        "needed": true,
+        "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+        "llmCall": false,
+        "estCostTier": "free"
+      }
+    ]
+  },
+  "passAudit": {
+    "plan": {
+      "courseId": "15237",
+      "fileId": "3402104",
+      "filename": "MMC copy of Precept 9_StudentVersion.pdf",
+      "resolvedType": "discussion_prompt",
+      "heuristicConfidence": 0.82,
+      "neededPasses": [
+        "extract_pages",
+        "heuristic_classify",
+        "llm_pass1",
+        "finalize"
+      ],
+      "skippedPasses": [
+        "llm_classify",
+        "llm_pass2"
+      ],
+      "estLlmCalls": 1,
+      "estRealisticLlmCalls": 1.0,
+      "steps": [
+        {
+          "pass": "extract_pages",
+          "needed": true,
+          "reason": "Required local PDF/HTML extraction; no LLM.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "heuristic_classify",
+          "needed": true,
+          "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_classify",
+          "needed": false,
+          "reason": "Heuristic confidence 0.82 sufficient; skip flash classify call.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_pass1",
+          "needed": true,
+          "reason": "Type discussion_prompt: pass1 link/file_node only (no concept extraction profile).",
+          "llmCall": true,
+          "estCostTier": "low"
+        },
+        {
+          "pass": "llm_pass2",
+          "needed": false,
+          "reason": "Type discussion_prompt disables pass2 (single-pass type-specific or link-only profile).",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "finalize",
+          "needed": true,
+          "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+          "llmCall": false,
+          "estCostTier": "free"
+        }
+      ]
+    },
+    "actualType": "discussion_prompt",
+    "deepseekPasses": 1,
+    "conceptCount": 21,
+    "detailCount": 5,
+    "totalLlmTokens": 0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "ran": true,
+        "useful": true,
+        "verdict": "required",
+        "note": "Local I/O; pages present means extract succeeded."
+      },
+      {
+        "pass": "heuristic_classify",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "Routed to discussion_prompt (free)."
+      },
+      {
+        "pass": "llm_classify",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Skipped; heuristic confidence sufficient.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass1",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "No pass1 tool trace.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass2",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Correctly skipped: profile disables pass2, type-specific pass1 only, or no log_* tools.",
+        "tokens": 0
+      },
+      {
+        "pass": "finalize",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "logged_details promoted to concept details."
+      }
+    ],
+    "cutCandidates": [],
+    "recommendations": [
+      "Pass2 correctly skipped for this type/pass1 tool pattern."
+    ]
+  },
+  "passes": [
+    "extract_pages",
+    "heuristic_classify",
+    "teaching_units",
+    "type_structure",
+    "concept_candidates",
+    "problem_scan",
+    "detail_attach",
+    "reconcile"
+  ],
+  "buildMode": "template_multi_pass_offline",
+  "builtAt": "2026-07-01T22:49:38Z",
+  "concepts": [
+    {
+      "name": "MMC copy of Precept 9_StudentVersion",
+      "details": []
+    },
+    {
+      "name": "scary movie, what type of evidence is this that the amygdala",
+      "details": []
+    },
+    {
+      "name": "1.Match the brain structure to the learning it helps perform",
+      "details": []
+    },
+    {
+      "name": "neu 201- precept 9",
+      "details": []
+    },
+    {
+      "name": "mmcproblem set 6",
+      "details": []
+    },
+    {
+      "name": "core concepts",
+      "details": []
+    },
+    {
+      "name": "lateral hypothalamussupervised learningreinforcement learningpavlovian conditioning (classical)operant conditioning",
+      "details": [
+        "Vocabulary: Lateral HypothalamusSupervised learningReinforcement learningPavlovian conditioning (classical)Operant conditioning"
+      ]
+    },
+    {
+      "name": "regulation of thirstregulation of feedingleptin",
+      "details": []
+    },
+    {
+      "name": "reward prediction errornucleus accumbensventral tegmental area",
+      "details": [
+        "Vocabulary: Reward prediction errorNucleus accumbensVentral tegmental area"
+      ]
+    },
+    {
+      "name": "tolerance",
+      "details": []
+    },
+    {
+      "name": "dopamine & rpe",
+      "details": []
+    },
+    {
+      "name": "no change, increase, decrease.",
+      "details": [
+        "Fill in the blank: No change, increase, decrease."
+      ]
+    },
+    {
+      "name": "james-lange theorycannon-bard theorypapez circuitamygdala outputs to hypothalamus",
+      "details": [
+        "Vocabulary: James-Lange theoryCannon-Bard theoryPapez circuitAmygdala outputs to hypothalamus"
+      ]
+    },
+    {
+      "name": "circuit for aggressionserotonin",
+      "details": []
+    },
+    {
+      "name": "eegepilepsysignal properties: frequency (hz) and amplitude (voltage)",
+      "details": [
+        "Vocabulary: EEGEpilepsySignal properties: frequency (Hz) and amplitude (voltage)"
+      ]
+    },
+    {
+      "name": "epilepsy",
+      "details": []
+    },
+    {
+      "name": "vocabulary",
+      "details": []
+    },
+    {
+      "name": "review w/answers",
+      "details": []
+    },
+    {
+      "name": "fmri (see next slide)",
+      "details": []
+    },
+    {
+      "name": "breakdown of 2b",
+      "details": []
+    },
+    {
+      "name": "correlation",
+      "details": []
+    }
+  ],
+  "conceptCount": 21,
+  "detailCount": 5,
+  "events": [],
+  "problems": [],
+  "sections": [
+    "Vocabulary",
+    "1.Match the brain structure to the learning it helps perform"
+  ],
+  "deepseekPasses": 1,
+  "expectsPass2": false,
+  "gtProvenance": {
+    "typeSource": "heuristic_high",
+    "typeConfidence": 0.82,
+    "offlinePassAudit": {
+      "extract_pages": {
+        "localPdf": true,
+        "pageCount": 33,
+        "pdfPath": "C:\\Allen\\nucleus\\canvasfiles\\3402104"
+      },
+      "heuristic_classify": {
+        "expectedFileType": "discussion_prompt",
+        "source": "heuristic_high",
+        "confidence": 0.82
+      },
+      "teaching_units": {
+        "sectionCount": 2
+      },
+      "type_structure": {
+        "slideRows": 20,
+        "readingSections": 0,
+        "syllabusWeeks": 0
+      },
+      "concept_candidates": {
+        "candidateCount": 21
+      },
+      "problem_scan": {
+        "problemCount": 0
+      },
+      "detail_attach": {
+        "conceptKeysWithDetails": 5,
+        "detailCount": 5
+      },
+      "reconcile": {
+        "inputTitles": 21,
+        "accepted": 21,
+        "capped": 0,
+        "detailAttached": 5
+      }
+    },
+    "reconcileStats": {
+      "inputTitles": 21,
+      "accepted": 21,
+      "capped": 0,
+      "detailAttached": 5
+    }
+  }
+}

@@ -343,10 +343,34 @@ function renderFiles(files) {
   `).join("");
 }
 
+function normalizeHomepageBody(html) {
+  const text = String(html || "").trim()
+  if (!text) return ""
+
+  const bodyMatch = text.match(/<body\b[^>]*>([\s\S]*?)<\/body>/i)
+  if (bodyMatch) return bodyMatch[1].trim()
+
+  if (/<html[\s>]/i.test(text)) {
+    return text
+      .replace(/<!doctype[^>]*>/gi, "")
+      .replace(/<\/?html[^>]*>/gi, "")
+      .replace(/<head[\s\S]*?<\/head>/gi, "")
+      .replace(/<\/?body[^>]*>/gi, "")
+      .trim()
+  }
+
+  return text
+}
+
 function getCourseFrontPage(canvasData, courseId) {
   const frontPages = canvasData && canvasData.front_pages
   if (!frontPages) return null
-  return frontPages[courseId] || frontPages[String(courseId)] || null
+  const frontPage = frontPages[courseId] || frontPages[String(courseId)] || null
+  if (!frontPage) return null
+
+  const body = normalizeHomepageBody(frontPage.body)
+  if (body === String(frontPage.body || "").trim()) return frontPage
+  return { ...frontPage, body }
 }
 
 function renderCourseSection(section, assignments, modules, moduleItems, files, frontPage, weeklySchedule) {
@@ -393,6 +417,28 @@ function renderCourseSection(section, assignments, modules, moduleItems, files, 
       <div class="course-list">${renderAssignments(assignments)}</div>
     </section>
   `
+}
+
+function renderCourseSectionHtml(courseId, canvasData = {}, activeSection = "assignments") {
+  const courses = canvasData && Array.isArray(canvasData.courses) ? canvasData.courses : [];
+  const course = courses.find(item => String(item.id) === String(courseId));
+  if (!course) return "";
+  const assignments = getCourseBucket(canvasData, "assignments", course.id);
+  const modules = getCourseBucket(canvasData, "modules", course.id);
+  const moduleItems = getCourseMapBucket(canvasData, "module_items", course.id);
+  const files = getCourseBucket(canvasData, "file", course.id);
+  const frontPage = getCourseFrontPage(canvasData, course.id);
+  const weeklySchedule = getWeeklySchedule(canvasData, course.id);
+  const hasHomepage = Boolean(frontPage && frontPage.body);
+  const validSections = hasHomepage
+    ? ["homepage", "assignments", "weekly", "modules", "files"]
+    : ["assignments", "weekly", "modules", "files"];
+  const section = validSections.includes(activeSection)
+    ? activeSection
+    : hasHomepage
+      ? "homepage"
+      : "assignments";
+  return renderCourseSection(section, assignments, modules, moduleItems, files, frontPage, weeklySchedule);
 }
 
 function createCourseHtmlTemplate(course, canvasData = {}, activeSection = "assignments") {
@@ -453,13 +499,15 @@ function createAllCourseHtmlTemplates(canvasData = {}) {
 if (typeof module !== "undefined") {
   module.exports = {
     createCourseHtmlTemplate,
-    createAllCourseHtmlTemplates
+    createAllCourseHtmlTemplates,
+    renderCourseSectionHtml
   };
 }
 
 if (typeof window !== "undefined") {
   window.nucleusCourseTemplates = {
     createCourseHtmlTemplate,
-    createAllCourseHtmlTemplates
+    createAllCourseHtmlTemplates,
+    renderCourseSectionHtml
   };
 }

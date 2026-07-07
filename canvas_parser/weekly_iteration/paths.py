@@ -41,3 +41,19 @@ def holdout_fixture_snapshot_path(root: Path) -> Path:
 
 def holdout_report_path(root: Path) -> Path:
     return cache_dir(root) / 'report_holdout.json'
+
+
+def harvard_ground_truth_dir(root: Path) -> Path:
+    return root / 'ground-truth' / 'harvard'
+
+
+def harvard_snapshot_path(root: Path) -> Path:
+    return cache_dir(root) / 'snapshots_harvard.json'
+
+
+def harvard_fixture_snapshot_path(root: Path) -> Path:
+    return root / 'fixtures' / 'weekly_iteration' / 'snapshots_harvard.json'
+
+
+def harvard_report_path(root: Path) -> Path:
+    return cache_dir(root) / 'report_harvard.json'

@@ -198,6 +198,7 @@ function routeInboxMessages(messages = []) {
 
     messages.forEach(message => {
         if (!message || !message.id) return
+        if (message.inboxCategory === 'non_academic' || message.inboxCategory === 'campus_events') return
 
         const senderEmail = normalizeEmail(extractEmail(message.from))
         if (!contactEmails.has(senderEmail)) return

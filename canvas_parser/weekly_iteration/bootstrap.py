@@ -71,6 +71,11 @@ def main(argv: list[str] | None = None) -> int:
         action='store_true',
         help='Export holdout student fixtures to snapshots_holdout.json',
     )
+    export_cmd.add_argument(
+        '--harvard',
+        action='store_true',
+        help='Export Harvard fixtures to snapshots_harvard.json',
+    )
 
     seed_cmd = sub.add_parser('seed-cache', help='Copy fixtures into .cache for default eval path')
 
@@ -78,7 +83,13 @@ def main(argv: list[str] | None = None) -> int:
     root = Path(args.root)
 
     if args.command == 'export-fixtures':
-        profile = get_profile(root, 'holdout' if getattr(args, 'holdout', False) else 'primary')
+        if getattr(args, 'holdout', False) and getattr(args, 'harvard', False):
+            raise SystemExit('Use only one of --holdout or --harvard.')
+        profile_name = (
+            'harvard' if getattr(args, 'harvard', False)
+            else ('holdout' if getattr(args, 'holdout', False) else 'primary')
+        )
+        profile = get_profile(root, profile_name)
         snapshot = Path(args.snapshot) if args.snapshot else profile.snapshot_path
         out = export_gt_fixtures(
             root,

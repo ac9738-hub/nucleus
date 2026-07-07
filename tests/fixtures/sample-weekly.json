@@ -1,0 +1,20 @@
+{
+  "weekly_schedule": {
+    "demo": [
+      {
+        "weekLabel": "Week 1",
+        "weekStart": "2026-01-05T00:00:00.000Z",
+        "files": [{ "name": "Sample Syllabus.pdf" }],
+        "assignments": [{ "name": "Quiz 1" }],
+        "events": []
+      },
+      {
+        "weekLabel": "Week 2",
+        "weekStart": "2026-01-12T00:00:00.000Z",
+        "files": [],
+        "assignments": [],
+        "events": [{ "name": "Grading review" }]
+      }
+    ]
+  }
+}

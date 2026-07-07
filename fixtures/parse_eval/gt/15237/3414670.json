@@ -1,0 +1,374 @@
+{
+  "version": 1,
+  "courseId": "15237",
+  "fileId": "3414670",
+  "filename": "Precept 9_IG_DD.pdf",
+  "expectedFileType": "discussion_prompt",
+  "passPlan": {
+    "courseId": "15237",
+    "fileId": "3414670",
+    "filename": "Precept 9_IG_DD.pdf",
+    "resolvedType": "discussion_prompt",
+    "heuristicConfidence": 0.82,
+    "neededPasses": [
+      "extract_pages",
+      "heuristic_classify",
+      "llm_pass1",
+      "finalize"
+    ],
+    "skippedPasses": [
+      "llm_classify",
+      "llm_pass2"
+    ],
+    "estLlmCalls": 1,
+    "estRealisticLlmCalls": 1.0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "needed": true,
+        "reason": "Required local PDF/HTML extraction; no LLM.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "heuristic_classify",
+        "needed": true,
+        "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_classify",
+        "needed": false,
+        "reason": "Heuristic confidence 0.82 sufficient; skip flash classify call.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_pass1",
+        "needed": true,
+        "reason": "Type discussion_prompt: pass1 link/file_node only (no concept extraction profile).",
+        "llmCall": true,
+        "estCostTier": "low"
+      },
+      {
+        "pass": "llm_pass2",
+        "needed": false,
+        "reason": "Type discussion_prompt disables pass2 (single-pass type-specific or link-only profile).",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "finalize",
+        "needed": true,
+        "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+        "llmCall": false,
+        "estCostTier": "free"
+      }
+    ]
+  },
+  "passAudit": {
+    "plan": {
+      "courseId": "15237",
+      "fileId": "3414670",
+      "filename": "Precept 9_IG_DD.pdf",
+      "resolvedType": "discussion_prompt",
+      "heuristicConfidence": 0.82,
+      "neededPasses": [
+        "extract_pages",
+        "heuristic_classify",
+        "llm_pass1",
+        "finalize"
+      ],
+      "skippedPasses": [
+        "llm_classify",
+        "llm_pass2"
+      ],
+      "estLlmCalls": 1,
+      "estRealisticLlmCalls": 1.0,
+      "steps": [
+        {
+          "pass": "extract_pages",
+          "needed": true,
+          "reason": "Required local PDF/HTML extraction; no LLM.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "heuristic_classify",
+          "needed": true,
+          "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_classify",
+          "needed": false,
+          "reason": "Heuristic confidence 0.82 sufficient; skip flash classify call.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_pass1",
+          "needed": true,
+          "reason": "Type discussion_prompt: pass1 link/file_node only (no concept extraction profile).",
+          "llmCall": true,
+          "estCostTier": "low"
+        },
+        {
+          "pass": "llm_pass2",
+          "needed": false,
+          "reason": "Type discussion_prompt disables pass2 (single-pass type-specific or link-only profile).",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "finalize",
+          "needed": true,
+          "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+          "llmCall": false,
+          "estCostTier": "free"
+        }
+      ]
+    },
+    "actualType": "discussion_prompt",
+    "deepseekPasses": 1,
+    "conceptCount": 24,
+    "detailCount": 7,
+    "totalLlmTokens": 0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "ran": true,
+        "useful": true,
+        "verdict": "required",
+        "note": "Local I/O; pages present means extract succeeded."
+      },
+      {
+        "pass": "heuristic_classify",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "Routed to discussion_prompt (free)."
+      },
+      {
+        "pass": "llm_classify",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Skipped; heuristic confidence sufficient.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass1",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "No pass1 tool trace.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass2",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Correctly skipped: profile disables pass2, type-specific pass1 only, or no log_* tools.",
+        "tokens": 0
+      },
+      {
+        "pass": "finalize",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "logged_details promoted to concept details."
+      }
+    ],
+    "cutCandidates": [],
+    "recommendations": [
+      "Pass2 correctly skipped for this type/pass1 tool pattern."
+    ]
+  },
+  "passes": [
+    "extract_pages",
+    "heuristic_classify",
+    "teaching_units",
+    "type_structure",
+    "concept_candidates",
+    "problem_scan",
+    "detail_attach",
+    "reconcile"
+  ],
+  "buildMode": "template_multi_pass_offline",
+  "builtAt": "2026-07-01T22:49:38Z",
+  "concepts": [
+    {
+      "name": "Precept 9_IG_DD",
+      "details": []
+    },
+    {
+      "name": "type of evidence is this that the amygdala",
+      "details": []
+    },
+    {
+      "name": "might be involved in producing the",
+      "details": []
+    },
+    {
+      "name": "Problem 1",
+      "details": []
+    },
+    {
+      "name": "Problem 2",
+      "details": []
+    },
+    {
+      "name": "neu 201- precept 9",
+      "details": []
+    },
+    {
+      "name": "pset 6",
+      "details": []
+    },
+    {
+      "name": "core concepts",
+      "details": []
+    },
+    {
+      "name": "supervised learningreinforcement learning",
+      "details": [
+        "Vocabulary:Supervised learningReinforcement learning"
+      ]
+    },
+    {
+      "name": "pavlovian conditioning (classical)",
+      "details": []
+    },
+    {
+      "name": "operant conditioning",
+      "details": []
+    },
+    {
+      "name": "regulation of thirstregulation of feeding",
+      "details": []
+    },
+    {
+      "name": "reward prediction errornucleus accumbensventral tegmental areatolerance",
+      "details": [
+        "Vocabulary:Reward prediction errorNucleus accumbensVentral tegmental areaTolerance"
+      ]
+    },
+    {
+      "name": "dopamine and rpe",
+      "details": []
+    },
+    {
+      "name": "no change, increase, decrease.",
+      "details": [
+        "Fill in the blank: No change, increase, decrease."
+      ]
+    },
+    {
+      "name": "james-lange theorycannon-bard theorypapez circuitamygdala",
+      "details": [
+        "Vocabulary:James-Lange theoryCannon-Bard theoryPapez circuitAmygdala"
+      ]
+    },
+    {
+      "name": "circuit for aggression",
+      "details": []
+    },
+    {
+      "name": "original papez circuit",
+      "details": []
+    },
+    {
+      "name": "fear learning and response",
+      "details": [
+        "Amygdala: Fear learning and response"
+      ]
+    },
+    {
+      "name": "fmri while watching a scary movie, what",
+      "details": []
+    },
+    {
+      "name": "necessitysufficiencycorrelation",
+      "details": []
+    },
+    {
+      "name": "lesions (necessity) stimulation (sufficiency)",
+      "details": []
+    },
+    {
+      "name": "eegepilepsysignal properties: frequency and amplitude",
+      "details": [
+        "Vocabulary:EEGEpilepsySignal properties: frequency and amplitude"
+      ]
+    },
+    {
+      "name": "rem and non-rem sleepsleep cycle stagesnarcolepsycircadian rhythms",
+      "details": [
+        "Vocabulary:REM and non-REM sleepSleep cycle stagesNarcolepsyCircadian rhythms"
+      ]
+    }
+  ],
+  "conceptCount": 24,
+  "detailCount": 7,
+  "events": [],
+  "problems": [
+    "Problem 1",
+    "Problem 2"
+  ],
+  "sections": [
+    "Problem 1",
+    "Problem 2"
+  ],
+  "deepseekPasses": 1,
+  "expectsPass2": false,
+  "gtProvenance": {
+    "typeSource": "heuristic_high",
+    "typeConfidence": 0.82,
+    "offlinePassAudit": {
+      "extract_pages": {
+        "localPdf": true,
+        "pageCount": 48,
+        "pdfPath": "C:\\Allen\\nucleus\\canvasfiles\\3414670"
+      },
+      "heuristic_classify": {
+        "expectedFileType": "discussion_prompt",
+        "source": "heuristic_high",
+        "confidence": 0.82
+      },
+      "teaching_units": {
+        "sectionCount": 2
+      },
+      "type_structure": {
+        "slideRows": 22,
+        "readingSections": 0,
+        "syllabusWeeks": 0
+      },
+      "concept_candidates": {
+        "candidateCount": 24
+      },
+      "problem_scan": {
+        "problemCount": 2
+      },
+      "detail_attach": {
+        "conceptKeysWithDetails": 7,
+        "detailCount": 7
+      },
+      "reconcile": {
+        "inputTitles": 24,
+        "accepted": 24,
+        "capped": 0,
+        "detailAttached": 7
+      }
+    },
+    "reconcileStats": {
+      "inputTitles": 24,
+      "accepted": 24,
+      "capped": 0,
+      "detailAttached": 7
+    }
+  }
+}

@@ -50,6 +50,7 @@
       '<button type="button" class="synapse-sidebar-toggle" data-synapse-toggle-sidebar aria-label="Hide chat history">&lsaquo;</button>' +
       "</div>" +
       '<button type="button" class="synapse-new-chat-button" data-synapse-new-conversation><span class="synapse-new-chat-icon" aria-hidden="true">+</span>New chat</button>' +
+      '<button type="button" class="synapse-learn-course-button" data-synapse-learn-course-open><span class="synapse-new-chat-icon" aria-hidden="true">▶</span>Textbooks</button>' +
       '<div class="synapse-history-list">' + (items || '<div class="synapse-history-empty">No past chats yet.</div>') + "</div>" +
       "</aside>" +
       (collapsed
@@ -61,6 +62,38 @@
   function findConversation(state, conversationId) {
     var conversations = getConversations(state);
     return conversations.find(function (c) { return String(c.id) === String(conversationId); }) || conversations[0] || null;
+  }
+
+  function renderSynapseLearnPage(tab, state) {
+    var textbook = (typeof window !== "undefined" && window.nucleusSynapseTextbook) || null;
+    var t = templates();
+    if (!textbook || !t) {
+      return '<section class="workspace-panel"><div><h2>Learn</h2><p>Synapse textbook module did not load.</p></div></section>';
+    }
+
+    var session = tab && tab.learnSession ? tab.learnSession : null;
+    var main = "";
+
+    if (!session || !session.courseId || !Array.isArray(session.lessons)) {
+      var courses = (session && session.courses) || [];
+      main = textbook.renderCourseCardGrid(courses, {
+        pending: !session || session.coursesLoadState !== "done",
+        loading: session && (session.coursesLoadState === "loading" || session.curriculumLoadState === "loading"),
+        error: session && (session.coursesLoadError || session.curriculumLoadError)
+      });
+    } else {
+      var lessonIndex = session.lessonIndex || 0;
+      var lessons = session.lessons || [];
+      main = textbook.renderTextbookShell(Object.assign({}, session, {
+        lesson: lessons[lessonIndex] || lessons[0] || null
+      }));
+    }
+
+    return (
+      '<section class="synapse-textbook-shell">' +
+      main +
+      "</section>"
+    );
   }
 
   function renderSynapseChatPage(tab, state) {
@@ -87,6 +120,9 @@
   }
 
   function renderSynapseApp(tab, state) {
+    if (tab && tab.synapseMode === "learn") {
+      return renderSynapseLearnPage(tab || {}, state || {});
+    }
     return renderSynapseChatPage(tab || {}, state || {});
   }
 
@@ -122,9 +158,15 @@
     var messages = Array.isArray(opts.initialMessages) ? opts.initialMessages.slice() : [];
     var sending = false;
     var disposed = false;
+    var scrollPending = false;
 
     function scrollToBottom() {
-      thread.scrollTop = thread.scrollHeight;
+      if (!thread || scrollPending) return;
+      scrollPending = true;
+      requestAnimationFrame(function () {
+        scrollPending = false;
+        if (thread) thread.scrollTop = thread.scrollHeight;
+      });
     }
 
     function clearEmptyState() {
@@ -169,15 +211,38 @@
       };
     }
 
+    var deltaBuffer = "";
+    var deltaRaf = 0;
+
+    function flushDelta(handle) {
+      if (deltaRaf) {
+        cancelAnimationFrame(deltaRaf);
+        deltaRaf = 0;
+      }
+      if (!handle || !deltaBuffer) return;
+      handle.textEl.appendChild(document.createTextNode(deltaBuffer));
+      deltaBuffer = "";
+      scrollToBottom();
+    }
+
     function pushDelta(handle, delta) {
       if (!handle || !delta) return;
       handle.buffer += delta;
-      handle.textEl.appendChild(document.createTextNode(delta));
-      scrollToBottom();
+      deltaBuffer += delta;
+      if (deltaRaf) return;
+      deltaRaf = requestAnimationFrame(function () {
+        deltaRaf = 0;
+        if (!handle || !deltaBuffer) return;
+        var chunk = deltaBuffer;
+        deltaBuffer = "";
+        handle.textEl.appendChild(document.createTextNode(chunk));
+        scrollToBottom();
+      });
     }
 
     function finalizeAssistant(handle, finalText) {
       if (!handle) return "";
+      flushDelta(handle);
       var text = typeof finalText === "string" && finalText.length ? finalText : handle.buffer;
       handle.textEl.innerHTML = t.formatContent(text);
       handle.node.classList.remove("synapse-streaming");
@@ -189,6 +254,7 @@
 
     function failAssistant(handle, errorText) {
       if (!handle) return;
+      flushDelta(handle);
       handle.node.classList.remove("synapse-streaming");
       handle.node.classList.add("synapse-error");
       handle.textEl.textContent = errorText || "Something went wrong.";
@@ -249,7 +315,8 @@
           requestId: requestId,
           conversationId: conversationId,
           model: model,
-          messages: messages.slice()
+          messages: messages.slice(),
+          enableArtifacts: true
         })
       ).then(function (result) {
         if (disposed) { cleanup(); return; }
@@ -261,6 +328,12 @@
         var finalText = result && typeof result.text === "string" ? result.text : assistant.buffer;
         finalizeAssistant(assistant, finalText);
         messages.push({ role: "assistant", content: finalText });
+        if (Array.isArray(result && result.artifacts) && result.artifacts.length) {
+          var synArtifacts = typeof window !== "undefined" ? window.nucleusSynapseArtifacts : null;
+          if (synArtifacts && typeof synArtifacts.appendSynapseArtifactChips === "function") {
+            synArtifacts.appendSynapseArtifactChips(thread, result.artifacts, { autoPreviewFirst: true });
+          }
+        }
         if (typeof opts.onAssistantMessage === "function") {
           opts.onAssistantMessage({ role: "assistant", content: finalText, createdAt: Date.now() });
         }
@@ -304,6 +377,7 @@
     renderSynapseApp: renderSynapseApp,
     renderSynapseSidebar: renderSynapseSidebar,
     renderSynapseChatPage: renderSynapseChatPage,
+    renderSynapseLearnPage: renderSynapseLearnPage,
     mountSynapseChat: mountSynapseChat
   };
 

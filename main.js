@@ -12,16 +12,53 @@ const { app, BrowserWindow, ipcMain, WebContentsView, session, webFrameMain, glo
 const path = require('path');
 const fs = require('fs')
 const { spawn } = require('child_process')
+const { performance } = require('node:perf_hooks')
 const {open_canvas_auth_window, get_auth_token, get_auth_csrf, get_base_url, clear_auth_state} = require('./app/canvas/auth')
 const { createAgentProcess } = require('./agent-process')
 const { createDataStore } = require('./data-store')
 const { createContextStore } = require('./context-store')
+const { buildContextIndex } = require('./context-index')
+const {
+  isTabIncludedInContext,
+  normalizeSession
+} = require('./lib/workspace-session')
+const { createWorkspaceSessionStore } = require('./lib/workspace-session-store')
+const { resolveFocusCourseIdsForRetrieval, buildRetrievalPruneOptions } = require('./lib/workspace-retrieval-policy')
+const { buildWorkspaceContextPacket } = require('./lib/workspace-context-packet')
 const {
   MAX_VISIBLE_TEXT_BLOCKS,
   MAX_VISIBLE_TEXT_CHARS,
   compactText,
   sliceVisiblePageTextBlocks
 } = require('./context-pipeline')
+const {
+  resolveAllCitations
+} = require('./text-chunks')
+const {
+  SIDEKICK_RETRIEVAL_K,
+  buildGroundingPayload,
+  withScreenChunks
+} = require('./sidekick-retrieval-budget')
+const { RetrievalSessionStore } = require('./sidekick-retrieval-session')
+const { statusForToolCall, statusForPhase } = require('./sidekick-status')
+const {
+  normalizeAnswerMode,
+  isGroundedAnswerMode,
+  SIDEKICK_ANSWER_GROUNDED,
+  SIDEKICK_ANSWER_GENERAL
+} = require('./sidekick-answer-mode')
+const {
+  buildVectorRetrievalOptions,
+  collectVisibleNodes,
+  formatCourseMethodsContext,
+  pollCourseProblemSolvingContext,
+  resolveSidekickFocusCourseIds,
+  shouldPollCourseMethods
+} = require('./sidekick-course-methods')
+const {
+  SIDEKICK_DEFAULT_MODEL,
+  normalizeSidekickModel
+} = require('./sidekick-models')
 const { renderwebsearchresult, searchweb } = require('./engine')
 const { getAuthBounds, getBrowserBounds, setRightPanelWidth, setWorkspaceSidebarCollapsed } = require('./view-layout')
 const {
@@ -34,12 +71,17 @@ const {
   normalizeFrameUrl,
   sameTabId
 } = require('./tab-utils')
-const { createCanvasApi, clearCanvasAuthFromEnv, killParserProcess } = require('./app/canvas/api')
+const { createCanvasApi, clearCanvasAuthFromEnv, killParserProcess, beginCanvasSyncWipe, endCanvasSyncWipe, setParserBatchGate } = require('./app/canvas/api')
+const {
+  canvasDiskRecoveryEnabled,
+  canvasMemoryCacheEnabled
+} = require('./lib/canvas-cache-policy')
 const { createSynapseClient } = require('./app/synapse/client')
 const {
   getThemeSelection,
   getRendererStylesheets,
   getCanvasThemeConfig,
+  buildCanvasSlateThemeCss,
   getThemeRuntime,
   buildThemeVarsCss,
   getThemePalette,
@@ -47,6 +89,31 @@ const {
   setStoredTheme,
   listThemes
 } = require('./theme-manager')
+const { createCanvasPreloadSlotPool, SLOT_STATES } = require('./lib/canvas-preload-slot-pool')
+const {
+  createCanvasNavStackStore,
+  snapshotNativeEntry,
+  snapshotNativeFromForward,
+  snapshotWebEntry,
+  isNavigableWebUrl,
+  navEntriesEqual
+} = require('./lib/canvas-nav-stack')
+const { buildExtractVisibleCanvasLinksScript } = require('./lib/canvas-preload-dom')
+const { collectNativeSectionUrls } = require('./lib/canvas-preload-native')
+const { createCanvasPreloadMetrics } = require('./lib/canvas-preload-metrics')
+const { createCanvasNavTransition } = require('./lib/canvas-nav-transition')
+const {
+  CANVAS_BACK_CACHE_SLOT_INDEX,
+  CANVAS_PREDICTIVE_SLOT_COUNT,
+  CANVAS_PRELOAD_SLOT_COUNT,
+  normalizePointerHints,
+  normalizeDomLinks,
+  buildPreloadFocusCourseIds,
+  buildSiblingCourseCounts,
+  collectProtectedPreloadUrls,
+  buildPredictivePreloadUrls,
+  pointerHintsFresh
+} = require('./lib/canvas-preload-orchestrator')
 const {
   creategmailauthview,
   get_token,
@@ -72,6 +139,35 @@ const {
   addOutgoingMailToContactChatAsync,
   startMailContactsSync
 } = require('./app/mail/contacts')
+const { createMainDiagnostics } = require('./lib/diagnostics-main')
+const { createResourceGovernor } = require('./lib/resource-governor')
+const { createLagSpikeCollector } = require('./lib/lag-spike-collector')
+const { createPerfEvalServer } = require('./lib/perf-eval-server')
+const { planPreloadUrls, summarizePlan } = require('./lib/canvas-preload-planner')
+
+const mainDiag = createMainDiagnostics({ rootDir: __dirname })
+
+function logSlateCover(event, data = {}) {
+  if (!mainDiag || !mainDiag.isEnabled('tabs')) return
+  mainDiag.log('tabs', `slate:${event}`, data)
+}
+
+function debugNavLog(location, message, data = {}, hypothesisId = '') {
+  // #region agent log
+  fetch('http://127.0.0.1:7283/ingest/c1155abf-8302-4940-9722-19bb0cae0569', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '5b3c30' },
+    body: JSON.stringify({
+      sessionId: '5b3c30',
+      location,
+      message,
+      data,
+      timestamp: Date.now(),
+      hypothesisId
+    })
+  }).catch(() => {})
+  // #endregion
+}
 
 function mailError(error) {
   return error && error.message ? error.message : String(error)
@@ -215,8 +311,32 @@ const BROWSER_POOL_LIMITS = {
 }
 const BROWSER_POOL_STARTUP_DELAY_MS = 3500
 const BROWSER_POOL_PROTECTED_RECENT = 2
-const CANVAS_PREDICTIVE_LINK_COUNT = 2
-const canvasPredictiveByTab = new Map()
+// Simple tab model: one dedicated pre-injected canvas WebContentsView per canvastab.
+const USE_SIMPLE_TAB_MODEL = true
+const CANVAS_DOM_CANDIDATE_LIMIT = 20
+let canvasPreloadGeneration = 0
+let canvasPreloadPoolInitialized = false
+const canvasPreloadSlots = createCanvasPreloadSlotPool({ slotCount: CANVAS_PRELOAD_SLOT_COUNT })
+const canvasPointerHintsByTab = new Map()
+const canvasNavStack = createCanvasNavStackStore()
+const canvasPreloadStats = createCanvasPreloadMetrics()
+const canvasPointerHintDiagnostics = {
+  received: 0,
+  stored: 0,
+  lastAt: 0,
+  lastSource: '',
+  lastLinkCount: 0,
+  lastHintTabId: '',
+  droppedNoTabId: 0,
+  droppedNotCanvasTab: 0,
+  refreshSkippedInactive: 0
+}
+let canvasPreloadLastPlan = []
+let canvasPreloadLastPlanTabId = ''
+const canvasLinkCancelByTab = new Map()
+let tabActivationGeneration = 0
+let rendererActiveTabRequestSeq = 0
+let canvasNativePreloadDebounceTimer = null
 
 class BrowserPool {
   limits(type) {
@@ -936,7 +1056,7 @@ async function applyCanvasTheme(webContents) {
 // file is the authoritative, editable theme layer for the slate overlay.
 async function applySlateTheme() {
   if (!slate || !slate.webContents || slate.webContents.isDestroyed()) return
-  const css = readThemeCss(__dirname, `themes/${activeThemeName}/slate.css`, '')
+  const css = buildCanvasSlateThemeCss(__dirname)
   await injectAuthorThemeCss(slate.webContents, 'nucleus-slate-theme', css)
 }
 
@@ -1010,24 +1130,159 @@ const canvasBlankWarmUrl = "data:text/html;charset=utf-8," + encodeURIComponent(
 `)
 
 let agent = null
+let sidekickResponseBuffer = ''
+let sidekickGroundingCatalog = []
+const sidekickRetrievalSession = new RetrievalSessionStore()
+let sidekickPendingTurn = null
+let sidekickPendingRetrieval = null
+let sidekickPendingStageContinue = null
+
+function emitSidekickStatus(label) {
+  const text = String(label || '').trim()
+  if (!text) return
+  const window = BrowserWindow.getAllWindows()[0]
+  if (window && !window.webContents.isDestroyed()) {
+    window.webContents.send('prompt:status', { label: text })
+  }
+}
+
+function classifySidekickGrounding(messageText) {
+  const text = String(messageText || '').trim()
+  const problemQuery = /\b(help me (?:with|on|solve)|i(?:'m| am) stuck|solve (?:this|the|problem|question)|(?:give me )?(?:a )?hint|(?:problem|question|exercise)\s*#?\d+|pset\s*\d+)/i.test(text)
+  const groundedExplain = /\b(explain|what is|what are|how does|how do|define|summarize|tell me about)\b/i.test(text)
+  const academicQuery = problemQuery || groundedExplain || /\b(syllabus|lecture|slides?|reading|exam|midterm|homework|pset|canvas|course|module|quiz)\b/i.test(text)
+  return { problemQuery, academicQuery, groundedExplain }
+}
+
+function buildScreenOnlyGrounding({ screenSlice }) {
+  const payload = buildGroundingPayload({ startpoints: [], screenSlice })
+  sidekickRetrievalSession.reset()
+  sidekickRetrievalSession.setScreenCatalog(
+    (payload.catalog || []).filter(chunk => String(chunk.citeLabel || '').startsWith('C'))
+  )
+  return {
+    callContext: sidekickRetrievalSession.getCallContext(),
+    catalog: sidekickRetrievalSession.getCitationCatalog(),
+    groundingLabels: sidekickRetrievalSession.getGroundingLabels(),
+    retrievalSession: sidekickRetrievalSession.toSnapshot(),
+    requireCitations: false,
+    retrievalAttempted: false,
+    retrievalEmpty: false,
+    truncated: false
+  }
+}
+
+function appendCourseMethodsContext({ messageText, answerMode, screenSlice, hints, session }) {
+  if (!shouldPollCourseMethods(hints, answerMode, screenSlice)) return ''
+  const graph = getCanvasVisibleGraph()
+  if (!graph) return ''
+  emitSidekickStatus(statusForPhase('course_methods'))
+  const poll = pollCourseProblemSolvingContext({
+    graph,
+    query: messageText,
+    courseIds: resolveSidekickFocusCourseIds(contextStore.getSnapshot(), screenSlice),
+    visibleNodes: collectVisibleNodes(screenSlice)
+  })
+  const methodsContext = formatCourseMethodsContext(poll)
+  if (!methodsContext) return ''
+  if (session && typeof session.setCourseGraphContext === 'function') {
+    session.setCourseGraphContext(methodsContext)
+  }
+  return methodsContext
+}
+
+function buildSidekickGrounding({ messageText, startpoints, screenSlice, answerMode }) {
+  const hints = classifySidekickGrounding(messageText)
+  const pruneOptions = buildSidekickPruneOptions(messageText)
+  const payload = buildGroundingPayload({
+    startpoints,
+    screenSlice,
+    pruneOptions
+  })
+  sidekickRetrievalSession.reset()
+  sidekickRetrievalSession.setPruneOptions(pruneOptions)
+  sidekickRetrievalSession.setScreenCatalog(
+    (payload.catalog || []).filter(chunk => String(chunk.citeLabel || '').startsWith('C'))
+  )
+  sidekickRetrievalSession.seedTurnZero({ query: messageText, payload })
+  appendCourseMethodsContext({
+    messageText,
+    answerMode,
+    screenSlice,
+    hints,
+    session: sidekickRetrievalSession
+  })
+  const layered = sidekickRetrievalSession.getLayeredContext()
+  const retrievalAttempted = Boolean(String(messageText || '').trim())
+  const retrievalEmpty = retrievalAttempted && !(Array.isArray(startpoints) && startpoints.length)
+  const catalog = sidekickRetrievalSession.getCitationCatalog()
+  const requireCitations = catalog.length > 0 && (hints.academicQuery || hints.problemQuery)
+  return {
+    callContext: layered.callContext,
+    courseGraphContext: layered.courseGraphContext,
+    ragContext: layered.ragContext,
+    screenContext: layered.screenContext,
+    catalog,
+    groundingLabels: sidekickRetrievalSession.getGroundingLabels(),
+    retrievalSession: sidekickRetrievalSession.toSnapshot(),
+    requireCitations,
+    retrievalAttempted,
+    retrievalEmpty,
+    problemQuery: hints.problemQuery,
+    academicQuery: hints.academicQuery,
+    groundedExplain: hints.groundedExplain,
+    truncated: payload.truncated || layered.truncated
+  }
+}
 
 function getAgent() {
   if (agent) return agent
   agent = createAgentProcess({
     scriptPath: path.join(__dirname, 'sidekick.py'),
+    onAfterToolBatch: () => {
+      if (!sidekickPendingStageContinue || !agent) return
+      const payload = sidekickPendingStageContinue
+      sidekickPendingStageContinue = null
+      emitSidekickStatus(
+        payload.mode === 'wait_for_context'
+          ? statusForPhase('grounding')
+          : statusForPhase('running_tools')
+      )
+      agent.send(['stage_continue', payload])
+    },
     onText: text => {
+      sidekickResponseBuffer += String(text || '')
       const window = BrowserWindow.getAllWindows()[0]
       if (window && !window.webContents.isDestroyed()) {
         window.webContents.send('prompt:response-chunk', text)
       }
     },
+    onReplace: text => {
+      sidekickResponseBuffer = String(text || '')
+      const window = BrowserWindow.getAllWindows()[0]
+      if (window && !window.webContents.isDestroyed()) {
+        window.webContents.send('prompt:response-replace', text)
+      }
+    },
     onDone: () => {
       const window = BrowserWindow.getAllWindows()[0]
       if (window && !window.webContents.isDestroyed()) {
+        const citations = resolveAllCitations(sidekickResponseBuffer, sidekickGroundingCatalog)
+        if (citations.length) {
+          window.webContents.send('prompt:response-citations', citations)
+        }
         window.webContents.send('prompt:response-done')
       }
+      sidekickResponseBuffer = ''
+      sidekickRetrievalSession.reset()
+      sidekickPendingTurn = null
+      sidekickPendingRetrieval = null
+      sidekickPendingStageContinue = null
     },
-    onToolCall: data => runfunction(data)
+    onToolCall: async data => {
+      emitSidekickStatus(statusForToolCall(data))
+      return runfunction(data)
+    }
   })
   return agent
 }
@@ -1081,7 +1336,12 @@ const vectorRetrieval = (() => {
     if (proc && proc.exitCode === null && !proc.killed && !proc.stdin.destroyed) return
     proc = null
     stdoutBuffer = ''
-    const newProc = spawn('python', [path.join(__dirname, 'vector_retreival.py')])
+    const newProc = spawn('python', [path.join(__dirname, 'vector_retreival.py')], {
+      env: {
+        ...process.env,
+        NUCLEUS_DISABLE_CANVAS_DISK_RECOVERY: canvasDiskRecoveryEnabled() ? '0' : '1'
+      }
+    })
     proc = newProc
     console.log('vector retrieval process started', newProc.pid)
 
@@ -1201,6 +1461,76 @@ const vectorRetrieval = (() => {
   }
 })()
 
+async function resolvePendingRetrieval(messageText, retrievalOptions = {}) {
+  if (sidekickPendingRetrieval) {
+    const pending = sidekickPendingRetrieval
+    sidekickPendingRetrieval = null
+    return pending
+  }
+  if (!messageText) return []
+  return vectorRetrieval.sendQuery(messageText, {
+    mode: 'agent',
+    k: SIDEKICK_RETRIEVAL_K,
+    ...retrievalOptions
+  })
+}
+
+async function buildStageContinuePayload({ mode, reason = '' }) {
+  const turn = sidekickPendingTurn || {}
+  const messageText = String(turn.messageText || '')
+  const answerMode = normalizeAnswerMode(turn.answerMode)
+  const hints = classifySidekickGrounding(messageText)
+  const screenSlice = getScreenSliceForGrounding()
+  const retrievalOptions = buildVectorRetrievalOptions({
+    hints,
+    answerMode,
+    contextSnapshot: contextStore.getSnapshot(),
+    screenSlice,
+    k: SIDEKICK_RETRIEVAL_K
+  })
+  let grounding
+  if (mode === 'wait_for_context') {
+    emitSidekickStatus(statusForPhase('searching_canvas'))
+    const startpoints = await resolvePendingRetrieval(messageText, retrievalOptions)
+    grounding = buildSidekickGrounding({
+      messageText,
+      startpoints,
+      screenSlice,
+      answerMode
+    })
+  } else {
+    emitSidekickStatus(statusForPhase('running_tools'))
+    grounding = {
+      ...buildScreenOnlyGrounding({ screenSlice: getScreenSliceForGrounding() }),
+      problemQuery: isGroundedAnswerMode(answerMode) ? hints.problemQuery : false,
+      academicQuery: isGroundedAnswerMode(answerMode) ? hints.academicQuery : false,
+      groundedExplain: isGroundedAnswerMode(answerMode) ? hints.groundedExplain : false,
+      requireCitations: false,
+      retrievalAttempted: false,
+      retrievalEmpty: false
+    }
+  }
+  sidekickGroundingCatalog = grounding.catalog
+  return {
+    mode,
+    answerMode,
+    sidekickModel: normalizeSidekickModel(turn.sidekickModel),
+    reason: String(reason || ''),
+    callContext: grounding.callContext,
+    courseGraphContext: grounding.courseGraphContext,
+    ragContext: grounding.ragContext,
+    screenContext: grounding.screenContext,
+    retrievalSession: grounding.retrievalSession,
+    groundingLabels: grounding.groundingLabels,
+    requireCitations: grounding.requireCitations,
+    retrievalAttempted: grounding.retrievalAttempted,
+    retrievalEmpty: grounding.retrievalEmpty,
+    problemQuery: grounding.problemQuery,
+    academicQuery: grounding.academicQuery,
+    groundedExplain: grounding.groundedExplain
+  }
+}
+
 /**
  * Sends a user prompt payload to the Python agent over stdin.
  *
@@ -1210,28 +1540,68 @@ const vectorRetrieval = (() => {
  */
 async function senduserprompt(payload) {
   if (Array.isArray(payload) && payload[0] === 'message') {
+    if (!resourceGovernor.shouldAllowSidekick()) {
+      emitSidekickStatus(statusForPhase('memory_pressure'))
+      return
+    }
     const messagePayload = payload[1]
     const messageText = typeof messagePayload === 'object' && messagePayload !== null
       ? String(messagePayload.text || '')
       : String(messagePayload || '')
-    const startpoints = messageText
-      ? await vectorRetrieval.sendQuery(messageText, { mode: 'agent' })
-      : []
-    const retrievalContext = vectorRetrieval.contextFor(startpoints)
+    const answerMode = normalizeAnswerMode(
+      typeof messagePayload === 'object' && messagePayload !== null
+        ? messagePayload.answerMode
+        : SIDEKICK_ANSWER_GROUNDED
+    )
+    const sidekickModel = normalizeSidekickModel(
+      typeof messagePayload === 'object' && messagePayload !== null
+        ? (messagePayload.sidekickModel || messagePayload.model)
+        : SIDEKICK_DEFAULT_MODEL
+    )
+    const hints = classifySidekickGrounding(messageText)
+    const screenSlice = getScreenSliceForGrounding()
+    const retrievalOptions = buildVectorRetrievalOptions({
+      hints,
+      answerMode,
+      contextSnapshot: contextStore.getSnapshot(),
+      screenSlice,
+      k: SIDEKICK_RETRIEVAL_K
+    })
+    const screenGrounding = buildScreenOnlyGrounding({ screenSlice })
+    sidekickPendingTurn = { messageText, messagePayload, answerMode, sidekickModel }
+    sidekickPendingRetrieval = isGroundedAnswerMode(answerMode) && messageText
+      ? vectorRetrieval.sendQuery(messageText, retrievalOptions)
+      : null
+    sidekickPendingStageContinue = null
+    sidekickResponseBuffer = ''
+    sidekickGroundingCatalog = screenGrounding.catalog
     const payloadObject = typeof messagePayload === 'object' && messagePayload !== null
       ? { ...messagePayload }
       : { text: String(messagePayload || '') }
     const existingSystemContext = String(payloadObject.systemContext || '').trim()
     const regionContext = String(payloadObject.regionContext || '').trim()
-    // Live app/render state now travels as a structured, versioned snapshot the
-    // sidekick formats itself; systemContext carries only ad-hoc text (region
-    // capture + any caller-provided extra context).
     payloadObject.systemContext = [existingSystemContext, regionContext].filter(Boolean).join('\n\n')
     payloadObject.contextSnapshot = contextStore.getSnapshot()
-    payloadObject.callContext = retrievalContext
+    payloadObject.stage = 1
+    payloadObject.answerMode = answerMode
+    payloadObject.sidekickModel = sidekickModel
+    payloadObject.callContext = isGroundedAnswerMode(answerMode) ? screenGrounding.callContext : ''
+    payloadObject.retrievalSession = screenGrounding.retrievalSession
+    payloadObject.requireCitations = false
+    payloadObject.groundingLabels = screenGrounding.groundingLabels
+    payloadObject.retrievalAttempted = false
+    payloadObject.retrievalEmpty = false
+    payloadObject.problemQuery = isGroundedAnswerMode(answerMode) ? hints.problemQuery : false
+    payloadObject.academicQuery = isGroundedAnswerMode(answerMode) ? hints.academicQuery : false
+    payloadObject.groundedExplain = isGroundedAnswerMode(answerMode) ? hints.groundedExplain : false
     delete payloadObject.regionContext
     payloadObject.text = messageText
     logAppState('prompt-send')
+    emitSidekickStatus(
+      isGroundedAnswerMode(answerMode)
+        ? statusForPhase('live_context')
+        : statusForPhase('thinking')
+    )
     getAgent().send(['message', payloadObject])
     return
   }
@@ -1250,6 +1620,7 @@ let activetab = 'None'
 // snapshot shipped to the sidekick. Slices are updated by event-driven
 // contributors (renderer UI state, tab registry, per-surface screen providers).
 const contextStore = createContextStore()
+const workspaceSessionStore = createWorkspaceSessionStore({ rootDir: __dirname })
 // Last UI-state payload pushed by the renderer (sections, layout, workspaces, full
 // tab list incl. center/task tabs the main process does not track in currtabs).
 let rendererUiState = null
@@ -1258,13 +1629,60 @@ let rendererUiState = null
 let screenSliceOwner = 'none'
 let screenSliceSurfaceKey = ''
 let tabOperationChain = Promise.resolve()
+let canvasNavBusyUntil = 0
+
+const lagSpikeCollector = createLagSpikeCollector()
+let perfEvalServer = null
+
+function markCanvasNavBusy(durationMs = 450) {
+  canvasNavBusyUntil = Math.max(canvasNavBusyUntil, Date.now() + Math.max(0, Number(durationMs) || 0))
+}
+
+function isCanvasNavBusy() {
+  return Date.now() < canvasNavBusyUntil
+}
 
 function runSerializedTabOperation(task) {
-  const run = tabOperationChain.then(task, task)
+  const enqueuedAt = performance.now()
+  const run = tabOperationChain.then(() => {
+    lagSpikeCollector.noteSerializedWait(performance.now() - enqueuedAt)
+    return task()
+  }, () => {
+    lagSpikeCollector.noteSerializedWait(performance.now() - enqueuedAt)
+    return task()
+  })
   tabOperationChain = run.catch(() => {})
   return run
 }
 let rendererOverlayDepth = 0
+const resourceGovernor = createResourceGovernor({
+  getContext() {
+    const activeTab = activetab && activetab !== 'None' ? activetab : null
+    return {
+      tabs: currtabs.length,
+      activeTabId: activeTab && activeTab.id ? activeTab.id : null,
+      activeTabType: activeTab && activeTab.type ? activeTab.type : null,
+      tabNavigating: currtabs.some(tab => tab && tab.loading)
+        || Boolean(activeTab && activeTab.loading),
+      sidekickPending: Boolean(sidekickPendingTurn || sidekickPendingRetrieval),
+      preloadSlotsBusy: canvasPreloadSlots.size()
+    }
+  },
+  onPolicyChange(policy, previous) {
+    if (policy.pausePreload && (!previous || !previous.pausePreload)) {
+      cancelCanvasPredictiveRefreshSchedule()
+      canvasPreloadGeneration += 1
+    }
+  }
+})
+const vectorRetrievalRestartSoon = vectorRetrieval.restartSoon.bind(vectorRetrieval)
+vectorRetrieval.restartSoon = function restartSoonWithResourceGovernor(delayMs = 1500) {
+  if (resourceGovernor.shouldDeferVectorReload()) {
+    resourceGovernor.deferVectorRestart(delayMs)
+    return
+  }
+  vectorRetrievalRestartSoon(delayMs)
+}
 let slate = null
 let canvasSetupPromise = null
 let mainwindow = null
@@ -1276,6 +1694,7 @@ let canvasVisibleContextPollInFlight = false
 let htmlVisibleContextPollInFlight = false
 let canvasVisibleContextUpdateQueued = false
 let visibleContextUpdateQueued = false
+let visibleContextDeferNavTimer = null
 let lastAppStateLogKey = ''
 const MAX_REGION_TEXT_BLOCKS = 40
 const MAX_REGION_TEXT_CHARS = 6000
@@ -1592,6 +2011,7 @@ async function captureRegionContextForTab(tab, region = {}) {
 }
 
 let canvasApi
+let canvasDiskReadsBlocked = !canvasDiskRecoveryEnabled()
 const dataStore = createDataStore({
   sendToRenderer: (channel, payload) => {
     BrowserWindow.getAllWindows().forEach(window => {
@@ -1656,16 +2076,35 @@ canvasApi = createCanvasApi({
     canvasBaseUrl: canvas_base_url
   }),
   sendCanvasDataUpdate: () => dataStore.sendCanvasDataUpdate(),
-  onCanvasTasks: (tasks, options) => addCanvasTasks(tasks, options)
+  onCanvasTasks: (tasks, options) => addCanvasTasks(tasks, options),
+  shouldBlockCanvasDiskReads: () => !canvasDiskRecoveryEnabled() || canvasDiskReadsBlocked
 })
 
-setImmediate(() => {
-  try {
-    addCanvasTasks(canvasApi.getCanvasTasksFromDisk(), { restartVector: false })
-  } catch (error) {
-    console.error('Unable to load Canvas tasks from disk:', error)
-  }
+setParserBatchGate({
+  canSend: () => resourceGovernor.shouldAllowParser(),
+  onQueueChange: depth => resourceGovernor.setParserQueueDepth(depth)
 })
+resourceGovernor.setHooks({
+  onParserFlush: () => canvasApi.flushParserBatchQueue(),
+  onVectorRestart: delayMs => vectorRetrievalRestartSoon(delayMs)
+})
+
+if (readCanvasSyncState().wiped) {
+  canvasDiskReadsBlocked = true
+  canvasInitialSetupDone = false
+  console.log('[canvas] Sync wipe pending — disk cache reads blocked until manual sync.')
+} else if (!canvasDiskRecoveryEnabled()) {
+  console.log('[canvas] Disk recovery disabled — Canvas data loads only after an explicit sync in this session.')
+}
+
+if (canvasDiskRecoveryEnabled()) {
+  setImmediate(() => {
+    if (canvasDiskReadsBlocked) return
+    canvasApi.getCanvasTasksFromDiskAsync()
+      .then(tasks => addCanvasTasks(tasks, { restartVector: false }))
+      .catch(error => console.error('Unable to load Canvas tasks from disk:', error))
+  })
+}
 
 // return the contents of a file
 function readInjectionCssFile(filename) {
@@ -2000,46 +2439,137 @@ async function logoutCanvas() {
   return { ok: true }
 }
 
+const CANVAS_SYNC_STATE_PATH = path.join(__dirname, '.cache', 'canvas_sync_state.json')
+
 const CANVAS_SYNC_RELATIVE_PATHS = [
   'canvas_data.json',
   'canvas_graph.json',
+  'canvas_graph_tasks.json',
   'canvas_embedding_cache.json',
   'assignmenthtml.json',
   path.join('app', 'canvas', 'canvas_homepages'),
   'canvasfiles',
   'outside_sources',
   'engine-search-cache',
-  'frame-html'
+  'frame-html',
+  path.join('.cache', 'pdf_extract'),
+  path.join('.cache', 'canvas_preload')
 ]
 
-function clearCanvasSyncData() {
-  const removed = []
+function readCanvasSyncState() {
+  try {
+    const raw = fs.readFileSync(CANVAS_SYNC_STATE_PATH, 'utf8').trim()
+    if (!raw) return { wiped: false }
+    const parsed = JSON.parse(raw)
+    return parsed && typeof parsed === 'object' ? parsed : { wiped: false }
+  } catch (_error) {
+    return { wiped: false }
+  }
+}
 
-  CANVAS_SYNC_RELATIVE_PATHS.forEach(relativePath => {
-    const fullPath = path.join(__dirname, relativePath)
+function writeCanvasSyncState(state) {
+  fs.mkdirSync(path.dirname(CANVAS_SYNC_STATE_PATH), { recursive: true })
+  fs.writeFileSync(CANVAS_SYNC_STATE_PATH, JSON.stringify(state, null, 2))
+}
+
+function markCanvasSyncWiped() {
+  writeCanvasSyncState({ wiped: true, wipedAt: new Date().toISOString() })
+  canvasDiskReadsBlocked = true
+  canvasInitialSetupDone = false
+}
+
+function clearCanvasSyncWipeMark() {
+  writeCanvasSyncState({ wiped: false, syncedAt: new Date().toISOString() })
+  if (canvasDiskRecoveryEnabled()) {
+    canvasDiskReadsBlocked = false
+  }
+}
+
+function sleepSync(ms) {
+  const until = Date.now() + ms
+  while (Date.now() < until) {}
+}
+
+function removeCanvasSyncPath(fullPath, retries = 5) {
+  for (let attempt = 0; attempt < retries; attempt += 1) {
     try {
-      if (!fs.existsSync(fullPath)) return
-      if (fs.statSync(fullPath).isDirectory()) {
+      if (!fs.existsSync(fullPath)) return true
+      const stat = fs.statSync(fullPath)
+      if (stat.isDirectory()) {
         fs.rmSync(fullPath, { recursive: true, force: true })
-        removed.push(`${relativePath}/`)
       } else {
         fs.unlinkSync(fullPath)
-        removed.push(relativePath)
       }
+      return !fs.existsSync(fullPath)
     } catch (error) {
-      console.warn(`Unable to remove Canvas sync path ${relativePath}:`, error.message || error)
+      if (attempt === retries - 1) {
+        console.warn(`Unable to remove Canvas sync path ${fullPath}:`, error.message || error)
+        return false
+      }
+      sleepSync(100 * (attempt + 1))
     }
-  })
+  }
+  return false
+}
 
-  canvasGraphIndex = null
-  canvasGraphVisibleIndexes = null
-  canvasGraphCacheKey = ''
-  canvasInitialSetupDone = false
-  const removedTasks = dataStore.removeCanvasTasks()
-  dataStore.sendCanvasDataUpdate()
-  vectorRetrieval.restartSoon()
+function collectExtraCanvasSyncPaths(rootDir) {
+  const extras = []
+  try {
+    for (const name of fs.readdirSync(rootDir)) {
+      if (/^canvas_graph\.json\..+\.bak$/i.test(name)) extras.push(name)
+      if (/^\.canvas_graph\.json\..+\.tmp$/i.test(name)) extras.push(name)
+      if (/^\.canvas_data\.json\..+\.tmp$/i.test(name)) extras.push(name)
+    }
+  } catch (_error) {}
+  return extras
+}
 
-  return { ok: true, removed, removedTasks }
+function clearCanvasSyncData() {
+  beginCanvasSyncWipe()
+  markCanvasSyncWiped()
+  try {
+    const removed = []
+    const relativePaths = [
+      ...CANVAS_SYNC_RELATIVE_PATHS,
+      ...collectExtraCanvasSyncPaths(__dirname)
+    ]
+
+    relativePaths.forEach(relativePath => {
+      const fullPath = path.join(__dirname, relativePath)
+      if (removeCanvasSyncPath(fullPath)) {
+        removed.push(relativePath.endsWith('/') ? relativePath : relativePath)
+      }
+    })
+
+    canvasGraphIndex = null
+    canvasGraphVisibleIndexes = null
+    canvasGraphCacheKey = ''
+    if (canvasApi && typeof canvasApi.clearLiveCanvasSession === 'function') {
+      canvasApi.clearLiveCanvasSession()
+    }
+    if (canvasApi && typeof canvasApi.invalidateCanvasDataCache === 'function') {
+      canvasApi.invalidateCanvasDataCache()
+    }
+    const removedTasks = dataStore.removeCanvasTasks()
+    dataStore.sendCanvasDataUpdate({ canvasWiped: true })
+    vectorRetrieval.restartSoon()
+
+    const hasAuth = loadCanvasAuthFromEnv()
+    const lingering = ['canvas_data.json', 'canvas_graph.json', 'canvas_graph_tasks.json']
+      .filter(name => fs.existsSync(path.join(__dirname, name)))
+    if (lingering.length) {
+      console.warn('[canvas] Wipe finished but these files still exist:', lingering.join(', '))
+    } else {
+      console.log(
+        '[canvas] Sync cache wiped from disk (%d path(s)). Data stays empty until you click "Sync Canvas now" in Settings.',
+        removed.length
+      )
+    }
+
+    return { ok: true, removed, removedTasks, hasAuth, resyncStarted: false, lingering, wipePending: true }
+  } finally {
+    endCanvasSyncWipe()
+  }
 }
 
 async function validateCanvasAuthState() {
@@ -2216,7 +2746,12 @@ async function openCanvasTabFromTool(input = {}) {
 
   try {
     await installCanvasSessionCookies()
-    await setup()
+    if (canvasDiskReadsBlocked) {
+      return "ERROR opening Canvas tab: Canvas sync was cleared. Use Settings → Sync Canvas now first."
+    }
+    if (!canvasInitialSetupDone) {
+      await syncCanvasData()
+    }
   } catch (error) {
     return "ERROR opening Canvas tab: saved Canvas authentication failed: "
       + (error && error.message ? error.message : String(error))
@@ -2293,6 +2828,34 @@ function pruneCanvasGraphChild(node) {
   }
 }
 
+function pruneCanvasGraphConcept(node) {
+  const base = pruneCanvasGraphChild(node)
+  return {
+    ...base,
+    problems: Array.isArray(node.problems) ? node.problems.map(String) : [],
+    prerequisiteConceptIds: Array.isArray(node.prerequisiteConceptIds)
+      ? node.prerequisiteConceptIds.map(String)
+      : []
+  }
+}
+
+function pruneCanvasGraphProblem(node) {
+  const base = pruneCanvasGraphChild(node)
+  return {
+    ...base,
+    steps: Array.isArray(node.steps) ? node.steps : [],
+    incomingConceptNodeIds: Array.isArray(node.incomingConceptNodeIds)
+      ? node.incomingConceptNodeIds.map(String)
+      : [],
+    outgoingConceptNodeIds: Array.isArray(node.outgoingConceptNodeIds)
+      ? node.outgoingConceptNodeIds.map(String)
+      : [],
+    assignmentNodeIds: Array.isArray(node.assignmentNodeIds)
+      ? node.assignmentNodeIds.map(String)
+      : []
+  }
+}
+
 // Builds a compact, in-memory index from the full (possibly huge) canvas graph,
 // keeping only the fields consumed by the visible-context pipeline. The full
 // parsed graph is discarded afterwards so we never hold its full weight resident.
@@ -2309,6 +2872,10 @@ function buildLightweightCanvasIndex(graph) {
         courseid: file.courseid,
         fileid: file.fileid,
         name: file.name,
+        academicFileType: file.academicFileType || '',
+        typeExtractions: file.typeExtractions && typeof file.typeExtractions === 'object'
+          ? file.typeExtractions
+          : {},
         canvaspreviewurl: file.canvaspreviewurl,
         downloadurl: file.downloadurl,
         pages: (Array.isArray(file.pages) ? file.pages : []).map(page => ({
@@ -2341,13 +2908,13 @@ function buildLightweightCanvasIndex(graph) {
   }
 
   const concepts = (graph.concepts || []).map(concept => {
-    const out = pruneCanvasGraphChild(concept)
+    const out = pruneCanvasGraphConcept(concept)
     out.details = (concept.details || []).map(pruneCanvasGraphChild)
     out.examples = (concept.examples || []).map(pruneCanvasGraphChild)
     return out
   })
 
-  const problems = (graph.problems || []).map(pruneCanvasGraphChild)
+  const problems = (graph.problems || []).map(pruneCanvasGraphProblem)
 
   const learningBlocks = {}
   Object.entries(graph.learningBlocks || {}).forEach(([courseId, blocks]) => {
@@ -2416,6 +2983,12 @@ function readJsonFileWithRetry(filePath, attempts = 3, delayMs = 100) {
 // when its size/mtime changes. statSync is microseconds; the heavy parse only
 // runs on an actual file change instead of on every visible-context update.
 function getCanvasVisibleGraph() {
+  if (!canvasDiskRecoveryEnabled() || canvasDiskReadsBlocked) {
+    canvasGraphIndex = null
+    canvasGraphVisibleIndexes = null
+    canvasGraphCacheKey = ''
+    return null
+  }
   const graphPath = path.join(__dirname, 'canvas_graph.json')
   let stat
   try {
@@ -2938,8 +3511,8 @@ function updateSurfaceSlice() {
       surface.kind = `section-${ui.activeSection}`
       surface.description = `${ui.activeSection} section`
     } else if (ui && ui.top === 'workspace') {
-      surface.kind = 'project-center'
-      surface.description = 'Workspace Project Center'
+      surface.kind = 'workspace-control-center'
+      surface.description = 'Workspace Control Center'
     }
   }
   contextStore.update('surface', surface)
@@ -2968,6 +3541,19 @@ function composeScreenSliceFromMain() {
   if (screenSliceOwner !== 'main') return
   const tab = activetab !== 'None' ? activetab : null
   if (!isHtmlVisibleContextTab(tab)) return
+  if (!isActiveTabIncludedInAiContext()) {
+    contextStore.update('screen', withScreenChunks({
+      source: 'excluded-tab',
+      surfaceKind: 'excluded',
+      url: tab.url || '',
+      title: tab.label || '',
+      text: [],
+      canvas: null,
+      truncated: false,
+      charCount: 0
+    }))
+    return
+  }
   const canvas = currentCanvasPageContext
   const html = currentHtmlPageContext
   let screen = null
@@ -3023,11 +3609,102 @@ function composeScreenSliceFromMain() {
     }
   }
 
-  contextStore.update('screen', screen)
+  contextStore.update('screen', withScreenChunks(screen))
 }
 
 // Applies the renderer UI-state push (sections, layout, workspace catalog, full
 // tab list) into the app/layout/workspaces slices and refreshes derived slices.
+function getRendererWorkspaceSession(workspaceId) {
+  const ui = rendererUiState
+  const id = String(workspaceId || (ui && ui.activeWorkspaceId) || '')
+  if (ui && ui.workspaceSessions && ui.workspaceSessions[id]) {
+    return normalizeSession(ui.workspaceSessions[id], id)
+  }
+  return workspaceSessionStore.get(id)
+}
+
+function isActiveTabIncludedInAiContext() {
+  const ui = rendererUiState
+  if (!ui || !ui.activeWorkspaceId || !ui.activeTabId) return true
+  const session = getRendererWorkspaceSession(ui.activeWorkspaceId)
+  return isTabIncludedInContext(session, ui.activeTabId)
+}
+
+function getScreenSliceForGrounding() {
+  if (!isActiveTabIncludedInAiContext()) return null
+  return contextStore.get('screen')
+}
+
+function recomputeWorkspaceContextSlices() {
+  const ui = rendererUiState
+  if (!ui) return
+
+  if (ui.workspaceSessions && typeof ui.workspaceSessions === 'object') {
+    workspaceSessionStore.mergeFromRenderer(ui.workspaceSessions)
+  }
+
+  const workspaceId = String(ui.activeWorkspaceId || '')
+  const session = workspaceSessionStore.get(workspaceId)
+  contextStore.update('workspaceSession', session)
+
+  const rendererTabs = Array.isArray(ui.tabs) ? ui.tabs : []
+  const activeTab = rendererTabs.find(tab => sameTabId(tab.id, ui.activeTabId)) || null
+  const includedTabs = rendererTabs.filter(tab => isTabIncludedInContext(session, tab.id))
+
+  let canvasData = null
+  try {
+    canvasData = canvasApi.readCanvasData()
+  } catch (_error) {
+    canvasData = null
+  }
+
+  const allCourseIds = (canvasData && Array.isArray(canvasData.courses)
+    ? canvasData.courses
+    : []
+  ).map(course => String(course.id || '')).filter(Boolean)
+
+  const scope = resolveFocusCourseIdsForRetrieval(session, {
+    tabs: includedTabs,
+    activeTab: activeTab && isTabIncludedInContext(session, activeTab.id) ? activeTab : null,
+    allCourseIds
+  })
+
+  const contextPacket = buildWorkspaceContextPacket(session, {
+    workspaceId,
+    tabs: includedTabs,
+    activeTab: activeTab && isTabIncludedInContext(session, activeTab.id) ? activeTab : null,
+    allCourseIds,
+    tasks: dataStore.getTasksSnapshot()
+  })
+  contextStore.update('workspaceContext', contextPacket)
+
+  const index = buildContextIndex({
+    tasks: dataStore.getTasksSnapshot(),
+    canvasData,
+    activeTab: activeTab && isTabIncludedInContext(session, activeTab.id) ? activeTab : null,
+    tabs: includedTabs
+  })
+  index.focusCourseIds = scope.focusCourseIds
+  contextStore.update('index', index)
+}
+
+function buildSidekickPruneOptions(messageText = '') {
+  const packet = contextStore.get('workspaceContext')
+  if (packet && packet.pruneOptions) {
+    return {
+      ...packet.pruneOptions,
+      query: String(messageText || packet.pruneOptions.query || '')
+    }
+  }
+  const snapshot = contextStore.getSnapshot()
+  return buildRetrievalPruneOptions(snapshot.workspaceSession || {}, {
+    query: messageText,
+    tabs: snapshot.tabs || [],
+    activeTab: snapshot.activeTab,
+    allCourseIds: (snapshot.index && snapshot.index.courses || []).map(course => course.id)
+  })
+}
+
 function applyRendererUiState(ui) {
   rendererUiState = ui && typeof ui === 'object' ? ui : null
   if (rendererUiState) {
@@ -3054,6 +3731,7 @@ function applyRendererUiState(ui) {
       : []
     contextStore.update('workspaces', { active: rendererUiState.activeWorkspaceId || null, open })
   }
+  recomputeWorkspaceContextSlices()
   recomputeTabsSlice()
   recomputeActiveTabSlice()
   updateSurfaceSlice()
@@ -3557,6 +4235,7 @@ async function updateCurrentHtmlVisibleContext() {
 async function updateCurrentCanvasVisibleContext() {
   if (canvasVisibleContextPollInFlight) return
   canvasVisibleContextPollInFlight = true
+  const traceId = lagSpikeCollector.begin('visible_context.update')
   try {
     const tab = activetab !== 'None' ? activetab : null
     if (!tab || tab.type !== 'canvastab' || tab.canvasMode !== 'browser' || !tab.view) {
@@ -3596,6 +4275,7 @@ async function updateCurrentCanvasVisibleContext() {
   } catch (error) {
     console.error("Unable to update Canvas visible context:", error)
   } finally {
+    lagSpikeCollector.end(traceId, { tabId: activetab !== 'None' && activetab ? activetab.id : '' })
     canvasVisibleContextPollInFlight = false
   }
 }
@@ -3605,6 +4285,16 @@ async function updateCurrentCanvasVisibleContext() {
 // the main thread is only touched when the visible region can actually change.
 function scheduleVisibleContextUpdate() {
   if (visibleContextUpdateQueued) return
+  if (isCanvasNavBusy()) {
+    if (!visibleContextDeferNavTimer) {
+      const waitMs = Math.max(20, canvasNavBusyUntil - Date.now() + 20)
+      visibleContextDeferNavTimer = setTimeout(() => {
+        visibleContextDeferNavTimer = null
+        scheduleVisibleContextUpdate()
+      }, waitMs)
+    }
+    return
+  }
   visibleContextUpdateQueued = true
   canvasVisibleContextUpdateQueued = true
   setTimeout(async () => {
@@ -3683,11 +4373,11 @@ async function navigateTabFromTool(input = {}) {
       revealCanvasView(foundtab.view)
       return { ok: false, error: "Canvas auth is not ready.", tab: compactTab(foundtab) }
     }
-    await runCanvasSlateNavigation(mainwindow, foundtab.view, () => {
+    await runCanvasNavAction(mainwindow, foundtab, foundtab.view, () => {
       return loadCanvasTabURL(foundtab.view, url, status => {
         mainwindow.webContents.send('canvas:navigation-finished', status)
       })
-    })
+    }, { destUrl: url, reason: 'toolbar_nav' })
   } else {
     await foundtab.view.webContents.loadURL(url)
   }
@@ -3787,7 +4477,10 @@ async function refreshCanvasDataFromTool() {
     return { ok: false, error: "No saved Canvas authentication found. Open Canvas manually once to sign in." }
   }
   await installCanvasSessionCookies()
-  await setup()
+  if (canvasDiskReadsBlocked) {
+    return { ok: false, error: 'Canvas sync was cleared. Run Settings → Sync Canvas now before refreshing.' }
+  }
+  await syncCanvasData()
   const data = readCanvasDataForTool()
   return {
     ok: true,
@@ -3883,6 +4576,95 @@ async function runfunction(data) {
   else if (data.name === "refresh_canvas_data") {
     tool_response.push(JSON.stringify(await refreshCanvasDataFromTool()))
   }
+  else if (data.name === "continue_sidekick") {
+    const input = data.input || {}
+    const mode = String(input.mode || '').trim()
+    const reason = String(input.reason || '').trim()
+    const answerMode = normalizeAnswerMode(sidekickPendingTurn && sidekickPendingTurn.answerMode)
+    if (mode !== 'wait_for_context' && mode !== 'tool_use') {
+      tool_response.push(JSON.stringify({
+        ok: false,
+        error: 'mode must be wait_for_context or tool_use'
+      }))
+    } else if (mode === 'wait_for_context' && !isGroundedAnswerMode(answerMode)) {
+      tool_response.push(JSON.stringify({
+        ok: false,
+        error: 'Canvas search requires Grounded mode. Switch the answer mode toggle and try again.'
+      }))
+    } else {
+      sidekickPendingStageContinue = await buildStageContinuePayload({ mode, reason })
+      tool_response.push(JSON.stringify({
+        ok: true,
+        mode,
+        note: 'Stage 2 will start after tool acknowledgement.'
+      }))
+    }
+  }
+  else if (data.name === "retrieve_user_context") {
+    const answerMode = normalizeAnswerMode(sidekickPendingTurn && sidekickPendingTurn.answerMode)
+    if (!isGroundedAnswerMode(answerMode)) {
+      tool_response.push(JSON.stringify({
+        ok: false,
+        error: 'retrieve_user_context is only available in Grounded mode.'
+      }))
+    } else {
+    const input = data.input || {}
+    const query = String(input.query || '').trim()
+    const hints = classifySidekickGrounding(query || (sidekickPendingTurn && sidekickPendingTurn.messageText) || '')
+    const options = buildVectorRetrievalOptions({
+      hints: {
+        problemQuery: hints.problemQuery || Boolean(input.problem_query || input.problemQuery),
+        academicQuery: hints.academicQuery || Boolean(input.grounded)
+      },
+      answerMode,
+      contextSnapshot: contextStore.getSnapshot(),
+      screenSlice: getScreenSliceForGrounding(),
+      k: SIDEKICK_RETRIEVAL_K
+    })
+    const courseId = String(input.course_id || input.courseId || '').trim()
+    if (courseId) options.focusCourseIds = [courseId]
+    if (input.grounded) options.grounded = true
+    if (input.problem_query || input.problemQuery) options.problemQuery = true
+    const maxChunks = Number(input.max_chunks ?? input.maxChunks)
+    const keep = input.keep !== false
+    const replaceSlots = input.replace_slots || input.replaceSlots || []
+    const keepSlots = input.keep_slots || input.keepSlots || null
+    const startpoints = query ? await vectorRetrieval.sendQuery(query, options) : []
+    const payload = buildGroundingPayload({
+      startpoints,
+      screenSlice: getScreenSliceForGrounding(),
+      pruneOptions: buildSidekickPruneOptions(
+        query || (sidekickPendingTurn && sidekickPendingTurn.messageText) || ''
+      ),
+      maxCatalogChunks: Number.isFinite(maxChunks) && maxChunks > 0
+        ? Math.min(maxChunks, 24)
+        : undefined
+    })
+    sidekickRetrievalSession.setPruneOptions(buildSidekickPruneOptions(
+      query || (sidekickPendingTurn && sidekickPendingTurn.messageText) || ''
+    ))
+    const slot = sidekickRetrievalSession.addRetrieval({
+      query,
+      payload,
+      keep,
+      replaceSlots,
+      keepSlots,
+      maxChunks: Number.isFinite(maxChunks) && maxChunks > 0 ? maxChunks : undefined
+    })
+    sidekickGroundingCatalog = sidekickRetrievalSession.getCitationCatalog()
+    appendCourseMethodsContext({
+      messageText: query || (sidekickPendingTurn && sidekickPendingTurn.messageText) || '',
+      answerMode,
+      screenSlice: getScreenSliceForGrounding(),
+      hints,
+      session: sidekickRetrievalSession
+    })
+    getAgent().send(['retrieval_session', sidekickRetrievalSession.toSnapshot()])
+    tool_response.push(JSON.stringify(
+      sidekickRetrievalSession.buildSlotToolResponse(slot)
+    ))
+    }
+  }
   else{
     tool_response.push("Main.js could not find function, nothing changed")
   }
@@ -3947,7 +4729,9 @@ function clearViewTabWireState(view) {
   view._nucleusTitleWired = false
   view._nucleusPredictiveSwapHandlerAttached = false
   view._nucleusPredictiveHandlersAttached = false
+  view._nucleusCanvasWindowOpenAttached = false
   view._nucleusPredictive = false
+  view._nucleusClaimedCanvasNav = null
 }
 
 function sendTabTitleUpdate(tab, title) {
@@ -4138,8 +4922,16 @@ function broadcastTabViewState(tab, tier, snapshotDataUrl = "") {
     id: tab.id,
     tier,
     discarded: Boolean(tab.discarded),
+    loading: Boolean(tab.loading),
     snapshotDataUrl: snapshotDataUrl || tab.snapshotDataUrl || ""
   })
+}
+
+function setTabLoadingState(tab, loading, tier = "active") {
+  if (!tab) return
+  tab.loading = Boolean(loading)
+  if (tab.loading) resourceGovernor.markInteractiveBusy()
+  broadcastTabViewState(tab, tier)
 }
 
 async function captureTabSnapshotFromView(view) {
@@ -4247,27 +5039,31 @@ async function restoreStashedTabView(tab, window = mainwindow) {
           mainwindow.webContents.send('canvas:navigation-finished', 'auth')
           revealCanvasView(tab.view)
         } else {
-          tab.view._nucleusSuppressNextCanvasSlate = true
-          await runCanvasSlateNavigation(window, tab.view, () => {
+          await runCanvasNavAction(window, tab, tab.view, () => {
             return loadCanvasTabURL(tab.view, requestedUrl, status => {
               mainwindow.webContents.send('canvas:navigation-finished', status)
             })
-          })
+          }, { destUrl: requestedUrl, reason: 'tab_restore_reload' })
         }
       } else if (
         tab.pendingSwitchSlate &&
-        rendererOverlayDepth === 0 &&
-        !tab.view._nucleusSlateNavigationInProgress
+        rendererOverlayDepth === 0
       ) {
         tab.pendingSwitchSlate = false
         try {
-          const gotslate = addslate(window)
-          await setSlateAnimation(gotslate, 'show', 'right')
-          revealCanvasOverSlate(window, tab.view, tab, gotslate)
+          const nav = getCanvasNav()
+          const sourceUrl = tab.view.webContents.getURL()
+          await nav.cover(window, tab, tab.view, {
+            sourceUrl,
+            destUrl: sourceUrl,
+            reason: 'tab_switch_pending',
+            concealSource: Boolean(tab._nucleusConcealWebSource)
+          })
+          await nav.waitForReveal(window, tab, tab.view, sourceUrl)
           sendCanvasViewReady(window, tab)
         } catch (error) {
           console.error('Unable to animate canvas tab switch:', error)
-          revealCanvasView(tab.view, { immediate: true })
+          revealCanvasView(tab.view, { skipFirstPaintSlate: true })
         }
       } else {
         tab.pendingSwitchSlate = false
@@ -4390,12 +5186,31 @@ async function ensureActiveWebContentTabView(tab, window = mainwindow) {
 const tabViewLifecycle = {
   async onTabDeactivated(tab, window = mainwindow) {
     if (!tab || tab === "None" || !isWebContentTab(tab) || !tab.view) return
+    if (usesDedicatedCanvasTabViews() && tab.type === "canvastab") {
+      hideCanvasTabWebView(tab, window)
+      logPoolTierCounts("tab-deactivated")
+      return
+    }
     await stashTabViewToBackup(tab, window)
     logPoolTierCounts("tab-deactivated")
   },
 
   async onTabActivated(tab, window = mainwindow) {
     if (!tab || !isWebContentTab(tab)) return
+    for (const other of currtabs) {
+      if (!other || other === tab || !isWebContentTab(other)) continue
+      if (other.type === 'canvastab' && other.view) {
+        await cancelStaleCanvasNavForTab(other, window, 'tab_switch_cancel')
+      }
+    }
+    if (
+      usesDedicatedCanvasTabViews() &&
+      isCanvasBrowserTab(tab) &&
+      isDedicatedCanvasTabView(tab.view)
+    ) {
+      logPoolTierCounts("tab-activated")
+      return
+    }
     await ensureActiveWebContentTabView(tab, window)
     logPoolTierCounts("tab-activated")
   },
@@ -4406,6 +5221,10 @@ const tabViewLifecycle = {
       if (!isWebContentTab(tab) || !tab.view) continue
       if (keepTabId && sameTabId(tab.id, keepTabId)) continue
       if (String(tab.workspaceId) === String(activeWorkspaceId)) continue
+      if (usesDedicatedCanvasTabViews() && tab.type === "canvastab") {
+        hideCanvasTabWebView(tab, window)
+        continue
+      }
       await stashTabViewToBackup(tab, window)
     }
     logPoolTierCounts("workspace-deactivated")
@@ -4414,11 +5233,15 @@ const tabViewLifecycle = {
 
 async function stashTabViewToBackup(tab, window = mainwindow) {
   if (!tab || !tab.view) return "closed"
+  if (usesDedicatedCanvasTabViews() && tab.type === "canvastab") {
+    hideCanvasTabWebView(tab, window)
+    return "hidden"
+  }
   cancelCanvasPredictiveRefreshSchedule()
   const poolType = getTabPoolType(tab)
   detachWebContentView(window, tab.view)
   if (poolType === "canvas") {
-    await clearCanvasPredictiveViews(tab.id, window)
+    cancelCanvasPreloadForTab(tab.id)
   }
   const view = tab.view
   const cache = {
@@ -4440,9 +5263,13 @@ async function stashTabViewToBackup(tab, window = mainwindow) {
 
 async function releaseTabView(tab, window = mainwindow) {
   if (!tab || !tab.view) return "closed"
+  if (usesDedicatedCanvasTabViews() && isDedicatedCanvasTabView(tab.view)) {
+    releaseDedicatedCanvasTabView(tab, window)
+    return "released"
+  }
   const poolType = getTabPoolType(tab)
   if (poolType === "canvas") {
-    await clearCanvasPredictiveViews(tab.id, window)
+    cancelCanvasPreloadForTab(tab.id)
   }
   const view = tab.view
   tab.view = null
@@ -4450,91 +5277,530 @@ async function releaseTabView(tab, window = mainwindow) {
   return browserpool.releaseView(window, poolType, view)
 }
 
-function normalizeCanvasNavigationUrl(url, baseUrl = "") {
-  const normalized = normalizeFrameUrl(url)
-  if (normalized) return normalized
-  try {
-    return new URL(String(url || "").trim(), baseUrl || "https://canvas.local").href
-  } catch (_error) {
-    return String(url || "").trim()
+function usesDedicatedCanvasTabViews() {
+  return USE_SIMPLE_TAB_MODEL
+}
+
+function createDedicatedCanvasView() {
+  const view = browserpool.createView("canvas")
+  view._nucleusDedicatedCanvas = true
+  view._nucleusPoolType = "canvas"
+  return view
+}
+
+function isDedicatedCanvasTabView(view) {
+  return Boolean(view && view._nucleusDedicatedCanvas && !view.webContents.isDestroyed())
+}
+
+async function releaseNonDedicatedViewFromCanvasTab(tab, window = mainwindow) {
+  if (!tab || !tab.view) return
+  if (tab.view.webContents.isDestroyed()) {
+    tab.view = null
+    tab.poolType = null
+    return
   }
-}
+  if (isDedicatedCanvasTabView(tab.view)) return
 
-function findCanvasPredictiveEntry(tabId, url) {
-  const normalizedUrl = normalizeCanvasNavigationUrl(url)
-  if (!normalizedUrl) return null
-
-  const predictions = canvasPredictiveByTab.get(String(tabId)) || []
-  return predictions.find(prediction => {
-    if (!prediction || !prediction.view || prediction.view.webContents.isDestroyed()) {
-      return false
-    }
-    const loadedUrl = prediction.view.webContents.getURL()
-    return (
-      browserpool.urlsLikelyMatch(prediction.url, normalizedUrl) ||
-      browserpool.urlsLikelyMatch(loadedUrl, normalizedUrl)
-    )
-  }) || null
-}
-
-function removeCanvasPredictiveEntry(tabId, prediction) {
-  const key = String(tabId || "")
-  const predictions = canvasPredictiveByTab.get(key) || []
-  canvasPredictiveByTab.set(
-    key,
-    predictions.filter(item => item !== prediction)
-  )
-}
-
-async function clearCanvasPredictiveViews(tabId, window = mainwindow) {
-  const key = String(tabId || "")
-  const predictions = canvasPredictiveByTab.get(key) || []
-  canvasPredictiveByTab.delete(key)
-
-  for (const prediction of predictions) {
-    if (!prediction || !prediction.view) continue
-    const ownerTab = currtabs.find(tab => tab && tab.view === prediction.view)
-    if (ownerTab) continue
-    await browserpool.releaseView(window, "canvas", prediction.view)
-  }
-}
-
-async function extractTopCanvasLinks(view) {
-  if (!view || view.webContents.isDestroyed()) return []
-
+  const view = tab.view
+  const poolType = tab.poolType || view._nucleusPoolType || "web"
+  detachWebContentView(window, view)
+  clearViewTabWireState(view)
+  tab.view = null
+  tab.poolType = null
   try {
-    return await view.webContents.executeJavaScript(`
-      (() => {
-        const current = new URL(window.location.href);
-        const seen = new Set();
-        const links = [];
-        const nodes = Array.from(document.querySelectorAll("a[href]"));
-
-        for (const node of nodes) {
-          let href = "";
-          try {
-            href = new URL(node.getAttribute("href"), current.href).href;
-          } catch (_error) {
-            continue;
-          }
-
-          if (!href || seen.has(href)) continue;
-          if (!/^https?:/i.test(href)) continue;
-          if (href.includes("/download") || href.includes("download_frd=1")) continue;
-          if (node.getAttribute("href") === "#") continue;
-
-          seen.add(href);
-          links.push(href);
-          if (links.length >= ${CANVAS_PREDICTIVE_LINK_COUNT}) break;
-        }
-
-        return links;
-      })();
-    `, true)
+    await browserpool.releaseView(window, poolType, view)
   } catch (error) {
-    console.error("Unable to extract canvas predictive links:", error)
-    return []
+    console.error("Unable to release non-dedicated canvas tab view:", error)
   }
+}
+
+async function ensureCanvasTabWebView(tab, window = mainwindow) {
+  if (!tab || tab.type !== "canvastab") return null
+  if (tab.view && !tab.view.webContents.isDestroyed() && isDedicatedCanvasTabView(tab.view)) {
+    return tab.view
+  }
+  await releaseNonDedicatedViewFromCanvasTab(tab, window)
+  const view = createDedicatedCanvasView()
+  tab.view = view
+  tab.poolType = "canvas"
+  view.setVisible(false)
+  view.setBounds(getBrowserBounds(window, tab))
+  window.contentView.addChildView(view)
+  const warmUrl = canvasBlankWarmUrl
+  try {
+    const loaded = String(view.webContents.getURL() || "")
+    if (!loaded || loaded === "about:blank") {
+      await view.webContents.loadURL(warmUrl)
+    }
+  } catch (error) {
+    console.error("Unable to warm dedicated canvas tab view:", error)
+  }
+  return view
+}
+
+function hideCanvasTabWebView(tab, window = mainwindow, options = {}) {
+  if (!tab || !tab.view || tab.view.webContents.isDestroyed()) return
+  const nav = getCanvasNav()
+  const navActive = nav.isActive(tab.view)
+  if (!options.underSlate && (tab.loading || navActive)) {
+    return
+  }
+  detachWebContentView(window, tab.view)
+  broadcastTabViewState(tab, "stashed")
+}
+
+async function beginCanvasWebToNativeSwitch(window, tab, reason = 'web_to_native') {
+  if (!tab) return { ok: false, fromBrowser: false }
+  const nav = getCanvasNav()
+  const view = tab.view && !tab.view.webContents.isDestroyed() ? tab.view : null
+  const fromBrowser = Boolean(view && isCanvasBrowserTab(tab))
+
+  if (fromBrowser) {
+    let sourceUrl = tab.url || ''
+    try {
+      sourceUrl = view.webContents.getURL() || sourceUrl
+    } catch (_error) {
+      // ignore
+    }
+    tab.loading = true
+    broadcastTabViewState(tab, 'active')
+    if (!nav.isActive(view)) {
+      await nav.cover(window, tab, view, {
+        sourceUrl,
+        destUrl: sourceUrl,
+        reason,
+        concealSource: false
+      })
+    }
+    await cacheCanvasWebViewForBack(window, tab, { preserveCover: true })
+    hideCanvasTabWebView(tab, window, { underSlate: true })
+  }
+
+  tab.canvasMode = 'native'
+  tab.url = ''
+  tab.loading = fromBrowser
+  tab._nucleusConcealWebSource = true
+  activetab = tab
+  syncActiveSurfaceFromMainTab(window, tab)
+  if (!fromBrowser) {
+    broadcastTabViewState(tab, 'active')
+  }
+  return { ok: true, fromBrowser }
+}
+
+async function revealCanvasNativeSurface(window, tab) {
+  if (!tab) return { ok: false, error: 'invalid_tab' }
+  const nav = getCanvasNav()
+  await nav.revealSlateOnly(window, tab, 'web_to_native')
+  syncActiveSurfaceFromMainTab(window, tab)
+  broadcastTabViewState(tab, 'active')
+  return { ok: true }
+}
+
+function releaseDedicatedCanvasTabView(tab, window = mainwindow) {
+  if (!tab || !tab.view) return
+  const view = tab.view
+  detachWebContentView(window, view)
+  clearViewTabWireState(view)
+  tab.view = null
+  tab.poolType = null
+  if (canvasPreloadSlots.viewInPool(view)) return
+  browserpool.releaseView(window, "canvas", view).catch(error => {
+    console.error("Unable to release dedicated canvas tab view:", error)
+  })
+}
+
+async function ensureSimpleCanvasTabViewForPush(tab, window = mainwindow) {
+  if (!usesDedicatedCanvasTabViews() || !tab || tab.type !== "canvastab") return false
+  await ensureCanvasTabWebView(tab, window)
+  if (isCanvasNativeTab(tab)) {
+    hideCanvasTabWebView(tab, window)
+  }
+  return true
+}
+
+function bumpCanvasLinkCancel(tabId) {
+  const key = String(tabId || "")
+  const next = (canvasLinkCancelByTab.get(key) || 0) + 1
+  canvasLinkCancelByTab.set(key, next)
+  return next
+}
+
+function canvasLinkCancelSnapshot(tabId) {
+  const key = String(tabId || "")
+  return { tabId: key, gen: canvasLinkCancelByTab.get(key) || 0 }
+}
+
+function canvasLinkOpeningCancelled(snapshot) {
+  if (!snapshot) return false
+  return (canvasLinkCancelByTab.get(snapshot.tabId) || 0) !== snapshot.gen
+}
+
+function mergeRendererTabsFromPayload(tabs, activeTabId) {
+  if (!Array.isArray(tabs)) return
+  for (const incoming of tabs) {
+    const mainTab = currtabs.find(localtab => sameTabId(localtab.id, incoming.id))
+    if (mainTab) mergeIncomingTab(mainTab, incoming)
+  }
+  if (activeTabId) {
+    const active = currtabs.find(localtab => sameTabId(localtab.id, activeTabId))
+    if (active) activetab = active
+  }
+}
+
+function urlsLikelyMatchCanvas(left, right) {
+  return browserpool.urlsLikelyMatch(left, right)
+}
+
+let canvasNavCoordinator = null
+
+function getCanvasNav() {
+  if (!canvasNavCoordinator) {
+    canvasNavCoordinator = createCanvasNavTransition({
+      rootDir: __dirname,
+      injectAuthorThemeCss,
+      normalizeCanvasNavigationUrl,
+      urlsLikelyMatchCanvas,
+      canvasBlankWarmUrl,
+      logSlateCover,
+      setTabLoadingState,
+      attachWebContentView,
+      sendCanvasViewReady,
+      getActiveTab: () => activetab,
+      getRendererOverlayDepth: () => rendererOverlayDepth,
+      isCanvasBrowserTab,
+      getBrowserBounds,
+      getSlate: getslate,
+      setSlateBounds,
+      sameTabId,
+      clearCanvasWebNavigationClaim,
+      recordSpan: (op, fn, meta) => lagSpikeCollector.span(op, fn, meta)
+    })
+  }
+  return canvasNavCoordinator
+}
+
+async function runCanvasNavAction(window, tab, view, action, options = {}) {
+  if (!view) {
+    return typeof action === 'function' ? action() : undefined
+  }
+  if (tab && !isCanvasBrowserTab(tab)) {
+    return action()
+  }
+  const nav = getCanvasNav()
+  const sourceUrl = view.webContents.isDestroyed() ? '' : view.webContents.getURL()
+  await nav.cover(window, tab, view, {
+    sourceUrl,
+    destUrl: options.destUrl != null ? String(options.destUrl) : null,
+    reason: options.reason || 'nav_action',
+    concealSource: Boolean(tab._nucleusConcealWebSource)
+  })
+  const result = await action()
+  const destUrl = options.destUrl != null
+    ? String(options.destUrl)
+    : (view.webContents.isDestroyed() ? '' : view.webContents.getURL())
+  await nav.waitForReveal(window, tab, view, destUrl)
+  return result
+}
+
+function findPreloadSlot(url) {
+  return canvasPreloadSlots.findByUrl(url, urlsLikelyMatchCanvas)
+}
+
+function getCachedPreloadSlotUrls() {
+  const urls = []
+  for (const slot of canvasPreloadSlots.slotSnapshot()) {
+    if (!slot || !slot.url) continue
+    if (slot.state !== SLOT_STATES.READY && slot.state !== SLOT_STATES.LOADING) continue
+    const normalized = normalizeCanvasNavigationUrl(slot.url)
+    if (normalized) urls.push(normalized)
+  }
+  return urls
+}
+
+function getCanvasPreloadAllowedHosts() {
+  const hosts = new Set()
+  const bases = [canvas_base_url, process.env.CANVAS_BASE_URL_HOLDOUT].filter(Boolean)
+  for (const base of bases) {
+    try {
+      hosts.add(new URL(base).hostname.toLowerCase())
+    } catch (_error) {
+      // ignore
+    }
+  }
+  return [...hosts]
+}
+
+function buildPreloadFilterOptions(tab, options = {}) {
+  return {
+    activeUrl: tab && tab.url ? tab.url : '',
+    allowedHosts: options.allowedHosts || getCanvasPreloadAllowedHosts(),
+    cachedSlotUrls: options.cachedSlotUrls || getCachedPreloadSlotUrls(),
+    urlsMatch: urlsLikelyMatchCanvas
+  }
+}
+
+function getPointerHintsForTab(tabId, payload = {}, filterOptions = {}) {
+  const fromPayload = normalizePointerHints(
+    payload.links || payload.pointerHints || [],
+    filterOptions
+  )
+  if (fromPayload.length) return fromPayload
+  const cached = canvasPointerHintsByTab.get(String(tabId || ''))
+  if (!cached || !pointerHintsFresh(cached)) return []
+  return normalizePointerHints(cached.hints, filterOptions)
+}
+
+function buildPreloadPlanForTab(tab, options = {}) {
+  const canvasData = readCanvasDataForPreload() || {}
+  const filterOptions = buildPreloadFilterOptions(tab, options)
+  const pointerHints = getPointerHintsForTab(tab.id, options, filterOptions)
+  const domLinks = normalizeDomLinks(options.domLinks || [], filterOptions)
+  const plannerOptions = {
+    limit: Math.max(CANVAS_PREDICTIVE_SLOT_COUNT + 6, 10),
+    explicitUrls: options.explicitUrls || [],
+    sectionUrls: options.sectionUrls || [],
+    domLinks,
+    pointerHints,
+    order: options.order || 'extras-first',
+    focusCourseIds: buildPreloadFocusCourseIds(tab, currtabs),
+    siblingCourseCounts: buildSiblingCourseCounts(currtabs),
+    tasks: dataStore.getTasksSnapshot ? dataStore.getTasksSnapshot() : [],
+    graph: getCanvasVisibleGraph(),
+    ...filterOptions
+  }
+  canvasPreloadLastPlan = summarizePlan(planPreloadUrls(canvasData, plannerOptions)).slice(0, 12)
+  canvasPreloadLastPlanTabId = tab && tab.id ? String(tab.id) : ''
+  return buildPredictivePreloadUrls(canvasData, {
+    ...plannerOptions,
+    limit: CANVAS_PREDICTIVE_SLOT_COUNT
+  })
+}
+
+function slotsCoverPreloadUrls(tab) {
+  const backSlot = canvasPreloadSlots.getSlot(CANVAS_BACK_CACHE_SLOT_INDEX)
+  return collectProtectedPreloadUrls(tab, {
+    normalizeUrl: normalizeCanvasNavigationUrl,
+    urlsMatch: urlsLikelyMatchCanvas,
+    parentEntry: canvasNavStack.peekParent(tab && tab.id),
+    backSlot
+  })
+}
+
+function resolveCanvasTabFromWebContents(webContents) {
+  const tab = resolveTabForWebContents(webContents)
+  if (!tab || tab.type !== 'canvastab') return null
+  return tab
+}
+
+async function handleCanvasPointerHints(payload = {}) {
+  const tabId = String(payload.tabId || '')
+  if (!tabId) {
+    canvasPointerHintDiagnostics.droppedNoTabId += 1
+    return { ok: false, reason: 'missing_tab' }
+  }
+  canvasPointerHintDiagnostics.received += 1
+  const tab = currtabs.find(localtab => sameTabId(localtab.id, tabId))
+  if (!tab || tab.type !== 'canvastab') {
+    canvasPointerHintDiagnostics.droppedNotCanvasTab += 1
+    return { ok: false, reason: 'invalid_tab' }
+  }
+  const filterOptions = buildPreloadFilterOptions(tab)
+  const hints = normalizePointerHints(payload.links || payload.domLinks || [], filterOptions)
+  const emitReason = String(payload.emitReason || '')
+  canvasPointerHintsByTab.set(tabId, {
+    hints,
+    source: String(payload.source || 'native_course'),
+    emitReason,
+    at: Date.now()
+  })
+  canvasPointerHintDiagnostics.stored += 1
+  canvasPointerHintDiagnostics.lastAt = Date.now()
+  canvasPointerHintDiagnostics.lastSource = String(payload.source || 'native_course')
+  canvasPointerHintDiagnostics.lastLinkCount = hints.length
+  canvasPointerHintDiagnostics.lastHintTabId = tabId
+
+  const isActive = activetab !== 'None' && tab && sameTabId(activetab.id, tabId)
+  const shouldRefresh = hints.length > 0 || emitReason === 'direction' || emitReason === 'force'
+  if (isActive && shouldRefresh) {
+    if (isCanvasNativeTab(tab) && tab.courseId) {
+      scheduleCanvasPredictiveRefresh(mainwindow, tab, 300)
+    } else if (isCanvasBrowserTab(tab) && tab.view) {
+      scheduleCanvasPredictiveRefresh(mainwindow, tab, 300)
+    }
+  } else if (shouldRefresh) {
+    canvasPointerHintDiagnostics.refreshSkippedInactive += 1
+  }
+  return { ok: true, count: hints.length, emitReason }
+}
+
+function buildCanvasPreloadDebugResources() {
+  const snapshot = resourceGovernor.getLatestSnapshot()
+  if (!snapshot) return null
+  const canvasTabs = currtabs.filter(localtab => localtab && localtab.type === 'canvastab').length
+  const browserTabs = currtabs.filter(localtab => localtab && localtab.type === 'browsertab').length
+  return {
+    system: snapshot.system,
+    main: snapshot.main,
+    electron: snapshot.electron,
+    counts: {
+      tabs: currtabs.length,
+      canvasTabs,
+      browserTabs,
+      poolWebInUse: browserpool.inUseLength('web'),
+      poolWeb: browserpool.inUseLength('web') + browserpool.availableLength('web') + browserpool.backupLength('web'),
+      poolCanvasInUse: browserpool.inUseLength('canvas'),
+      poolCanvas: browserpool.inUseLength('canvas') + browserpool.availableLength('canvas') + browserpool.backupLength('canvas'),
+      preloadSlotsActive: canvasPreloadSlots.size(),
+      preloadSlots: CANVAS_PRELOAD_SLOT_COUNT
+    }
+  }
+}
+
+function buildPointerHintsForStats(tab, requestedTabId = '') {
+  const hintTabId = String(requestedTabId || (tab && tab.id ? String(tab.id) : '') || canvasPointerHintDiagnostics.lastHintTabId || '')
+  const filterOptions = tab ? buildPreloadFilterOptions(tab) : {}
+  const hintEntry = hintTabId ? canvasPointerHintsByTab.get(hintTabId) : null
+  if (!hintEntry || !pointerHintsFresh(hintEntry)) return []
+  return normalizePointerHints(hintEntry.hints, filterOptions)
+}
+
+function buildCanvasPreloadStatsPayload(payload = {}) {
+  const summary = canvasPreloadStats.summarize()
+  const activeTab = activetab !== 'None' ? activetab : null
+  const activeTabId = activeTab && activeTab.id ? String(activeTab.id) : ''
+  const requestedTabId = String(payload.tabId || '')
+  const hintTabId = requestedTabId || activeTabId || canvasPointerHintDiagnostics.lastHintTabId || ''
+  const pointerHints = buildPointerHintsForStats(activeTab, hintTabId)
+  const cachedTabs = [...canvasPointerHintsByTab.entries()].map(([tabId, entry]) => ({
+    tabId,
+    linkCount: Array.isArray(entry.hints) ? entry.hints.length : 0,
+    ageMs: entry && entry.at ? Math.max(0, Date.now() - entry.at) : null
+  }))
+
+  return {
+    ok: true,
+    stats: {
+      hits: summary.predictiveHits,
+      misses: summary.misses,
+      lastPlan: canvasPreloadLastPlan,
+      lastHit: summary.lastHit
+    },
+    metrics: {
+      ...summary,
+      hitRate: summary.predictiveHitRate
+    },
+    slots: canvasPreloadSlots.slotSnapshot(),
+    generation: canvasPreloadGeneration,
+    backCacheSlot: CANVAS_BACK_CACHE_SLOT_INDEX,
+    predictiveSlotCount: CANVAS_PREDICTIVE_SLOT_COUNT,
+    activeTabId,
+    hintTabId,
+    pointerHints,
+    pointerHintDiagnostics: {
+      ...canvasPointerHintDiagnostics,
+      cachedTabs
+    },
+    resources: buildCanvasPreloadDebugResources()
+  }
+}
+
+function countPythonProcesses(appRef) {
+  if (!appRef || typeof appRef.getAppMetrics !== 'function') return 0
+  try {
+    return appRef.getAppMetrics().filter(entry => {
+      const name = String(entry.name || '').toLowerCase()
+      return name.includes('python') || name.includes('python.exe')
+    }).length
+  } catch (_error) {
+    return 0
+  }
+}
+
+function startPerfEvalServerIfEnabled(appRef) {
+  if (process.env.NUCLEUS_PERF_SERVER !== '1' && !process.env.NUCLEUS_PERF_SERVER_PORT) return
+  perfEvalServer = createPerfEvalServer({
+    port: process.env.NUCLEUS_PERF_SERVER_PORT,
+    getSnapshot: () => ({
+      lag: lagSpikeCollector.getSnapshot(),
+      governor: {
+        status: resourceGovernor.getStatus(),
+        policy: resourceGovernor.getPolicy(),
+        memoryThrottle: typeof resourceGovernor.getMemoryThrottleState === 'function'
+          ? resourceGovernor.getMemoryThrottleState()
+          : null,
+        snapshot: resourceGovernor.getLatestSnapshot()
+      },
+      preload: buildCanvasPreloadStatsPayload(),
+      resources: buildCanvasPreloadDebugResources(),
+      pythonProcessCount: countPythonProcesses(appRef)
+    })
+  })
+  perfEvalServer.start().then(result => {
+    if (result && result.ok && result.port && result.port !== Number(process.env.NUCLEUS_PERF_SERVER_PORT || 8790)) {
+      process.env.NUCLEUS_PERF_SERVER_PORT = String(result.port)
+    }
+  }).catch(error => {
+    console.error('[nucleus:perf] failed to start eval server:', error)
+  })
+}
+
+function recreatePreloadSlotView(index, window = mainwindow) {
+  const slot = canvasPreloadSlots.getSlot(index)
+  if (slot && slot.view && !slot.view.webContents.isDestroyed()) {
+    detachWebContentView(window, slot.view)
+  }
+  const view = browserpool.createView("canvas")
+  view._nucleusPredictive = true
+  view.setVisible(false)
+  view.setBounds(getBrowserBounds(window))
+  window.contentView.addChildView(view)
+  canvasPreloadSlots.initSlot(index, view)
+  return view
+}
+
+async function ensureCanvasPreloadPoolInitialized(window = mainwindow) {
+  if (canvasPreloadPoolInitialized) return
+  for (let index = 0; index < CANVAS_PRELOAD_SLOT_COUNT; index += 1) {
+    const slot = canvasPreloadSlots.getSlot(index)
+    if (!slot || !slot.view || slot.view.webContents.isDestroyed()) {
+      recreatePreloadSlotView(index, window)
+    }
+  }
+  canvasPreloadPoolInitialized = true
+}
+
+
+function cancelCanvasPreloadForTab(tabId, options = {}) {
+  canvasPreloadSlots.cancelForTab(tabId, {
+    protectedUrls: options.protectedUrls || [],
+    urlsLikelyMatch: urlsLikelyMatchCanvas
+  })
+}
+
+async function recycleMainViewIntoPreloadSlot(window, tab, view, options = {}) {
+  if (!view || view.webContents.isDestroyed()) return null
+  detachWebContentView(window, view)
+  let url = ""
+  try {
+    url = view.webContents.getURL()
+  } catch (_error) {
+    url = tab && tab.url ? tab.url : ""
+  }
+  const recycleOptions = {
+    role: options.role || '',
+    backCacheIndex: options.backCacheIndex
+  }
+  const recycled = canvasPreloadSlots.recycleView(
+    view,
+    normalizeCanvasNavigationUrl(url),
+    tab ? tab.id : "",
+    recycleOptions
+  )
+  if (recycled && recycled.replacedView && !recycled.replacedView.webContents.isDestroyed()) {
+    await browserpool.releaseView(window, "canvas", recycled.replacedView)
+  }
+  return recycled
 }
 
 async function loadCanvasTabURLQuiet(view, url) {
@@ -4548,12 +5814,1025 @@ async function loadCanvasTabURLQuiet(view, url) {
   if (!hasAuth) return false
 
   const normalizedUrl = normalizeCanvasNavigationUrl(url)
-  view._nucleusSuppressNextCanvasSlate = true
   view._nucleusPredictive = true
+  const generation = canvasPreloadGeneration
   const navPromise = waitForCanvasNavigation(view)
-  await view.webContents.loadURL(normalizedUrl)
-  await waitForCanvasNavigationAndSettle(view, navPromise)
+  try {
+    await view.webContents.loadURL(normalizedUrl)
+  } catch (error) {
+    const code = error && (error.code || error.errno)
+    if (code === "ERR_ABORTED" || code === -3) {
+      canvasPreloadStats.recordMiss({ source: "stale_load", url: normalizedUrl })
+      return false
+    }
+    throw error
+  }
+  if (generation !== canvasPreloadGeneration) return false
+  await waitForCanvasNavigationAndSettle(view, navPromise, { fast: true })
+  return generation === canvasPreloadGeneration
+}
+
+async function loadUrlsIntoPreloadSlots(window, tab, urls, options = {}) {
+  if (!resourceGovernor.shouldAllowPreload()) {
+    return {
+      loaded: 0,
+      generation: options.generation == null ? canvasPreloadGeneration : options.generation,
+      skipped: 'resource_governor'
+    }
+  }
+  await ensureCanvasPreloadPoolInitialized(window)
+  const generation = options.generation == null ? ++canvasPreloadGeneration : options.generation
+  const protectedUrls = slotsCoverPreloadUrls(tab)
+  let loaded = 0
+  const predictiveLimit = Math.min(
+    CANVAS_PREDICTIVE_SLOT_COUNT,
+    Array.isArray(urls) ? urls.length : 0
+  )
+
+  for (const rawUrl of urls || []) {
+    if (generation !== canvasPreloadGeneration) break
+    if (loaded >= predictiveLimit) break
+    const url = normalizeCanvasNavigationUrl(rawUrl)
+    if (!url) continue
+    if (findPreloadSlot(url)) {
+      loaded += 1
+      continue
+    }
+    const planUrls = (urls || []).map(item => normalizeCanvasNavigationUrl(item)).filter(Boolean)
+    const slotIndex = canvasPreloadSlots.pickSlotForLoad(planUrls, {
+      protectedUrls,
+      urlsLikelyMatch: urlsLikelyMatchCanvas
+    })
+    if (slotIndex == null) break
+    let slot = canvasPreloadSlots.getSlot(slotIndex)
+    if (!slot || !slot.view || slot.view.webContents.isDestroyed()) {
+      recreatePreloadSlotView(slotIndex, window)
+      slot = canvasPreloadSlots.getSlot(slotIndex)
+    }
+    canvasPreloadSlots.assignLoading(slotIndex, url, tab.id, generation, options.loadReason || "")
+    const ok = await loadCanvasTabURLQuiet(slot.view, url)
+    if (generation !== canvasPreloadGeneration) {
+      canvasPreloadSlots.resetSlot(slotIndex)
+      continue
+    }
+    if (ok) {
+      canvasPreloadSlots.markReady(slotIndex, url)
+      loaded += 1
+    } else {
+      canvasPreloadSlots.resetSlot(slotIndex)
+    }
+  }
+  return { loaded, generation }
+}
+
+async function swapPreloadedIntoMain(window, tab, url, options = {}) {
+  const normalizedUrl = normalizeCanvasNavigationUrl(url)
+  const match = findPreloadSlot(normalizedUrl)
+  if (!match || !match.view) {
+    canvasPreloadStats.recordMiss({
+      tabId: tab.id,
+      url: normalizedUrl,
+      source: options.source || "will-navigate",
+      poolSize: canvasPreloadSlots.size()
+    })
+    return false
+  }
+
+  canvasPreloadStats.recordHit({
+    tabId: tab.id,
+    url: normalizedUrl,
+    source: options.source || "will-navigate",
+    poolSize: canvasPreloadSlots.size(),
+    loadReason: match.loadReason || "",
+    slotState: match.state || "",
+    loadingAt: match.loadingAt || 0,
+    loadDurationMs: match.loadDurationMs || 0,
+    courseId: tab.courseId ? String(tab.courseId) : ""
+  })
+
+  const preloadedView = canvasPreloadSlots.takeViewFromSlot(match)
+  const mainView = tab.view
+  const nav = getCanvasNav()
+  const transitionActive = nav.isActive(mainView)
+  if (mainView && mainView !== preloadedView) {
+    await recycleMainViewIntoPreloadSlot(window, tab, mainView, match.index)
+  }
+
+  preloadedView._nucleusPredictive = false
+  preloadedView._nucleusDedicatedCanvas = true
+  tab.view = preloadedView
+  tab.poolType = "canvas"
+  tab.url = normalizedUrl
+  ensureCanvasTabViewHandlers(window, tab, preloadedView)
+  wireTabTitleUpdates(window, preloadedView, tab)
+  pushTabTitleFromView(window, preloadedView, tab)
+  renderTab(preloadedView, window, tab)
+  if (transitionActive && mainView) {
+    nav.transfer(mainView, preloadedView, tab, window, { destUrl: normalizedUrl })
+  } else if (!options.skipFirstPaintSlate) {
+    revealCanvasView(preloadedView, { skipFirstPaintSlate: true })
+  } else {
+    revealCanvasView(preloadedView, { skipFirstPaintSlate: true })
+  }
+  window.webContents.send("tabs:url_update", { id: tab.id, url: tab.url })
+  window.webContents.send("canvas:navigation-finished", "done")
+  scheduleCanvasVisibleContextUpdate()
+  refreshCanvasPreloadSlots(window, tab).catch(error => {
+    console.error("Unable to refresh canvas preload slots after swap:", error)
+  })
   return true
+}
+
+function readCanvasDataForPreload() {
+  if (!canvasDiskRecoveryEnabled()) {
+    try {
+      return canvasApi && typeof canvasApi.readCanvasData === 'function'
+        ? canvasApi.readCanvasData()
+        : null
+    } catch (_error) {
+      return null
+    }
+  }
+  if (canvasDiskReadsBlocked) return null
+  try {
+    return readJsonFileWithRetry(path.join(__dirname, "canvas_data.json"))
+  } catch (_error) {
+    return null
+  }
+}
+
+async function refreshCanvasPreloadSlots(window, tab, options = {}) {
+  return lagSpikeCollector.span('preload.refresh', async () => {
+  if (!tab || tab.type !== "canvastab" || !isCanvasBrowserTab(tab) || !tab.view) return
+  const domLinks = options.domLinks && options.domLinks.length
+    ? normalizeDomLinks(options.domLinks)
+    : await lagSpikeCollector.span('preload.extract_links', () => extractTopCanvasLinks(tab.view), { tabId: tab.id })
+  const urls = buildPreloadPlanForTab(tab, {
+    domLinks,
+    explicitUrls: options.explicitUrls || [],
+    order: "extras-first"
+  })
+  await lagSpikeCollector.span('preload.load_slots', () => loadUrlsIntoPreloadSlots(window, tab, urls, {
+    loadReason: options.reason || "browser_refresh",
+    generation: ++canvasPreloadGeneration
+  }), { planned: urls.length, tabId: tab.id })
+  return { planned: urls.length, urls }
+  }, { tabId: tab && tab.id, reason: options.reason || 'browser_refresh' })
+}
+
+async function refreshCanvasPreloadForNativeTab(tab, reason = "native_section", options = {}) {
+  if (!tab || tab.type !== "canvastab" || !isCanvasNativeTab(tab) || !tab.courseId) return
+  const courseSection = options.courseSection || tab.courseSection || "homepage"
+  const allowedHosts = options.allowedHosts || getCanvasPreloadAllowedHosts()
+  const sectionUrls = collectNativeSectionUrls(readCanvasDataForPreload() || {}, {
+    courseId: String(tab.courseId),
+    courseSection,
+    limit: CANVAS_PREDICTIVE_SLOT_COUNT,
+    allowedHosts
+  })
+  const urls = buildPreloadPlanForTab(tab, {
+    sectionUrls,
+    domLinks: options.domLinks || [],
+    explicitUrls: options.explicitUrls || [],
+    order: "extras-first"
+  })
+  await loadUrlsIntoPreloadSlots(mainwindow, tab, urls, {
+    loadReason: reason,
+    generation: ++canvasPreloadGeneration
+  })
+  return { planned: urls.length, urls }
+}
+
+function beginCanvasNavRecordSuppression(view) {
+  if (view) view._nucleusSuppressNavRecord = true
+}
+
+function endCanvasNavRecordSuppression(view) {
+  if (view) view._nucleusSuppressNavRecord = false
+}
+
+function pushCanvasNavEntry(tab, entry) {
+  if (!tab || !entry) return false
+  return canvasNavStack.push(tab.id, entry, urlsLikelyMatchCanvas)
+}
+
+function buildCanvasTabBackPayload(tab) {
+  if (!tab) return null
+  return {
+    canvasMode: tab.canvasMode,
+    url: tab.url || '',
+    canvasNativePage: tab.canvasNativePage,
+    courseId: tab.courseId,
+    courseSection: tab.courseSection,
+    yindex: tab.yindex,
+    loading: Boolean(tab.loading)
+  }
+}
+
+function recordCanvasNavForward(tab, navForwardFrom) {
+  if (!tab || !navForwardFrom) return false
+  if (navForwardFrom.kind === 'native') {
+    return pushCanvasNavEntry(tab, snapshotNativeFromForward(navForwardFrom))
+  }
+  if (navForwardFrom.kind === 'web' && navForwardFrom.url) {
+    return pushCanvasNavEntry(tab, snapshotWebEntry(navForwardFrom.url, normalizeCanvasNavigationUrl))
+  }
+  return false
+}
+
+async function cacheCanvasWebViewForBack(window, tab, options = {}) {
+  if (!tab || !tab.view || tab.view.webContents.isDestroyed()) {
+    // #region agent log
+    debugNavLog('main.js:cacheCanvasWebViewForBack', 'skip', { tabId: tab && tab.id, reason: 'no_view' }, 'H7')
+    // #endregion
+    return false
+  }
+  const currentUrl = tab.view.webContents.getURL()
+  if (!isNavigableWebUrl(currentUrl, { blankWarmUrl: canvasBlankWarmUrl })) {
+    // #region agent log
+    debugNavLog('main.js:cacheCanvasWebViewForBack', 'skip', {
+      tabId: tab.id,
+      reason: 'not_navigable',
+      currentUrl: String(currentUrl || '').slice(0, 120)
+    }, 'H7')
+    // #endregion
+    return false
+  }
+  const nav = getCanvasNav()
+  const navActiveBefore = nav.isActive(tab.view)
+  if (navActiveBefore && !options.preserveCover) {
+    await nav.cancel(tab.view, 'back_cache')
+  }
+  const recycled = await recycleMainViewIntoPreloadSlot(window, tab, tab.view, {
+    role: 'back_cache',
+    backCacheIndex: CANVAS_BACK_CACHE_SLOT_INDEX
+  })
+  if (recycled) {
+    tab.view = null
+  }
+  // #region agent log
+  debugNavLog('main.js:cacheCanvasWebViewForBack', 'done', {
+    tabId: tab.id,
+    recycled: Boolean(recycled),
+    slotIndex: recycled ? recycled.index : null,
+    cachedUrl: normalizeCanvasNavigationUrl(currentUrl),
+    viewCleared: !tab.view,
+    navActiveBefore
+  }, 'H7')
+  // #endregion
+  return Boolean(recycled)
+}
+
+async function restoreCanvasWebFromCache(window, tab, url) {
+  const normalizedUrl = normalizeCanvasNavigationUrl(url)
+  // #region agent log
+  debugNavLog('main.js:restoreCanvasWebFromCache', 'start', {
+    tabId: tab.id,
+    destUrl: normalizedUrl,
+    viewNull: !tab.view,
+    stackSize: canvasNavStack.size(tab.id)
+  }, 'H12')
+  // #endregion
+  tab.canvasMode = 'browser'
+  tab.url = normalizedUrl
+  tab.loading = true
+  activetab = tab
+  broadcastTabViewState(tab, 'active')
+  const nav = getCanvasNav()
+  let view = tab.view && !tab.view.webContents.isDestroyed() ? tab.view : null
+  const coverAlreadyActive = Boolean(view && nav.isActive(view))
+  if (!view) {
+    view = await ensureCanvasTabWebView(tab, window)
+  }
+  ensureCanvasTabViewHandlers(window, tab, view)
+  beginCanvasNavRecordSuppression(view)
+  if (!coverAlreadyActive) {
+    const sourceUrl = view.webContents.isDestroyed() ? '' : view.webContents.getURL()
+    await nav.cover(window, tab, view, {
+      sourceUrl,
+      destUrl: normalizedUrl,
+      reason: 'canvas_back_web'
+    })
+  }
+  const swapped = await swapPreloadedIntoMain(window, tab, normalizedUrl, {
+    source: 'canvas_back',
+    skipFirstPaintSlate: true
+  })
+  // #region agent log
+  debugNavLog('main.js:restoreCanvasWebFromCache', 'post_swap', {
+    tabId: tab.id,
+    swapped: Boolean(swapped),
+    liveUrl: tab.view && !tab.view.webContents.isDestroyed() ? tab.view.webContents.getURL() : '',
+    navActive: tab.view ? nav.isActive(tab.view) : false
+  }, 'H12')
+  // #endregion
+  if (!swapped) {
+    await loadCanvasLinkFast(tab.view, normalizedUrl, status => {
+      window.webContents.send('canvas:navigation-finished', status)
+    })
+  } else {
+    await revealPreloadedCanvasSwapIfReady(window, tab, normalizedUrl, 'canvas_back_preload_swap')
+  }
+  await nav.waitForReveal(window, tab, tab.view, normalizedUrl)
+  endCanvasNavRecordSuppression(tab.view)
+  if (tab.view) {
+    tab.view._nucleusPendingNavReach = null
+    tab.view._nucleusPendingNavReachDest = null
+  }
+  tab._nucleusPostUndoNav = true
+  // #region agent log
+  debugNavLog('main.js:restoreCanvasWebFromCache', 'done', {
+    tabId: tab.id,
+    loading: Boolean(tab.loading),
+    navActive: tab.view ? nav.isActive(tab.view) : false,
+    viewVisible: tab.view ? tab.view.getVisible() : false,
+    liveUrl: tab.view && !tab.view.webContents.isDestroyed() ? tab.view.webContents.getURL() : ''
+  }, 'H11')
+  // #endregion
+  syncActiveSurfaceFromMainTab(window, tab)
+  return { ok: true, url: normalizedUrl }
+}
+
+async function restoreCanvasNavEntry(window, tab, entry) {
+  if (!tab || !entry) return { ok: false, error: 'empty_entry' }
+  if (entry.kind === 'native') {
+    tab.canvasNativePage = entry.page
+    tab.courseId = entry.courseId
+    tab.courseSection = entry.courseSection
+    tab.yindex = entry.yindex
+    const switched = await beginCanvasWebToNativeSwitch(window, tab, 'nav_back_native')
+    return {
+      ok: Boolean(switched && switched.ok),
+      kind: 'native',
+      needsNativeReveal: Boolean(switched && switched.fromBrowser),
+      tab: buildCanvasTabBackPayload(tab)
+    }
+  }
+  if (entry.kind === 'web' && entry.url) {
+    try {
+      const result = await restoreCanvasWebFromCache(window, tab, entry.url)
+      return {
+        ok: Boolean(result && result.ok),
+        kind: 'web',
+        url: entry.url,
+        tab: buildCanvasTabBackPayload(tab)
+      }
+    } catch (error) {
+      console.error('Unable to restore cached canvas web entry:', error)
+      return { ok: false, error: 'web_restore_failed' }
+    }
+  }
+  return { ok: false, error: 'unknown_entry' }
+}
+
+async function cancelStaleCanvasNavForTab(tab, window = mainwindow, reason = 'stale_nav') {
+  if (!tab || tab.type !== 'canvastab' || !tab.view || tab.view.webContents.isDestroyed()) return
+  const nav = getCanvasNav()
+  if (!nav.isActive(tab.view)) return
+  await nav.cancel(tab.view, reason)
+  if (tab.loading) {
+    setTabLoadingState(tab, false, tab.viewTier || 'active')
+  }
+  clearCanvasWebNavigationClaim(tab.view)
+}
+
+function noteCanvasNavForward(tabId) {
+  const tab = currtabs.find(localtab => sameTabId(localtab.id, tabId))
+  if (!tab || !isCanvasNativeTab(tab)) return
+  pushCanvasNavEntry(tab, snapshotNativeEntry(tab))
+}
+
+function maybeRecordCanvasWebNav(tab, url) {
+  if (!tab || !url) return
+  const view = tab.view
+  if (view && view._nucleusSuppressNavRecord) return
+  if (!isNavigableWebUrl(url, { blankWarmUrl: canvasBlankWarmUrl })) return
+  pushCanvasNavEntry(tab, snapshotWebEntry(url, normalizeCanvasNavigationUrl))
+}
+
+function ensureCanvasTabViewHandlers(window, tab, view) {
+  if (!tab || !view) return
+  if (prepareTabViewWiring(view, tab)) {
+    attachCanvasPredictiveNavigationHandlers(window, tab, view)
+  } else if (!view._nucleusPredictiveSwapHandlerAttached) {
+    attachCanvasPredictiveNavigationHandlers(window, tab, view)
+  }
+}
+
+async function loadCanvasTabURLFast(view, url, sendsignal) {
+  const targetSession = view && view.webContents ? view.webContents.session : session.defaultSession
+  const hasAuth = await ensureCanvasAuthForNavigation(targetSession)
+  if (!hasAuth) {
+    sendsignal("auth")
+    revealCanvasView(view, { skipFirstPaintSlate: true })
+    return
+  }
+  const normalizedUrl = normalizeCanvasNavigationUrl(url)
+  let liveUrl = ''
+  try {
+    liveUrl = view.webContents.getURL()
+  } catch (_error) {
+    liveUrl = ''
+  }
+  if (urlsLikelyMatchCanvas(normalizeCanvasNavigationUrl(liveUrl), normalizedUrl)) {
+    await waitForCanvasNavigationAndSettle(view, Promise.resolve(), { fast: true })
+    sendsignal("done")
+    if (!getCanvasNav().isActive(view)) {
+      revealCanvasView(view, { skipFirstPaintSlate: true })
+    }
+    return
+  }
+  const navpromise = waitForCanvasNavigationAny(view, normalizedUrl)
+  view.webContents.loadURL(normalizedUrl).catch(error => {
+    console.error("Unable to load canvas tab URL:", error)
+    sendsignal("fail")
+  })
+  try {
+    await waitForInPageNavigationSettle(view, navpromise, normalizedUrl)
+  } catch (_error) {
+    await waitForCanvasNavigationAndSettle(view, navpromise, { fast: true })
+  }
+  sendsignal("done")
+  if (!getCanvasNav().isActive(view)) {
+    revealCanvasView(view, { skipFirstPaintSlate: true })
+  }
+}
+
+async function loadCanvasLinkFast(view, url, sendsignal) {
+  return loadCanvasTabURLFast(view, url, sendsignal)
+}
+
+async function activateCanvasBrowserLinkSimple(window, tab, normalizedUrl, options = {}) {
+  return lagSpikeCollector.span('canvas.open_link', async () => {
+  markCanvasNavBusy()
+  const cancelSnap = canvasLinkCancelSnapshot(tab.id)
+  if (options.tabs) mergeRendererTabsFromPayload(options.tabs, options.activeTabId)
+  if (tab.type === "browsertab") tab.type = "canvastab"
+  tab.canvasMode = "browser"
+  tab.url = normalizedUrl
+  tab.loading = true
+  activetab = tab
+  broadcastTabViewState(tab, "active")
+
+  if (!options.skipNavPush) {
+    recordCanvasNavForward(tab, options.navForwardFrom)
+    if (
+      options.navForwardFrom &&
+      options.navForwardFrom.kind === 'native' &&
+      tab.view &&
+      !tab.view.webContents.isDestroyed()
+    ) {
+      await cacheCanvasWebViewForBack(window, tab)
+    } else if (
+      options.navForwardFrom &&
+      options.navForwardFrom.kind === 'web' &&
+      tab.view &&
+      !tab.view.webContents.isDestroyed()
+    ) {
+      await cacheCanvasWebViewForBack(window, tab)
+    }
+  }
+
+  const view = await ensureCanvasTabWebView(tab, window)
+  ensureCanvasTabViewHandlers(window, tab, view)
+  beginCanvasNavRecordSuppression(view)
+  renderTab(view, window, tab)
+  if (canvasLinkOpeningCancelled(cancelSnap)) {
+    endCanvasNavRecordSuppression(view)
+    setTabLoadingState(tab, false, "active")
+    return { ok: false, reason: "cancelled" }
+  }
+  const sourceUrl = view.webContents.isDestroyed() ? "" : view.webContents.getURL()
+  const mainView = view
+  const nav = getCanvasNav()
+  const concealSource = Boolean(
+    tab._nucleusConcealWebSource ||
+    (options.navForwardFrom && options.navForwardFrom.kind === 'native')
+  )
+  debugNavLog('main.js:activateCanvasBrowserLinkSimple', 'open_link_start', {
+    tabId: tab.id,
+    destUrl: normalizedUrl,
+    concealSource,
+    concealFlag: Boolean(tab._nucleusConcealWebSource),
+    fromNative: Boolean(options.navForwardFrom && options.navForwardFrom.kind === 'native'),
+    sourceUrl,
+    viewVisible: view ? view.getVisible() : false,
+    stackSize: canvasNavStack.size(tab.id)
+  }, 'H1')
+  await nav.cover(window, tab, view, {
+    sourceUrl,
+    destUrl: normalizedUrl,
+    reason: 'open_link',
+    concealSource
+  })
+  const swapped = await swapPreloadedIntoMain(window, tab, normalizedUrl, {
+    source: "open_link",
+    skipFirstPaintSlate: true
+  })
+  if (!swapped) {
+    await loadCanvasLinkFast(tab.view, normalizedUrl, status => {
+      window.webContents.send("canvas:navigation-finished", status)
+    })
+  } else {
+    await revealPreloadedCanvasSwapIfReady(window, tab, normalizedUrl, 'open_link_preload_swap')
+  }
+  await nav.waitForReveal(window, tab, tab.view, normalizedUrl)
+  if (!options.skipNavPush) {
+    pushCanvasNavEntry(tab, snapshotWebEntry(normalizedUrl, normalizeCanvasNavigationUrl))
+  }
+  endCanvasNavRecordSuppression(tab.view)
+  syncActiveSurfaceFromMainTab(window, tab)
+  debugNavLog('main.js:activateCanvasBrowserLinkSimple', 'open_link_done', {
+    tabId: tab.id,
+    destUrl: normalizedUrl,
+    loading: Boolean(tab.loading),
+    concealFlag: Boolean(tab._nucleusConcealWebSource),
+    navActive: getCanvasNav().isActive(tab.view),
+    viewVisible: tab.view ? tab.view.getVisible() : false,
+    swapped: Boolean(swapped),
+    stackSize: canvasNavStack.size(tab.id),
+    runId: 'post-fix'
+  }, 'H4')
+  return { ok: true, url: normalizedUrl }
+  }, { tabId: tab && tab.id, url: normalizedUrl })
+}
+
+async function activateCanvasBrowserLink(window, tab, normalizedUrl, options = {}) {
+  if (usesDedicatedCanvasTabViews()) {
+    return activateCanvasBrowserLinkSimple(window, tab, normalizedUrl, options)
+  }
+  tab.url = normalizedUrl
+  tab.canvasMode = "browser"
+  const view = tab.view || await ensureActiveWebContentTabView(tab, window)
+  if (!view) return { ok: false, error: "no_view" }
+  await loadCanvasTabURL(view, normalizedUrl, status => {
+    window.webContents.send("canvas:navigation-finished", status)
+  })
+  return { ok: true, url: normalizedUrl }
+}
+
+async function restoreCanvasNativeSurface(window, tab, options = {}) {
+  bumpCanvasLinkCancel(tab.id)
+  if (options.tabs) mergeRendererTabsFromPayload(options.tabs, options.activeTabId)
+  const switched = await beginCanvasWebToNativeSwitch(window, tab, 'native_restore')
+  return {
+    ok: Boolean(switched && switched.ok),
+    needsNativeReveal: Boolean(switched && switched.fromBrowser)
+  }
+}
+
+async function revealPreloadedCanvasSwapIfReady(window, tab, destUrl, reason = 'preload_swap_ready') {
+  if (!tab || !tab.view || tab.view.webContents.isDestroyed()) return false
+  const nav = getCanvasNav()
+  if (!nav.isActive(tab.view)) return false
+  let liveUrl = ''
+  try {
+    liveUrl = tab.view.webContents.getURL()
+  } catch (_error) {
+    liveUrl = ''
+  }
+  const normalizedDest = normalizeCanvasNavigationUrl(destUrl)
+  if (!urlsLikelyMatchCanvas(normalizeCanvasNavigationUrl(liveUrl), normalizedDest)) {
+    return false
+  }
+  await nav.forceReveal(tab.view, tab, window, reason)
+  return true
+}
+
+async function goBackCanvasTab(window, tab) {
+  if (!tab || tab.type !== 'canvastab') {
+    return { ok: false, error: 'invalid_tab' }
+  }
+
+  const targetEntry = canvasNavStack.peekParent(tab.id)
+  if (!targetEntry) {
+    return { ok: true, wentBack: false }
+  }
+
+  await cancelStaleCanvasNavForTab(tab, window, 'back_cancel_stale')
+
+  const restoringWeb = targetEntry.kind === 'web' && Boolean(targetEntry.url)
+  const restoringNative = targetEntry.kind === 'native'
+  if (
+    restoringWeb &&
+    isCanvasBrowserTab(tab) &&
+    tab.view &&
+    !tab.view.webContents.isDestroyed()
+  ) {
+    const nav = getCanvasNav()
+    let sourceUrl = ''
+    try {
+      sourceUrl = tab.view.webContents.getURL()
+    } catch (_error) {
+      sourceUrl = tab.url || ''
+    }
+    await nav.cover(window, tab, tab.view, {
+      sourceUrl,
+      destUrl: normalizeCanvasNavigationUrl(targetEntry.url),
+      reason: 'canvas_back_web'
+    })
+  } else if (isCanvasBrowserTab(tab) && !restoringNative) {
+    await cacheCanvasWebViewForBack(window, tab)
+  }
+
+  debugNavLog('main.js:goBackCanvasTab', 'back_restore', {
+    tabId: tab.id,
+    entryKind: targetEntry.kind,
+    entryUrl: targetEntry.kind === 'web' ? targetEntry.url : '',
+    stackSize: canvasNavStack.size(tab.id)
+  }, 'H6')
+
+  const restored = await restoreCanvasNavEntry(window, tab, targetEntry)
+  if (!restored.ok) {
+    debugNavLog('main.js:goBackCanvasTab', 'back_failed', {
+      tabId: tab.id,
+      error: restored.error || 'unknown',
+      viewMissing: !tab.view
+    }, 'H6')
+    return { ok: false, wentBack: false, error: restored.error || 'restore_failed' }
+  }
+
+  canvasNavStack.pop(tab.id)
+  tab._nucleusPostUndoNav = true
+  // #region agent log
+  debugNavLog('main.js:goBackCanvasTab', 'back_done', {
+    tabId: tab.id,
+    kind: restored.kind,
+    stackSize: canvasNavStack.size(tab.id),
+    viewNull: !tab.view,
+    canvasMode: tab.canvasMode,
+    loading: Boolean(tab.loading),
+    navActive: tab.view ? getCanvasNav().isActive(tab.view) : false
+  }, 'H6')
+  // #endregion
+  return {
+    ok: true,
+    wentBack: true,
+    kind: restored.kind,
+    url: restored.url,
+    tab: restored.tab,
+    restoreNative: restored.kind === 'native',
+    needsNativeReveal: Boolean(restored.needsNativeReveal)
+  }
+}
+
+async function handleCanvasPreloadPlan(payload = {}) {
+  const tabId = String(payload.tabId || "")
+  const tab = currtabs.find(localtab => sameTabId(localtab.id, tabId))
+  if (!tab || tab.type !== "canvastab") return { ok: false, reason: "invalid_tab" }
+
+  const explicitUrls = Array.isArray(payload.urls)
+    ? payload.urls.map(normalizeCanvasNavigationUrl).filter(Boolean)
+    : []
+  const domLinks = normalizeDomLinks(payload.domLinks || [])
+  const reason = String(payload.reason || "preload_plan")
+
+  if (isCanvasBrowserTab(tab) && tab.view) {
+    const result = await refreshCanvasPreloadSlots(mainwindow, tab, {
+      reason,
+      explicitUrls,
+      domLinks
+    })
+    return { ok: true, surface: "browser", planned: result && result.planned ? result.planned : 0 }
+  }
+
+  if (isCanvasNativeTab(tab) && tab.courseId) {
+    const result = await refreshCanvasPreloadForNativeTab(tab, reason, {
+      explicitUrls,
+      domLinks,
+      courseSection: payload.courseSection || tab.courseSection
+    })
+    return { ok: true, surface: "native", planned: result && result.planned ? result.planned : 0 }
+  }
+  return { ok: false, reason: "inactive_surface" }
+}
+
+function scheduleDeferredInactiveTabCleanup(previousTab, generation, window = mainwindow) {
+  setImmediate(async () => {
+    if (generation !== tabActivationGeneration) return
+    if (previousTab && previousTab !== "None") {
+      await tabViewLifecycle.onTabDeactivated(previousTab, window)
+    }
+  })
+}
+
+function normalizeCanvasNavigationUrl(url, baseUrl = "") {
+  const normalized = normalizeFrameUrl(url)
+  if (normalized) return normalized
+  try {
+    return new URL(String(url || "").trim(), baseUrl || "https://canvas.local").href
+  } catch (_error) {
+    return String(url || "").trim()
+  }
+}
+
+async function extractTopCanvasLinks(view) {
+  if (!view || view.webContents.isDestroyed()) return []
+  try {
+    return await view.webContents.executeJavaScript(
+      buildExtractVisibleCanvasLinksScript(CANVAS_DOM_CANDIDATE_LIMIT),
+      true
+    )
+  } catch (error) {
+    console.error("Unable to extract canvas predictive links:", error)
+    return []
+  }
+}
+
+const CANVAS_NAV_CLAIM_MS = 15000
+
+function clearCanvasWebNavigationClaim(view) {
+  if (view) view._nucleusClaimedCanvasNav = null
+}
+
+function hasCanvasWebNavigationClaim(view, url) {
+  const claim = view && view._nucleusClaimedCanvasNav
+  if (!claim) return false
+  if (Date.now() - claim.at > CANVAS_NAV_CLAIM_MS) {
+    clearCanvasWebNavigationClaim(view)
+    return false
+  }
+  if (!url) return true
+  return urlsLikelyMatchCanvas(claim.destUrl, normalizeCanvasNavigationUrl(url))
+}
+
+function claimCanvasWebNavigation(view, destUrl, source) {
+  if (!view || view.webContents.isDestroyed()) return false
+  const normalized = normalizeCanvasNavigationUrl(destUrl)
+  if (!normalized) return false
+  if (hasCanvasWebNavigationClaim(view, normalized)) return false
+  if (getCanvasNav().isActive(view)) return false
+  view._nucleusClaimedCanvasNav = {
+    destUrl: normalized,
+    source: String(source || ''),
+    at: Date.now()
+  }
+  return true
+}
+
+async function runCanvasLinkNavigationCover(window, tab, view, destUrl, options = {}) {
+  const normalizedDest = normalizeCanvasNavigationUrl(destUrl)
+  const source = String(options.source || 'canvas_link')
+  const inPageNav = Boolean(options.inPageNav)
+  const navReachPromise = inPageNav
+    ? (options.navReachPromise || waitForCanvasNavigationAny(view, normalizedDest))
+    : null
+  attachWebContentView(window, view, tab)
+  const nav = getCanvasNav()
+  const sourceUrl = options.sourceUrl != null
+    ? String(options.sourceUrl)
+    : (view.webContents.isDestroyed() ? '' : view.webContents.getURL())
+  if (!options.skipNavPush && isNavigableWebUrl(sourceUrl, { blankWarmUrl: canvasBlankWarmUrl })) {
+    pushCanvasNavEntry(tab, snapshotWebEntry(sourceUrl, normalizeCanvasNavigationUrl))
+  }
+  await nav.cover(window, tab, view, {
+    sourceUrl,
+    destUrl: normalizedDest,
+    reason: source,
+    concealSource: Boolean(options.concealSource)
+  })
+  if (inPageNav) {
+    const preSettleUrl = view.webContents.isDestroyed() ? '' : view.webContents.getURL()
+    const alreadyAtDest = urlsLikelyMatchCanvas(
+      normalizeCanvasNavigationUrl(preSettleUrl),
+      normalizedDest
+    )
+    // #region agent log
+    debugNavLog('main.js:runCanvasLinkNavigationCover', 'in_page_pre_settle', {
+      tabId: tab.id,
+      destUrl: normalizedDest,
+      preSettleUrl,
+      alreadyAtDest,
+      navActive: nav.isActive(view),
+      postUndo: Boolean(tab._nucleusPostUndoNav),
+      stackSize: canvasNavStack.size(tab.id),
+      runId: 'post-fix'
+    }, 'H9')
+    // #endregion
+    const settleStart = Date.now()
+    const settleResult = await waitForInPageNavigationSettle(view, navReachPromise, normalizedDest)
+    const liveUrl = view.webContents.isDestroyed() ? normalizedDest : view.webContents.getURL()
+    // #region agent log
+    debugNavLog('main.js:runCanvasLinkNavigationCover', 'in_page_post_settle', {
+      tabId: tab.id,
+      destUrl: normalizedDest,
+      liveUrl,
+      settleMs: Date.now() - settleStart,
+      urlMatchesDest: urlsLikelyMatchCanvas(normalizeCanvasNavigationUrl(liveUrl), normalizedDest),
+      settleResult,
+      runId: 'post-fix'
+    }, 'H9')
+    // #endregion
+    await nav.waitForReveal(window, tab, view, liveUrl || normalizedDest)
+    tab._nucleusPostUndoNav = false
+    // #region agent log
+    debugNavLog('main.js:runCanvasLinkNavigationCover', 'in_page_done', {
+      tabId: tab.id,
+      loading: Boolean(tab.loading),
+      navActive: nav.isActive(view),
+      viewVisible: view.getVisible(),
+      runId: 'post-fix'
+    }, 'H9')
+    // #endregion
+  } else if (!options.skipNavigationFinished) {
+    canvaspageload(view, status => {
+      window.webContents.send('canvas:navigation-finished', status)
+    }).finally(() => {
+      maybeRecordCanvasWebNav(tab, normalizedDest)
+    })
+    await nav.waitForReveal(window, tab, view, normalizedDest)
+  } else {
+    await nav.waitForReveal(window, tab, view, normalizedDest)
+  }
+  if (!options.skipNavPush) {
+    const settledUrl = view.webContents.isDestroyed()
+      ? normalizedDest
+      : (view.webContents.getURL() || normalizedDest)
+    pushCanvasNavEntry(tab, snapshotWebEntry(settledUrl, normalizeCanvasNavigationUrl))
+  }
+}
+
+async function handleCanvasInPageLinkNavigation(window, tab, view, rawUrl, source) {
+  const destUrl = normalizeCanvasNavigationUrl(rawUrl)
+  const claimed = claimCanvasWebNavigation(view, destUrl, source)
+  debugNavLog('main.js:handleCanvasInPageLinkNavigation', claimed ? 'claim_ok' : 'claim_blocked', {
+    tabId: tab && tab.id ? tab.id : '',
+    destUrl,
+    source,
+    navActive: getCanvasNav().isActive(view),
+    concealFlag: tab ? Boolean(tab._nucleusConcealWebSource) : false,
+    postUndo: tab ? Boolean(tab._nucleusPostUndoNav) : false,
+    stackSize: tab ? canvasNavStack.size(tab.id) : 0,
+    viewUrl: view && !view.webContents.isDestroyed() ? view.webContents.getURL() : '',
+    staleClaim: hasCanvasWebNavigationClaim(view, destUrl)
+  }, 'H10')
+  if (!claimed) return
+  const navReachPromise = view._nucleusPendingNavReach || waitForCanvasNavigationAny(view, destUrl)
+  view._nucleusPendingNavReach = null
+  view._nucleusPendingNavReachDest = null
+  beginCanvasNavRecordSuppression(view)
+  try {
+    await runCanvasLinkNavigationCover(window, tab, view, destUrl, {
+      source,
+      inPageNav: true,
+      navReachPromise
+    })
+  } catch (error) {
+    clearCanvasWebNavigationClaim(view)
+    const nav = getCanvasNav()
+    if (nav.isActive(view)) {
+      await nav.cancel(view, 'in_page_nav_error')
+    }
+    if (tab && tab.loading) {
+      setTabLoadingState(tab, false, tab.viewTier || 'active')
+    }
+    console.error('Unable to run canvas in-page link navigation:', error)
+  } finally {
+    endCanvasNavRecordSuppression(view)
+    clearCanvasWebNavigationClaim(view)
+  }
+}
+
+async function handleCanvasPreloadLinkNavigation(window, tab, view, url) {
+  const destUrl = normalizeCanvasNavigationUrl(url)
+  if (!claimCanvasWebNavigation(view, destUrl, 'will_navigate_preload')) {
+    // #region agent log
+    debugNavLog('main.js:handleCanvasPreloadLinkNavigation', 'claim_blocked', {
+      tabId: tab && tab.id ? tab.id : '',
+      destUrl,
+      navActive: getCanvasNav().isActive(view),
+      postUndo: tab ? Boolean(tab._nucleusPostUndoNav) : false
+    }, 'H19')
+    // #endregion
+    return
+  }
+  beginCanvasNavRecordSuppression(view)
+  const sourceUrl = view.webContents.getURL()
+  const nav = getCanvasNav()
+  try {
+    if (isNavigableWebUrl(sourceUrl, { blankWarmUrl: canvasBlankWarmUrl })) {
+      pushCanvasNavEntry(tab, snapshotWebEntry(sourceUrl, normalizeCanvasNavigationUrl))
+    }
+    await nav.cover(window, tab, view, {
+      sourceUrl,
+      destUrl,
+      reason: 'will_navigate_preload'
+    })
+    const swapped = await swapPreloadedIntoMain(window, tab, url, {
+      source: 'will-navigate',
+      skipFirstPaintSlate: true
+    })
+    // #region agent log
+    debugNavLog('main.js:handleCanvasPreloadLinkNavigation', 'post_swap', {
+      tabId: tab.id,
+      destUrl,
+      swapped: Boolean(swapped),
+      liveUrl: tab.view && !tab.view.webContents.isDestroyed() ? tab.view.webContents.getURL() : '',
+      navActive: tab.view ? nav.isActive(tab.view) : false,
+      postUndo: Boolean(tab._nucleusPostUndoNav)
+    }, 'H19')
+    // #endregion
+    if (!swapped) {
+      await nav.cancel(view, 'preload_swap_failed')
+      clearCanvasWebNavigationClaim(view)
+      await runCanvasNavAction(window, tab, view, () => {
+        return loadCanvasLinkFast(view, url, status => {
+          window.webContents.send('canvas:navigation-finished', status)
+        })
+      }, { destUrl, reason: 'preload_fallback' })
+      maybeRecordCanvasWebNav(tab, destUrl)
+    } else {
+      await revealPreloadedCanvasSwapIfReady(window, tab, destUrl, 'will_navigate_preload_swap')
+    }
+    const revealView = tab.view || view
+    await nav.waitForReveal(window, tab, revealView, destUrl)
+    tab._nucleusPostUndoNav = false
+    pushCanvasNavEntry(tab, snapshotWebEntry(destUrl, normalizeCanvasNavigationUrl))
+    syncActiveSurfaceFromMainTab(window, tab)
+    // #region agent log
+    debugNavLog('main.js:handleCanvasPreloadLinkNavigation', 'done', {
+      tabId: tab.id,
+      destUrl,
+      loading: Boolean(tab.loading),
+      navActive: revealView ? nav.isActive(revealView) : false,
+      viewVisible: revealView ? revealView.getVisible() : false,
+      postUndo: Boolean(tab._nucleusPostUndoNav)
+    }, 'H19')
+    // #endregion
+  } catch (error) {
+    clearCanvasWebNavigationClaim(view)
+    if (nav.isActive(view)) {
+      await nav.cancel(view, 'preload_nav_error')
+    }
+    if (tab.view && nav.isActive(tab.view)) {
+      await nav.cancel(tab.view, 'preload_nav_error')
+    }
+    if (tab.loading) {
+      setTabLoadingState(tab, false, tab.viewTier || 'active')
+    }
+    console.error('Unable to swap preloaded canvas view:', error)
+  } finally {
+    endCanvasNavRecordSuppression(tab.view || view)
+    clearCanvasWebNavigationClaim(tab.view || view)
+  }
+}
+
+function handleCanvasWindowOpen(window, tab, view, url) {
+  if (handleEngineInternalNavigation(tab, url)) {
+    return { action: 'deny' }
+  }
+  if (isLikelyDownloadUrl(url)) {
+    markIntentionalDownload(view, url)
+    view.webContents.downloadURL(url)
+    return { action: 'deny' }
+  }
+  if (tab.type !== 'canvastab') {
+    view.webContents.loadURL(url)
+    return { action: 'deny' }
+  }
+
+  const destUrl = normalizeCanvasNavigationUrl(url)
+  if (findPreloadSlot(url)) {
+    void handleCanvasPreloadLinkNavigation(window, tab, view, url).catch(error => {
+      console.error('Unable to swap canvas preload popup view:', error)
+    })
+    return { action: 'deny' }
+  }
+
+  if (!claimCanvasWebNavigation(view, destUrl, 'window_open')) {
+    return { action: 'deny' }
+  }
+
+  void ensureCanvasAuthForNavigation(view.webContents.session).then(async hasAuth => {
+    if (!hasAuth) {
+      clearCanvasWebNavigationClaim(view)
+      window.webContents.send('canvas:navigation-finished', 'auth')
+      revealCanvasView(view, { skipFirstPaintSlate: true })
+      return
+    }
+    const nav = getCanvasNav()
+    try {
+      await nav.cover(window, tab, view, {
+        sourceUrl: view.webContents.getURL(),
+        destUrl,
+        reason: 'window_open_load'
+      })
+      await loadCanvasLinkFast(view, url, status => {
+        window.webContents.send('canvas:navigation-finished', status)
+      })
+      await nav.waitForReveal(window, tab, view, destUrl)
+      maybeRecordCanvasWebNav(tab, destUrl)
+    } catch (error) {
+      clearCanvasWebNavigationClaim(view)
+      console.error('Unable to load canvas tab popup URL:', error)
+      window.webContents.send('canvas:navigation-finished', 'fail')
+    }
+  }).catch(error => {
+    clearCanvasWebNavigationClaim(view)
+    console.error('Unable to load canvas tab popup URL:', error)
+    window.webContents.send('canvas:navigation-finished', 'fail')
+  })
+  return { action: 'deny' }
 }
 
 function attachCanvasPredictiveNavigationHandlers(window, tab, view) {
@@ -4563,134 +6842,102 @@ function attachCanvasPredictiveNavigationHandlers(window, tab, view) {
   view.webContents.on("will-navigate", (event, url) => {
     if (tab.type !== "canvastab" || tab.view !== view) return
     if (isLikelyDownloadUrl(url)) return
-
-    const prediction = findCanvasPredictiveEntry(tab.id, url)
-    if (!prediction) return
-
+    if (!findPreloadSlot(url)) return
+    if (hasCanvasWebNavigationClaim(view, url)) return
+    if (getCanvasNav().isActive(view)) return
     event.preventDefault()
-    swapCanvasPredictiveView(window, tab, prediction, url).catch(error => {
-      console.error("Unable to swap canvas predictive view:", error)
-    })
+    // #region agent log
+    debugNavLog('main.js:will_navigate_preload', 'intercept', {
+      tabId: tab.id,
+      destUrl: normalizeCanvasNavigationUrl(url),
+      postUndo: Boolean(tab._nucleusPostUndoNav)
+    }, 'H19')
+    // #endregion
+    void handleCanvasPreloadLinkNavigation(window, tab, view, url)
   })
+
+  if (!view._nucleusCanvasWindowOpenAttached) {
+    view._nucleusCanvasWindowOpenAttached = true
+    view.webContents.setWindowOpenHandler(({ url }) => {
+      const ownerTab = resolveTabForView(view, tab)
+      if (!ownerTab || ownerTab.view !== view) {
+        return { action: 'deny' }
+      }
+      return handleCanvasWindowOpen(window, ownerTab, view, url)
+    })
+  }
 
   if (view._nucleusTabWired || view._nucleusPredictiveHandlersAttached) return
   view._nucleusPredictiveHandlersAttached = true
-
-  let canvasNavigationLoadPromise = null
 
   view.webContents.on("did-navigate", (_event, url) => {
     if (tab.view !== view) return
     tab.url = url
     logTabNavigationState(tab, url, "did-navigate")
+    maybeRecordCanvasWebNav(tab, url)
     window.webContents.send("tabs:url_update", { id: tab.id, url })
+    scheduleCanvasPredictiveRefresh(window, tab)
   })
 
   view.webContents.on("did-navigate-in-page", (_event, url) => {
     if (tab.view !== view) return
     tab.url = url
     logTabNavigationState(tab, url, "did-navigate-in-page")
+    maybeRecordCanvasWebNav(tab, url)
     window.webContents.send("tabs:url_update", { id: tab.id, url })
+    scheduleCanvasPredictiveRefresh(window, tab)
   })
 
   view.webContents.on("did-start-navigation", (_event, _url, isInPlace, isMainFrame) => {
-    if (!isCanvasBrowserTab(tab) || tab.view !== view || !isMainFrame || isInPlace) return
-    if (isLikelyDownloadUrl(_url)) return
-    if (view._nucleusSuppressNextCanvasSlate) {
-      view._nucleusSuppressNextCanvasSlate = false
+    if (tab.view !== view) return
+    const decision = shouldArmCanvasNavCover(view, tab, {
+      url: _url,
+      isInPlace,
+      isMainFrame,
+      source: 'predictive_did_start_nav'
+    })
+    logSlateCover('nav_start', {
+      handler: 'predictive_did_start_nav',
+      decision: decision.reason,
+      arm: decision.arm,
+      url: String(_url || ''),
+      isInPlace,
+      isMainFrame,
+      tabId: tab && tab.id ? tab.id : '',
+      coverActive: getCanvasNav().isActive(view),
+      slateNavInProgress: Boolean(view._nucleusSlateNavigationInProgress)
+    })
+    if (!decision.arm) {
       return
     }
-    if (view._nucleusSlateNavigationInProgress) return
-    if (view._nucleusCanvasNavigationInProgress) return
-    if (canvasNavigationLoadPromise) return
-
-    const navpromise = waitForCanvasNavigation(view)
-    canvasNavigationLoadPromise = canvaspageload(view, status => {
-      window.webContents.send("canvas:navigation-finished", status)
-    })
-    coverCurrentCanvasNavigationWithSlate(window, view, navpromise).catch(error => {
-      console.error("Unable to cover Canvas navigation with slate:", error)
-    })
-    canvasNavigationLoadPromise.finally(() => {
-      canvasNavigationLoadPromise = null
-    })
-  })
-}
-
-async function swapCanvasPredictiveView(window, tab, prediction, url) {
-  if (!tab || !prediction || !prediction.view) return false
-
-  const currentView = tab.view
-  if (!currentView || currentView === prediction.view) return false
-
-  removeCanvasPredictiveEntry(tab.id, prediction)
-
-  tab.view = null
-  const currentUrl = currentView.webContents.isDestroyed()
-    ? tab.url
-    : currentView.webContents.getURL()
-  await browserpool.stashToBackup(window, "canvas", currentView, {
-    tabId: tab.id,
-    url: currentUrl,
-    label: tab.label
-  })
-
-  prediction.view._nucleusPredictive = false
-  tab.view = prediction.view
-  tab.url = normalizeCanvasNavigationUrl(url)
-
-  window.webContents.send("tabs:url_update", { id: tab.id, url: tab.url })
-  wireTabTitleUpdates(window, prediction.view, tab)
-  pushTabTitleFromView(window, prediction.view, tab)
-  renderTab(prediction.view, window, tab)
-  revealCanvasView(prediction.view)
-  window.webContents.send("canvas:navigation-finished", "done")
-  scheduleCanvasVisibleContextUpdate()
-
-  refreshCanvasPredictiveViews(window, tab).catch(error => {
-    console.error("Unable to refresh canvas predictive views after swap:", error)
-  })
-
-  return true
-}
-
-async function refreshCanvasPredictiveViews(window, tab) {
-  if (!shouldRefreshCanvasPredictions(tab)) {
-    return
-  }
-
-  await clearCanvasPredictiveViews(tab.id, window)
-  const links = await extractTopCanvasLinks(tab.view)
-  const predictions = []
-
-  for (const linkUrl of links.slice(0, CANVAS_PREDICTIVE_LINK_COUNT)) {
-    if (!browserpool.canAcquireActive("canvas")) break
-
-    const predictiveView = browserpool.acquirePredictiveView("canvas")
-    if (!predictiveView) break
-
-    predictiveView.setVisible(false)
-    predictiveView.setBounds(getBrowserBounds(window, tab))
-    try {
-      window.contentView.addChildView(predictiveView)
-    } catch (_error) {
-      // View may already be attached.
+    const armDest = normalizeCanvasNavigationUrl(_url)
+    if (armDest && findPreloadSlot(armDest)) {
+      // #region agent log
+      debugNavLog('main.js:predictive_did_start_nav', 'preload_route', {
+        tabId: tab && tab.id ? tab.id : '',
+        destUrl: armDest,
+        postUndo: Boolean(tab._nucleusPostUndoNav)
+      }, 'H19')
+      // #endregion
+      void handleCanvasPreloadLinkNavigation(window, tab, view, _url)
+      return
     }
-
-    const loaded = await loadCanvasTabURLQuiet(predictiveView, linkUrl)
-    if (!loaded) {
-      await browserpool.releaseView(window, "canvas", predictiveView)
-      continue
+    if (
+      armDest &&
+      (!view._nucleusPendingNavReach || view._nucleusPendingNavReachDest !== armDest)
+    ) {
+      view._nucleusPendingNavReach = waitForCanvasNavigationAny(view, armDest)
+      view._nucleusPendingNavReachDest = armDest
+      // #region agent log
+      debugNavLog('main.js:predictive_did_start_nav', 'nav_reach_armed', {
+        tabId: tab && tab.id ? tab.id : '',
+        destUrl: armDest,
+        liveUrl: view.webContents.isDestroyed() ? '' : view.webContents.getURL()
+      }, 'H13')
+      // #endregion
     }
-
-    predictions.push({
-      url: normalizeCanvasNavigationUrl(linkUrl),
-      view: predictiveView
-    })
-  }
-
-  if (predictions.length) {
-    canvasPredictiveByTab.set(String(tab.id), predictions)
-  }
+    void handleCanvasInPageLinkNavigation(window, tab, view, _url, 'predictive_did_start_nav')
+  })
 }
 
 let canvasPredictiveRefreshTimer = null
@@ -4700,16 +6947,34 @@ function cancelCanvasPredictiveRefreshSchedule() {
     clearTimeout(canvasPredictiveRefreshTimer)
     canvasPredictiveRefreshTimer = null
   }
+  if (canvasNativePreloadDebounceTimer) {
+    clearTimeout(canvasNativePreloadDebounceTimer)
+    canvasNativePreloadDebounceTimer = null
+  }
 }
 
 function scheduleCanvasPredictiveRefresh(window, tab, delayMs = 500) {
-  if (!tab || tab.type !== "canvastab" || !isCanvasBrowserTab(tab)) return
+  if (!tab || tab.type !== "canvastab") return
+  if (!resourceGovernor.shouldAllowPreload()) return
   cancelCanvasPredictiveRefreshSchedule()
+  if (isCanvasNavBusy()) {
+    delayMs = Math.max(delayMs, canvasNavBusyUntil - Date.now() + 250)
+  }
+  if (isCanvasNativeTab(tab) && tab.courseId) {
+    canvasNativePreloadDebounceTimer = setTimeout(() => {
+      canvasNativePreloadDebounceTimer = null
+      refreshCanvasPreloadForNativeTab(tab, "native_section").catch(error => {
+        console.error("Unable to refresh native canvas preload:", error)
+      })
+    }, Math.max(delayMs, 800))
+    return
+  }
+  if (!isCanvasBrowserTab(tab)) return
   canvasPredictiveRefreshTimer = setTimeout(() => {
     canvasPredictiveRefreshTimer = null
     if (activetab === "None" || !sameTabId(activetab.id, tab.id) || !tab.view) return
-    refreshCanvasPredictiveViews(window, tab).catch(error => {
-      console.error("Unable to refresh canvas predictive views:", error)
+    refreshCanvasPreloadSlots(window, tab).catch(error => {
+      console.error("Unable to refresh canvas preload slots:", error)
     })
   }, delayMs)
 }
@@ -4742,14 +7007,12 @@ function hideAllWebContentViews(window) {
     if (!tab || !tab.view || tab.view.webContents.isDestroyed()) continue
     detachWebContentView(window, tab.view)
   }
-  for (const predictions of canvasPredictiveByTab.values()) {
-    for (const prediction of predictions) {
-      if (!prediction || !prediction.view || prediction.view.webContents.isDestroyed()) continue
-      detachWebContentView(window, prediction.view)
-    }
+  for (const view of canvasPreloadSlots.allViews()) {
+    if (!view || view.webContents.isDestroyed()) continue
+    detachWebContentView(window, view)
   }
-  if (slate && !slate.webContents.isDestroyed()) {
-    slate.setVisible(false)
+  if (!hasActiveCanvasSlateCover()) {
+    getCanvasNav().hideSlateInstant('hide_all_views')
   }
 }
 
@@ -4781,7 +7044,26 @@ function renderTab(view, window, tab = null) {
     return
   }
   if (tab && tab.type === 'canvastab' && isCanvasBrowserTab(tab)) {
-    revealCanvasView(view, { immediate: canvasViewHasReadyContent(view) })
+    const nav = getCanvasNav()
+    const navActive = nav.isActive(view)
+    const branch = (navActive || tab.loading) ? 'renderWhileTransition' : 'revealCanvasView'
+    debugNavLog('main.js:renderTab', 'canvas_browser', {
+      tabId: tab.id,
+      branch,
+      loading: Boolean(tab.loading),
+      navActive,
+      viewVisible: view.getVisible(),
+      concealFlag: Boolean(tab._nucleusConcealWebSource),
+      claim: view._nucleusClaimedCanvasNav ? view._nucleusClaimedCanvasNav.source : null,
+      url: tab.url || ''
+    }, branch === 'renderWhileTransition' ? 'H3' : 'H4')
+    if (navActive || tab.loading) {
+      nav.renderWhileTransition(view, tab, window)
+      return
+    }
+    // Navigation handlers (open_link, in-page nav, back) already own the slate transition.
+    revealCanvasView(view, { skipFirstPaintSlate: true, trigger: 'render_tab' })
+    if (tab.pendingSwitchSlate) tab.pendingSwitchSlate = false
     return
   }
   view.setVisible(true)
@@ -4808,8 +7090,32 @@ function getauth() {
 
 let canvasInitialSetupDone = false
 
-async function setup() {
-  return canvasApi.setupCanvasData()
+async function setup(options = {}) {
+  console.log('[canvas] Starting Canvas API download…')
+  try {
+    const result = await canvasApi.setupCanvasData(options)
+    console.log(
+      '[canvas] Canvas API download finished. '
+      + 'parser.py is still running in the background — watch for '
+      + '"parser all passes completed" before assuming parsing is done.'
+    )
+    return result
+  } catch (error) {
+    console.error('[canvas] Canvas sync failed:', error && error.message ? error.message : error)
+    throw error
+  }
+}
+
+async function syncCanvasData(options = {}) {
+  console.log('[canvas] Manual sync requested.')
+  await setup({
+    freshSync: canvasDiskReadsBlocked || !canvasInitialSetupDone,
+    ...options
+  })
+  clearCanvasSyncWipeMark()
+  canvasInitialSetupDone = true
+  dataStore.sendCanvasDataUpdate()
+  return { ok: true }
 }
 
 function getauthview(view) {
@@ -4824,19 +7130,24 @@ async function openCanvasApp() {
   if (loadCanvasAuthFromEnv()) {
     try {
       await installCanvasSessionCookies()
-      if (!canvasInitialSetupDone) {
-        await setup()
-        canvasInitialSetupDone = true
+      if (!canvasInitialSetupDone && !canvasDiskReadsBlocked) {
+        await syncCanvasData()
       }
-      return { ok: true, status: "cached-auth" }
+      const needsSessionSync = !canvasDiskRecoveryEnabled() && !canvasInitialSetupDone
+      return {
+        ok: true,
+        status: canvasDiskReadsBlocked
+          ? 'wipe-pending'
+          : (needsSessionSync ? 'needs-sync' : 'cached-auth'),
+        wipePending: canvasDiskReadsBlocked || needsSessionSync
+      }
     } catch (error) {
       console.warn("Saved Canvas auth failed, opening auth window:", error && error.message ? error.message : error)
     }
   }
 
   open_canvas_auth_window(mainwindow, getauth, getauthview, async () => {
-    await setup()
-    canvasInitialSetupDone = true
+    await syncCanvasData()
   })
   return { ok: true, status: "auth-open" }
 }
@@ -4867,7 +7178,7 @@ async function ensureCanvasAuthForNavigation(targetSession = session.defaultSess
   }
 
   if (!authview) {
-    open_canvas_auth_window(mainwindow, getauth, getauthview, setup)
+    open_canvas_auth_window(mainwindow, getauth, getauthview, syncCanvasData)
   }
   await waitForCanvasAuth()
   await installCanvasSessionCookies(targetSession)
@@ -4899,7 +7210,10 @@ function canvaspageload(view, sendsignal) {
         sendsignal(result.status)
       }
       if (result.status !== 'superseded') {
-        revealCanvasView(view)
+        const nav = getCanvasNav()
+        if (!nav.isActive(view)) {
+          revealCanvasView(view, { skipFirstPaintSlate: true })
+        }
       }
       resolve(result)
     }
@@ -4917,8 +7231,8 @@ function canvaspageload(view, sendsignal) {
         !view._nucleusPredictive &&
         ownerWindow
       ) {
-        refreshCanvasPredictiveViews(ownerWindow, ownerTab).catch(error => {
-          console.error("Unable to refresh canvas predictive views after load:", error)
+        refreshCanvasPreloadSlots(ownerWindow, ownerTab).catch(error => {
+          console.error("Unable to refresh canvas preload slots after load:", error)
         })
         scheduleCanvasVisibleContextUpdate()
       }
@@ -4955,7 +7269,86 @@ function waitForCanvasNavigation(view) {
   })
 }
 
-async function waitForCanvasNavigationAndSettle(view, navpromise) {
+function waitForCanvasNavigationAny(view, destUrl) {
+  return new Promise(resolve => {
+    if (!view || view.webContents.isDestroyed()) {
+      resolve('no_view')
+      return
+    }
+    const wc = view.webContents
+    const normalizedDest = destUrl ? normalizeCanvasNavigationUrl(destUrl) : ''
+    let settled = false
+    let pollTimer = null
+
+    const urlMatchesDest = () => {
+      if (!normalizedDest) return false
+      if (wc.isDestroyed()) return false
+      return urlsLikelyMatchCanvas(normalizeCanvasNavigationUrl(wc.getURL()), normalizedDest)
+    }
+
+    const cleanup = () => {
+      wc.removeListener('did-navigate', onNav)
+      wc.removeListener('did-navigate-in-page', onNav)
+      if (pollTimer) {
+        clearInterval(pollTimer)
+        pollTimer = null
+      }
+    }
+
+    const done = (reason) => {
+      if (settled) return
+      settled = true
+      cleanup()
+      resolve(reason)
+    }
+
+    if (urlMatchesDest()) {
+      done('already_at_dest')
+      return
+    }
+
+    const onNav = () => {
+      if (normalizedDest && !urlMatchesDest()) return
+      done('nav_event')
+    }
+
+    wc.on('did-navigate', onNav)
+    wc.on('did-navigate-in-page', onNav)
+
+    pollTimer = setInterval(() => {
+      if (urlMatchesDest()) done('poll_url_match')
+    }, 32)
+    setTimeout(() => {
+      if (pollTimer) {
+        clearInterval(pollTimer)
+        pollTimer = null
+      }
+    }, 5000)
+  })
+}
+
+async function waitForInPageNavigationSettle(view, navPromise, destUrl) {
+  const normalizedDest = normalizeCanvasNavigationUrl(destUrl)
+  const liveNow = view && !view.webContents.isDestroyed() ? view.webContents.getURL() : ''
+  if (urlsLikelyMatchCanvas(normalizeCanvasNavigationUrl(liveNow), normalizedDest)) {
+    await waitForCanvasNavigationAndSettle(view, Promise.resolve(), { fast: true })
+    return { skipped: true, reason: 'already_at_dest' }
+  }
+  const timeoutMs = 4000
+  await Promise.race([
+    waitForCanvasNavigationAndSettle(view, navPromise, { fast: true }).then(() => ({ skipped: false })),
+    wait(timeoutMs).then(() => {
+      const live = view && !view.webContents.isDestroyed() ? view.webContents.getURL() : ''
+      if (urlsLikelyMatchCanvas(normalizeCanvasNavigationUrl(live), normalizedDest)) {
+        return { skipped: false, reason: 'timeout_url_match' }
+      }
+      throw new Error('in_page_nav_settle_timeout')
+    })
+  ])
+  return { skipped: false }
+}
+
+async function waitForCanvasNavigationAndSettle(view, navpromise, options = {}) {
   await navpromise
   const twoFrameWait = view
     ? view.webContents.executeJavaScript(`
@@ -4967,11 +7360,13 @@ async function waitForCanvasNavigationAndSettle(view, navpromise) {
       `, true)
     : Promise.resolve()
 
+  const frameBudget = options.fast ? 120 : 300
+  const tailBudget = options.fast ? 200 : 700
   await Promise.race([
     twoFrameWait.catch(() => false),
-    wait(300)
+    wait(frameBudget)
   ])
-  await wait(700)
+  await wait(tailBudget)
 }
 
 async function loadCanvasTabURL(view, url, sendsignal) {
@@ -4999,9 +7394,86 @@ function getTabForView(view) {
 }
 
 function canvasViewHasReadyContent(view) {
+  return canvasWebViewUrlIsReady(view)
+}
+
+function canvasWebViewUrlIsReady(view) {
   if (!view || view.webContents.isDestroyed()) return false
   const url = String(view.webContents.getURL() || '').trim()
-  return Boolean(url && url !== 'about:blank')
+  if (!url || url === 'about:blank') return false
+  if (url === canvasBlankWarmUrl) return false
+  return true
+}
+
+
+function shouldArmCanvasNavCover(view, tab, details = {}) {
+  const url = String(details.url || '')
+  const isInPlace = Boolean(details.isInPlace)
+  const isMainFrame = details.isMainFrame !== false
+  const source = String(details.source || 'unspecified')
+  if (!tab || !isCanvasBrowserTab(tab)) {
+    return { arm: false, reason: 'not_canvas_browser', source, url }
+  }
+  if (!isMainFrame || isInPlace) {
+    return { arm: false, reason: 'filtered_frame', source, url, isInPlace, isMainFrame }
+  }
+  if (isLikelyDownloadUrl(url)) {
+    return { arm: false, reason: 'download', source, url }
+  }
+  if (view && view._nucleusSuppressNextCanvasSlate) {
+    view._nucleusSuppressNextCanvasSlate = false
+    return { arm: false, reason: 'form_submit_suppress', source, url }
+  }
+  if (view && view._nucleusSuppressNavRecord) {
+    return { arm: false, reason: 'suppress_nav_record', source, url }
+  }
+  if (view && getCanvasNav().isActive(view)) {
+    return { arm: false, reason: 'transition_active', source, url }
+  }
+  if (view && hasCanvasWebNavigationClaim(view, url)) {
+    debugNavLog('main.js:shouldArmCanvasNavCover', 'skip_claim', {
+      url,
+      claimSource: view._nucleusClaimedCanvasNav ? view._nucleusClaimedCanvasNav.source : '',
+      claimDest: view._nucleusClaimedCanvasNav ? view._nucleusClaimedCanvasNav.destUrl : ''
+    }, 'H2')
+    return { arm: false, reason: 'nav_already_claimed', source, url }
+  }
+  return { arm: true, reason: 'ok', source, url }
+}
+
+function hasActiveCanvasSlateCover() {
+  for (const tab of currtabs) {
+    if (!tab || tab.type !== 'canvastab' || !isCanvasBrowserTab(tab)) continue
+    if (!tab.view || tab.view.webContents.isDestroyed()) continue
+    if (getCanvasNav().isActive(tab.view)) return true
+  }
+  if (slate && (slate._nucleusCanvasCoverActive || slate._nucleusFadeInFlight)) return true
+  return false
+}
+
+
+async function armCanvasCoverForTab(window, tab) {
+  if (!tab) return { ok: false, error: 'invalid_tab' }
+  if (!tab.view || tab.view.webContents.isDestroyed()) {
+    if (tab.loading !== true) {
+      tab.loading = true
+      broadcastTabViewState(tab, 'active')
+    }
+    return { ok: true, slateOnly: true }
+  }
+  const anchorUrl = tab.view.webContents.getURL()
+  const nav = getCanvasNav()
+  const concealSource = Boolean(
+    tab._nucleusConcealWebSource || isCanvasNativeTab(tab)
+  )
+  await nav.cover(window, tab, tab.view, {
+    sourceUrl: anchorUrl,
+    destUrl: anchorUrl,
+    reason: 'tab_switch_cover',
+    concealSource
+  })
+  await nav.waitForReveal(window, tab, tab.view, anchorUrl)
+  return { ok: true }
 }
 
 function sendCanvasViewReady(window, tab) {
@@ -5016,56 +7488,86 @@ function revealCanvasView(view, options = {}) {
     view.setVisible(false)
     return
   }
-  view._nucleusCanvasNavigationInProgress = false
 
   const window = BrowserWindow.getAllWindows()[0]
+  const nav = getCanvasNav()
+
   if (rendererOverlayDepth > 0) {
     view.setVisible(false)
     return
   }
-  if (tab && window) {
-    attachWebContentView(window, view, tab)
-  }
 
-  const isActiveView = activetab !== "None" && activetab.view === view
-  if (!isActiveView) {
-    view.setVisible(false)
-    return
-  }
-
-  if (view._nucleusBlankedForCanvasWipe) {
-    view.setVisible(false)
-    return
-  }
-
-  const revealImmediately = options.immediate === true || (
-    options.immediate !== false &&
-    !view._nucleusCanvasNavigationInProgress &&
-    !view._nucleusSlateNavigationInProgress &&
-    canvasViewHasReadyContent(view)
-  )
-
-  if (revealImmediately) {
-    if (view._nucleusRevealTimer) {
-      clearTimeout(view._nucleusRevealTimer)
-      view._nucleusRevealTimer = null
+  if (options.skipFirstPaintSlate || !tab || !isCanvasBrowserTab(tab)) {
+    if (nav.isActive(view)) {
+      void nav.forceReveal(view, tab, window, options.trigger || 'skip_slate_force')
+    } else {
+      nav.revealView(view, tab, window, options.trigger || 'direct_reveal')
     }
-    view.setVisible(true)
-    sendCanvasViewReady(window, tab)
     return
   }
 
-  if (view._nucleusRevealTimer) {
-    clearTimeout(view._nucleusRevealTimer)
-  }
-  view._nucleusRevealTimer = setTimeout(() => {
-    view._nucleusRevealTimer = null
-    const stillActiveView = activetab !== "None" && activetab.view === view
-    if (!stillActiveView || view._nucleusBlankedForCanvasWipe || rendererOverlayDepth > 0) return
+  // #region agent log
+  fetch('http://127.0.0.1:7283/ingest/c1155abf-8302-4940-9722-19bb0cae0569',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'5b3c30'},body:JSON.stringify({sessionId:'5b3c30',location:'main.js:revealCanvasView',message:'cover_path',data:{trigger:options.trigger||'',tabId:tab.id,url:view.webContents.isDestroyed()?'':view.webContents.getURL(),viewVisible:view.getVisible()},timestamp:Date.now(),hypothesisId:'H6'})}).catch(()=>{});
+  // #endregion
 
-    view.setVisible(true)
-    sendCanvasViewReady(window, tab)
-  }, 100)
+  void (async () => {
+    const anchorUrl = options.anchorUrl != null
+      ? String(options.anchorUrl)
+      : String(view.webContents.isDestroyed() ? '' : view.webContents.getURL() || '')
+    await nav.cover(window, tab, view, {
+      sourceUrl: anchorUrl,
+      destUrl: anchorUrl,
+      reason: options.trigger || 'reveal_canvas_view',
+      tabSwitchCover: Boolean(options.tabSwitchCover),
+      concealSource: Boolean(tab._nucleusConcealWebSource)
+    })
+    await nav.waitForReveal(window, tab, view, anchorUrl)
+  })().catch(error => {
+    console.error('Unable to reveal canvas view with transition:', error)
+    nav.revealView(view, tab, window, 'reveal_error')
+  })
+}
+
+function syncSlateBackgroundColor(transparent = true) {
+  if (!slate || slate.webContents.isDestroyed()) return
+  try {
+    if (transparent) {
+      slate.webContents.setBackgroundColor('#00000000')
+      return
+    }
+    const palette = getThemePalette(__dirname)
+    const color = palette.surface || palette.bg || '#050916'
+    slate.webContents.setBackgroundColor(color)
+  } catch (_error) {
+    // Best-effort.
+  }
+}
+
+function getslate(window) {
+  if (!slate) {
+    slate = new WebContentsView({
+      webPreferences: {
+        transparent: true
+      }
+    })
+    syncSlateBackgroundColor(true)
+    slate._nucleusSlateLoaded = false
+    slate._nucleusCoverUrl = 'slate.html'
+    slate.webContents.once('did-finish-load', () => {
+      slate._nucleusSlateLoaded = true
+      applySlateTheme()
+    })
+    slate.webContents.loadFile(path.join(__dirname, 'slate.html'))
+    slate.setVisible(false)
+    window.contentView.addChildView(slate)
+  }
+  return slate
+}
+
+function setSlateBounds(window, tab = null) {
+  if (!slate) return
+  const boundTab = tab || (activetab !== "None" ? activetab : null)
+  slate.setBounds(getBrowserBounds(window, boundTab))
 }
 
 function getCanvasTabForView(view) {
@@ -5092,159 +7594,11 @@ function isIntentionalDownload(view, url) {
   return recent
 }
 
-function getslate(window) {
-  if (!slate) {
-    slate = new WebContentsView({
-      webPreferences: {
-        transparent: true
-      }
-    })
-    slate._nucleusSlateLoaded = false
-    slate.webContents.once('did-finish-load', () => {
-      slate._nucleusSlateLoaded = true
-      applySlateTheme()
-    })
-    slate.webContents.loadFile(path.join(__dirname, 'slate.html'))
-    slate.setVisible(false)
-    window.contentView.addChildView(slate)
-  }
-  return slate
-}
-
-function setSlateBounds(window) {
-  if (!slate) return
-  const tab = activetab !== "None" ? activetab : null
-  slate.setBounds(getBrowserBounds(window, tab))
-}
-
-async function setSlateAnimation(view, phase, direction = 'right') {
-  if (!view) return
-
-  if (!view._nucleusSlateLoaded) {
-    await new Promise(resolve => {
-      view.webContents.once('did-finish-load', resolve)
-    })
-  }
-  const currclass = `${phase}-${direction === 'left' ? 'left' : 'right'}`
-  try {
-    return view.webContents.executeJavaScript(`
-      new Promise(resolve => {
-        const slate = document.querySelector('.slate');
-        if (!slate) {
-          resolve(false);
-          return;
-        }
-        let settled = false;
-
-        function finish() {
-          if (settled) return;
-          settled = true;
-          slate.removeEventListener('animationend', onAnimationEnd);
-          resolve(true);
-        }
-
-        function onAnimationEnd(event) {
-          if (event.target !== slate) return;
-          finish()
-        }
-
-        slate.addEventListener('animationend', onAnimationEnd);
-        setTimeout(finish, 1000);
-        slate.classList.remove('show-right', 'hide-right', 'show-left', 'hide-left');
-        void slate.offsetWidth;
-        slate.classList.add(${JSON.stringify(currclass)});
-      });
-
-    `, true)
-  } catch (error) {
-    console.error("Unable to animate slate:", error)
-  }
-}
-
-function addslate(window) {
-  
-  const gotslate = getslate(window)
-  try {
-    window.contentView.removeChildView(gotslate)
-  } catch (_error) {
-    // The slate may not be attached yet.
-  }
-  setSlateBounds(window)
-  window.contentView.addChildView(gotslate)
-  gotslate.setVisible(true)
-  return gotslate
-}
-
-// Reveals the freshly loaded canvas page over the slate (forward links): the
-// page is raised above the slate and shown, then the slate is dropped behind it
-// with no exit animation, so the page simply "loads on top" of the slide.
-function revealCanvasOverSlate(window, view, tab, gotslate) {
-  attachWebContentView(window, view, tab)
-  view.setVisible(true)
-  gotslate.setVisible(false)
-}
-
-async function runCanvasSlateNavigation(window, view, action, options = {}) {
-  if (!view) return
-  const tab = getCanvasTabForView(view)
-  if (tab && !isCanvasBrowserTab(tab)) {
-    return action()
-  }
-  if (view._nucleusSlateNavigationInProgress) {
-    return action()
-  }
-
-  const direction = options.direction === 'left' ? 'left' : 'right'
-  const revealOnTop = options.revealOnTop !== false
-
-  view._nucleusSlateNavigationInProgress = true
-  try {
-    const gotslate = addslate(window)
-    await setSlateAnimation(gotslate, 'show', direction)
-    view.setVisible(false)
-    const result = await action()
-    if (revealOnTop) {
-      revealCanvasOverSlate(window, view, tab, gotslate)
-    } else {
-      view.setVisible(true)
-      await setSlateAnimation(gotslate, 'hide', direction)
-      gotslate.setVisible(false)
-    }
-    return result
-  } finally {
-    view._nucleusSlateNavigationInProgress = false
-  }
-}
-
-async function coverCurrentCanvasNavigationWithSlate(window, view, navpromise, options = {}) {
-  if (!view || view._nucleusSlateNavigationInProgress) return
-  const tab = getCanvasTabForView(view)
-  if (!isCanvasBrowserTab(tab)) return
-
-  const direction = options.direction === 'left' ? 'left' : 'right'
-  const revealOnTop = options.revealOnTop !== false
-
-  view._nucleusSlateNavigationInProgress = true
-  try {
-    const gotslate = addslate(window)
-    await setSlateAnimation(gotslate, 'show', direction)
-    view.setVisible(false)
-    await waitForCanvasNavigationAndSettle(view, navpromise)
-    if (revealOnTop) {
-      revealCanvasOverSlate(window, view, tab, gotslate)
-    } else {
-      view.setVisible(true)
-      await setSlateAnimation(gotslate, 'hide', direction)
-      gotslate.setVisible(false)
-    }
-  } finally {
-    view._nucleusSlateNavigationInProgress = false
-  }
-}
-
 async function loadbrowserpool(window) {
   await browserpool.loadDeferred(window)
 }
+
+
 // ─────────────────────────────────────────────────────────────────────────────
 // APP LIFECYCLE
 // ─────────────────────────────────────────────────────────────────────────────
@@ -5263,6 +7617,10 @@ protocol.registerSchemesAsPrivileged([
 ])
 
 app.whenReady().then(() => {
+  mainDiag.attachApp(app)
+  mainDiag.attachIpc(ipcMain)
+  resourceGovernor.start(app)
+  startPerfEvalServerIfEnabled(app)
   protocol.registerStringProtocol('nucleus', (_request, callback) => {
     callback({ mimeType: 'text/html', data: '<!doctype html><html><body></body></html>' })
   })
@@ -5603,6 +7961,12 @@ app.whenReady().then(() => {
     // can inject the app-wide :root token block synchronously before first paint.
     event.returnValue = getThemeRuntime(__dirname)
   })
+  ipcMain.on('canvas:cache_policy', event => {
+    event.returnValue = {
+      diskRecoveryEnabled: canvasDiskRecoveryEnabled(),
+      memoryCacheEnabled: canvasMemoryCacheEnabled()
+    }
+  })
 
   // theme:list — Available themes plus the active one.
   ipcMain.handle('theme:list', () => {
@@ -5654,18 +8018,25 @@ app.whenReady().then(() => {
   ipcMain.handle('synapse:send', async (event, payload = {}) => {
     const requestId = payload && payload.requestId ? payload.requestId : ''
     const sender = event.sender
-    return synapseClient.send(payload, {
-      onDelta: delta => {
-        if (!requestId || sender.isDestroyed()) return
-        sender.send('synapse:response-chunk', { requestId, delta })
-      }
-    })
+    resourceGovernor.markSynapseBusy()
+    try {
+      return await synapseClient.send(payload, {
+        onDelta: delta => {
+          if (!requestId || sender.isDestroyed()) return
+          sender.send('synapse:response-chunk', { requestId, delta })
+        }
+      })
+    } finally {
+      resourceGovernor.clearSynapseBusy()
+    }
   });
 
   // tabs:new_active — Switches the active rendered tab view.
   // in:  tab ({ view: WebContentsView, ... } | 'None')
   // out: undefined
   ipcMain.handle('tabs:new_active', async (_, tab) => runSerializedTabOperation(async () => {
+    const requestSeq = ++rendererActiveTabRequestSeq
+    const activationGeneration = ++tabActivationGeneration
     const previousActive = activetab !== "None" ? activetab : null
 
     if (tab === 'None') {
@@ -5683,6 +8054,7 @@ app.whenReady().then(() => {
       syncActiveSurfaceFromMainTab(mainwindow, null)
       return
     }
+    if (requestSeq !== rendererActiveTabRequestSeq) return
 
     if (tab && tab.pendingSwitchSlate) {
       foundtab.pendingSwitchSlate = true
@@ -5690,15 +8062,17 @@ app.whenReady().then(() => {
       foundtab.pendingSwitchSlate = false
     }
 
+    mergeIncomingTab(foundtab, tab)
     activeWorkspaceIdForPool = foundtab.workspaceId || activeWorkspaceIdForPool
     if (previousActive && !sameTabId(previousActive.id, foundtab.id)) {
-      await tabViewLifecycle.onTabDeactivated(previousActive, mainwindow)
+      scheduleDeferredInactiveTabCleanup(previousActive, activationGeneration, mainwindow)
     }
     await tabViewLifecycle.deactivateTabsOutsideWorkspace(
       foundtab.workspaceId,
       foundtab.id,
       mainwindow
     )
+    if (requestSeq !== rendererActiveTabRequestSeq) return
     activetab = foundtab
     await tabViewLifecycle.onTabActivated(foundtab, mainwindow)
     syncActiveSurfaceFromMainTab(mainwindow, foundtab)
@@ -5726,6 +8100,21 @@ app.whenReady().then(() => {
     return dataStore.deleteWorkspace(workspaceid)
   })
 
+  ipcMain.handle('workspaceSession:getAll', () => ({
+    ok: true,
+    sessions: workspaceSessionStore.getAll()
+  }))
+
+  ipcMain.handle('workspaceSession:update', (_, payload = {}) => {
+    const workspaceId = String(payload.workspaceId || payload.workspaceid || '').trim()
+    if (!workspaceId) {
+      return { ok: false, error: 'workspaceId is required' }
+    }
+    const session = workspaceSessionStore.set(workspaceId, payload.session || payload)
+    contextStore.update('workspaceSession', session)
+    return { ok: true, session }
+  })
+
   ipcMain.handle('canvas:open_app', async () => {
     await openCanvasApp()
     return { ok: true }
@@ -5745,6 +8134,21 @@ app.whenReady().then(() => {
 
   ipcMain.handle('canvas:clear_sync_data', () => clearCanvasSyncData())
 
+  ipcMain.handle('canvas:sync', async () => {
+    try {
+      if (!loadCanvasAuthFromEnv()) {
+        return { ok: false, error: 'Canvas login required. Open Canvas and sign in first.' }
+      }
+      await installCanvasSessionCookies()
+      return await syncCanvasData()
+    } catch (error) {
+      return {
+        ok: false,
+        error: error && error.message ? error.message : String(error)
+      }
+    }
+  })
+
   ipcMain.handle('canvas:logout', async () => {
     try {
       return await logoutCanvas()
@@ -5755,6 +8159,211 @@ app.whenReady().then(() => {
       }
     }
   })
+
+  ipcMain.on('canvas:form_submit_pending', (event) => {
+    const tab = currtabs.find(localtab =>
+      localtab &&
+      localtab.view &&
+      localtab.view.webContents === event.sender
+    )
+    if (!tab || !tab.view) return
+    resourceGovernor.markInteractiveBusy()
+    tab.view._nucleusSuppressNextCanvasSlate = true
+    logSlateCover('form_submit_pending', {
+      tabId: tab.id,
+      url: tab.view.webContents.isDestroyed() ? '' : tab.view.webContents.getURL()
+    })
+  })
+
+  ipcMain.on('canvas:first_paint', (event, payload = {}) => {
+    const tab = currtabs.find(localtab =>
+      localtab &&
+      localtab.view &&
+      localtab.view.webContents === event.sender
+    )
+    if (!tab || !tab.view) return
+    if (!canvasWebViewUrlIsReady(tab.view)) {
+      logSlateCover('first_paint_ignored', {
+        tabId: tab.id,
+        reason: String(payload.reason || 'unspecified'),
+        url: tab.view.webContents.isDestroyed() ? '' : tab.view.webContents.getURL()
+      })
+      return
+    }
+    getCanvasNav().handleFirstPaint(tab.view, payload)
+    logSlateCover('first_paint', {
+      tabId: tab.id,
+      reason: String(payload.reason || 'unspecified'),
+      generation: payload.generation,
+      url: tab.view.webContents.isDestroyed() ? '' : tab.view.webContents.getURL()
+    })
+  })
+
+  ipcMain.on('canvas:pointer_hints', (event, payload = {}) => {
+    const tab = resolveCanvasTabFromWebContents(event.sender)
+    if (!tab) {
+      canvasPointerHintDiagnostics.droppedNoTabId += 1
+      return
+    }
+    void handleCanvasPointerHints({
+      tabId: tab.id,
+      courseId: tab.courseId ? String(tab.courseId) : '',
+      courseSection: tab.courseSection || 'homepage',
+      source: String(payload.source || 'canvas_webview'),
+      emitReason: String(payload.emitReason || ''),
+      links: Array.isArray(payload.links) ? payload.links : []
+    })
+  })
+
+  ipcMain.on('canvas:link_mousedown', (event, payload = {}) => {
+    const tab = resolveCanvasTabFromWebContents(event.sender)
+    if (!tab) return
+    const url = normalizeCanvasNavigationUrl(payload.url || '')
+    if (!url) return
+    void handleCanvasPreloadPlan({
+      tabId: tab.id,
+      courseId: tab.courseId ? String(tab.courseId) : '',
+      courseSection: tab.courseSection || 'homepage',
+      urls: [url],
+      reason: 'link_mousedown'
+    })
+  })
+
+  ipcMain.handle('canvas:open_link', async (_, payload = {}) => runSerializedTabOperation(async () => {
+    try {
+      const tabId = String(payload.tabId || '')
+      const url = normalizeCanvasNavigationUrl(payload.url || '')
+      let tab = currtabs.find(localtab => sameTabId(localtab.id, tabId))
+      if (!tab) return { ok: false, error: 'invalid_tab' }
+      return await activateCanvasBrowserLink(mainwindow, tab, url, payload)
+    } catch (error) {
+      return { ok: false, error: error && error.message ? error.message : String(error) }
+    }
+  }))
+
+  ipcMain.handle('canvas:restore_native', async (_, payload = {}) => {
+    try {
+      const tabId = String(payload.tabId || '')
+      const tab = currtabs.find(localtab => sameTabId(localtab.id, tabId))
+      if (!tab) return { ok: false, error: 'invalid_tab' }
+      return await restoreCanvasNativeSurface(mainwindow, tab, payload)
+    } catch (error) {
+      return { ok: false, error: error && error.message ? error.message : String(error) }
+    }
+  })
+
+  ipcMain.handle('canvas:reveal_native', async (_, payload = {}) => {
+    try {
+      const tabId = String(payload.tabId || '')
+      const tab = currtabs.find(localtab => sameTabId(localtab.id, tabId))
+      if (!tab) return { ok: false, error: 'invalid_tab' }
+      return await revealCanvasNativeSurface(mainwindow, tab)
+    } catch (error) {
+      return { ok: false, error: error && error.message ? error.message : String(error) }
+    }
+  })
+
+  ipcMain.handle('canvas:preload_plan', async (_, payload = {}) => runSerializedTabOperation(async () => {
+    try {
+      return await handleCanvasPreloadPlan(payload)
+    } catch (error) {
+      return { ok: false, error: error && error.message ? error.message : String(error) }
+    }
+  }))
+
+  ipcMain.handle('canvas:preload_pointer_hints', async (_, payload = {}) => {
+    try {
+      return await handleCanvasPointerHints(payload)
+    } catch (error) {
+      return { ok: false, error: error && error.message ? error.message : String(error) }
+    }
+  })
+
+  ipcMain.handle('canvas:preload_stats', async (_, payload = {}) => {
+    return buildCanvasPreloadStatsPayload(payload)
+  })
+
+  ipcMain.handle('resource:get_snapshot', () => {
+    return {
+      ok: true,
+      status: resourceGovernor.getStatus(),
+      snapshot: resourceGovernor.getLatestSnapshot()
+    }
+  })
+
+  ipcMain.handle('canvas:arm_cover', async (_, payload = {}) => runSerializedTabOperation(async () => {
+    try {
+      const tabId = String(payload.tabId || '')
+      const tab = currtabs.find(localtab => sameTabId(localtab.id, tabId))
+      if (!tab) return { ok: false, error: 'invalid_tab' }
+      return await armCanvasCoverForTab(mainwindow, tab)
+    } catch (error) {
+      return { ok: false, error: error && error.message ? error.message : String(error) }
+    }
+  }))
+
+  ipcMain.handle('canvas:back', async (_, tabid) => runSerializedTabOperation(async () => {
+    try {
+      const tab = currtabs.find(localtab => sameTabId(localtab.id, tabid))
+      if (!tab || tab.type !== 'canvastab') {
+        return { ok: false, error: 'invalid_tab' }
+      }
+      return await goBackCanvasTab(mainwindow, tab)
+    } catch (error) {
+      return { ok: false, error: error && error.message ? error.message : String(error) }
+    }
+  }))
+
+  ipcMain.handle('canvas:nav_forward', async (_, tabId) => {
+    noteCanvasNavForward(tabId)
+    return { ok: true }
+  })
+
+  ipcMain.handle('tabs:switch_active', async (_, payload = {}) => runSerializedTabOperation(async () => {
+    return lagSpikeCollector.span('tab.switch_active', async () => {
+    const requestSeq = ++rendererActiveTabRequestSeq
+    const activationGeneration = ++tabActivationGeneration
+    const previousActive = activetab !== 'None' ? activetab : null
+    const incomingTab = payload && payload.tab ? payload.tab : 'None'
+
+    if (incomingTab === 'None') {
+      if (previousActive) await tabViewLifecycle.onTabDeactivated(previousActive, mainwindow)
+      activetab = 'None'
+      syncActiveSurfaceFromMainTab(mainwindow, null)
+      return { ok: true }
+    }
+
+    const foundtab = currtabs.find(localtab => sameTabId(localtab.id, incomingTab.id))
+    if (!foundtab) {
+      return { ok: false, error: 'tab_not_found', needsFullPush: true }
+    }
+    if (requestSeq !== rendererActiveTabRequestSeq) {
+      return { ok: false, reason: 'stale_request' }
+    }
+
+    mergeIncomingTab(foundtab, incomingTab)
+    if (foundtab.pendingSwitchSlate) {
+      foundtab.pendingSwitchSlate = true
+    }
+    activeWorkspaceIdForPool = foundtab.workspaceId || activeWorkspaceIdForPool
+    if (previousActive && !sameTabId(previousActive.id, foundtab.id)) {
+      scheduleDeferredInactiveTabCleanup(previousActive, activationGeneration, mainwindow)
+    }
+    await tabViewLifecycle.deactivateTabsOutsideWorkspace(foundtab.workspaceId, foundtab.id, mainwindow)
+    if (requestSeq !== rendererActiveTabRequestSeq) {
+      return { ok: false, reason: 'stale_request' }
+    }
+    activetab = foundtab
+    await tabViewLifecycle.onTabActivated(foundtab, mainwindow)
+    syncActiveSurfaceFromMainTab(mainwindow, foundtab)
+    if (isNativeSurfaceTab(foundtab)) {
+      hideAllWebContentViews(mainwindow)
+    } else if (foundtab.type === 'canvastab') {
+      scheduleCanvasPredictiveRefresh(mainwindow, foundtab)
+    }
+    return { ok: true }
+    }, { tabId: payload && payload.tab && payload.tab.id ? payload.tab.id : 'None' })
+  }))
 
   // surface:scrolled — the active WebContentsView (web or Canvas) reports a scroll
   // position change so the main process can refresh the render-context screen slice
@@ -5798,7 +8407,7 @@ app.whenReady().then(() => {
       chars += value.length
     }
     const scroll = payload.scroll && typeof payload.scroll === 'object' ? payload.scroll : {}
-    contextStore.update('screen', {
+    contextStore.update('screen', withScreenChunks({
       source: 'renderer-dom',
       surfaceKind: String(payload.kind || ''),
       url: String(payload.url || ''),
@@ -5813,7 +8422,7 @@ app.whenReady().then(() => {
       canvas: null,
       truncated: incoming.length > text.length,
       charCount: chars
-    })
+    }))
     logAppState('renderer-screen')
   })
 
@@ -5903,11 +8512,11 @@ app.whenReady().then(() => {
         revealCanvasView(foundtab.view)
         return { ok: false, error: "Canvas auth is not ready.", url }
       }
-      await runCanvasSlateNavigation(mainwindow, foundtab.view, () => {
+      await runCanvasNavAction(mainwindow, foundtab, foundtab.view, () => {
         return loadCanvasTabURL(foundtab.view, url, status => {
           mainwindow.webContents.send('canvas:navigation-finished', status)
         })
-      })
+      }, { destUrl: url, reason: 'tabs_url_nav' })
     } else {
       await foundtab.view.webContents.loadURL(url)
     }
@@ -5918,27 +8527,17 @@ app.whenReady().then(() => {
   //in: tabid of tab going back
   ipcMain.handle('tabs:back', async (_, tabid) => {
     const foundtab = currtabs.find(localtab => sameTabId(localtab.id, tabid))
-    if (!foundtab || !isWebContentTab(foundtab) || !foundtab.view) {
+    if (!foundtab || !isWebContentTab(foundtab)) {
       return { ok: false, error: "Browser tab not found." }
     }
+    if (foundtab.type === "canvastab") {
+      return goBackCanvasTab(mainwindow, foundtab)
+    }
+    if (!foundtab.view || foundtab.view.webContents.isDestroyed()) {
+      return { ok: false, error: "no_view" }
+    }
     if (foundtab.view.webContents.canGoBack()) {
-      if (foundtab.type === "canvastab") {
-        await runCanvasSlateNavigation(mainwindow, foundtab.view, async () => {
-          const navpromise = waitForCanvasNavigation(foundtab.view)
-          canvaspageload(foundtab.view, status => {
-            mainwindow.webContents.send('canvas:navigation-finished', status)
-          })
-          foundtab.view.webContents.goBack()
-          await waitForCanvasNavigationAndSettle(foundtab.view, navpromise)
-        }, { direction: 'left', revealOnTop: false })
-        if (foundtab.view.webContents.getURL() === canvasBlankWarmUrl) {
-          foundtab.view.setVisible(false)
-          foundtab.url = ""
-          return { ok: true, wentBack: false, restoreNative: true }
-        }
-      } else {
-        foundtab.view.webContents.goBack()
-      }
+      foundtab.view.webContents.goBack()
       return { ok: true, wentBack: true }
     }
     return { ok: true, wentBack: false }
@@ -5968,7 +8567,8 @@ app.whenReady().then(() => {
           tabSnapshotCaptureTimers.delete(String(localtab.id))
         }
         if (localtab.type === "canvastab") {
-          closedTabCleanup.push(clearCanvasPredictiveViews(localtab.id, mainwindow))
+          closedTabCleanup.push(Promise.resolve(cancelCanvasPreloadForTab(localtab.id)))
+          canvasNavStack.clear(localtab.id)
         }
         if (localtab.view) {
           closedTabCleanup.push(releaseTabView(localtab, mainwindow))
@@ -5997,8 +8597,15 @@ app.whenReady().then(() => {
         tabids.add(mainTab.id)
       }
 
+      if (mainTab && mainTab.type === "canvastab" && usesDedicatedCanvasTabViews()) {
+        await ensureSimpleCanvasTabViewForPush(mainTab, mainwindow)
+      }
+
       if (mainTab && isWebContentTab(mainTab) && !mainTab.view) {
           const tab = mainTab
+          if (usesDedicatedCanvasTabViews() && tab.type === "canvastab") {
+            continue
+          }
           const isActiveTab = resolvedActiveTabId && sameTabId(tab.id, resolvedActiveTabId)
           if (!isActiveTab) {
             continue
@@ -6214,44 +8821,10 @@ app.whenReady().then(() => {
             await injectCanvasPreviewRedirector(frame)
           })
           view.webContents.setWindowOpenHandler(({ url }) => {
-            if (handleEngineInternalNavigation(tab, url)) {
-              return { action: 'deny' }
-            }
-
-            if (isLikelyDownloadUrl(url)) {
-              markIntentionalDownload(view, url)
-              view.webContents.downloadURL(url)
-              return { action: 'deny' }
-            }
-
-            if (tab.type === "canvastab") {
-              const prediction = findCanvasPredictiveEntry(tab.id, url)
-              if (prediction) {
-                swapCanvasPredictiveView(mainwindow, tab, prediction, url).catch(error => {
-                  console.error("Unable to swap canvas predictive popup view:", error)
-                })
-                return { action: 'deny' }
-              }
-              ensureCanvasAuthForNavigation(view.webContents.session).then(hasAuth => {
-                if (!hasAuth) {
-                  mainwindow.webContents.send('canvas:navigation-finished', 'auth')
-                  revealCanvasView(view)
-                  return
-                }
-                return runCanvasSlateNavigation(mainwindow, view, () => {
-                  return loadCanvasTabURL(view, url, status => {
-                    mainwindow.webContents.send('canvas:navigation-finished', status)
-                  })
-                })
-              }).catch(error => {
-                console.error("Unable to load canvas tab popup URL:", error)
-                mainwindow.webContents.send('canvas:navigation-finished', 'fail')
-              })
-            } else {
-              view.webContents.loadURL(url);
-            }
-            return { action: 'deny' };
-          });
+            const ownerTab = resolveTabForView(view, tab)
+            if (!ownerTab) return { action: 'deny' }
+            return handleCanvasWindowOpen(mainwindow, ownerTab, view, url)
+          })
           view.webContents.on('will-navigate', event => {
             const ownerTab = resolveTabForView(view, tab)
             if (!ownerTab) return
@@ -6259,28 +8832,31 @@ app.whenReady().then(() => {
               event.preventDefault()
             }
           })
-          let canvasNavigationLoadPromise = null
           view.webContents.on('did-start-navigation', (_event, _url, isInPlace, isMainFrame) => {
-            if (!isCanvasBrowserTab(tab) || !isMainFrame || isInPlace) return
-            if (isLikelyDownloadUrl(_url)) return
-            if (view._nucleusSuppressNextCanvasSlate) {
-              view._nucleusSuppressNextCanvasSlate = false
+            const decision = shouldArmCanvasNavCover(view, tab, {
+              url: _url,
+              isInPlace,
+              isMainFrame,
+              source: 'wire_tab_did_start_nav'
+            })
+            logSlateCover('nav_start', {
+              handler: 'wire_tab_did_start_nav',
+              decision: decision.reason,
+              arm: decision.arm,
+              url: String(_url || ''),
+              isInPlace,
+              isMainFrame,
+              tabId: tab && tab.id ? tab.id : '',
+              simpleModel: usesDedicatedCanvasTabViews(),
+              coverActive: getCanvasNav().isActive(view),
+              slateNavInProgress: false
+            })
+            if (!decision.arm) return
+            if (usesDedicatedCanvasTabViews()) {
+              // Simple tab model: predictive handler owns cover.
               return
             }
-            if (view._nucleusSlateNavigationInProgress) return
-            if (view._nucleusCanvasNavigationInProgress) return
-            if (canvasNavigationLoadPromise) return
-
-            const navpromise = waitForCanvasNavigation(view)
-            canvasNavigationLoadPromise = canvaspageload(view, status => {
-              mainwindow.webContents.send('canvas:navigation-finished', status)
-            })
-            coverCurrentCanvasNavigationWithSlate(mainwindow, view, navpromise).catch(error => {
-              console.error("Unable to cover Canvas navigation with slate:", error)
-            })
-            canvasNavigationLoadPromise.finally(() => {
-              canvasNavigationLoadPromise = null
-            })
+            void handleCanvasInPageLinkNavigation(mainwindow, tab, view, _url, 'wire_tab_did_start_nav')
           })
           view.webContents.on('did-navigate', (_event, url) => {
             tab.url = url
@@ -6318,9 +8894,7 @@ app.whenReady().then(() => {
               pushTabTitleFromView(mainwindow, view, tab)
               mainwindow.webContents.send('canvas:navigation-finished', 'done')
               revealCanvasView(view)
-              refreshCanvasPredictiveViews(mainwindow, tab).catch(error => {
-                console.error("Unable to refresh canvas predictive views after restore:", error)
-              })
+              scheduleCanvasPredictiveRefresh(mainwindow, tab)
             } else {
             const hasAuth = await ensureCanvasAuthForNavigation(view.webContents.session)
             if (!hasAuth) {
@@ -6336,11 +8910,11 @@ app.whenReady().then(() => {
                 revealCanvasView(view)
               })
             } else {
-              runCanvasSlateNavigation(mainwindow, view, () => {
+              runCanvasNavAction(mainwindow, tab, view, () => {
                 return loadCanvasTabURL(view, initialUrl, status => {
                   mainwindow.webContents.send('canvas:navigation-finished', status)
                 })
-              }).catch(error => {
+              }, { destUrl: initialUrl, reason: 'initial_tab_load' }).catch(error => {
                 console.error("Unable to load initial canvas tab URL:", error)
                 mainwindow.webContents.send('canvas:navigation-finished', 'fail')
                 revealCanvasView(view)
@@ -6479,5 +9053,7 @@ app.on('window-all-closed', () => {
 });
 
 app.on('will-quit', () => {
+  if (perfEvalServer) perfEvalServer.stop()
+  resourceGovernor.stop()
   globalShortcut.unregisterAll()
 })

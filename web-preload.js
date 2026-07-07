@@ -1,12 +1,7 @@
 // Generic web-view preload.
-// Functionality: notifies the main process whenever the page scrolls so the
-// render-context "screen" slice can be refreshed event-driven (on every y-scroll
-// change of the active tab) instead of on a fixed poll. Intercepts nucleus://
-// links so they stay inside the app instead of being handed to Windows.
-// Dependencies: main.js listens for the 'surface:scrolled' and
-// 'engine:internal-navigate' channels.
+// Intercepts nucleus:// links so they stay inside the app instead of being handed to Windows.
+// Dependencies: main.js listens for the 'engine:internal-navigate' channel.
 const { contextBridge, ipcRenderer } = require('electron')
-const { attachSurfaceScrollNotify } = require('./lib/surface-scroll-notify')
 
 function sendEngineOpenApp(app) {
   ipcRenderer.send('engine:open-app', app)
@@ -98,7 +93,6 @@ document.addEventListener('submit', event => {
   if (url) navigateInternal(url)
 }, true)
 
-attachSurfaceScrollNotify(window)
 
 try {
   ipcRenderer.send('engine:preload-ready')

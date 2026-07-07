@@ -18,7 +18,7 @@ from .paths import (
     default_report_path,
     default_snapshot_path,
 )
-from .students import StudentProfile, get_profile, holdout_profile
+from .students import StudentProfile, get_profile, harvard_profile, holdout_profile
 
 
 def _ground_truth_snapshots(snapshots: list[dict], gt_dir: Path) -> list[dict]:
@@ -134,11 +134,13 @@ def _build_report(results, aggregate: float, *, mode: str, target: float, label:
             'weekly_accuracy': round(weekly.accuracy, 4) if weekly and weekly.total else None,
             'weekly_matched': weekly.matched if weekly else 0,
             'weekly_total': weekly.total if weekly else 0,
+            'weekly_skipped_locked': weekly.skipped_locked if weekly else 0,
             'weekly_misses': weekly.misses if weekly else [],
             'sections': {
                 name: {
                     'matched': section.matched,
                     'total': section.total,
+                    'skipped_locked': section.skipped_locked,
                     'accuracy': round(section.accuracy, 4),
                     'misses': section.misses,
                 }
@@ -158,6 +160,16 @@ def _build_report(results, aggregate: float, *, mode: str, target: float, label:
 
 def main(argv: list[str] | None = None) -> int:
     root = Path(__file__).resolve().parents[2]
+
+    env_values = load_env_file(root / '.env')
+    fake_raw = os.environ.get('NUCLEUS_FAKE_DATE') or env_values.get('NUCLEUS_FAKE_DATE', '')
+    if fake_raw:
+        os.environ['NUCLEUS_FAKE_DATE'] = fake_raw
+    from canvas_parser.clock import install_clock_shim
+
+    clock_status = install_clock_shim()
+    if clock_status.get('active'):
+        print(f'NUCLEUS fake clock: {clock_status.get("fake_date")}', file=sys.stderr)
 
     if hasattr(sys.stdout, 'reconfigure'):
         sys.stdout.reconfigure(encoding='utf-8')
@@ -183,10 +195,27 @@ def main(argv: list[str] | None = None) -> int:
         action='store_true',
         help='Evaluate holdout ground truth (ground-truth/holdout/) without affecting main score',
     )
+    parser.add_argument(
+        '--harvard',
+        action='store_true',
+        help='Evaluate Harvard ground truth (ground-truth/harvard/) without affecting main score',
+    )
+    parser.add_argument(
+        '--include-locked',
+        action='store_true',
+        help='Include locked/unavailable Canvas items in weekly eval (default: skip them for --harvard)',
+    )
     args = parser.parse_args(argv)
 
     root = Path(args.root)
-    profile = holdout_profile(root) if args.holdout else get_profile(root, 'primary')
+    if args.holdout and args.harvard:
+        raise SystemExit('Use only one of --holdout or --harvard.')
+    if args.harvard:
+        profile = harvard_profile(root)
+    elif args.holdout:
+        profile = holdout_profile(root)
+    else:
+        profile = get_profile(root, 'primary')
     gt_dir = profile.ground_truth_dir
     default_snapshot = profile.snapshot_path
     default_report = profile.report_path
@@ -205,16 +234,17 @@ def main(argv: list[str] | None = None) -> int:
     try:
         snapshot_path = _resolve_snapshot_path(root, snapshot_arg, profile)
     except FileNotFoundError:
-        if args.holdout:
+        if args.holdout or args.harvard:
             fixture = profile.fixture_snapshot_path
             if fixture.is_file():
                 snapshot_path = fixture
             else:
                 course_ids = ' '.join(f'--course-id {cid}' for cid in profile.canvas_course_ids)
-                print(f'Holdout snapshot not found: {root / snapshot_arg}', file=sys.stderr)
+                profile_flag = '--harvard' if args.harvard else '--holdout'
+                print(f'{profile.name.title()} snapshot not found: {root / snapshot_arg}', file=sys.stderr)
                 print(
                     'Fetch with: python -m canvas_parser.weekly_iteration.fetch_snapshots '
-                    f'--holdout {course_ids} --enrich-pages',
+                    f'{profile_flag} {course_ids} --enrich-pages',
                     file=sys.stderr,
                 )
                 print(
@@ -241,7 +271,8 @@ def main(argv: list[str] | None = None) -> int:
         root_dir=root,
         use_llm_weekly=args.llm,
         weekly_only=True,
-        strict_weekly=args.holdout,
+        strict_weekly=args.holdout or args.harvard,
+        unlocked_only=args.harvard and not args.include_locked,
     )
 
     weekly_results = [
@@ -253,6 +284,8 @@ def main(argv: list[str] | None = None) -> int:
         if weekly_results else 0.0
     )
     report = _build_report(results, aggregate, mode=mode, target=args.target, label=report_label)
+    if args.harvard and not args.include_locked:
+        report['unlocked_only'] = True
 
     report_path = Path(report_arg)
     if not report_path.is_absolute():
@@ -267,8 +300,10 @@ def main(argv: list[str] | None = None) -> int:
         if weekly_accuracy is None:
             print(f"  {course['ground_truth_file']}: n/a")
             continue
+        skipped = course.get('weekly_skipped_locked') or 0
+        suffix = f', skipped {skipped} locked' if skipped else ''
         print(
             f"  {course['ground_truth_file']}: {weekly_accuracy * 100:.1f}% "
-            f"({course['weekly_matched']}/{course['weekly_total']})"
+            f"({course['weekly_matched']}/{course['weekly_total']}{suffix})"
         )
     return 0 if report['passed'] else 1

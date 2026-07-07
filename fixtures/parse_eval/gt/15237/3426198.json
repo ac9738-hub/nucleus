@@ -1,0 +1,615 @@
+{
+  "version": 1,
+  "courseId": "15237",
+  "fileId": "3426198",
+  "filename": "Lecture 18_developmental disorders_slides.pdf",
+  "expectedFileType": "lecture_slides",
+  "passPlan": {
+    "courseId": "15237",
+    "fileId": "3426198",
+    "filename": "Lecture 18_developmental disorders_slides.pdf",
+    "resolvedType": "lecture_slides",
+    "heuristicConfidence": 0.92,
+    "neededPasses": [
+      "extract_pages",
+      "heuristic_classify",
+      "llm_pass1",
+      "finalize"
+    ],
+    "skippedPasses": [
+      "llm_classify",
+      "llm_pass2"
+    ],
+    "estLlmCalls": 1,
+    "estRealisticLlmCalls": 1.0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "needed": true,
+        "reason": "Required local PDF/HTML extraction; no LLM.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "heuristic_classify",
+        "needed": true,
+        "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_classify",
+        "needed": false,
+        "reason": "Heuristic confidence 0.92 sufficient; skip flash classify call.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_pass1",
+        "needed": true,
+        "reason": "Type lecture_slides: pass1 extracts concepts=True, problems=True, events=False.",
+        "llmCall": true,
+        "estCostTier": "high"
+      },
+      {
+        "pass": "llm_pass2",
+        "needed": false,
+        "reason": "Type lecture_slides disables pass2 (single-pass type-specific or link-only profile).",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "finalize",
+        "needed": true,
+        "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+        "llmCall": false,
+        "estCostTier": "free"
+      }
+    ]
+  },
+  "passAudit": {
+    "plan": {
+      "courseId": "15237",
+      "fileId": "3426198",
+      "filename": "Lecture 18_developmental disorders_slides.pdf",
+      "resolvedType": "lecture_slides",
+      "heuristicConfidence": 0.92,
+      "neededPasses": [
+        "extract_pages",
+        "heuristic_classify",
+        "llm_pass1",
+        "finalize"
+      ],
+      "skippedPasses": [
+        "llm_classify",
+        "llm_pass2"
+      ],
+      "estLlmCalls": 1,
+      "estRealisticLlmCalls": 1.0,
+      "steps": [
+        {
+          "pass": "extract_pages",
+          "needed": true,
+          "reason": "Required local PDF/HTML extraction; no LLM.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "heuristic_classify",
+          "needed": true,
+          "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_classify",
+          "needed": false,
+          "reason": "Heuristic confidence 0.92 sufficient; skip flash classify call.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_pass1",
+          "needed": true,
+          "reason": "Type lecture_slides: pass1 extracts concepts=True, problems=True, events=False.",
+          "llmCall": true,
+          "estCostTier": "high"
+        },
+        {
+          "pass": "llm_pass2",
+          "needed": false,
+          "reason": "Type lecture_slides disables pass2 (single-pass type-specific or link-only profile).",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "finalize",
+          "needed": true,
+          "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+          "llmCall": false,
+          "estCostTier": "free"
+        }
+      ]
+    },
+    "actualType": "lecture_slides",
+    "deepseekPasses": 1,
+    "conceptCount": 75,
+    "detailCount": 22,
+    "totalLlmTokens": 0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "ran": true,
+        "useful": true,
+        "verdict": "required",
+        "note": "Local I/O; pages present means extract succeeded."
+      },
+      {
+        "pass": "heuristic_classify",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "Routed to lecture_slides (free)."
+      },
+      {
+        "pass": "llm_classify",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Skipped; heuristic confidence sufficient.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass1",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "No pass1 tool trace.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass2",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Correctly skipped: profile disables pass2, type-specific pass1 only, or no log_* tools.",
+        "tokens": 0
+      },
+      {
+        "pass": "finalize",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "logged_details promoted to concept details."
+      }
+    ],
+    "cutCandidates": [],
+    "recommendations": [
+      "Pass2 correctly skipped for this type/pass1 tool pattern."
+    ]
+  },
+  "passes": [
+    "extract_pages",
+    "heuristic_classify",
+    "teaching_units",
+    "type_structure",
+    "concept_candidates",
+    "problem_scan",
+    "detail_attach",
+    "reconcile"
+  ],
+  "buildMode": "template_multi_pass_offline",
+  "builtAt": "2026-07-01T22:49:37Z",
+  "concepts": [
+    {
+      "name": "Lecture 18_developmental disorders_slides",
+      "details": []
+    },
+    {
+      "name": "1878 - edward jenner (english physician)",
+      "details": []
+    },
+    {
+      "name": "1880 - louis pasteur, chickens, and cholerakey ideas",
+      "details": []
+    },
+    {
+      "name": "Problem 1",
+      "details": []
+    },
+    {
+      "name": "Problem 2",
+      "details": []
+    },
+    {
+      "name": "Problem 3",
+      "details": []
+    },
+    {
+      "name": "Problem 4",
+      "details": []
+    },
+    {
+      "name": "neurodevelopmental disorders",
+      "details": []
+    },
+    {
+      "name": "summary of last lecture",
+      "details": []
+    },
+    {
+      "name": "synaptic homeostasis equilibrates circuit firing",
+      "details": [
+        "– Broader and slower: synaptic homeostasis equilibrates circuit firing"
+      ]
+    },
+    {
+      "name": "outline for today",
+      "details": []
+    },
+    {
+      "name": "may share underlying causes / predispositions",
+      "details": []
+    },
+    {
+      "name": "types of dna mutations",
+      "details": []
+    },
+    {
+      "name": "genes, whole chromosomes",
+      "details": [
+        "Copy number variation (CNV): genes, whole chromosomes"
+      ]
+    },
+    {
+      "name": "deletioninsertion (duplication, repeat expansion)",
+      "details": []
+    },
+    {
+      "name": "substitution",
+      "details": []
+    },
+    {
+      "name": "causes of neurodevelopmental disorders include",
+      "details": []
+    },
+    {
+      "name": "genetics",
+      "details": []
+    },
+    {
+      "name": "can cause frame shift",
+      "details": []
+    },
+    {
+      "name": "trisomy 21",
+      "details": []
+    },
+    {
+      "name": "environment",
+      "details": []
+    },
+    {
+      "name": "may interact(gene x environment)",
+      "details": []
+    },
+    {
+      "name": "affects each individual differently",
+      "details": [
+        "• “Spectrum”: affects each individual differently"
+      ]
+    },
+    {
+      "name": "characteristics of autism",
+      "details": []
+    },
+    {
+      "name": "stephen wiltshire",
+      "details": []
+    },
+    {
+      "name": "daniel tammet",
+      "details": []
+    },
+    {
+      "name": "connectivity modelbrain activity",
+      "details": []
+    },
+    {
+      "name": "neurotypicalasd",
+      "details": []
+    },
+    {
+      "name": "autism diagnoses are increasing",
+      "details": []
+    },
+    {
+      "name": "autism recognized as diagnosis by american psychiatric association",
+      "details": [
+        "• 1980: Autism recognized as diagnosis by American Psychiatric Association"
+      ]
+    },
+    {
+      "name": "dsm iv expands definition of autism",
+      "details": [
+        "• 1994: DSM IV expands definition of autism"
+      ]
+    },
+    {
+      "name": "dsm v categorizes asperger’s, pdd-nos as autism (more kids)",
+      "details": [
+        "• 2013: DSM V categorizes Asperger’s, PDD-NOS as autism (more kids)"
+      ]
+    },
+    {
+      "name": "genetics of autism",
+      "details": []
+    },
+    {
+      "name": "campbell & wang, plos 2011",
+      "details": []
+    },
+    {
+      "name": "validated cnvsassociated with asd",
+      "details": [
+        "Red: validated CNVsassociated with ASD"
+      ]
+    },
+    {
+      "name": "origins of vaccines",
+      "details": []
+    },
+    {
+      "name": "milkmaids with cowpox = immune to smallpox",
+      "details": [
+        "●Observation: milkmaids with cowpox = immune to smallpox"
+      ]
+    },
+    {
+      "name": "maybe cowpox pustules confer protection against smallpox? (tested on 8-year-old)",
+      "details": [
+        "●Hypothesis: Maybe cowpox pustules confer protection against smallpox? (tested on 8-year-old)"
+      ]
+    },
+    {
+      "name": "rnasars-cov2x",
+      "details": []
+    },
+    {
+      "name": "autism generally diagnosed around age of mmr administration",
+      "details": [
+        "•Individual: autism generally diagnosed around age of MMR administration"
+      ]
+    },
+    {
+      "name": "autism rates rose as vaccination rates rose",
+      "details": [
+        "•Population: autism rates rose as vaccination rates rose"
+      ]
+    },
+    {
+      "name": "correlation is not causation",
+      "details": []
+    },
+    {
+      "name": "do vaccines cause autism?",
+      "details": [
+        "Logic and Inference: do vaccines cause autism?"
+      ]
+    },
+    {
+      "name": "highly effective",
+      "details": [
+        "•Population level: highly effective"
+      ]
+    },
+    {
+      "name": "herd immunity slows spread of infection",
+      "details": []
+    },
+    {
+      "name": "no immunity",
+      "details": []
+    },
+    {
+      "name": "infectedimmune not immune",
+      "details": []
+    },
+    {
+      "name": "fine, 1993",
+      "details": []
+    },
+    {
+      "name": "kindergarten vaccination rates, by county",
+      "details": []
+    },
+    {
+      "name": "no datameaslescomplete",
+      "details": []
+    },
+    {
+      "name": "reported measles cases(first six months 2019)",
+      "details": []
+    },
+    {
+      "name": "estimated vaccination rates(2010)",
+      "details": []
+    },
+    {
+      "name": "stretching and question break",
+      "details": []
+    },
+    {
+      "name": "vaccination is safe",
+      "details": []
+    },
+    {
+      "name": "impossible to test in randomized control study",
+      "details": []
+    },
+    {
+      "name": "conditions sharing symptomatic overlap with autism",
+      "details": [
+        "Syndromic autism: conditions sharing symptomatic overlap with autism"
+      ]
+    },
+    {
+      "name": "rett syndrome",
+      "details": []
+    },
+    {
+      "name": "genetics of rett syndrome",
+      "details": []
+    },
+    {
+      "name": "prenatal / infant lethal•girls (xmx): mosaic, survive",
+      "details": [
+        "•Boys (XMY): prenatal / infant lethal•Girls (XMX): mosaic, survive"
+      ]
+    },
+    {
+      "name": "severe neurodevelopmental defects",
+      "details": [
+        "•Duplications: severe neurodevelopmental defects"
+      ]
+    },
+    {
+      "name": "prenatal-postnatal",
+      "details": [
+        "Environment could be:-prenatal-postnatal"
+      ]
+    },
+    {
+      "name": "• defining “exposure” (recall, titers, diagnosis, treatment)• definition of autism",
+      "details": [
+        "Issues include: • defining “exposure” (recall, titers, diagnosis, treatment)• definition of autism"
+      ]
+    },
+    {
+      "name": "parallels to autism include",
+      "details": []
+    },
+    {
+      "name": "normal mousemouse born of infected dam",
+      "details": []
+    },
+    {
+      "name": "fetal gene expression",
+      "details": []
+    },
+    {
+      "name": "mounting evidence of immune dysregulation in asd",
+      "details": []
+    },
+    {
+      "name": "moonlighting proteins?",
+      "details": [
+        "Molecular pleiotropy: moonlighting proteins?"
+      ]
+    },
+    {
+      "name": "mhci-deficientwt",
+      "details": []
+    },
+    {
+      "name": "•mhciii (complement) proteins•microglia (brain’s resident macrophages)",
+      "details": [
+        "So do: •MHCIII (complement) proteins•Microglia (brain’s resident macrophages)"
+      ]
+    },
+    {
+      "name": "mhci-deficient",
+      "details": []
+    },
+    {
+      "name": "too much retraction",
+      "details": [
+        "Cav1.2 (Cacna1c)(Timothy syndrome):Too much retraction"
+      ]
+    },
+    {
+      "name": "mecp2(rett syndrome)impaired elimination",
+      "details": []
+    },
+    {
+      "name": "visual attention task",
+      "details": []
+    },
+    {
+      "name": "summary for today",
+      "details": []
+    },
+    {
+      "name": "affective, anxiety, and mood disorders",
+      "details": [
+        "NEXT LECTURE: AFFECTIVE, ANXIETY, AND MOOD DISORDERS"
+      ]
+    }
+  ],
+  "conceptCount": 75,
+  "detailCount": 22,
+  "events": [],
+  "problems": [
+    "Problem 1",
+    "Problem 2",
+    "Problem 3",
+    "Problem 4"
+  ],
+  "sections": [
+    "Causes of neurodevelopmental disorders include",
+    "1880 - Louis Pasteur, chickens, and choleraKey ideas",
+    "Problem 1",
+    "Problem 2",
+    "Problem 3",
+    "Problem 4",
+    "Parallels to autism include"
+  ],
+  "deepseekPasses": 1,
+  "expectsPass2": false,
+  "gtProvenance": {
+    "typeSource": "heuristic_high",
+    "typeConfidence": 0.92,
+    "offlinePassAudit": {
+      "extract_pages": {
+        "localPdf": true,
+        "pageCount": 61,
+        "pdfPath": "C:\\Allen\\nucleus\\canvasfiles\\3426198"
+      },
+      "heuristic_classify": {
+        "expectedFileType": "lecture_slides",
+        "source": "heuristic_high",
+        "confidence": 0.92
+      },
+      "teaching_units": {
+        "sectionCount": 7
+      },
+      "type_structure": {
+        "slideRows": 77,
+        "readingSections": 0,
+        "syllabusWeeks": 0
+      },
+      "concept_candidates": {
+        "candidateCount": 75
+      },
+      "problem_scan": {
+        "problemCount": 4
+      },
+      "detail_attach": {
+        "conceptKeysWithDetails": 25,
+        "detailCount": 25
+      },
+      "reconcile": {
+        "inputTitles": 75,
+        "accepted": 75,
+        "capped": 0,
+        "detailAttached": 22
+      }
+    },
+    "reconcileStats": {
+      "inputTitles": 75,
+      "accepted": 75,
+      "capped": 0,
+      "detailAttached": 22
+    }
+  }
+}

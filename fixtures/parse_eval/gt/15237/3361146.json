@@ -1,0 +1,390 @@
+{
+  "version": 1,
+  "courseId": "15237",
+  "fileId": "3361146",
+  "filename": "NEU201- Quiz 2 Review Session Jeopardy Game .pdf",
+  "expectedFileType": "review_sheet",
+  "passPlan": {
+    "courseId": "15237",
+    "fileId": "3361146",
+    "filename": "NEU201- Quiz 2 Review Session Jeopardy Game .pdf",
+    "resolvedType": "review_sheet",
+    "heuristicConfidence": 0.88,
+    "neededPasses": [
+      "extract_pages",
+      "heuristic_classify",
+      "llm_pass1",
+      "finalize"
+    ],
+    "skippedPasses": [
+      "llm_classify",
+      "llm_pass2"
+    ],
+    "estLlmCalls": 1,
+    "estRealisticLlmCalls": 1.0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "needed": true,
+        "reason": "Required local PDF/HTML extraction; no LLM.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "heuristic_classify",
+        "needed": true,
+        "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_classify",
+        "needed": false,
+        "reason": "Heuristic confidence 0.88 sufficient; skip flash classify call.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_pass1",
+        "needed": true,
+        "reason": "Type review_sheet: pass1 extracts concepts=True, problems=True, events=False.",
+        "llmCall": true,
+        "estCostTier": "high"
+      },
+      {
+        "pass": "llm_pass2",
+        "needed": false,
+        "reason": "Type review_sheet disables pass2 (single-pass type-specific or link-only profile).",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "finalize",
+        "needed": true,
+        "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+        "llmCall": false,
+        "estCostTier": "free"
+      }
+    ]
+  },
+  "passAudit": {
+    "plan": {
+      "courseId": "15237",
+      "fileId": "3361146",
+      "filename": "NEU201- Quiz 2 Review Session Jeopardy Game .pdf",
+      "resolvedType": "review_sheet",
+      "heuristicConfidence": 0.88,
+      "neededPasses": [
+        "extract_pages",
+        "heuristic_classify",
+        "llm_pass1",
+        "finalize"
+      ],
+      "skippedPasses": [
+        "llm_classify",
+        "llm_pass2"
+      ],
+      "estLlmCalls": 1,
+      "estRealisticLlmCalls": 1.0,
+      "steps": [
+        {
+          "pass": "extract_pages",
+          "needed": true,
+          "reason": "Required local PDF/HTML extraction; no LLM.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "heuristic_classify",
+          "needed": true,
+          "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_classify",
+          "needed": false,
+          "reason": "Heuristic confidence 0.88 sufficient; skip flash classify call.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_pass1",
+          "needed": true,
+          "reason": "Type review_sheet: pass1 extracts concepts=True, problems=True, events=False.",
+          "llmCall": true,
+          "estCostTier": "high"
+        },
+        {
+          "pass": "llm_pass2",
+          "needed": false,
+          "reason": "Type review_sheet disables pass2 (single-pass type-specific or link-only profile).",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "finalize",
+          "needed": true,
+          "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+          "llmCall": false,
+          "estCostTier": "free"
+        }
+      ]
+    },
+    "actualType": "review_sheet",
+    "deepseekPasses": 1,
+    "conceptCount": 31,
+    "detailCount": 2,
+    "totalLlmTokens": 0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "ran": true,
+        "useful": true,
+        "verdict": "required",
+        "note": "Local I/O; pages present means extract succeeded."
+      },
+      {
+        "pass": "heuristic_classify",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "Routed to review_sheet (free)."
+      },
+      {
+        "pass": "llm_classify",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Skipped; heuristic confidence sufficient.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass1",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "No pass1 tool trace.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass2",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Correctly skipped: profile disables pass2, type-specific pass1 only, or no log_* tools.",
+        "tokens": 0
+      },
+      {
+        "pass": "finalize",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "logged_details promoted to concept details."
+      }
+    ],
+    "cutCandidates": [],
+    "recommendations": [
+      "Pass2 correctly skipped for this type/pass1 tool pattern."
+    ]
+  },
+  "passes": [
+    "extract_pages",
+    "heuristic_classify",
+    "teaching_units",
+    "type_structure",
+    "concept_candidates",
+    "problem_scan",
+    "detail_attach",
+    "reconcile"
+  ],
+  "buildMode": "template_multi_pass_offline",
+  "builtAt": "2026-07-01T22:49:38Z",
+  "concepts": [
+    {
+      "name": "fields are found in what",
+      "details": []
+    },
+    {
+      "name": "terms of the receptive",
+      "details": []
+    },
+    {
+      "name": "motor neurons",
+      "details": []
+    },
+    {
+      "name": "Transduction of mechanical sound to neural signals occurs",
+      "details": []
+    },
+    {
+      "name": "jeopardy board",
+      "details": []
+    },
+    {
+      "name": "visionvision iichemosensesauditory/",
+      "details": []
+    },
+    {
+      "name": "final jeopardy",
+      "details": []
+    },
+    {
+      "name": "glutamate receptors",
+      "details": []
+    },
+    {
+      "name": "exposure reduces calcium levels, it triggers",
+      "details": []
+    },
+    {
+      "name": "center-surround receptive",
+      "details": []
+    },
+    {
+      "name": "retina, lgn, and layer ivc",
+      "details": []
+    },
+    {
+      "name": "lgn (conscious visual",
+      "details": [
+        "Major Target: LGN (conscious visual"
+      ]
+    },
+    {
+      "name": "explain convergence in",
+      "details": []
+    },
+    {
+      "name": "receptor potentials are a type of",
+      "details": []
+    },
+    {
+      "name": "smell comes up through mouth into nasal cavity",
+      "details": []
+    },
+    {
+      "name": "high frequencies are transduced",
+      "details": []
+    },
+    {
+      "name": "cochlea",
+      "details": []
+    },
+    {
+      "name": "auditory nervecochlear nucleus",
+      "details": []
+    },
+    {
+      "name": "contralateraldistal musclescorticospinal tract",
+      "details": []
+    },
+    {
+      "name": "upper motor neurons",
+      "details": []
+    },
+    {
+      "name": "motor cortex, brainstem - voluntary",
+      "details": []
+    },
+    {
+      "name": "movement- spinal interneurons",
+      "details": []
+    },
+    {
+      "name": "drg neurons, feedback about muscle",
+      "details": []
+    },
+    {
+      "name": "length",
+      "details": []
+    },
+    {
+      "name": "knee-jerk reflex",
+      "details": []
+    },
+    {
+      "name": "type topic here",
+      "details": [
+        "Topic: Type topic here"
+      ]
+    },
+    {
+      "name": "final",
+      "details": []
+    },
+    {
+      "name": "type question here",
+      "details": []
+    },
+    {
+      "name": "final jeopardy question",
+      "details": []
+    },
+    {
+      "name": "type answer here",
+      "details": []
+    },
+    {
+      "name": "final jeopardy answer",
+      "details": []
+    }
+  ],
+  "conceptCount": 31,
+  "detailCount": 2,
+  "events": [],
+  "problems": [],
+  "sections": [
+    "Receptor potentials are a type of",
+    "Transduction of mechanical sound to neural signals occurs",
+    "High frequencies are transduced"
+  ],
+  "deepseekPasses": 1,
+  "expectsPass2": false,
+  "gtProvenance": {
+    "typeSource": "heuristic_high",
+    "typeConfidence": 0.88,
+    "offlinePassAudit": {
+      "extract_pages": {
+        "localPdf": true,
+        "pageCount": 55,
+        "pdfPath": "C:\\Allen\\nucleus\\canvasfiles\\3361146"
+      },
+      "heuristic_classify": {
+        "expectedFileType": "review_sheet",
+        "source": "heuristic_high",
+        "confidence": 0.88
+      },
+      "teaching_units": {
+        "sectionCount": 3
+      },
+      "type_structure": {
+        "slideRows": 42,
+        "readingSections": 0,
+        "syllabusWeeks": 0
+      },
+      "concept_candidates": {
+        "candidateCount": 31
+      },
+      "problem_scan": {
+        "problemCount": 0
+      },
+      "detail_attach": {
+        "conceptKeysWithDetails": 2,
+        "detailCount": 2
+      },
+      "reconcile": {
+        "inputTitles": 31,
+        "accepted": 31,
+        "capped": 0,
+        "detailAttached": 2
+      }
+    },
+    "reconcileStats": {
+      "inputTitles": 31,
+      "accepted": 31,
+      "capped": 0,
+      "detailAttached": 2
+    }
+  }
+}

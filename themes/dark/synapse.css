@@ -20,8 +20,8 @@
 /* ----- Sidebar ----- */
 .synapse-sidebar {
   background:
-    radial-gradient(circle at 28% 0%, rgba(117, 103, 216, 0.14), transparent 36%),
-    linear-gradient(180deg, rgba(10, 16, 36, 0.92), rgba(4, 8, 22, 0.96));
+    radial-gradient(circle at 28% 0%, rgba(var(--accent-rgb), 0.14), transparent 36%),
+    linear-gradient(180deg, rgba(var(--surface-rgb), 0.92), rgba(var(--bg-rgb), 0.96));
   border: 1px solid var(--border);
   border-radius: 8px;
   display: flex;
@@ -53,9 +53,9 @@
 .synapse-brand-mark {
   background:
     radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.28), transparent 42%),
-    linear-gradient(135deg, #7567d8 0%, #55b89f 58%, #5aa9c8 100%);
+    var(--accent-gradient);
   border-radius: 8px;
-  box-shadow: 0 8px 18px rgba(117, 103, 216, 0.28);
+  box-shadow: 0 8px 18px rgba(var(--accent-rgb), 0.28);
   flex: 0 0 28px;
   height: 28px;
   width: 28px;
@@ -79,7 +79,7 @@
 
 .synapse-sidebar-toggle,
 .synapse-sidebar-rail {
-  background: rgba(21, 28, 52, 0.86);
+  background: rgba(var(--surface-2-rgb), 0.86);
   border: 1px solid var(--border);
   border-radius: 7px;
   color: var(--text-dim);
@@ -101,7 +101,7 @@
 .synapse-sidebar-toggle:focus-visible,
 .synapse-sidebar-rail:hover,
 .synapse-sidebar-rail:focus-visible {
-  border-color: rgba(117, 103, 216, 0.32);
+  border-color: rgba(var(--accent-rgb), 0.32);
   color: var(--text);
   outline: none;
 }
@@ -119,11 +119,11 @@
 
 .synapse-new-chat-button {
   align-items: center;
-  background: linear-gradient(135deg, rgba(117, 103, 216, 0.95), rgba(90, 169, 200, 0.88));
+  background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.95), rgba(var(--accent-2-rgb), 0.88));
   border: 0;
   border-radius: 999px;
-  box-shadow: 0 10px 24px rgba(117, 103, 216, 0.22);
-  color: #fff;
+  box-shadow: 0 10px 24px rgba(var(--accent-rgb), 0.22);
+  color: var(--text-on-accent);
   cursor: pointer;
   display: flex;
   font: inherit;
@@ -136,8 +136,8 @@
 }
 
 .synapse-new-chat-button:hover {
-  box-shadow: 0 12px 28px rgba(117, 103, 216, 0.3);
-  transform: translateY(-1px);
+  box-shadow: 0 12px 28px rgba(var(--accent-rgb), 0.3);
+  transform: none;
 }
 
 .synapse-new-chat-icon {
@@ -175,8 +175,8 @@
 }
 
 .synapse-history-item.is-active {
-  background: rgba(117, 103, 216, 0.14);
-  box-shadow: inset 0 0 0 1px rgba(117, 103, 216, 0.22);
+  background: rgba(var(--accent-rgb), 0.14);
+  box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), 0.22);
   color: var(--text);
 }
 
@@ -210,7 +210,7 @@
 
 /* ----- Chat panel ----- */
 .synapse-chat {
-  background: rgba(12, 18, 36, 0.72);
+  background: rgba(var(--surface-rgb), 0.72);
   border: 1px solid var(--border);
   border-radius: 8px;
   display: flex;
@@ -222,7 +222,7 @@
 
 .synapse-chat-header {
   align-items: flex-end;
-  background: rgba(4, 8, 22, 0.34);
+  background: rgba(var(--bg-rgb), 0.34);
   border-bottom: 1px solid var(--border);
   display: flex;
   gap: 24px;
@@ -249,7 +249,7 @@
 }
 
 .synapse-model-select select {
-  background: rgba(4, 8, 22, 0.72);
+  background: rgba(var(--bg-rgb), 0.72);
   border: 1px solid var(--border);
   border-radius: 999px;
   color: var(--text);
@@ -289,7 +289,7 @@
 
 .synapse-empty-hero {
   background:
-    radial-gradient(circle at 50% 20%, rgba(117, 103, 216, 0.2), transparent 40%),
+    radial-gradient(circle at 50% 20%, rgba(var(--accent-rgb), 0.2), transparent 40%),
     linear-gradient(145deg, rgba(14, 22, 48, 0.9), rgba(6, 10, 25, 0.94));
   border: 1px solid var(--border);
   border-radius: 13px;
@@ -301,11 +301,11 @@
 .synapse-empty-mark {
   background:
     radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.28), transparent 42%),
-    linear-gradient(135deg, #7567d8 0%, #55b89f 58%, #5aa9c8 100%);
+    var(--accent-gradient);
   border-radius: 50%;
   box-shadow:
-    0 0 28px rgba(117, 103, 216, 0.34),
-    0 0 52px rgba(90, 169, 200, 0.16);
+    0 0 28px rgba(var(--accent-rgb), 0.34),
+    0 0 52px rgba(var(--accent-2-rgb), 0.16);
   height: 56px;
   margin: 0 auto 16px;
   width: 56px;
@@ -372,10 +372,10 @@
 }
 
 .synapse-msg-user .synapse-msg-text {
-  background: linear-gradient(135deg, #7567d8, #596bc6);
+  background: var(--accent-gradient);
   border-color: transparent;
-  box-shadow: 0 8px 22px rgba(117, 103, 216, 0.18);
-  color: #fff;
+  box-shadow: 0 8px 22px rgba(var(--accent-rgb), 0.18);
+  color: var(--text-on-accent);
 }
 
 .synapse-msg-assistant .synapse-msg-text {
@@ -453,7 +453,7 @@
 }
 
 .synapse-composer:focus-within .synapse-composer-field {
-  border-color: rgba(117, 103, 216, 0.42);
+  border-color: rgba(var(--accent-rgb), 0.42);
 }
 
 .synapse-composer textarea {
@@ -474,11 +474,11 @@
 }
 
 .synapse-send-button {
-  background: linear-gradient(135deg, rgba(117, 103, 216, 0.95), rgba(90, 169, 200, 0.88));
+  background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.95), rgba(var(--accent-2-rgb), 0.88));
   border: 0;
   border-radius: 8px;
-  box-shadow: 0 8px 20px rgba(117, 103, 216, 0.2);
-  color: #fff;
+  box-shadow: 0 8px 20px rgba(var(--accent-rgb), 0.2);
+  color: var(--text-on-accent);
   cursor: pointer;
   flex: 0 0 auto;
   font: inherit;
@@ -490,7 +490,7 @@
 
 .synapse-send-button:hover:not(:disabled) {
   filter: brightness(1.06);
-  transform: translateY(-1px);
+  transform: none;
 }
 
 .synapse-send-button:disabled {

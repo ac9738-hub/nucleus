@@ -208,6 +208,45 @@ function getThemeRuntime(rootDir) {
   };
 }
 
+function buildCanvasSlateThemeCss(rootDir) {
+  const { activeTheme } = getThemeSelection(rootDir);
+  const palette = getThemePalette(rootDir);
+  const colorScheme = getThemeColorScheme(rootDir);
+  const canvas = getCanvasThemeConfig(rootDir);
+  const slateCss = readThemeCss(rootDir, `themes/${activeTheme}/slate.css`, "");
+  const varsCss = buildThemeVarsCss(palette, colorScheme);
+  const gradient = canvas.criticalGradient
+    || palette["canvas-gradient"]
+    || "linear-gradient(135deg, #0c1224 0%, #050916 100%)";
+  const surface = palette.surface || palette.bg || "#050916";
+  const bridgeCss = `
+:root {
+  --slate-fill: ${gradient};
+}
+html, body {
+  background: transparent !important;
+}
+.slate {
+  background-color: ${surface};
+  background-image: ${gradient};
+}
+`;
+  return `${varsCss}\n${bridgeCss}\n${slateCss}`;
+}
+
+function buildCanvasCoverSlateUrl(rootDir) {
+  const palette = getThemePalette(rootDir);
+  const canvas = getCanvasThemeConfig(rootDir);
+  const gradient = canvas.criticalGradient
+    || palette["canvas-gradient"]
+    || "linear-gradient(135deg, #0c1224 0%, #050916 100%)";
+  const surface = palette.surface || palette.bg || "#050916";
+  const css = buildCanvasSlateThemeCss(rootDir);
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${css}
+html,body{margin:0;height:100%;background:${surface};background-image:${gradient}}</style></head><body></body></html>`;
+  return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
+}
+
 module.exports = {
   getThemeSelection,
   getRendererStylesheets,
@@ -215,6 +254,8 @@ module.exports = {
   getThemePalette,
   getThemeColorScheme,
   buildThemeVarsCss,
+  buildCanvasSlateThemeCss,
+  buildCanvasCoverSlateUrl,
   getThemeRuntime,
   readThemeCss,
   getStoredTheme,

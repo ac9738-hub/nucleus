@@ -1,8 +1,16 @@
 // Task ranking helper.
 // Functionality: scores tasks from due date, grade weight, effort, dependencies,
 // and task type; renderer/render.js uses it to order task cards.
-// Dependencies: browser global window.TaskOptimizer or CommonJS module export.
-const StudySections = require('./study-sections');
+// Dependencies: browser global window.StudySections (study-sections.js) or CommonJS in tests.
+function getStudySectionsHelper() {
+  if (typeof window !== "undefined" && window.StudySections) {
+    return window.StudySections;
+  }
+  if (typeof require !== "undefined") {
+    return require("./study-sections");
+  }
+  return null;
+}
 const Config = {
   K_BASE: 0.25,
   K_SCALE: 0.80,
@@ -218,7 +226,8 @@ function zeroScore(task) {
 
 function getStudyProgressStats(task, taskType) {
   if (!isStudyTask(task, taskType)) return null;
-  return StudySections.getStudyProgressStats(task);
+  const helper = getStudySectionsHelper();
+  return helper ? helper.getStudyProgressStats(task) : null;
 }
 
 function calcPriority(task, cfg = Config) {

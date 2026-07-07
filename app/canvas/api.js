@@ -15,14 +15,34 @@ const {
   buildWeeklyScheduleFromCanvasData
 } = require('./weekly-schedule')
 const { buildStudySectionsFromTask } = require('../../study-sections')
+const {
+  resolveGraphReadPath,
+  isGraphTooLargeForNode
+} = require('../../lib/canvas-graph-read')
+const {
+  canvasDiskRecoveryEnabled,
+  canvasMemoryCacheEnabled,
+  parserDiskRecoveryEnabled
+} = require('../../lib/canvas-cache-policy')
+const {
+  archiveLiveGraph,
+  unwireLiveGraphIfNeeded
+} = require('../../lib/parser-graph-archive')
+
+const LAMBDA_PARSER_PLACEMENTS = new Set([
+  'local_download_lambda_parse',
+  'lambda_download_parse'
+])
+const DEFAULT_PARSER_PLACEMENT = 'local_download_lambda_parse'
+const PARSER_DONE_MARKER = 'parser all passes completed__________________________________________________'
 
 // Project root, used to resolve the active theme palette for saved homepages.
 const THEME_ROOT = path.join(__dirname, '..', '..')
 
 const RESOURCE_LIMITS = {
-  MAX_PAGINATION_PAGES: Number(process.env.CANVAS_MAX_PAGINATION_PAGES || 50),
-  MAX_PAGINATION_ITEMS: Number(process.env.CANVAS_MAX_PAGINATION_ITEMS || 5000),
-  MAX_PAGE_BODY_FETCHES: Number(process.env.CANVAS_MAX_PAGE_BODY_FETCHES || 250),
+  MAX_PAGINATION_PAGES: Number(process.env.CANVAS_MAX_PAGINATION_PAGES || 80),
+  MAX_PAGINATION_ITEMS: Number(process.env.CANVAS_MAX_PAGINATION_ITEMS || 8000),
+  MAX_PAGE_BODY_FETCHES: Number(process.env.CANVAS_MAX_PAGE_BODY_FETCHES || 400),
   MAX_PARSER_BATCH_ITEMS: Number(process.env.PARSER_MAX_BATCH_ITEMS || 50),
   CANVAS_FETCH_TIMEOUT_MS: Number(process.env.CANVAS_FETCH_TIMEOUT_MS || 60000),
   PARSER_TASK_REFRESH_MS: Number(process.env.PARSER_TASK_REFRESH_MS || 2000),
@@ -55,7 +75,7 @@ function canvasFetchOptions(extra = {}) {
   return options
 }
 
-const canvasCourseColors = ["#1d9e75", "#378add", "#7f77dd", "#d85a30", "#d4537e", "#c58d35"]
+const canvasCourseColors = ["#0374B5", "#8B1C62", "#E67E22", "#27AE60", "#8E44AD", "#C0392B", "#16A085", "#2980B9"]
 
 function sleepSync(ms) {
   const end = Date.now() + ms
@@ -63,6 +83,9 @@ function sleepSync(ms) {
 }
 
 function readJsonFileWithRetry(filePath, attempts = 3, delayMs = 100) {
+  if (isGraphTooLargeForNode(filePath)) {
+    throw new Error(`Refusing to read oversized JSON in Node (${filePath}); use canvas_graph_tasks.json sidecar`)
+  }
   let lastError = null
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     try {
@@ -81,6 +104,58 @@ function readJsonFileWithRetry(filePath, attempts = 3, delayMs = 100) {
 let parserProc = null
 let parserAuthSignature = null
 let canvasSetupInProgress = null
+let parserAllPassesCompleted = false
+const parserCompletionWaiters = []
+let parserBatchQueue = []
+let canSendParserBatch = () => true
+let onParserBatchQueueChange = null
+let activeFlushParserBatchQueue = null
+let parserTaskRefreshTimer = null
+let parserTaskRefreshRestartVector = false
+let canvasSyncWipePending = false
+let canvasDiskReadsBlockedFn = () => false
+
+function setCanvasDiskReadBlock(checkFn) {
+  canvasDiskReadsBlockedFn = typeof checkFn === 'function' ? checkFn : () => false
+}
+
+function notifyParserBatchQueueChange() {
+  if (onParserBatchQueueChange) onParserBatchQueueChange(parserBatchQueue.length)
+}
+
+function setParserBatchGate(options = {}) {
+  if (typeof options.canSend === 'function') {
+    canSendParserBatch = options.canSend
+  }
+  if (typeof options.onQueueChange === 'function') {
+    onParserBatchQueueChange = options.onQueueChange
+  }
+  if (activeFlushParserBatchQueue) activeFlushParserBatchQueue()
+}
+
+function notifyParserAllPassesCompleted() {
+  parserAllPassesCompleted = true
+  const waiters = parserCompletionWaiters.splice(0)
+  waiters.forEach(resolve => resolve())
+}
+
+function waitForParserAllPasses(timeoutMs = 4 * 60 * 60 * 1000) {
+  if (parserAllPassesCompleted) {
+    return Promise.resolve()
+  }
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      const index = parserCompletionWaiters.indexOf(onDone)
+      if (index >= 0) parserCompletionWaiters.splice(index, 1)
+      reject(new Error(`Parser did not finish within ${timeoutMs}ms`))
+    }, timeoutMs)
+    function onDone() {
+      clearTimeout(timer)
+      resolve()
+    }
+    parserCompletionWaiters.push(onDone)
+  })
+}
 
 function decodeHtmlEntities(text) {
   const entities = {
@@ -117,6 +192,57 @@ function stripHtmlToText(value) {
     .replace(/\n\s+/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim()
+}
+
+function isIgnorableCanvasFetchError(error) {
+  const message = String(error && error.message ? error.message : error).toLowerCase()
+  return (
+    /\b403\b/.test(message) ||
+    /\b404\b/.test(message) ||
+    message.includes('forbidden') ||
+    message.includes('not found') ||
+    message.includes('not authorized') ||
+    message.includes('unauthorized') ||
+    message.includes('access denied') ||
+    message.includes('insufficient permissions')
+  )
+}
+
+function filterCoursesForSync(courses) {
+  if (!Array.isArray(courses)) return []
+  return courses.filter(course => {
+    if (!course || course.id == null) return false
+    if (course.workflow_state === 'deleted') return false
+    if (course.access_restricted_by_date === true) return false
+    return true
+  })
+}
+
+function coursesWithWikiHomepage(courses) {
+  return filterCoursesForSync(courses).filter(course => course.default_view === 'wiki')
+}
+
+function buildSyllabusBucketFromCourse(course) {
+  if (!course || course.id == null) return null
+  const syllabusBody = course.syllabus_body || ''
+  const syllabusText = stripHtmlToText(syllabusBody)
+  if (!syllabusText) return null
+  return {
+    id: course.id,
+    name: course.name || course.course_code || '',
+    html_url: course.html_url || '',
+    syllabus_body: syllabusBody,
+    syllabus_text: syllabusText
+  }
+}
+
+function extractSyllabiFromCourses(courses) {
+  const buckets = {}
+  filterCoursesForSync(courses).forEach(course => {
+    const entry = buildSyllabusBucketFromCourse(course)
+    if (entry) buckets[course.id] = entry
+  })
+  return buckets
 }
 
 function formatEnvValue(value) {
@@ -162,7 +288,34 @@ function clearCanvasAuthFromEnv(envPath, keys = CANVAS_AUTH_ENV_KEYS) {
   fs.writeFileSync(envPath, nextLines.join('\n'))
 }
 
+function cancelParserTaskRefresh() {
+  if (parserTaskRefreshTimer) {
+    clearTimeout(parserTaskRefreshTimer)
+    parserTaskRefreshTimer = null
+  }
+  parserTaskRefreshRestartVector = false
+}
+
+function clearParserBatchQueue() {
+  if (!parserBatchQueue.length) return
+  parserBatchQueue = []
+  notifyParserBatchQueueChange()
+}
+
+function beginCanvasSyncWipe() {
+  canvasSyncWipePending = true
+  cancelParserTaskRefresh()
+  clearParserBatchQueue()
+  killParserProcess()
+  invalidateWeeklyScheduleCache()
+}
+
+function endCanvasSyncWipe() {
+  canvasSyncWipePending = false
+}
+
 function killParserProcess() {
+  cancelParserTaskRefresh()
   if (!parserProc || parserProc.killed) {
     parserProc = null
     parserAuthSignature = null
@@ -171,6 +324,30 @@ function killParserProcess() {
   parserProc.kill()
   parserProc = null
   parserAuthSignature = null
+}
+
+function forceFlushParserBatchQueue() {
+  if (!activeFlushParserBatchQueue) return
+  const allow = canSendParserBatch
+  canSendParserBatch = () => true
+  try {
+    activeFlushParserBatchQueue()
+  } finally {
+    canSendParserBatch = allow
+  }
+}
+
+function scheduleCanvasTasksRefresh(restartVector, rootDir, onCanvasTasks) {
+  if (canvasSyncWipePending) return
+  parserTaskRefreshRestartVector = restartVector || parserTaskRefreshRestartVector
+  if (parserTaskRefreshTimer) return
+  parserTaskRefreshTimer = setTimeout(() => {
+    parserTaskRefreshTimer = null
+    if (canvasSyncWipePending) return
+    const restart = parserTaskRefreshRestartVector
+    parserTaskRefreshRestartVector = false
+    onCanvasTasks(make_canvas_tasks(rootDir), { restartVector: restart })
+  }, RESOURCE_LIMITS.PARSER_TASK_REFRESH_MS)
 }
 
 function parseCanvasDate(value) {
@@ -494,14 +671,11 @@ function findCanvasAssignment(lookup, courseid, assignment) {
 }
 
 function readCanvasGraphFromRoot(rootDir) {
-  const parsedStatePath = path.join(rootDir, 'canvas_graph.json')
-  if (!fs.existsSync(parsedStatePath)) {
-    return {}
-  }
-
+  if (!canvasDiskRecoveryEnabled()) return {}
   try {
-    const raw = fs.readFileSync(parsedStatePath, 'utf8')
-    return raw.trim() ? JSON.parse(raw) : {}
+    const readPath = resolveGraphReadPath(rootDir)
+    if (!readPath) return {}
+    return readJsonFileWithRetry(readPath) || {}
   } catch (error) {
     console.error('Unable to read Canvas graph for weekly schedule:', error)
     return {}
@@ -734,7 +908,7 @@ function adaptPythonWeeklySchedule(pythonSchedules, canvasData, rootDir) {
 function buildWeeklyScheduleViaPython(canvasData, rootDir) {
   const graphPath = path.join(rootDir, 'canvas_graph.json')
   const args = ['-m', 'canvas_parser.weekly', '--canvas-data', '-']
-  if (fs.existsSync(graphPath)) {
+  if (canvasDiskRecoveryEnabled() && fs.existsSync(graphPath)) {
     args.push('--graph', graphPath)
   } else {
     args.push('--no-graph')
@@ -745,7 +919,8 @@ function buildWeeklyScheduleViaPython(canvasData, rootDir) {
     encoding: 'utf8',
     maxBuffer: 50 * 1024 * 1024,
     timeout: 120000,
-    windowsHide: true
+    windowsHide: true,
+    env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
   })
   if (proc.error) {
     throw proc.error
@@ -762,7 +937,7 @@ function buildWeeklyScheduleViaPython(canvasData, rootDir) {
 function buildWeeklyScheduleViaPythonAsync(canvasData, rootDir) {
   const graphPath = path.join(rootDir, 'canvas_graph.json')
   const args = ['-m', 'canvas_parser.weekly', '--canvas-data', '-']
-  if (fs.existsSync(graphPath)) {
+  if (canvasDiskRecoveryEnabled() && fs.existsSync(graphPath)) {
     args.push('--graph', graphPath)
   } else {
     args.push('--no-graph')
@@ -771,12 +946,13 @@ function buildWeeklyScheduleViaPythonAsync(canvasData, rootDir) {
     const proc = spawn('python', args, {
       cwd: rootDir,
       stdio: ['pipe', 'pipe', 'pipe'],
-      windowsHide: true
+      windowsHide: true,
+      env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
     })
     let stdout = ''
     let stderr = ''
-    proc.stdout.on('data', chunk => { stdout += chunk.toString() })
-    proc.stderr.on('data', chunk => { stderr += chunk.toString() })
+    proc.stdout.on('data', chunk => { stdout += chunk.toString('utf8') })
+    proc.stderr.on('data', chunk => { stderr += chunk.toString('utf8') })
     proc.on('error', reject)
     proc.on('close', code => {
       if (code !== 0) {
@@ -867,6 +1043,7 @@ async function buildWeeklyScheduleAsync(canvasData, rootDir) {
 }
 
 function scheduleWeeklyScheduleBuild(canvasData, rootDir, canvasDataPath, onReady) {
+  if (!canvasMemoryCacheEnabled()) return
   const key = weeklyScheduleCacheKey(rootDir, canvasDataPath)
   if (weeklyScheduleCache.key === key && weeklyScheduleCache.schedule) {
     return
@@ -906,16 +1083,32 @@ function buildWeeklySchedule(canvasData, rootDir) {
 }
 
 function make_canvas_tasks(rootDir) {
-  const parsedStatePath = path.join(rootDir, 'canvas_graph.json')
-  if (!fs.existsSync(parsedStatePath)) {
-    return []
-  }
-
-  let allCanvasNodes = {}
   try {
-    allCanvasNodes = readJsonFileWithRetry(parsedStatePath) || {}
+    const readPath = resolveGraphReadPath(rootDir)
+    if (!readPath) return []
+    const allCanvasNodes = readJsonFileWithRetry(readPath) || {}
+    return makeCanvasTasksFromGraph(rootDir, allCanvasNodes)
   } catch (error) {
     console.error("Unable to read parsed Canvas task state:", error)
+    return []
+  }
+}
+
+async function make_canvas_tasks_async(rootDir) {
+  try {
+    const readPath = resolveGraphReadPath(rootDir)
+    if (!readPath) return []
+    const raw = await fs.promises.readFile(readPath, 'utf8')
+    const allCanvasNodes = raw.trim() ? JSON.parse(raw) : {}
+    return makeCanvasTasksFromGraph(rootDir, allCanvasNodes)
+  } catch (error) {
+    console.error("Unable to read parsed Canvas task state:", error)
+    return []
+  }
+}
+
+function makeCanvasTasksFromGraph(rootDir, allCanvasNodes) {
+  if (!allCanvasNodes || typeof allCanvasNodes !== 'object') {
     return []
   }
   const canvasSyllabi = allCanvasNodes.syllabi || {}
@@ -1044,23 +1237,94 @@ function make_canvas_tasks(rootDir) {
   return tasks
 }
 
-function getParserProcess(authState, rootDir, onCanvasTasks) {
+function resolveParserPlacement() {
+  const raw = String(process.env.PARSER_PLACEMENT || DEFAULT_PARSER_PLACEMENT).trim().toLowerCase().replace(/-/g, '_')
+  if (raw === 'local_subprocess' || raw === 'parser_py' || raw === 'local') {
+    return 'local_subprocess'
+  }
+  return raw
+}
+
+function usesLambdaParserPlacement(placement = resolveParserPlacement()) {
+  return LAMBDA_PARSER_PLACEMENTS.has(placement)
+}
+
+function attachParserProcessHandlers(proc, rootDir, onCanvasTasks) {
+  let stdoutBuffer = ''
+  let handledCompletion = false
+
+  proc.on('error', error => {
+    console.error('parser process error:', error && error.message ? error.message : error)
+  })
+  proc.on('exit', (code, signal) => {
+    if (code !== 0 && code !== null) {
+      console.error(`parser exited with code ${code}${signal ? ` signal ${signal}` : ''}`)
+    }
+  })
+  proc.stdout.on('data', chunk => {
+    const text = chunk.toString('utf8')
+    stdoutBuffer += text
+    const lines = stdoutBuffer.split(/\r?\n/)
+    stdoutBuffer = lines.pop() || ''
+    for (const line of lines) {
+      const trimmed = line.trim()
+      if (
+        trimmed.includes('parser.py main is running')
+        || trimmed.includes('parser app parse:')
+        || trimmed.includes('parser all passes completed')
+        || trimmed.startsWith('parser download-only prefetch completed')
+      ) {
+        console.log(`[canvas] ${trimmed}`)
+      }
+      if (trimmed.startsWith('parser task update assignment')) {
+        scheduleCanvasTasksRefresh(false, rootDir, onCanvasTasks)
+      }
+      if (trimmed === 'parser local summaries completed__________________________________________________') {
+        scheduleCanvasTasksRefresh(false, rootDir, onCanvasTasks)
+      }
+      if (trimmed === PARSER_DONE_MARKER && !handledCompletion) {
+        handledCompletion = true
+        notifyParserAllPassesCompleted()
+        scheduleCanvasTasksRefresh(true, rootDir, onCanvasTasks)
+      }
+    }
+  })
+  proc.stderr.on('data', chunk => {
+    console.error('parser:', chunk.toString('utf8'))
+  })
+  proc.on('close', () => {
+    parserProc = null
+    parserAuthSignature = null
+  })
+}
+
+function getParserProcess(authState, rootDir, onCanvasTasks, options = {}) {
   const authSignature = JSON.stringify({
     cookie: authState.canvasAuthCookie || '',
     csrf: authState.canvasAuthCsrf || '',
     baseUrl: authState.canvasBaseUrl || ''
   })
 
-  if (parserProc && !parserProc.killed && parserAuthSignature === authSignature) {
-    return parserProc
+  const freshSync = Boolean(options.freshSync)
+  const skipParserDisk = !parserDiskRecoveryEnabled() || freshSync
+
+  if (freshSync && parserProc && !parserProc.killed) {
+    parserProc.kill()
+    parserProc = null
+    parserAuthSignature = null
   }
 
-  if (parserProc && !parserProc.killed) {
+  if (parserProc && !parserProc.killed && parserAuthSignature !== authSignature) {
     parserProc.kill()
     parserProc = null
   }
 
-  parserProc = spawn('python', [path.join(rootDir, "parser.py")], {
+  if (parserProc && !parserProc.killed && parserAuthSignature === authSignature) {
+    return parserProc
+  }
+
+  parserAllPassesCompleted = false
+  parserProc = spawn('python', [path.join(rootDir, 'parser.py')], {
     cwd: rootDir,
     env: {
       ...process.env,
@@ -1068,93 +1332,155 @@ function getParserProcess(authState, rootDir, onCanvasTasks) {
       PYTHONUNBUFFERED: '1',
       CANVAS_AUTH_COOKIE: authState.canvasAuthCookie || '',
       CANVAS_AUTH_CSRF: authState.canvasAuthCsrf || '',
-      CANVAS_BASE_URL: authState.canvasBaseUrl || ''
+      CANVAS_BASE_URL: authState.canvasBaseUrl || '',
+      PARSER_SKIP_DISK_RESUME: skipParserDisk ? '1' : '',
+      PARSER_SKIP_EMBEDDING_CACHE: parserDiskRecoveryEnabled() ? '' : '1',
+      PARSER_PDF_CACHE: parserDiskRecoveryEnabled() ? (process.env.PARSER_PDF_CACHE || '1') : '0',
+      NUCLEUS_DISABLE_CANVAS_DISK_RECOVERY: canvasDiskRecoveryEnabled() ? '' : '1'
     }
   })
-  let stdoutBuffer = ''
-  let handledCompletion = false
-  let taskRefreshTimer = null
-  let taskRefreshRestartVector = false
-
-  function scheduleCanvasTasksRefresh(restartVector = false) {
-    taskRefreshRestartVector = restartVector || taskRefreshRestartVector
-    if (taskRefreshTimer) return
-    taskRefreshTimer = setTimeout(() => {
-      taskRefreshTimer = null
-      const restart = taskRefreshRestartVector
-      taskRefreshRestartVector = false
-      onCanvasTasks(make_canvas_tasks(rootDir), { restartVector: restart })
-    }, RESOURCE_LIMITS.PARSER_TASK_REFRESH_MS)
-  }
-
-  parserProc.on('error', error => {
-    console.error('parser process error:', error && error.message ? error.message : error)
-  })
-  parserProc.on('exit', (code, signal) => {
-    if (code !== 0 && code !== null) {
-      console.error(`parser exited with code ${code}${signal ? ` signal ${signal}` : ''}`)
-    }
-  })
-  parserProc.stdout.on('data', chunk => {
-    const text = chunk.toString('utf8')
-    console.log(text)
-    stdoutBuffer += text
-    const lines = stdoutBuffer.split(/\r?\n/)
-    stdoutBuffer = lines.pop() || ''
-    for (const line of lines) {
-      const trimmed = line.trim()
-      if (trimmed.startsWith("parser task update assignment")) {
-        scheduleCanvasTasksRefresh(false)
-      }
-      if (trimmed === "parser local summaries completed__________________________________________________") {
-        scheduleCanvasTasksRefresh(false)
-      }
-      if (trimmed === "parser all passes completed__________________________________________________" && !handledCompletion) {
-        handledCompletion = true
-        scheduleCanvasTasksRefresh(true)
-      }
-    }
-  })
-  parserProc.stderr.on('data', chunk => {
-    console.error('parser:', chunk.toString('utf8'))
-  })
-  parserProc.on('close', () => {
-    parserProc = null
-    parserAuthSignature = null
-  })
+  attachParserProcessHandlers(parserProc, rootDir, onCanvasTasks)
 
   parserAuthSignature = authSignature
+  console.log(`[canvas] Local parser subprocess started (pid=${parserProc.pid})`)
   return parserProc
 }
 
-function createCanvasApi({ canvasDataPath, getAuthState, sendCanvasDataUpdate, rootDir, onCanvasTasks = () => {} }) {
+function startLambdaParserProcess(authState, rootDir, onCanvasTasks, options = {}) {
+  const authSignature = JSON.stringify({
+    cookie: authState.canvasAuthCookie || '',
+    csrf: authState.canvasAuthCsrf || '',
+    baseUrl: authState.canvasBaseUrl || ''
+  })
+
+  const freshSync = Boolean(options.freshSync)
+  const placement = resolveParserPlacement()
+
+  if (freshSync && parserProc && !parserProc.killed) {
+    parserProc.kill()
+    parserProc = null
+    parserAuthSignature = null
+  }
+
+  if (parserProc && !parserProc.killed && parserAuthSignature !== authSignature) {
+    parserProc.kill()
+    parserProc = null
+  }
+
+  if (parserProc && !parserProc.killed && parserAuthSignature === authSignature) {
+    return parserProc
+  }
+
+  archiveLiveGraph(rootDir)
+  parserAllPassesCompleted = false
+  onCanvasTasks([], { restartVector: false })
+  const timeoutSec = Number(process.env.PARSER_TIMEOUT_SEC || 7200)
+  parserProc = spawn('python', [
+    '-m', 'canvas_parser.parse.app_parse',
+    '--from-canvas-data',
+    '--placement', placement,
+    '--timeout', String(timeoutSec)
+  ], {
+    cwd: rootDir,
+    env: {
+      ...process.env,
+      PYTHONIOENCODING: 'utf-8',
+      PYTHONUNBUFFERED: '1',
+      CANVAS_AUTH_COOKIE: authState.canvasAuthCookie || '',
+      CANVAS_AUTH_CSRF: authState.canvasAuthCsrf || '',
+      CANVAS_BASE_URL: authState.canvasBaseUrl || '',
+      PARSER_PLACEMENT: placement,
+      PARSER_TIMEOUT_SEC: String(timeoutSec),
+      PARSER_SKIP_DISK_RESUME: '1',
+      PARSER_SKIP_EMBEDDING_CACHE: '1',
+      PARSER_PDF_CACHE: parserDiskRecoveryEnabled() ? (process.env.PARSER_PDF_CACHE || '1') : '0',
+      NUCLEUS_DISABLE_CANVAS_DISK_RECOVERY: canvasDiskRecoveryEnabled() ? '' : '1'
+    }
+  })
+  attachParserProcessHandlers(parserProc, rootDir, onCanvasTasks)
+
+  parserAuthSignature = authSignature
+  console.log(`[canvas] Lambda parser started (placement=${placement}, pid=${parserProc.pid})`)
+  return parserProc
+}
+
+function createCanvasApi({ canvasDataPath, getAuthState, sendCanvasDataUpdate, rootDir, onCanvasTasks = () => {}, shouldBlockCanvasDiskReads = () => false }) {
+  setCanvasDiskReadBlock(shouldBlockCanvasDiskReads)
   const canvasRootDir = rootDir || path.resolve(__dirname, '..', '..')
+  if (usesLambdaParserPlacement()) {
+    unwireLiveGraphIfNeeded(canvasRootDir)
+  }
   const envPath = path.join(canvasRootDir, '.env')
-  function readCanvasData() {
+  let parsedCanvasCache = { mtimeMs: null, data: null }
+  let liveCanvasDataSnapshot = null
+
+  function setLiveCanvasDataSnapshot(data) {
+    liveCanvasDataSnapshot = data ? JSON.parse(JSON.stringify(data)) : null
+  }
+
+  function clearLiveCanvasSession() {
+    liveCanvasDataSnapshot = null
+    invalidateCanvasDataCache()
+    invalidateWeeklyScheduleCache()
+  }
+
+  function invalidateCanvasDataCache() {
+    parsedCanvasCache = { mtimeMs: null, data: null }
+  }
+
+  function readParsedCanvasData() {
+    if (!canvasDiskRecoveryEnabled()) {
+      return liveCanvasDataSnapshot
+    }
+    if (shouldBlockCanvasDiskReads()) {
+      invalidateCanvasDataCache()
+      return null
+    }
     if (!fs.existsSync(canvasDataPath)) {
+      invalidateCanvasDataCache()
       return null
     }
 
     try {
-      const raw = fs.readFileSync(canvasDataPath, 'utf8')
-      if (!raw.trim()) return null
-      const data = JSON.parse(raw)
-      const key = weeklyScheduleCacheKey(canvasRootDir, canvasDataPath)
-      if (weeklyScheduleCache.key === key && weeklyScheduleCache.schedule) {
-        data.weekly_schedule = weeklyScheduleCache.schedule
-      } else {
-        data.weekly_schedule = weeklyScheduleCache.schedule || {}
-        scheduleWeeklyScheduleBuild(data, canvasRootDir, canvasDataPath, sendCanvasDataUpdate)
+      const stat = fs.statSync(canvasDataPath)
+      if (parsedCanvasCache.mtimeMs === stat.mtimeMs && parsedCanvasCache.data) {
+        return parsedCanvasCache.data
       }
+      const raw = fs.readFileSync(canvasDataPath, 'utf8')
+      if (!raw.trim()) {
+        parsedCanvasCache = { mtimeMs: stat.mtimeMs, data: null }
+        return null
+      }
+      const data = JSON.parse(raw)
+      parsedCanvasCache = { mtimeMs: stat.mtimeMs, data }
       return data
     } catch (error) {
       console.error("Unable to read Canvas data:", error)
+      invalidateCanvasDataCache()
       return null
     }
   }
 
-  function getCanvasProjectGroups() {
-    const canvasData = readCanvasData()
+  function readCanvasData() {
+    const data = readParsedCanvasData()
+    if (!data) return null
+
+    if (!canvasMemoryCacheEnabled()) {
+      data.weekly_schedule = data.weekly_schedule || {}
+      return data
+    }
+
+    const key = weeklyScheduleCacheKey(canvasRootDir, canvasDataPath)
+    if (weeklyScheduleCache.key === key && weeklyScheduleCache.schedule) {
+      data.weekly_schedule = weeklyScheduleCache.schedule
+    } else {
+      data.weekly_schedule = weeklyScheduleCache.schedule || {}
+      scheduleWeeklyScheduleBuild(data, canvasRootDir, canvasDataPath, sendCanvasDataUpdate)
+    }
+    return data
+  }
+
+  function buildCanvasProjectGroups(canvasData) {
     if (!canvasData || !Array.isArray(canvasData.courses)) {
       return []
     }
@@ -1198,6 +1524,11 @@ function createCanvasApi({ canvasDataPath, getAuthState, sendCanvasDataUpdate, r
       label: "Canvas Courses",
       items: canvasCourses
     }]
+  }
+
+  function getCanvasProjectGroups(canvasData) {
+    const data = canvasData !== undefined ? canvasData : readCanvasData()
+    return buildCanvasProjectGroups(data)
   }
 
   const CANVAS_MAX_CONCURRENT = 8
@@ -1276,17 +1607,150 @@ function createCanvasApi({ canvasDataPath, getAuthState, sendCanvasDataUpdate, r
     'text/plain',
     'text/markdown',
     'application/json',
+    'application/msword',
+    'application/vnd.ms-powerpoint',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'image/png',
+    'image/jpeg',
+    'image/gif',
+    'image/webp'
   ])
 
-  const PARSEABLE_FILE_EXTENSIONS = new Set(['.pdf', '.txt', '.md', '.json', '.docx', '.pptx', '.ipynb'])
+  const PARSEABLE_FILE_EXTENSIONS = new Set([
+    '.pdf', '.txt', '.md', '.json', '.doc', '.docx', '.ppt', '.pptx', '.ipynb', '.xlsx',
+    '.csv', '.tex', '.py', '.m', '.r', '.c', '.cpp', '.h', '.java',
+    '.png', '.jpg', '.jpeg', '.gif', '.webp'
+  ])
 
   function isParseableCanvasFile(file) {
-    const contentType = String(file && file['content-type'] || '').split(';')[0].trim().toLowerCase()
+    const contentType = String(file && (file['content-type'] || file.content_type || '') || '').split(';')[0].trim().toLowerCase()
     if (PARSEABLE_FILE_TYPES.has(contentType)) return true
     const name = String(file && (file.display_name || file.filename || file.name) || '').toLowerCase()
     return Array.from(PARSEABLE_FILE_EXTENSIONS).some(ext => name.endsWith(ext))
+  }
+
+  function extractCanvasFileIdsFromHtml(html) {
+    const ids = new Set()
+    const source = String(html || '')
+    if (!source) return []
+    const patterns = [
+      /\/files\/(\d+)/gi,
+      /preview=(\d+)/gi,
+      /data-api-endpoint="[^"]*\/files\/(\d+)/gi
+    ]
+    patterns.forEach(pattern => {
+      let match = pattern.exec(source)
+      while (match) {
+        ids.add(String(match[1]))
+        match = pattern.exec(source)
+      }
+    })
+    return Array.from(ids)
+  }
+
+  function canvasFileDownloadUrl(canvasBaseUrl, courseId, fileId) {
+    return `${canvasBaseUrl}/courses/${courseId}/files/${fileId}/download`
+  }
+
+  function canvasFilePreviewUrl(canvasBaseUrl, courseId, fileId) {
+    return `${canvasBaseUrl}/courses/${courseId}/files?preview=${fileId}`
+  }
+
+  function mergeCourseFileRecords(existingFiles, incomingFiles) {
+    const merged = Array.isArray(existingFiles) ? [...existingFiles] : []
+    const seen = new Set(
+      merged
+        .map(file => file && file.id != null ? String(file.id) : '')
+        .filter(Boolean)
+    )
+    ;(incomingFiles || []).forEach(file => {
+      if (!file || file.id == null) return
+      const fileId = String(file.id)
+      if (seen.has(fileId)) return
+      merged.push(file)
+      seen.add(fileId)
+    })
+    return merged
+  }
+
+  function synthesizeModuleOnlyFiles(files, moduleItemsByCourse) {
+    const merged = Array.isArray(files) ? [...files] : []
+    const seen = new Set(
+      merged
+        .map(file => file && file.id != null ? String(file.id) : '')
+        .filter(Boolean)
+    )
+    Object.values(moduleItemsByCourse || {}).forEach(itemsByModule => {
+      Object.values(itemsByModule || {}).forEach(items => {
+        if (!Array.isArray(items)) return
+        items.forEach(item => {
+          if (String(item && item.type || '').toLowerCase() !== 'file') return
+          const fileId = String(item.content_id || item.id || '')
+          if (!fileId || seen.has(fileId)) return
+          const title = String(item.title || item.name || '').trim()
+          if (!title) return
+          merged.push({
+            id: fileId,
+            display_name: title,
+            filename: title,
+            'content-type': item['content-type'] || item.content_type || ''
+          })
+          seen.add(fileId)
+        })
+      })
+    })
+    return merged
+  }
+
+  function buildParserFileRecord(courseId, file, canvasBaseUrl) {
+    const fileId = String(file && file.id || '')
+    if (!fileId) return null
+    const name = file.display_name || file.filename || file.name || `Canvas file ${fileId}`
+    const downloadUrl = file.url || canvasFileDownloadUrl(canvasBaseUrl, courseId, fileId)
+    return {
+      url: downloadUrl,
+      previewurl: file.previewurl || canvasFilePreviewUrl(canvasBaseUrl, courseId, fileId),
+      id: fileId,
+      name,
+      courseid: courseId,
+      content_type: file['content-type'] || file.content_type || ''
+    }
+  }
+
+  function collectParserFilesForCourse(courseId, canvasBaseUrl, files, moduleItems, assignments, pages) {
+    const linkedHtml = []
+    ;(assignments || []).forEach(assignment => {
+      linkedHtml.push(String(assignment && assignment.description || ''))
+    })
+    ;(pages || []).forEach(page => {
+      linkedHtml.push(String(page && page.body || ''))
+    })
+
+    const linkedIds = new Set()
+    linkedHtml.forEach(html => {
+      extractCanvasFileIdsFromHtml(html).forEach(fileId => linkedIds.add(fileId))
+    })
+
+    let courseFiles = mergeCourseFileRecords(
+      files,
+      Array.from(linkedIds).map(fileId => ({
+        id: fileId,
+        display_name: `Linked file ${fileId}`,
+        filename: `file-${fileId}`,
+        url: canvasFileDownloadUrl(canvasBaseUrl, courseId, fileId)
+      }))
+    )
+    courseFiles = synthesizeModuleOnlyFiles(courseFiles, moduleItems)
+
+    const parserFiles = []
+    courseFiles.forEach(file => {
+      if (!isParseableCanvasFile(file)) return
+      const record = buildParserFileRecord(courseId, file, canvasBaseUrl)
+      if (record) parserFiles.push(record)
+    })
+    return parserFiles
   }
 
   async function fetchCanvasPaginated(url, context, errors) {
@@ -1334,11 +1798,14 @@ function createCanvasApi({ canvasDataPath, getAuthState, sendCanvasDataUpdate, r
         const links = parseLinkHeader(response.headers.get('link'))
         nextUrl = links.next || ''
       } catch (error) {
-        errors.push({
-          context,
-          url: nextUrl,
-          message: formatCanvasError(error)
-        })
+        const message = formatCanvasError(error)
+        if (!isIgnorableCanvasFetchError(message)) {
+          errors.push({
+            context,
+            url: nextUrl,
+            message
+          })
+        }
         break
       } finally {
         releaseCanvasSlot()
@@ -1387,11 +1854,13 @@ function createCanvasApi({ canvasDataPath, getAuthState, sendCanvasDataUpdate, r
       return await fetchCanvasJson(url)
     } catch (error) {
       const message = formatCanvasError(error)
-      errors.push({
-        context,
-        url,
-        message
-      })
+      if (!isIgnorableCanvasFetchError(message)) {
+        errors.push({
+          context,
+          url,
+          message
+        })
+      }
       return []
     }
   }
@@ -1401,7 +1870,7 @@ function createCanvasApi({ canvasDataPath, getAuthState, sendCanvasDataUpdate, r
       return await fetchCanvasJson(url)
     } catch (error) {
       const message = formatCanvasError(error)
-      if (!message.includes('404')) {
+      if (!isIgnorableCanvasFetchError(message)) {
         errors.push({
           context,
           url,
@@ -1511,22 +1980,19 @@ function createCanvasApi({ canvasDataPath, getAuthState, sendCanvasDataUpdate, r
     return buckets
   }
 
-  async function fetchCanvasCourseSyllabi(courses, errors) {
+  async function fetchCanvasCourseSyllabi(courses, errors, existingBuckets = {}) {
     const { canvasBaseUrl } = getAuthState()
-    const buckets = {}
+    const buckets = { ...existingBuckets }
+    const syncCourses = filterCoursesForSync(courses).filter(
+      tcourse => !buckets[tcourse.id] && !buckets[String(tcourse.id)]
+    )
 
-    await mapWithConcurrency(courses, async tcourse => {
+    await mapWithConcurrency(syncCourses, async tcourse => {
       const url = canvasBaseUrl + '/api/v1/courses/' + tcourse.id + '?include[]=syllabus_body'
       const course = await fetchCanvasJsonOrNull(url, `course ${tcourse.id} syllabus`, errors)
-      const syllabusBody = course && stripHtmlToText(course.syllabus_body || '')
-      if (syllabusBody) {
-        buckets[tcourse.id] = {
-          id: tcourse.id,
-          name: tcourse.name || course.name || '',
-          html_url: course.html_url || tcourse.html_url || '',
-          syllabus_body: course.syllabus_body || '',
-          syllabus_text: syllabusBody
-        }
+      const entry = course ? buildSyllabusBucketFromCourse({ ...tcourse, ...course }) : null
+      if (entry) {
+        buckets[tcourse.id] = entry
       }
     })
 
@@ -1538,19 +2004,26 @@ function createCanvasApi({ canvasDataPath, getAuthState, sendCanvasDataUpdate, r
 
     const rateLimited = errors.filter(error => String(error.message || '').includes('429')).length
     const contexts = {}
+    const sampleMessages = {}
     errors.forEach(error => {
       const key = String(error.context || 'unknown').replace(/\s+\d+$/, '')
       contexts[key] = (contexts[key] || 0) + 1
+      if (!sampleMessages[key]) {
+        sampleMessages[key] = String(error.message || '').slice(0, 120)
+      }
     })
     const breakdown = Object.entries(contexts)
       .sort((left, right) => right[1] - left[1])
       .slice(0, 5)
-      .map(([label, count]) => `${label} (${count})`)
-      .join(', ')
+      .map(([label, count]) => {
+        const sample = sampleMessages[label]
+        return sample ? `${label} (${count}, e.g. ${sample})` : `${label} (${count})`
+      })
+      .join('; ')
 
     console.warn(
-      `Canvas sync finished with ${errors.length} skipped requests` +
-      `${rateLimited ? `, ${rateLimited} rate-limited` : ''}` +
+      `[canvas] Sync finished with ${errors.length} unexpected Canvas API failure(s)` +
+      `${rateLimited ? ` (${rateLimited} rate-limited)` : ''}` +
       `${breakdown ? `: ${breakdown}` : ''}`
     )
   }
@@ -1652,13 +2125,14 @@ ${html}
 </html>`
   }
 
-  async function setupCanvasData() {
+  async function setupCanvasData(options = {}) {
     if (canvasSetupInProgress) {
       return canvasSetupInProgress
     }
 
     canvasSetupInProgress = (async () => {
     invalidateWeeklyScheduleCache()
+    invalidateCanvasDataCache()
     const authState = getAuthState()
     const { canvasAuthCookie, canvasBaseUrl } = authState
     if (!fs.existsSync(canvasDataPath)) {
@@ -1667,10 +2141,11 @@ ${html}
     if (!canvasAuthCookie || !canvasBaseUrl) {
       throw new Error("Canvas auth is missing cookie or base URL.")
     }
+    console.log('[canvas] Fetching courses and files from Canvas API…')
     const profileresponse = fetchCanvasJson(canvasBaseUrl + '/api/v1/users/self')
     const canvasErrors = []
     const coursesresponse = fetchCanvasPaginated(
-      `${canvasBaseUrl}/api/v1/courses?include[]=term`,
+      `${canvasBaseUrl}/api/v1/courses?include[]=term&include[]=course_image&include[]=syllabus_body`,
       'courses list',
       canvasErrors
     )
@@ -1679,18 +2154,25 @@ ${html}
       coursesresponse
     ])
     saveCanvasAuthToEnv(envPath, authState)
-    const proc = getParserProcess(authState, canvasRootDir, onCanvasTasks)
+    const lambdaParse = usesLambdaParserPlacement()
+    const proc = lambdaParse ? null : getParserProcess(authState, canvasRootDir, onCanvasTasks, options)
     const prof = responses[0]
     const course = responses[1]
     if (!Array.isArray(course)) {
       throw new Error("Canvas courses response was not an array: " + JSON.stringify(course).slice(0, 500))
     }
-    const alldata = JSON.stringify({ profile: prof, courses: course }, null, 2)
-    fs.writeFileSync(canvasDataPath, alldata)
+    const data1 = { profile: prof, courses: course }
+    const syncCourses = filterCoursesForSync(course)
+    if (syncCourses.length < course.length) {
+      console.log(
+        `[canvas] Syncing ${syncCourses.length}/${course.length} accessible courses` +
+        ` (${course.length - syncCourses.length} skipped: deleted or date-restricted).`
+      )
+    }
     let filecount = 0
-    const data1 = JSON.parse(fs.readFileSync(canvasDataPath, 'utf8'))
-    data1.front_pages = await fetchCanvasFrontPages(course, canvasErrors)
-    data1.syllabi = await fetchCanvasCourseSyllabi(course, canvasErrors)
+    const syllabusFromList = extractSyllabiFromCourses(course)
+    data1.front_pages = await fetchCanvasFrontPages(coursesWithWikiHomepage(course), canvasErrors)
+    data1.syllabi = await fetchCanvasCourseSyllabi(course, canvasErrors, syllabusFromList)
     saveCanvasHomepages(course, data1.front_pages)
     const parsingSyllabi = []
     Object.entries(data1.syllabi).forEach(([courseid, syllabus]) => {
@@ -1709,7 +2191,8 @@ ${html}
         }, null, 2)
       })
     })
-    function writeParserLine(payload) {
+    function writeParserLineDirect(payload) {
+      if (lambdaParse) return true
       if (!proc || proc.killed || !proc.stdin || proc.stdin.destroyed || proc.stdin.writableEnded) {
         console.warn('parser stdin unavailable; skipped parser payload')
         return false
@@ -1733,10 +2216,30 @@ ${html}
       return wroteAny
     }
 
+    function flushParserBatchQueue() {
+      while (parserBatchQueue.length && canSendParserBatch()) {
+        const payload = parserBatchQueue.shift()
+        writeParserLineDirect(payload)
+      }
+      notifyParserBatchQueueChange()
+    }
+
+    activeFlushParserBatchQueue = flushParserBatchQueue
+
+    function writeParserLine(payload) {
+      if (lambdaParse) return true
+      if (!canSendParserBatch()) {
+        parserBatchQueue.push(payload)
+        notifyParserBatchQueueChange()
+        return true
+      }
+      return writeParserLineDirect(payload)
+    }
+
     const [assignmentsByCourse, filesByCourse, pagesByCourse] = await Promise.all([
-      fetchCanvasCourseBuckets(course, 'assignments', canvasErrors),
-      fetchCanvasCourseBuckets(course, 'files', canvasErrors),
-      fetchCanvasPages(course, canvasErrors)
+      fetchCanvasCourseBuckets(syncCourses, 'assignments', canvasErrors),
+      fetchCanvasCourseBuckets(syncCourses, 'files', canvasErrors),
+      fetchCanvasPages(syncCourses, canvasErrors)
     ])
     data1.assignments = assignmentsByCourse
     data1.file = filesByCourse
@@ -1777,27 +2280,6 @@ ${html}
     if (parsingSyllabi.length) {
       writeParserLine({ type: "syllabus", content: parsingSyllabi })
     }
-    Object.keys(data1.file).forEach(courseid => {
-      let parseingfiles = []
-      data1.file[courseid].forEach(file => {
-        if (file.id && file["content-type"] && file["mime_class"]) {
-          file.previewurl = `${canvasBaseUrl}/courses/${courseid}/files?preview=${file.id}`
-          if (isParseableCanvasFile(file)) {
-            parseingfiles.push({
-              url: file.url,
-              previewurl: file.previewurl,
-              id: file.id,
-              name: file.display_name || file.filename || file.name || '',
-              courseid,
-              content_type: file['content-type'] || ''
-            })
-          }
-        } else {
-          file.previewurl = null
-        }
-      })
-      writeParserLine({ type: "file", content: parseingfiles })
-    })
 
     for (const [courseid, pages] of Object.entries(data1.pages)) {
       if (!Array.isArray(pages) || !pages.length) continue
@@ -1819,7 +2301,7 @@ ${html}
       writeParserLine({ type: 'page', content: parsingPages })
     }
 
-    data1.modules = await fetchCanvasCourseBuckets(course, 'modules', canvasErrors)
+    data1.modules = await fetchCanvasCourseBuckets(syncCourses, 'modules', canvasErrors)
     data1.module_items = await fetchCanvasModuleItemBuckets(data1.modules, canvasErrors)
     for (const [courseid, modules] of Object.entries(data1.module_items || {})) {
       const moduleNameById = {}
@@ -1856,6 +2338,29 @@ ${html}
         writeParserLine({ type: 'module_item', content: parsingModuleItems })
       }
     }
+
+    Object.keys(data1.file || {}).forEach(courseid => {
+      const courseFiles = Array.isArray(data1.file[courseid]) ? data1.file[courseid] : []
+      courseFiles.forEach(file => {
+        if (!file || file.id == null) return
+        file.previewurl = canvasFilePreviewUrl(canvasBaseUrl, courseid, file.id)
+        if (!file.url) {
+          file.url = canvasFileDownloadUrl(canvasBaseUrl, courseid, file.id)
+        }
+      })
+      const parserFiles = collectParserFilesForCourse(
+        courseid,
+        canvasBaseUrl,
+        courseFiles,
+        data1.module_items[courseid] || {},
+        data1.assignments[courseid] || [],
+        data1.pages[courseid] || []
+      )
+      if (parserFiles.length) {
+        writeParserLine({ type: 'file', content: parserFiles })
+      }
+    })
+
     if (canvasErrors.length) {
       data1.errors = canvasErrors
       summarizeCanvasErrors(canvasErrors)
@@ -1863,7 +2368,11 @@ ${html}
       delete data1.errors
     }
     data1.weekly_schedule = buildWeeklySchedule(data1, canvasRootDir)
-    setWeeklyScheduleCache(canvasRootDir, canvasDataPath, data1.weekly_schedule)
+    if (canvasMemoryCacheEnabled()) {
+      setWeeklyScheduleCache(canvasRootDir, canvasDataPath, data1.weekly_schedule)
+    } else {
+      invalidateWeeklyScheduleCache()
+    }
     try {
       const { syncGradescopeState } = require('../platforms/gradescope/sync')
       const gradescopeResult = await syncGradescopeState(data1)
@@ -1926,8 +2435,25 @@ ${html}
       })
     }
     fs.writeFileSync(canvasDataPath, JSON.stringify(data1, null, 2))
-    if (!writeParserLine('None')) {
-      console.warn('Canvas parser did not receive completion signal; parsing may not start.')
+    setLiveCanvasDataSnapshot(data1)
+    invalidateCanvasDataCache()
+    if (lambdaParse) {
+      activeFlushParserBatchQueue = () => {}
+      clearParserBatchQueue()
+      startLambdaParserProcess(authState, canvasRootDir, onCanvasTasks, options)
+      console.log('[canvas] Lambda parse started from canvas_data.json; graph build continues in background.')
+    } else {
+      flushParserBatchQueue()
+      forceFlushParserBatchQueue()
+      const queuedBatches = parserBatchQueue.length
+      if (queuedBatches > 0) {
+        console.warn(`[canvas] ${queuedBatches} parser batch(es) still queued after flush`)
+      }
+      if (!writeParserLineDirect('None')) {
+        console.warn('[canvas] Parser did not receive completion signal (stdin unavailable).')
+      } else {
+        console.log('[canvas] Parser completion signal sent; graph build continues in background.')
+      }
     }
     sendCanvasDataUpdate()
     })()
@@ -1939,22 +2465,80 @@ ${html}
     }
   }
 
+  function isAllowedCanvasImageUrl(imageUrl) {
+    if (!imageUrl) return false
+    try {
+      const url = new URL(imageUrl)
+      const base = new URL(getAuthState().canvasBaseUrl || 'https://canvas.instructure.com')
+      return url.hostname === base.hostname || url.hostname.includes('instructure.com')
+    } catch (_error) {
+      return false
+    }
+  }
+
+  async function fetchCanvasImageDataUrl(imageUrl) {
+    const normalizedUrl = String(imageUrl || '').trim()
+    if (!normalizedUrl) {
+      return { ok: false, error: 'Missing image URL.' }
+    }
+    if (!isAllowedCanvasImageUrl(normalizedUrl)) {
+      return { ok: false, error: 'Image URL is not from Canvas.' }
+    }
+    await acquireCanvasSlot()
+    try {
+      const response = await fetch(normalizedUrl, canvasFetchOptions({
+        headers: getCanvasApiHeaders()
+      }))
+      if (!response.ok) {
+        return { ok: false, error: `Canvas image request failed (${response.status}).` }
+      }
+      const contentType = String(response.headers.get('content-type') || 'image/jpeg').split(';')[0].trim()
+      const buffer = Buffer.from(await response.arrayBuffer())
+      const dataUrl = `data:${contentType};base64,${buffer.toString('base64')}`
+      return { ok: true, dataUrl, contentType }
+    } catch (error) {
+      return { ok: false, error: formatCanvasError(error) }
+    } finally {
+      releaseCanvasSlot()
+    }
+  }
+
   return {
     getCanvasTasksFromDisk: () => make_canvas_tasks(canvasRootDir),
+    getCanvasTasksFromDiskAsync: () => make_canvas_tasks_async(canvasRootDir),
     getCanvasProjectGroups,
     readCanvasData,
-    setupCanvasData
+    setupCanvasData,
+    invalidateCanvasDataCache,
+    clearLiveCanvasSession,
+    fetchCanvasImageDataUrl,
+    flushParserBatchQueue: () => {
+      if (activeFlushParserBatchQueue) activeFlushParserBatchQueue()
+    },
+    clearParserBatchQueue,
+    getParserBatchQueueDepth: () => parserBatchQueue.length
   }
 }
 
 module.exports = {
   createCanvasApi,
+  setParserBatchGate,
   make_canvas_tasks,
   clearCanvasAuthFromEnv,
   killParserProcess,
+  beginCanvasSyncWipe,
+  endCanvasSyncWipe,
+  invalidateWeeklyScheduleCache,
+  setCanvasDiskReadBlock,
+  waitForParserAllPasses,
   resolveSchedulingDate,
   resolveWeekStartMs,
   resolveModuleAnchorWeekMs,
   startOfWeekMs,
-  buildWeeklySchedule
+  buildWeeklySchedule,
+  isIgnorableCanvasFetchError,
+  filterCoursesForSync,
+  coursesWithWikiHomepage,
+  extractSyllabiFromCourses,
+  buildSyllabusBucketFromCourse
 }

@@ -1,0 +1,650 @@
+{
+  "version": 1,
+  "courseId": "15237",
+  "fileId": "3295914",
+  "filename": "Lecture 8_ visual system I the eye_slides .pdf",
+  "expectedFileType": "lecture_slides",
+  "passPlan": {
+    "courseId": "15237",
+    "fileId": "3295914",
+    "filename": "Lecture 8_ visual system I the eye_slides .pdf",
+    "resolvedType": "lecture_slides",
+    "heuristicConfidence": 0.92,
+    "neededPasses": [
+      "extract_pages",
+      "heuristic_classify",
+      "llm_pass1",
+      "finalize"
+    ],
+    "skippedPasses": [
+      "llm_classify",
+      "llm_pass2"
+    ],
+    "estLlmCalls": 1,
+    "estRealisticLlmCalls": 1.0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "needed": true,
+        "reason": "Required local PDF/HTML extraction; no LLM.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "heuristic_classify",
+        "needed": true,
+        "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_classify",
+        "needed": false,
+        "reason": "Heuristic confidence 0.92 sufficient; skip flash classify call.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_pass1",
+        "needed": true,
+        "reason": "Type lecture_slides: pass1 extracts concepts=True, problems=True, events=False.",
+        "llmCall": true,
+        "estCostTier": "high"
+      },
+      {
+        "pass": "llm_pass2",
+        "needed": false,
+        "reason": "Type lecture_slides disables pass2 (single-pass type-specific or link-only profile).",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "finalize",
+        "needed": true,
+        "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+        "llmCall": false,
+        "estCostTier": "free"
+      }
+    ]
+  },
+  "passAudit": {
+    "plan": {
+      "courseId": "15237",
+      "fileId": "3295914",
+      "filename": "Lecture 8_ visual system I the eye_slides .pdf",
+      "resolvedType": "lecture_slides",
+      "heuristicConfidence": 0.92,
+      "neededPasses": [
+        "extract_pages",
+        "heuristic_classify",
+        "llm_pass1",
+        "finalize"
+      ],
+      "skippedPasses": [
+        "llm_classify",
+        "llm_pass2"
+      ],
+      "estLlmCalls": 1,
+      "estRealisticLlmCalls": 1.0,
+      "steps": [
+        {
+          "pass": "extract_pages",
+          "needed": true,
+          "reason": "Required local PDF/HTML extraction; no LLM.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "heuristic_classify",
+          "needed": true,
+          "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_classify",
+          "needed": false,
+          "reason": "Heuristic confidence 0.92 sufficient; skip flash classify call.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_pass1",
+          "needed": true,
+          "reason": "Type lecture_slides: pass1 extracts concepts=True, problems=True, events=False.",
+          "llmCall": true,
+          "estCostTier": "high"
+        },
+        {
+          "pass": "llm_pass2",
+          "needed": false,
+          "reason": "Type lecture_slides disables pass2 (single-pass type-specific or link-only profile).",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "finalize",
+          "needed": true,
+          "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+          "llmCall": false,
+          "estCostTier": "free"
+        }
+      ]
+    },
+    "actualType": "lecture_slides",
+    "deepseekPasses": 1,
+    "conceptCount": 80,
+    "detailCount": 30,
+    "totalLlmTokens": 0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "ran": true,
+        "useful": true,
+        "verdict": "required",
+        "note": "Local I/O; pages present means extract succeeded."
+      },
+      {
+        "pass": "heuristic_classify",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "Routed to lecture_slides (free)."
+      },
+      {
+        "pass": "llm_classify",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Skipped; heuristic confidence sufficient.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass1",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "No pass1 tool trace.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass2",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Correctly skipped: profile disables pass2, type-specific pass1 only, or no log_* tools.",
+        "tokens": 0
+      },
+      {
+        "pass": "finalize",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "logged_details promoted to concept details."
+      }
+    ],
+    "cutCandidates": [],
+    "recommendations": [
+      "Pass2 correctly skipped for this type/pass1 tool pattern."
+    ]
+  },
+  "passes": [
+    "extract_pages",
+    "heuristic_classify",
+    "teaching_units",
+    "type_structure",
+    "concept_candidates",
+    "problem_scan",
+    "detail_attach",
+    "reconcile"
+  ],
+  "buildMode": "template_multi_pass_offline",
+  "builtAt": "2026-07-01T22:49:38Z",
+  "concepts": [
+    {
+      "name": "Lecture 8_ visual system I the eye_slides",
+      "details": []
+    },
+    {
+      "name": "grade distribution",
+      "details": []
+    },
+    {
+      "name": "5 million / retinamostly in fovea(high density high acuity)color sensitivebright light (“photopic”)iodopsin (lackcolor",
+      "details": [
+        "5 million / retinaMostly in fovea(high density high acuity)Color sensitiveBright light (“photopic”)Iodopsin (lackcolor blindness)"
+      ]
+    },
+    {
+      "name": "not very dark",
+      "details": []
+    },
+    {
+      "name": "not very bright",
+      "details": []
+    },
+    {
+      "name": "more glutamate release",
+      "details": []
+    },
+    {
+      "name": "Problem 1",
+      "details": []
+    },
+    {
+      "name": "Problem 2",
+      "details": []
+    },
+    {
+      "name": "quiz 1",
+      "details": []
+    },
+    {
+      "name": "3 modules",
+      "details": [
+        "Course Content: 3 modules"
+      ]
+    },
+    {
+      "name": "vision",
+      "details": [
+        "Next two lectures: vision"
+      ]
+    },
+    {
+      "name": "compared to other senses",
+      "details": []
+    },
+    {
+      "name": "outline for today",
+      "details": []
+    },
+    {
+      "name": "gross anatomy of the eye",
+      "details": []
+    },
+    {
+      "name": "opthalmoscopic view of the retina",
+      "details": []
+    },
+    {
+      "name": "refraction and lens accommodation",
+      "details": [
+        "Focusing near and far: Refraction and lens accommodation"
+      ]
+    },
+    {
+      "name": "light refracted through cornea and lens",
+      "details": []
+    },
+    {
+      "name": "blurry because refraction reduced at cornea-water interface",
+      "details": [
+        "Under water: blurry because refraction reduced at cornea-WATER interface"
+      ]
+    },
+    {
+      "name": "goggles restore cornea-air interface & refraction",
+      "details": []
+    },
+    {
+      "name": "chromostereopsis",
+      "details": []
+    },
+    {
+      "name": "vison correction (glasses / contacts, lasic)",
+      "details": []
+    },
+    {
+      "name": "nearsighted(myopia)long eyeball",
+      "details": []
+    },
+    {
+      "name": "farsighted(hyperopia)short eyeball",
+      "details": []
+    },
+    {
+      "name": "~42 diopters of refraction (focuses 2.4cm behind surface)",
+      "details": [
+        "Cornea: ~42 diopters of refraction (focuses 2.4cm behind surface)"
+      ]
+    },
+    {
+      "name": "reshape the cornea",
+      "details": [
+        "Lasic: reshape the cornea"
+      ]
+    },
+    {
+      "name": "corrective lens",
+      "details": []
+    },
+    {
+      "name": "shallow depth of field",
+      "details": [
+        "Low light conditions: shallow depth of field"
+      ]
+    },
+    {
+      "name": "surprisingly narrow(and inverted on the retina)",
+      "details": [
+        "The visual field: surprisingly narrow(and inverted on the retina)"
+      ]
+    },
+    {
+      "name": "read letter = 5/60 of 1˚ of arc",
+      "details": [
+        "20/20 vision: read letter = 5/60 of 1˚ of arc"
+      ]
+    },
+    {
+      "name": "five classes of retinal cells",
+      "details": [
+        "Retinal circuitry: five classes of retinal cells"
+      ]
+    },
+    {
+      "name": "depolarize/hyperpolarize,release neurotransmitter proportionally",
+      "details": [
+        "All other cells: depolarize/hyperpolarize,release neurotransmitter proportionally"
+      ]
+    },
+    {
+      "name": "reflective layer at back of retina in nocturnal animals",
+      "details": [
+        "Tapetum lucidum: reflective layer at back of retina in nocturnal animals"
+      ]
+    },
+    {
+      "name": "reduced acuity (scatter)",
+      "details": []
+    },
+    {
+      "name": "(a) true(b) false",
+      "details": [
+        "Clickers: (A) True(B) False"
+      ]
+    },
+    {
+      "name": "no blind spot",
+      "details": [
+        "Octopus: no blind spot"
+      ]
+    },
+    {
+      "name": "more disks, more photopigment, more sensitive",
+      "details": [
+        "Rods: more disks, more photopigment, more sensitive"
+      ]
+    },
+    {
+      "name": "rods and cones (“duplex retina”)",
+      "details": [
+        "Photoreceptors: rods and cones (“duplex retina”)"
+      ]
+    },
+    {
+      "name": "day vision, color",
+      "details": [
+        "Cones: day vision, color"
+      ]
+    },
+    {
+      "name": "rods versus cones",
+      "details": [
+        "Photoreceptors: rods versus cones"
+      ]
+    },
+    {
+      "name": "no color)dim light (“scotopic”)rhodopsin (lacknight blindness)",
+      "details": [
+        "Color insensitive (night vision: no color)Dim light (“scotopic”)Rhodopsin (lacknight blindness)"
+      ]
+    },
+    {
+      "name": "cones",
+      "details": []
+    },
+    {
+      "name": "central(all cones)peripheral(more rods)",
+      "details": []
+    },
+    {
+      "name": "rods concentrated outside fovea",
+      "details": []
+    },
+    {
+      "name": "no fovea",
+      "details": [
+        "Albino retina: no fovea"
+      ]
+    },
+    {
+      "name": "loss of photoreceptors in the fovea",
+      "details": [
+        "Macular degeneration: loss of photoreceptors in the fovea"
+      ]
+    },
+    {
+      "name": "what we want to understand",
+      "details": [
+        "The retina: what we want to understand"
+      ]
+    },
+    {
+      "name": "“dark current” due to open na+ channels",
+      "details": [
+        "Rod photoreceptors: “dark current” due to open Na+ channels"
+      ]
+    },
+    {
+      "name": "cgmp levels drop, tonic na+ influx turned off (channels close)",
+      "details": [
+        "Light: cGMP levels drop, tonic Na+ influx turned OFF (channels close)"
+      ]
+    },
+    {
+      "name": "tonic na+ influxlight:no na+ influx",
+      "details": [
+        "Dark: Tonic Na+ influxLight:NO Na+ influx"
+      ]
+    },
+    {
+      "name": "steps of rod phototransduction (dim light)",
+      "details": []
+    },
+    {
+      "name": "stretching and question break",
+      "details": []
+    },
+    {
+      "name": "high spatial acuity vision",
+      "details": []
+    },
+    {
+      "name": "color vision",
+      "details": []
+    },
+    {
+      "name": "retinal absorbs light",
+      "details": []
+    },
+    {
+      "name": "normal variation in cone numbers/distribution",
+      "details": []
+    },
+    {
+      "name": "tetrachromat humans may have a fourth cone type",
+      "details": []
+    },
+    {
+      "name": "short wavelengthhigh frequencyhigh energy",
+      "details": []
+    },
+    {
+      "name": "long wavelengthlow frequency low energy",
+      "details": []
+    },
+    {
+      "name": "more than 12 cone types",
+      "details": [
+        "Mantis shrimp: more than 12 cone types"
+      ]
+    },
+    {
+      "name": "improved luminosity perception- better night vision",
+      "details": [
+        "Color blindness: - Improved luminosity perception- Better night vision"
+      ]
+    },
+    {
+      "name": "adjustment of sensitivity based on background light level",
+      "details": [
+        "ADAPTATION: adjustment of sensitivity based on background light level"
+      ]
+    },
+    {
+      "name": "mechanisms of light and dark adaptation",
+      "details": []
+    },
+    {
+      "name": "receptive field mapping",
+      "details": []
+    },
+    {
+      "name": "edges (contrast)",
+      "details": []
+    },
+    {
+      "name": "average darkness of surround",
+      "details": []
+    },
+    {
+      "name": "darker",
+      "details": []
+    },
+    {
+      "name": "average brightness of surround",
+      "details": []
+    },
+    {
+      "name": "brighter",
+      "details": []
+    },
+    {
+      "name": "rgc firing",
+      "details": []
+    },
+    {
+      "name": "simultaneous contrast illusion",
+      "details": []
+    },
+    {
+      "name": "clicker",
+      "details": []
+    },
+    {
+      "name": "achromatic areas + small areas of color averaged illusory color",
+      "details": [
+        "Munker illusion: achromatic areas + small areas of color averaged illusory color"
+      ]
+    },
+    {
+      "name": "lineswords",
+      "details": []
+    },
+    {
+      "name": "rgcs are the output cells of the retina",
+      "details": []
+    },
+    {
+      "name": "off cells hyperpolarize",
+      "details": []
+    },
+    {
+      "name": "off bipolar has ionotropic glutamate receptor",
+      "details": []
+    },
+    {
+      "name": "hyperpolarize cones",
+      "details": []
+    },
+    {
+      "name": "depolarize cones",
+      "details": []
+    },
+    {
+      "name": "off bipolar depolarized",
+      "details": []
+    },
+    {
+      "name": "depolarizes cone",
+      "details": []
+    }
+  ],
+  "conceptCount": 80,
+  "detailCount": 30,
+  "events": [],
+  "problems": [
+    "Problem 1",
+    "Problem 2"
+  ],
+  "sections": [
+    "Quiz 1",
+    "Compared to other senses",
+    "Problem 1",
+    "Problem 2",
+    "Average darkness of surround",
+    "Average brightness of surround",
+    "Horizontal cell detecting contrast",
+    "Uniform field of blue light"
+  ],
+  "deepseekPasses": 1,
+  "expectsPass2": false,
+  "gtProvenance": {
+    "typeSource": "heuristic_high",
+    "typeConfidence": 0.92,
+    "offlinePassAudit": {
+      "extract_pages": {
+        "localPdf": true,
+        "pageCount": 75,
+        "pdfPath": "C:\\Allen\\nucleus\\canvasfiles\\3295914"
+      },
+      "heuristic_classify": {
+        "expectedFileType": "lecture_slides",
+        "source": "heuristic_high",
+        "confidence": 0.92
+      },
+      "teaching_units": {
+        "sectionCount": 8
+      },
+      "type_structure": {
+        "slideRows": 126,
+        "readingSections": 0,
+        "syllabusWeeks": 0
+      },
+      "concept_candidates": {
+        "candidateCount": 80
+      },
+      "problem_scan": {
+        "problemCount": 2
+      },
+      "detail_attach": {
+        "conceptKeysWithDetails": 38,
+        "detailCount": 38
+      },
+      "reconcile": {
+        "inputTitles": 80,
+        "accepted": 80,
+        "capped": 0,
+        "detailAttached": 30
+      }
+    },
+    "reconcileStats": {
+      "inputTitles": 80,
+      "accepted": 80,
+      "capped": 0,
+      "detailAttached": 30
+    }
+  }
+}

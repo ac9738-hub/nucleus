@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Parse Pipeline Debugger</title>
+  <link rel="icon" href="data:," />
+  <style>
+    :root {
+      --bg: #0f1419;
+      --panel: #1a2332;
+      --border: #2d3a4d;
+      --text: #e7ecf3;
+      --muted: #8b9cb3;
+      --accent: #5b9fd4;
+      --accent2: #7bc96f;
+      --warn: #e8b84a;
+      --danger: #e06c75;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      padding: 12px 16px 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    .header-row {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+    header h1 { font-size: 16px; margin: 0; font-weight: 600; line-height: 32px; }
+    .server-url {
+      font-size: 12px;
+      color: var(--muted);
+      font-family: var(--mono);
+      line-height: 32px;
+    }
+    select {
+      background: var(--panel);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 13px;
+      min-height: 32px;
+    }
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+    .btn-wrap { display: flex; flex-direction: column; gap: 3px; min-width: 108px; }
+    button {
+      background: var(--panel);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 7px 12px;
+      font-size: 13px;
+      min-height: 32px;
+      cursor: pointer;
+      transition: background 0.12s, border-color 0.12s, transform 0.08s;
+      touch-action: manipulation;
+      user-select: none;
+    }
+    button:hover:not(:disabled) { background: #243044; border-color: #3d4f66; }
+    button:active:not(:disabled) { transform: scale(0.98); }
+    button.primary { background: var(--accent); border-color: var(--accent); color: #041018; font-weight: 600; }
+    button.primary:hover:not(:disabled) { background: #6eb0e0; }
+    button.waiting-pulse {
+      animation: pulse 1.2s ease-in-out infinite;
+      border-color: var(--warn);
+      box-shadow: 0 0 0 2px rgba(232, 184, 74, 0.25);
+    }
+    button.busy { opacity: 0.75; pointer-events: none; }
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 0 2px rgba(232, 184, 74, 0.2); }
+      50% { box-shadow: 0 0 0 5px rgba(232, 184, 74, 0.35); }
+    }
+    button:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+    .btn-hint {
+      font-size: 11px;
+      line-height: 1.3;
+      color: var(--muted);
+      max-width: 140px;
+      min-height: 28px;
+    }
+    .activity-bar {
+      margin-top: 10px;
+      padding: 8px 10px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 13px;
+    }
+    .activity-primary { font-weight: 500; line-height: 1.35; }
+    .activity-sub {
+      margin-top: 4px;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+    .activity-bar.waiting .activity-primary { color: var(--warn); }
+    .activity-bar.starting .activity-primary { color: var(--accent); }
+    .activity-bar.running .activity-primary { color: var(--accent); }
+    .activity-bar.done .activity-primary { color: var(--accent2); }
+    .activity-bar.error .activity-primary { color: var(--danger); }
+    .activity-log {
+      margin-top: 8px;
+      border-top: 1px solid var(--border);
+      padding-top: 6px;
+      max-height: 72px;
+      overflow-y: auto;
+      font-size: 11px;
+      color: var(--muted);
+      font-family: var(--mono);
+    }
+    .activity-log div { padding: 2px 0; }
+    .activity-log .log-step { color: #9eb4d0; }
+    .activity-log .log-pause { color: var(--warn); }
+    main {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 300px 1fr 1fr;
+      min-height: 0;
+    }
+    .panel {
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+    .panel h2 {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin: 0;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .list { overflow: auto; flex: 1; padding: 6px; }
+    .step {
+      padding: 8px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      border: 1px solid transparent;
+      margin-bottom: 4px;
+    }
+    .step:hover { background: #243044; }
+    .step.active { background: #243044; border-color: var(--accent); }
+    .step .title { font-family: var(--mono); font-size: 12px; }
+    .step .subline {
+      margin-top: 4px;
+      font-size: 11px;
+      color: var(--muted);
+      line-height: 1.35;
+    }
+    .step .meta { font-size: 10px; color: #6d7f96; margin-top: 3px; }
+    .step .cost-line {
+      margin-top: 4px;
+      font-size: 11px;
+      font-family: var(--mono);
+      color: var(--accent2);
+    }
+    .step .cost-line.pending { color: var(--warn); }
+    .step .cost-line.rollup { color: var(--muted); }
+    #sessionCost {
+      font-family: var(--mono);
+      color: var(--accent2);
+      font-size: 12px;
+      line-height: 32px;
+      white-space: nowrap;
+    }
+    .detail {
+      display: grid;
+      grid-template-rows: auto auto minmax(120px, 1fr);
+      min-height: 0;
+    }
+    .tabs {
+      display: flex;
+      gap: 4px;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+    }
+    .tab {
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 12px;
+      cursor: pointer;
+      color: var(--muted);
+      border: 1px solid transparent;
+    }
+    .tab.active { color: var(--text); border-color: var(--border); background: var(--panel); }
+    pre {
+      margin: 0;
+      padding: 12px;
+      overflow: auto;
+      min-height: 0;
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .empty { color: var(--muted); padding: 16px; font-size: 13px; }
+    @media (max-width: 1000px) {
+      main { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-row">
+      <h1>Parse Debugger</h1>
+      <span id="serverUrl" class="server-url" title="Open this URL in your browser"></span>
+      <span id="sessionCost" hidden title="Cumulative billed LLM cost this session"></span>
+      <select id="courseSelect"><option value="">Course…</option></select>
+      <select id="fileSelect" disabled><option value="">File…</option></select>
+      <select id="pauseMode" title="Pause only at pipeline phase boundaries">
+        <option value="phase" selected>Pause: each phase</option>
+        <option value="pass">Pause: each pass (verbose)</option>
+        <option value="turn">Pause: every turn (verbose)</option>
+      </select>
+      <select id="pipelineMode" title="Single file or full course concurrent file parse">
+        <option value="single_file">Mode: single file</option>
+        <option value="full_course">Mode: full course</option>
+      </select>
+      <div class="btn-group">
+        <div class="btn-wrap">
+          <button type="button" id="runBtn" class="primary" disabled>Run pipeline</button>
+          <div class="btn-hint" id="runHint">Pick a course and file</div>
+        </div>
+        <div class="btn-wrap">
+          <button type="button" id="proceedBtn" disabled>Proceed →</button>
+          <div class="btn-hint" id="proceedHint">Continues after each pause</div>
+        </div>
+        <div class="btn-wrap">
+          <button type="button" id="stopBtn" disabled>Stop</button>
+          <div class="btn-hint" id="stopHint">Cancel the running session</div>
+        </div>
+      </div>
+    </div>
+    <div id="activityBar" class="activity-bar">
+      <div class="activity-primary" id="activityPrimary">Ready — select a course and file, then Run pipeline.</div>
+      <div class="activity-sub" id="activitySub">Runs syllabus discovery → syllabus parse → deterministic seed → your file → syllabus final pass.</div>
+      <div class="activity-log" id="activityLog" hidden></div>
+    </div>
+  </header>
+  <main>
+    <section class="panel">
+      <h2>Steps</h2>
+      <div id="stepList" class="list"><div class="empty">Run a file to see checkpoints.</div></div>
+    </section>
+    <section class="panel detail">
+      <h2>Step detail</h2>
+      <div class="tabs" id="tabs"></div>
+      <pre id="detailView">Select a step.</pre>
+    </section>
+    <section class="panel detail">
+      <h2>Raw payload</h2>
+      <pre id="rawView">{}</pre>
+    </section>
+  </main>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    let session = null;
+    let pollTimer = null;
+    let selectedStep = -1;
+    let selectedDetailTabKey = null;
+    let uiBusy = false;
+    let localStatus = '';
+    let serverApiVersion = 0;
+
+    const TAB_KEYS = [
+      ['price_analysis', 'Price analysis'],
+      ['parsed_file_node', 'Parsed file node'],
+      ['syllabus_node', 'Syllabus node'],
+      ['file_nodes', 'File nodes'],
+      ['concept_nodes', 'Concept nodes'],
+      ['event_nodes', 'Event nodes'],
+      ['assignment_nodes', 'Assignment nodes'],
+      ['problem_nodes', 'Problem nodes'],
+      ['graph_full', 'Full graph'],
+      ['graph', 'Graph summary'],
+      ['system_prompt', 'System prompt'],
+      ['user_prompt', 'User / context'],
+      ['messages', 'Messages'],
+      ['tools', 'Tools'],
+      ['tool_calls', 'Tool calls'],
+      ['tool_results', 'Tool results'],
+      ['assistant_content', 'Assistant text'],
+      ['usage', 'Usage (raw)'],
+    ];
+
+    function formatUsd(value) {
+      const n = Number(value);
+      if (!Number.isFinite(n)) return '$0.0000';
+      return `$${n.toFixed(4)}`;
+    }
+
+    function buildPriceAnalysis(step) {
+      const cost = step?.cost;
+      if (!cost) return null;
+      const usage = cost.usage || {};
+      const hitRate = Number(cost.cache_hit_rate || 0);
+      return {
+        display: cost.display,
+        kind: cost.kind,
+        step_cost_usd: cost.step_usd,
+        counts_toward_session_total: cost.kind === 'call' || cost.kind === 'summary',
+        session_total_usd: session?.cost_summary?.total_cost_usd,
+        session_display: session?.cost_summary?.display,
+        tokens: {
+          input_cache_hit: usage.prompt_cache_hit_tokens,
+          input_cache_miss: usage.prompt_cache_miss_tokens,
+          output: usage.completion_tokens,
+          total: usage.total_tokens,
+        },
+        cache_hit_rate_pct: Math.round(hitRate * 1000) / 10,
+        breakdown: cost.detail,
+      };
+    }
+
+    function renderSessionCost() {
+      const el = $('sessionCost');
+      const summary = session?.cost_summary;
+      if (!summary || !summary.billed_steps) {
+        el.hidden = true;
+        el.textContent = '';
+        return;
+      }
+      el.hidden = false;
+      el.textContent = `Session ${summary.display || formatUsd(summary.total_cost_usd)}`;
+    }
+
+    async function api(path, opts = {}) {
+      const res = await fetch(path, {
+        headers: { 'Content-Type': 'application/json' },
+        cache: 'no-store',
+        ...opts,
+      });
+      let data = {};
+      try {
+        data = await res.json();
+      } catch (_) {
+        throw new Error(`Bad JSON response (${res.status})`);
+      }
+      if (!res.ok) {
+        const err = new Error(data.error || `Request failed (${res.status})`);
+        err.session = data.session;
+        throw err;
+      }
+      return data;
+    }
+
+    function escapeHtml(text) {
+      return String(text ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function escapeAttr(text) {
+      return String(text ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function setBtnBusy(id, busy, label) {
+      const btn = $(id);
+      if (!btn) return;
+      btn.classList.toggle('busy', busy);
+      if (label) btn.textContent = label;
+      else if (id === 'runBtn' && !busy) {
+        btn.textContent = isFullCourseMode() ? 'Run full course' : 'Run pipeline';
+      }
+      updateButtonHints();
+    }
+
+    function canRunPipeline() {
+      const hasCourse = !!$('courseSelect').value;
+      if (!hasCourse) return false;
+      if (isFullCourseMode()) return true;
+      return !!$('fileSelect').value;
+    }
+
+    function sessionActive() {
+      if (!session) return false;
+      return ['starting', 'running', 'waiting'].includes(session.status);
+    }
+
+    function updateButtonHints() {
+      const fullCourse = isFullCourseMode();
+      const hasFile = !!$('fileSelect').value;
+      const hasCourse = !!$('courseSelect').value;
+      const st = session?.status || 'idle';
+      const active = sessionActive();
+
+      $('runBtn').disabled = uiBusy || !canRunPipeline();
+      if (!uiBusy) {
+        $('runBtn').textContent = fullCourse ? 'Run full course' : 'Run pipeline';
+      }
+      $('proceedBtn').disabled = uiBusy || st !== 'waiting';
+      $('stopBtn').disabled = uiBusy || !active;
+
+      $('proceedBtn').classList.toggle('waiting-pulse', st === 'waiting' && !uiBusy);
+
+      if (!hasCourse) {
+        $('runHint').textContent = 'Pick a course';
+      } else if (fullCourse) {
+        $('runHint').textContent = active
+          ? 'Restart full course pipeline'
+          : 'All files: pass 1 together, then pass 2 — Proceed between phases';
+      } else if (!hasFile) {
+        $('runHint').textContent = 'Pick a file (or switch to full course mode)';
+      } else if (active) {
+        $('runHint').textContent = 'Click to restart pipeline for this file';
+      } else if (st === 'done') {
+        $('runHint').textContent = 'Finished — run again or pick another file';
+      } else {
+        $('runHint').textContent = 'Start single-file pipeline for the selected file';
+      }
+
+      if (st === 'waiting') {
+        $('proceedHint').textContent = session?.waiting_for?.hint || 'Click to continue';
+      } else if (uiBusy) {
+        $('proceedHint').textContent = 'Sending to server…';
+      } else if (st === 'running' || st === 'starting') {
+        $('proceedHint').textContent = 'Working — wait for pause';
+      } else {
+        $('proceedHint').textContent = 'Enabled when pipeline pauses';
+      }
+
+      $('stopHint').textContent = active
+        ? 'Interrupt current session'
+        : 'No active session';
+    }
+
+    function showError(message) {
+      $('activityBar').className = 'activity-bar error';
+      $('activityPrimary').textContent = 'Error';
+      $('activitySub').textContent = message;
+    }
+
+    function renderActivity() {
+      const bar = $('activityBar');
+      const st = session?.status || 'idle';
+      bar.className = 'activity-bar ' + st;
+
+      let primary = 'Ready — select a course and file, then Run pipeline.';
+      let sub = 'Single file: syllabus → seed → one file → final. Full course: all files run pass 1 together, then pass 2 — Proceed only between phases.';
+
+      if (uiBusy && localStatus === 'starting') {
+        primary = 'Starting session…';
+        sub = 'Initializing parser and waiting for first checkpoint.';
+      } else if (uiBusy && localStatus === 'proceeding') {
+        primary = 'Proceeding…';
+        sub = 'Resuming pipeline on server.';
+      } else if (uiBusy && localStatus === 'stopping') {
+        primary = 'Stopping…';
+        sub = 'Cancelling background parse task.';
+      } else if (session) {
+        if (st === 'starting') {
+          primary = 'Starting…';
+          sub = session.activity || 'Initializing parser runtime (may take 10–20s on first run).';
+        } else if (st === 'running' && !(session.steps?.length)) {
+          primary = 'Starting…';
+          sub = session.activity || 'Loading auth, Canvas session, and parser — please wait.';
+        } else if (st === 'waiting' && session.waiting_for) {
+          primary = 'Paused — ' + (session.waiting_for.subline || session.waiting_for.step_id);
+          sub = session.waiting_for.hint || session.activity || '';
+        } else if (st === 'running') {
+          primary = 'Running — ' + (session.activity || 'working…');
+          const costLine = session.cost_summary?.display;
+          sub = 'Next pause when a checkpoint is reached.'
+            + (costLine && session.cost_summary?.billed_steps
+              ? ` Running total: ${costLine}.` : '');
+        } else if (st === 'done') {
+          primary = 'Done — pipeline complete';
+          const costLine = session.cost_summary?.display;
+          sub = (session.steps?.length || 0) + ' checkpoints recorded.'
+            + (costLine ? ` Total LLM cost: ${costLine}.` : '');
+        } else if (st === 'error') {
+          primary = 'Error';
+          sub = (session.error || 'Unknown error').split('\n')[0];
+        }
+      }
+
+      $('activityPrimary').textContent = primary;
+      $('activitySub').textContent = sub;
+      renderSessionCost();
+
+      const logEl = $('activityLog');
+      const log = session?.activity_log || [];
+      if (log.length) {
+        logEl.hidden = false;
+        logEl.innerHTML = log.slice().reverse().map((row) =>
+          `<div class="log-${row.level || 'info'}">${new Date((row.ts || 0) * 1000).toLocaleTimeString()} ${row.message}</div>`
+        ).join('');
+      } else {
+        logEl.hidden = true;
+      }
+
+      updateButtonHints();
+    }
+
+    function hasTabContent(value) {
+      if (value === undefined || value === null || value === '') return false;
+      if (Array.isArray(value)) return true;
+      if (typeof value === 'object') return Object.keys(value).length > 0;
+      return true;
+    }
+
+    function formatTabValue(value) {
+      if (value === undefined || value === null) return '(empty)';
+      if (typeof value === 'string') return value || '(empty)';
+      if (Array.isArray(value)) {
+        return value.length ? JSON.stringify(value, null, 2) : '(empty array)';
+      }
+      try {
+        const text = JSON.stringify(value, null, 2);
+        return text || '(empty)';
+      } catch (err) {
+        return String(value);
+      }
+    }
+
+    function stepRecord(index) {
+      const rows = session?.steps || [];
+      const row = rows[index];
+      const detail = session?.step_detail;
+      if (!row && detail) return detail;
+      if (!row) return null;
+      if (detail && detail.id === row.id) {
+        return { ...row, ...detail, payload: detail.payload || row.payload };
+      }
+      return row;
+    }
+
+    function pickTabPayload(payload) {
+      const tabs = [];
+      const seen = new Set();
+      for (const [key, label] of TAB_KEYS) {
+        if (seen.has(key)) continue;
+        if (hasTabContent(payload[key])) {
+          tabs.push({ key, label, value: payload[key] });
+          seen.add(key);
+        }
+      }
+      if (!tabs.length) tabs.push({ key: '_all', label: 'All', value: payload });
+      return tabs;
+    }
+
+    function isFullCourseMode() {
+      const mode = $('pipelineMode');
+      return (mode?.value || 'single_file') === 'full_course';
+    }
+
+    function updatePipelineModeUi() {
+      const full = isFullCourseMode();
+      const fileSel = $('fileSelect');
+      const hasCourse = !!$('courseSelect').value;
+      fileSel.disabled = full || !hasCourse;
+      if (full) fileSel.value = '';
+      updateButtonHints();
+      renderActivity();
+    }
+
+    function stopPolling() {
+      if (pollTimer) {
+        clearTimeout(pollTimer);
+        pollTimer = null;
+      }
+    }
+
+    function renderDetailTabs(step, { resetTab = false } = {}) {
+      const payload = {
+        ...(step?.payload || {}),
+        price_analysis: buildPriceAnalysis(step),
+      };
+      $('rawView').textContent = JSON.stringify(step, null, 2);
+      const tabs = pickTabPayload(payload);
+      if (resetTab || !selectedDetailTabKey) {
+        selectedDetailTabKey = tabs[0]?.key || null;
+      } else {
+        const stillThere = tabs.some((t) => t.key === selectedDetailTabKey);
+        if (!stillThere) selectedDetailTabKey = tabs[0]?.key || null;
+      }
+      const activeIdx = Math.max(0, tabs.findIndex((t) => t.key === selectedDetailTabKey));
+      $('tabs').innerHTML = tabs.map((t, i) =>
+        `<span class="tab${i === activeIdx ? ' active' : ''}" data-idx="${i}">${t.label}</span>`
+      ).join('');
+      const renderTab = (tab) => {
+        $('detailView').textContent = formatTabValue(tab?.value);
+      };
+      renderTab(tabs[activeIdx]);
+      $('tabs').querySelectorAll('.tab').forEach((el) => {
+        el.onclick = () => {
+          const idx = Number(el.dataset.idx);
+          selectedDetailTabKey = tabs[idx]?.key || null;
+          $('tabs').querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+          el.classList.add('active');
+          renderTab(tabs[idx]);
+        };
+      });
+    }
+
+    async function showStep(index, stepOverride) {
+      const stepChanged = selectedStep !== index;
+      selectedStep = index;
+      if (stepChanged) selectedDetailTabKey = null;
+      const steps = session?.steps || [];
+      document.querySelectorAll('.step').forEach((el, i) => {
+        el.classList.toggle('active', i === index);
+      });
+      if (index < 0 || index >= steps.length) {
+        $('detailView').textContent = 'Select a step.';
+        $('rawView').textContent = '{}';
+        $('tabs').innerHTML = '';
+        return;
+      }
+      const step = stepOverride || stepRecord(index);
+      if (!step?.payload) {
+        try {
+          const data = await api(`/api/session?light=1&step=${index}`);
+          session = data.session;
+          const loaded = session?.step_detail;
+          if (loaded && loaded.id === (session?.steps?.[index]?.id || loaded.id)) {
+            renderDetailTabs(loaded, { resetTab: stepChanged });
+            return;
+          }
+        } catch (err) {
+          $('detailView').textContent = `Failed to load step detail: ${err.message || err}`;
+          return;
+        }
+      }
+      if (!step?.payload) {
+        $('detailView').textContent = 'No payload for this step yet.';
+        $('tabs').innerHTML = '';
+        $('rawView').textContent = JSON.stringify(step || {}, null, 2);
+        return;
+      }
+      renderDetailTabs(step, { resetTab: stepChanged });
+    }
+
+    function renderSteps() {
+      const list = $('stepList');
+      const steps = session?.steps || [];
+      if (!steps.length) {
+        list.innerHTML = '<div class="empty">Run a file to see checkpoints.</div>';
+        return;
+      }
+      list.innerHTML = steps.map((s, i) => {
+        const cost = s.cost;
+        let costHtml = '';
+        if (cost?.display) {
+          const cls = cost.kind === 'pending' ? ' pending' : (cost.kind === 'rollup' ? ' rollup' : '');
+          costHtml = `<div class="cost-line${cls}">${escapeHtml(cost.display)}</div>`;
+        }
+        return `
+        <div class="step${i === selectedStep ? ' active' : ''}" data-idx="${i}">
+          <div class="title">${escapeHtml(s.id)}</div>
+          <div class="subline">${escapeHtml(s.subline || '')}</div>
+          ${costHtml}
+          <div class="meta">${new Date((s.ts || 0) * 1000).toLocaleTimeString()}</div>
+        </div>`;
+      }).join('');
+      list.querySelectorAll('.step').forEach((el) => {
+        el.onclick = () => loadStepDetail(Number(el.dataset.idx));
+      });
+      if (selectedStep < 0 && steps.length) {
+        void showStep(steps.length - 1, session?.step_detail);
+      } else if (selectedStep >= 0) {
+        void showStep(selectedStep, session?.step_detail);
+      }
+    }
+
+    async function loadStepDetail(idx) {
+      const stepChanged = selectedStep !== idx;
+      selectedStep = idx;
+      if (stepChanged) selectedDetailTabKey = null;
+      document.querySelectorAll('.step').forEach((el, i) => {
+        el.classList.toggle('active', i === idx);
+      });
+      $('detailView').textContent = 'Loading step detail…';
+      try {
+        const data = await api(`/api/session?light=1&step=${idx}`);
+        session = data.session;
+        if (session) await showStep(idx, session.step_detail);
+      } catch (err) {
+        showError(err.message || String(err));
+      }
+      renderActivity();
+    }
+
+    async function refreshSession() {
+      const stepQ = selectedStep >= 0 ? `&step=${selectedStep}` : '';
+      try {
+        const data = await api(`/api/session?light=1${stepQ}`);
+        const prevCount = session?.step_count || 0;
+        session = data.session;
+        if (!uiBusy) localStatus = '';
+        renderActivity();
+        renderSteps();
+        if ((session?.step_count || 0) > prevCount && selectedStep < 0) {
+          void showStep((session.steps?.length || 1) - 1, session.step_detail);
+        } else if (selectedStep >= 0) {
+          void showStep(selectedStep, session.step_detail);
+        }
+      } catch (err) {
+        if (String(err.message || '').includes('404')) {
+          session = null;
+          renderActivity();
+        } else {
+          showError(`Session poll failed: ${err.message || err}`);
+        }
+      }
+      if (session && sessionActive()) schedulePoll();
+    }
+
+    function schedulePoll() {
+      if (pollTimer) clearTimeout(pollTimer);
+      if (!session || !sessionActive()) return;
+      const ms = (['starting', 'running'].includes(session.status) || uiBusy) ? 400 : 1500;
+      pollTimer = setTimeout(refreshSession, ms);
+    }
+
+    function startPolling() {
+      stopPolling();
+      refreshSession();
+    }
+
+    async function loadCourses() {
+      const sel = $('courseSelect');
+      sel.disabled = true;
+      try {
+        const data = await api('/api/courses');
+        sel.innerHTML = '<option value="">Course…</option>' +
+          (data.courses || []).map(c =>
+            `<option value="${escapeAttr(c.id)}">${escapeHtml(c.name)} (${escapeHtml(c.id)})</option>`
+          ).join('');
+      } catch (err) {
+        sel.innerHTML = '<option value="">Failed to load courses</option>';
+        throw err;
+      } finally {
+        sel.disabled = false;
+      }
+    }
+
+    async function loadFiles(courseId) {
+      const sel = $('fileSelect');
+      if (!courseId) {
+        sel.disabled = true;
+        sel.innerHTML = '<option value="">File…</option>';
+        renderActivity();
+        return;
+      }
+      sel.disabled = true;
+      sel.innerHTML = '<option value="">Loading files…</option>';
+      try {
+        const data = await api(`/api/courses/${encodeURIComponent(courseId)}/items`);
+        sel.disabled = false;
+        const items = data.items || [];
+        sel.innerHTML = '<option value="">File…</option>' +
+          items.map(it =>
+            `<option value="${escapeAttr(it.key)}">[${escapeHtml(it.batch_type)}] ${escapeHtml(it.name || it.id)}</option>`
+          ).join('');
+        if (items.length && !isFullCourseMode()) sel.value = items[0].key;
+      } catch (err) {
+        sel.disabled = false;
+        sel.innerHTML = '<option value="">Failed to load files</option>';
+        showError(String(err.message || err));
+      }
+      updatePipelineModeUi();
+      renderActivity();
+    }
+
+    $('courseSelect').onchange = () => {
+      updatePipelineModeUi();
+      loadFiles($('courseSelect').value);
+    };
+    $('fileSelect').onchange = () => renderActivity();
+    $('pipelineMode').onchange = () => {
+      updatePipelineModeUi();
+      if (isFullCourseMode() && serverApiVersion > 0 && serverApiVersion < 2) {
+        showError(
+          'This debug server is too old for full course mode. '
+          + 'Restart: python scripts/parse_debug_server.py'
+        );
+      }
+    };
+
+    $('runBtn').addEventListener('click', async () => {
+      const courseId = $('courseSelect').value;
+      const fullCourse = isFullCourseMode();
+      const itemKey = $('fileSelect').value;
+      if (!canRunPipeline()) {
+        showError(fullCourse ? 'Select a course first.' : 'Select a course and file first.');
+        return;
+      }
+      stopPolling();
+      uiBusy = true;
+      localStatus = 'starting';
+      setBtnBusy('runBtn', true, 'Starting…');
+      $('activityBar').className = 'activity-bar starting';
+      $('activityPrimary').textContent = fullCourse ? 'Starting full course pipeline…' : 'Starting pipeline…';
+      $('activitySub').textContent = 'Contacting server…';
+      selectedStep = -1;
+      selectedDetailTabKey = null;
+      try {
+        const body = {
+          course_id: courseId,
+          pipeline_mode: $('pipelineMode').value || 'single_file',
+          pause_mode: $('pauseMode').value || 'phase',
+        };
+        if (!fullCourse) body.item_key = itemKey;
+        const data = await api('/api/session', { method: 'POST', body: JSON.stringify(body) });
+        session = data.session;
+        if (!session) throw new Error('Server returned no session');
+        if (session.status === 'error') {
+          showError(session.error || data.error || 'Session failed');
+        } else {
+          $('activityBar').className = 'activity-bar ' + (session.status || 'starting');
+        }
+        renderSteps();
+        startPolling();
+      } catch (err) {
+        if (err.session) session = err.session;
+        else session = null;
+        const msg = String(err.message || err);
+        if (msg.includes('item_key required') || msg.includes('course_id and item_key')) {
+          showError(
+            msg + ' — restart parse_debug_server.py (stale server build). '
+            + 'Full course mode needs api_version >= 2.'
+          );
+        } else {
+          showError(msg);
+        }
+      } finally {
+        uiBusy = false;
+        localStatus = '';
+        setBtnBusy('runBtn', false);
+        renderActivity();
+      }
+    });
+
+    $('proceedBtn').onclick = async () => {
+      if (!session || session.status !== 'waiting') return;
+      uiBusy = true;
+      localStatus = 'proceeding';
+      setBtnBusy('proceedBtn', true, 'Proceeding…');
+      renderActivity();
+      try {
+        const data = await api('/api/session/proceed', { method: 'POST', body: '{}' });
+        session = data.session;
+        renderSteps();
+        startPolling();
+      } catch (err) {
+        if (err.session) session = err.session;
+        showError(String(err.message || err));
+      } finally {
+        uiBusy = false;
+        localStatus = '';
+        setBtnBusy('proceedBtn', false, 'Proceed →');
+        renderActivity();
+      }
+    };
+
+    $('stopBtn').onclick = async () => {
+      uiBusy = true;
+      localStatus = 'stopping';
+      setBtnBusy('stopBtn', true, 'Stopping…');
+      renderActivity();
+      try {
+        await api('/api/session/stop', { method: 'POST', body: '{}' });
+        await refreshSession();
+      } finally {
+        uiBusy = false;
+        setBtnBusy('stopBtn', false, 'Stop');
+        renderActivity();
+      }
+    };
+
+    document.addEventListener('keydown', (e) => {
+      if (e.target.matches('select, input, textarea')) return;
+      if (e.key === 'Enter' && session?.status === 'waiting' && !uiBusy) {
+        e.preventDefault();
+        $('proceedBtn').click();
+      }
+      if (e.key === 'Escape' && session && !uiBusy) {
+        $('stopBtn').click();
+      }
+    });
+
+    async function bootstrap() {
+      $('serverUrl').textContent = window.location.origin || 'http://127.0.0.1:8765';
+      try {
+        await fetch('/api/session/clear', { cache: 'no-store' });
+        session = null;
+        await loadCourses();
+        updatePipelineModeUi();
+        try {
+          const health = await api('/api/health');
+          serverApiVersion = Number(health.api_version || 0);
+          if (health.url) $('serverUrl').textContent = health.url;
+          if (isFullCourseMode() && serverApiVersion < 2) {
+            showError(
+              'This debug server is too old for full course mode. '
+              + 'Restart: python scripts/parse_debug_server.py'
+            );
+          } else if (health.env_error) {
+            showError(health.env_error + ' — fix .env in the repo root, then restart the server.');
+          }
+        } catch (_) {
+          // health is optional; page still works
+        }
+        renderActivity();
+      } catch (err) {
+        showError(String(err.message || err));
+      }
+    }
+
+    bootstrap();
+  </script>
+</body>
+</html>

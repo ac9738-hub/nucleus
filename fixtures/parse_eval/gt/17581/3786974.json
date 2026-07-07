@@ -1,0 +1,358 @@
+{
+  "version": 1,
+  "courseId": "17581",
+  "fileId": "3786974",
+  "filename": "Parkinson_2018.pdf",
+  "expectedFileType": "research_article",
+  "passPlan": {
+    "courseId": "17581",
+    "fileId": "3786974",
+    "filename": "Parkinson_2018.pdf",
+    "resolvedType": "research_article",
+    "heuristicConfidence": 0.86,
+    "neededPasses": [
+      "extract_pages",
+      "heuristic_classify",
+      "llm_pass1",
+      "finalize"
+    ],
+    "skippedPasses": [
+      "llm_classify",
+      "llm_pass2"
+    ],
+    "estLlmCalls": 1,
+    "estRealisticLlmCalls": 1.0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "needed": true,
+        "reason": "Required local PDF/HTML extraction; no LLM.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "heuristic_classify",
+        "needed": true,
+        "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_classify",
+        "needed": false,
+        "reason": "Heuristic confidence 0.86 sufficient; skip flash classify call.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_pass1",
+        "needed": true,
+        "reason": "Type research_article: pass1 extracts concepts=True, problems=False, events=False.",
+        "llmCall": true,
+        "estCostTier": "high"
+      },
+      {
+        "pass": "llm_pass2",
+        "needed": false,
+        "reason": "Type research_article disables pass2 (single-pass type-specific or link-only profile).",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "finalize",
+        "needed": true,
+        "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+        "llmCall": false,
+        "estCostTier": "free"
+      }
+    ]
+  },
+  "passAudit": {
+    "plan": {
+      "courseId": "17581",
+      "fileId": "3786974",
+      "filename": "Parkinson_2018.pdf",
+      "resolvedType": "research_article",
+      "heuristicConfidence": 0.86,
+      "neededPasses": [
+        "extract_pages",
+        "heuristic_classify",
+        "llm_pass1",
+        "finalize"
+      ],
+      "skippedPasses": [
+        "llm_classify",
+        "llm_pass2"
+      ],
+      "estLlmCalls": 1,
+      "estRealisticLlmCalls": 1.0,
+      "steps": [
+        {
+          "pass": "extract_pages",
+          "needed": true,
+          "reason": "Required local PDF/HTML extraction; no LLM.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "heuristic_classify",
+          "needed": true,
+          "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_classify",
+          "needed": false,
+          "reason": "Heuristic confidence 0.86 sufficient; skip flash classify call.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_pass1",
+          "needed": true,
+          "reason": "Type research_article: pass1 extracts concepts=True, problems=False, events=False.",
+          "llmCall": true,
+          "estCostTier": "high"
+        },
+        {
+          "pass": "llm_pass2",
+          "needed": false,
+          "reason": "Type research_article disables pass2 (single-pass type-specific or link-only profile).",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "finalize",
+          "needed": true,
+          "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+          "llmCall": false,
+          "estCostTier": "free"
+        }
+      ]
+    },
+    "actualType": "research_article",
+    "deepseekPasses": 1,
+    "conceptCount": 23,
+    "detailCount": 2,
+    "totalLlmTokens": 0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "ran": true,
+        "useful": true,
+        "verdict": "required",
+        "note": "Local I/O; pages present means extract succeeded."
+      },
+      {
+        "pass": "heuristic_classify",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "Routed to research_article (free)."
+      },
+      {
+        "pass": "llm_classify",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Skipped; heuristic confidence sufficient.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass1",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "No pass1 tool trace.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass2",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Correctly skipped: profile disables pass2, type-specific pass1 only, or no log_* tools.",
+        "tokens": 0
+      },
+      {
+        "pass": "finalize",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "logged_details promoted to concept details."
+      }
+    ],
+    "cutCandidates": [],
+    "recommendations": [
+      "Pass2 correctly skipped for this type/pass1 tool pattern."
+    ]
+  },
+  "passes": [
+    "extract_pages",
+    "heuristic_classify",
+    "teaching_units",
+    "type_structure",
+    "concept_candidates",
+    "problem_scan",
+    "detail_attach",
+    "reconcile"
+  ],
+  "buildMode": "template_multi_pass_offline",
+  "builtAt": "2026-07-01T22:49:39Z",
+  "concepts": [
+    {
+      "name": "1 department of psychology, university of california, los angeles, 1285 franz hall, box 951563 , los angeles, ca 90095,",
+      "details": []
+    },
+    {
+      "name": "article",
+      "details": []
+    },
+    {
+      "name": "similar neural responses predict friendship",
+      "details": []
+    },
+    {
+      "name": "10.1038/s41467-017-02722-7open",
+      "details": []
+    },
+    {
+      "name": "10.1038/s41467-017-02722-7article",
+      "details": [
+        "NATURE COMMUNICATIONS | DOI: 10.1038/s41467-017-02722-7ARTICLE"
+      ]
+    },
+    {
+      "name": "subject 1correlatecorrespondingtime series",
+      "details": []
+    },
+    {
+      "name": "subject 2",
+      "details": []
+    },
+    {
+      "name": "social distance",
+      "details": []
+    },
+    {
+      "name": "left amygdala",
+      "details": []
+    },
+    {
+      "name": "triangular part of left inferior frontal gyrus",
+      "details": []
+    },
+    {
+      "name": "right superior temporal gyrus",
+      "details": []
+    },
+    {
+      "name": "neural response similarity",
+      "details": []
+    },
+    {
+      "name": "nationality",
+      "details": []
+    },
+    {
+      "name": "handedness",
+      "details": []
+    },
+    {
+      "name": "gender",
+      "details": []
+    },
+    {
+      "name": "ethnicity",
+      "details": []
+    },
+    {
+      "name": "brain region",
+      "details": []
+    },
+    {
+      "name": "frequency",
+      "details": []
+    },
+    {
+      "name": "frequencyfrequency",
+      "details": []
+    },
+    {
+      "name": "classification accuracy",
+      "details": []
+    },
+    {
+      "name": "predicted social distance",
+      "details": []
+    },
+    {
+      "name": "true social distance",
+      "details": []
+    },
+    {
+      "name": "12 may 2017 accepted: 20 december 2017",
+      "details": [
+        "Received: 12 May 2017 Accepted: 20 December 2017"
+      ]
+    }
+  ],
+  "conceptCount": 23,
+  "detailCount": 2,
+  "events": [],
+  "problems": [
+    "Problem 60"
+  ],
+  "sections": [
+    "Problem 60"
+  ],
+  "deepseekPasses": 1,
+  "expectsPass2": false,
+  "gtProvenance": {
+    "typeSource": "heuristic_high",
+    "typeConfidence": 0.86,
+    "offlinePassAudit": {
+      "extract_pages": {
+        "localPdf": true,
+        "pageCount": 14,
+        "pdfPath": "C:\\Allen\\nucleus\\canvasfiles\\3786974"
+      },
+      "heuristic_classify": {
+        "expectedFileType": "research_article",
+        "source": "heuristic_high",
+        "confidence": 0.86
+      },
+      "teaching_units": {
+        "sectionCount": 1
+      },
+      "type_structure": {
+        "slideRows": 35,
+        "readingSections": 36,
+        "syllabusWeeks": 0
+      },
+      "concept_candidates": {
+        "candidateCount": 23
+      },
+      "problem_scan": {
+        "problemCount": 1
+      },
+      "detail_attach": {
+        "conceptKeysWithDetails": 12,
+        "detailCount": 12
+      },
+      "reconcile": {
+        "inputTitles": 23,
+        "accepted": 23,
+        "capped": 0,
+        "detailAttached": 2
+      }
+    },
+    "reconcileStats": {
+      "inputTitles": 23,
+      "accepted": 23,
+      "capped": 0,
+      "detailAttached": 2
+    }
+  }
+}

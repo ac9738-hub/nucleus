@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "split": "holdout",
+  "createdAt": "2026-06-23T21:37:25Z",
+  "sourceGraph": "canvas_graph.json",
+  "courseIds": [
+    "15222",
+    "14788",
+    "17239"
+  ],
+  "fileCount": 0,
+  "labeledFileCount": 0,
+  "localPdfCount": 0,
+  "files": []
+}

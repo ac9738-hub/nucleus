@@ -4,14 +4,150 @@
 // Dependencies: preload.js window.nucleus bridge, renderer/workspace-page-tabs.js
 // tab mutators, renderer/render.js render functions, and taskoptimizer.js.
 // ─── Data (owned by main process, renderer keeps local copies) ───────────────
-let tasks;         // array of task objects
-let workspaces;    // array of workspace objects
-let projectGroups; // array of project group objects
-let canvasData;    // parsed canvas_data.json snapshot
-let nucleusCanvasCSS;
+const DEFAULT_WORKSPACES = [
+  { id: "nucleus", name: "Nucleus", description: "Your main planning workspace." },
+  { id: "biology", name: "Biology", description: "Labs, readings, and course projects." },
+  { id: "computer-science", name: "Computer Science", description: "Problem sets, code practice, and notes." },
+  { id: "writing", name: "Writing", description: "Drafts, revisions, and source work." }
+];
+
+// var (not let) so app.js and other classic scripts share these bindings.
+var tasks = [];         // array of task objects
+var workspaces = DEFAULT_WORKSPACES.slice();    // array of workspace objects
+var projectGroups = []; // array of project group objects
+var canvasData = {};    // parsed canvas_data.json snapshot
+var canvasCachePolicy = { diskRecoveryEnabled: true, memoryCacheEnabled: true };
+var workspaceSessions = {}; // per-workspace Control Center session state
+
+function getWorkspaceSession(workspaceId) {
+  const lib = window.NucleusWorkspaceSession
+  const id = String(workspaceId || state.activeWorkspaceId || '')
+  const raw = workspaceSessions[id]
+  return lib && typeof lib.normalizeSession === 'function'
+    ? lib.normalizeSession(raw, id)
+    : (raw || {})
+}
+
+async function loadWorkspaceSessions() {
+  if (!window.nucleus || typeof window.nucleus.getWorkspaceSessions !== 'function') {
+    return
+  }
+  try {
+    const result = await window.nucleus.getWorkspaceSessions()
+    if (result && result.sessions && typeof result.sessions === 'object') {
+      workspaceSessions = result.sessions
+    }
+  } catch (error) {
+    console.error('Unable to load workspace sessions:', error)
+  }
+}
+
+function patchWorkspaceSession(workspaceId, patch, options = {}) {
+  const id = String(workspaceId || state.activeWorkspaceId || '')
+  const lib = window.NucleusWorkspaceSession
+  let next = null
+
+  if (patch && patch.tabContext && options.tab && lib && typeof lib.setTabIncludeInContext === 'function') {
+    const tabId = String(options.tab.id || '')
+    const entry = patch.tabContext[tabId]
+    if (tabId && entry) {
+      next = lib.setTabIncludeInContext(
+        getWorkspaceSession(id),
+        tabId,
+        entry.includeInContext !== false,
+        options.tab
+      )
+      const rest = { ...patch }
+      delete rest.tabContext
+      if (Object.keys(rest).length) {
+        next = lib.mergeSessionPatch(next, rest, id)
+      }
+    }
+  }
+
+  if (!next) {
+    next = lib && typeof lib.mergeSessionPatch === 'function'
+      ? lib.mergeSessionPatch(getWorkspaceSession(id), patch || {}, id)
+      : { ...getWorkspaceSession(id), ...(patch || {}) }
+  }
+
+  workspaceSessions[id] = next
+  if (window.nucleus && typeof window.nucleus.updateWorkspaceSession === 'function') {
+    void window.nucleus.updateWorkspaceSession({ workspaceId: id, session: next })
+  }
+  syncContextUiState()
+  return next
+}
+
+function recordWorkspaceActivity(workspaceId, type, label, ref) {
+  const lib = window.NucleusWorkspaceSession
+  if (!lib || typeof lib.recordActivity !== 'function') return
+  const id = String(workspaceId || state.activeWorkspaceId || '')
+  const next = lib.recordActivity(getWorkspaceSession(id), { type, label, ref }, id)
+  workspaceSessions[id] = next
+  if (window.nucleus && typeof window.nucleus.updateWorkspaceSession === 'function') {
+    void window.nucleus.updateWorkspaceSession({ workspaceId: id, session: next })
+  }
+  syncContextUiState()
+}
+
+function mergeSnapshotTasks(incoming) {
+  return Array.isArray(incoming) && incoming.length ? incoming : tasks;
+}
+
+function mergeSnapshotList(incoming, current) {
+  return Array.isArray(incoming) && incoming.length ? incoming : current;
+}
+
+function mergeSnapshotRecord(incoming, current) {
+  return incoming && typeof incoming === "object" && Object.keys(incoming).length
+    ? incoming
+    : current;
+}
+
+async function pullTasksFromMain() {
+  if (!window.nucleus) return 0;
+  if (typeof window.nucleus.getTasks === "function") {
+    const payload = await window.nucleus.getTasks();
+    if (payload && Array.isArray(payload.tasks) && payload.tasks.length) {
+      tasks = payload.tasks;
+      return payload.tasks.length;
+    }
+    return Number(payload && payload.taskCount) || 0;
+  }
+  if (typeof window.nucleus.getData === "function") {
+    const data = await window.nucleus.getData();
+    if (Array.isArray(data.tasks) && data.tasks.length) {
+      tasks = data.tasks;
+      return data.tasks.length;
+    }
+  }
+  return 0;
+}
+
+async function waitForCachedTasks(initialCount) {
+  if (initialCount > 0) return;
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    await new Promise(resolve => setTimeout(resolve, 500));
+    try {
+      const count = await pullTasksFromMain();
+      if (count > 0 && typeof render === "function") {
+        try {
+          render();
+        } catch (error) {
+          console.error("Render failed after task cache retry:", error);
+        }
+        return;
+      }
+    } catch (error) {
+      console.error("Unable to refresh cached tasks:", error);
+      return;
+    }
+  }
+}
 
 // ─── UI State (owned by renderer) ────────────────────────────────────────────
-let state = {
+var state = {
   activeSection: "home",         // which top section is active: "home" | "tasks" | "calendar"
   activeWorkspaceId: "nucleus",  // which workspace tab is selected
   activeTabId: null,             // which page tab is active within the workspace
@@ -20,9 +156,8 @@ let state = {
   workspaceSidebarCollapsed: false,
   aiPanelWidth: 340,
   aiPanelMinimized: false,
-  currentCanvasPageContext: null,
   tabs: [
-    { id: "center:nucleus", type: "center", workspaceId: "nucleus", label: "Project Center" }
+    { id: "center:nucleus", type: "center", workspaceId: "nucleus", label: "Control Center" }
   ],
   top: 'section'                 // whether the user is in a top section or a workspace: "section" | "workspace"
 }
@@ -48,31 +183,142 @@ window.__nucleusTabSnapshot = {
 
 function applyTabViewState(payload) {
   if (!payload || !payload.id) return;
+  const isActivePayload = sameTabId(payload.id, state.activeTabId);
+  if (!isActivePayload && (payload.tier === 'active' || payload.tier === 'stashed')) {
+  }
+  const diag = window.__nucleusDiag;
+  if (diag && diag.isEnabled("tabs")) {
+    diag.logTabs("view_state", {
+      tabId: payload.id,
+      tier: payload.tier || "",
+      discarded: Boolean(payload.discarded),
+      loading: typeof payload.loading === "boolean" ? payload.loading : null,
+      hasSnapshot: Boolean(payload.snapshotDataUrl),
+      isActive: sameTabId(payload.id, state.activeTabId)
+    });
+  }
   const tab = state.tabs.find(item => sameTabId(item.id, payload.id));
   if (!tab) return;
+  if (payload.tier === "active" && !sameTabId(payload.id, state.activeTabId)) {
+    if (payload.snapshotDataUrl) {
+      tab.snapshotDataUrl = payload.snapshotDataUrl;
+    }
+    if (typeof payload.loading === "boolean") {
+      tab.loading = payload.loading;
+    }
+    return;
+  }
+  if (
+    payload.tier === "stashed"
+    && sameTabId(payload.id, state.activeTabId)
+    && tab.type === "canvastab"
+    && tab.canvasMode !== "browser"
+  ) {
+    if (payload.snapshotDataUrl) {
+      tab.snapshotDataUrl = payload.snapshotDataUrl;
+    }
+    return;
+  }
+
+  const before = {
+    loading: Boolean(tab.loading),
+    viewTier: tab.viewTier || "",
+    discarded: Boolean(tab.discarded),
+    snapshotDataUrl: tab.snapshotDataUrl || ""
+  };
+
   tab.discarded = Boolean(payload.discarded);
   if (payload.snapshotDataUrl) {
     tab.snapshotDataUrl = payload.snapshotDataUrl;
   }
   if (payload.tier === "active") {
     tab.discarded = false;
-    tab.loading = false;
     if (sameTabId(payload.id, state.activeTabId)) {
       tab.viewTier = "active";
-      tabSnapshotOverlay = { visible: false, tabId: null, snapshotDataUrl: "" };
     }
   } else if (payload.tier) {
     tab.viewTier = payload.tier;
   }
+  if (typeof payload.loading === "boolean") {
+    tab.loading = payload.loading;
+  }
+
+  if (
+    typeof payload.loading === "boolean"
+    && !payload.loading
+    && before.loading
+    && sameTabId(payload.id, state.activeTabId)
+    && tab.type === "canvastab"
+    && tab.canvasMode === "browser"
+    && (tab.snapshotDataUrl || before.snapshotDataUrl)
+  ) {
+    tabSnapshotOverlay = {
+      visible: true,
+      tabId: tab.id,
+      snapshotDataUrl: tab.snapshotDataUrl || before.snapshotDataUrl
+    };
+  }
+
+  const after = {
+    loading: Boolean(tab.loading),
+    viewTier: tab.viewTier || "",
+    discarded: Boolean(tab.discarded),
+    snapshotDataUrl: tab.snapshotDataUrl || ""
+  };
+
   const inactiveSnapshotUpdate = payload.tier === "stashed"
     && !sameTabId(payload.id, state.activeTabId);
-  if (inactiveSnapshotUpdate) {
+  if (inactiveSnapshotUpdate && !payload.snapshotDataUrl) {
     return;
   }
-  if (typeof scheduleRenderWorkspacePageTabs === "function") {
-    scheduleRenderWorkspacePageTabs(sameTabId(payload.id, state.activeTabId) ? "full" : "patch");
-  } else {
-    renderWorkspacePageTabs();
+
+  const chromeChanged = before.viewTier !== after.viewTier
+    || before.discarded !== after.discarded
+    || before.loading !== after.loading;
+  const viewChanged = before.loading !== after.loading
+    || before.snapshotDataUrl !== after.snapshotDataUrl
+    || (Boolean(payload.snapshotDataUrl) && before.snapshotDataUrl !== payload.snapshotDataUrl);
+
+  if (!chromeChanged && !viewChanged) {
+    return;
+  }
+
+  if (chromeChanged) {
+    if (typeof patchWorkspacePageTabs === "function" && sameTabId(payload.id, state.activeTabId)) {
+      patchWorkspacePageTabs();
+    } else if (typeof scheduleRenderWorkspacePageTabs === "function") {
+      scheduleRenderWorkspacePageTabs("patch");
+    } else if (typeof renderWorkspacePageTabs === "function") {
+      renderWorkspacePageTabs();
+    }
+  }
+
+  if (sameTabId(payload.id, state.activeTabId)) {
+    if (chromeChanged) {
+      if (typeof renderBrowserToolbar === "function") {
+        renderBrowserToolbar();
+      }
+      if (typeof renderCanvasToolbar === "function") {
+        renderCanvasToolbar();
+      }
+    }
+    if (viewChanged) {
+      const diag = window.__nucleusDiag;
+      if (diag && diag.isEnabled("tabs")) {
+        diag.logTabs("view_repaint", {
+          tabId: payload.id,
+          loading: Boolean(tab.loading),
+          hadLoading: before.loading,
+          hasSnapshot: Boolean(tab.snapshotDataUrl),
+          tier: payload.tier || tab.viewTier || ""
+        });
+      }
+      if (typeof paintActiveView === "function") {
+        paintActiveView({ skipTransition: true });
+      } else if (typeof renderView === "function") {
+        renderView();
+      }
+    }
   }
 }
 
@@ -98,11 +344,16 @@ async function writeActiveBrowserTabFramesHtml() {
 }
 
 function getWorkspace(workspaceId) {
-  return workspaces.find(workspace => workspace.id === workspaceId) || workspaces[0];
+  const list = Array.isArray(workspaces) ? workspaces : [];
+  return list.find(workspace => workspace.id === workspaceId) || list[0] || {
+    id: workspaceId || "nucleus",
+    name: "Workspace",
+    description: ""
+  };
 }
 
 function getWorkspaceTasks(workspaceId) {
-  return tasks.filter(task => task.workspaceId === workspaceId);
+  return (Array.isArray(tasks) ? tasks : []).filter(task => task.workspaceId === workspaceId);
 }
 
 function getGreeting() {
@@ -115,10 +366,11 @@ function getProjectGroups() {
 }
 
 function getBrowserWorkspaceId() {
-  if (workspaces.some(workspace => workspace.id === state.activeWorkspaceId)) {
+  const list = Array.isArray(workspaces) ? workspaces : [];
+  if (list.some(workspace => workspace.id === state.activeWorkspaceId)) {
     return state.activeWorkspaceId;
   }
-  return workspaces[0] ? workspaces[0].id : "nucleus";
+  return list[0] ? list[0].id : "nucleus";
 }
 
 function getMaxAiPanelWidth() {
@@ -233,151 +485,70 @@ function setupAiPanelControls() {
 
 // ─── Render-context contributors ──────────────────────────────────────────────
 // The renderer owns UI state (sections, layout, workspace catalog, full tab list)
-// and paints native apps / home into #view. These push that state + on-screen text
-// into the main-process reactive context store so the sidekick snapshot is complete.
+// and pushes it into the main-process native context store.
 
-// Returns the surface kind for the renderer-painted (#view) surface, or null when
-// the active surface is a WebContentsView (web / Canvas browser) the main process
-// scrapes directly and therefore owns.
-function getRendererSurfaceKind() {
-  if (state.top !== "workspace") {
-    return `section-${state.activeSection || "home"}`;
-  }
-  const tab = Array.isArray(state.tabs)
-    ? state.tabs.find(item => sameTabId(item.id, state.activeTabId))
-    : null;
-  if (!tab) return "project-center";
-  if (tab.type === "center") return "project-center";
-  if (tab.type === "task") return "task";
-  if (tab.type === "canvastab" && tab.canvasMode !== "browser") return "canvas-native";
-  if (tab.type === "synapsetab") return "synapse";
-  if (tab.type === "mailtab") return "mail";
-  // browsertab and Canvas browser tabs are WebContentsView surfaces (main owns).
-  return null;
-}
+let lastContextUiStateKey = ''
 
-function extractRendererVisibleText(maxBlocks = 24, maxChars = 2600) {
-  const view = document.getElementById("view");
-  const content = document.querySelector(".content");
-  if (!view || !content) return null;
-  const contentRect = content.getBoundingClientRect();
-  const selectors = "h1,h2,h3,h4,h5,h6,p,li,dt,dd,blockquote,pre,code,td,th,caption,figcaption,label,button,a,span,div";
-  const nodes = Array.from(view.querySelectorAll(selectors));
-  const seen = new Set();
-  const blocks = [];
-  let chars = 0;
-  for (const node of nodes) {
-    if (!node || typeof node.getBoundingClientRect !== "function") continue;
-    const rect = node.getBoundingClientRect();
-    if (!rect || rect.width < 6 || rect.height < 6) continue;
-    const intersects = rect.bottom > contentRect.top
-      && rect.top < contentRect.bottom
-      && rect.right > contentRect.left
-      && rect.left < contentRect.right;
-    if (!intersects) continue;
-    const style = window.getComputedStyle(node);
-    if (!style || style.visibility === "hidden" || style.display === "none" || Number(style.opacity) === 0) continue;
-    let text = (node.innerText || node.textContent || "").replace(/\s+/g, " ").trim();
-    if (!text || text.length < 2) continue;
-    if (text.length > 280) text = text.slice(0, 280).trim();
-    const key = text.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    const remaining = Math.max(maxChars - chars, 0);
-    if (!remaining) break;
-    if (text.length > remaining) text = text.slice(0, remaining).trim();
-    if (!text) break;
-    blocks.push({
-      tag: String(node.tagName || "").toLowerCase(),
-      text,
-      y: Math.round(content.scrollTop + (rect.top - contentRect.top)),
-      x: Math.round(rect.left - contentRect.left)
-    });
-    chars += text.length;
-    if (blocks.length >= maxBlocks) break;
-  }
-  blocks.sort((a, b) => (a.y - b.y) || (a.x - b.x));
+function buildContextUiStatePayload() {
   return {
-    scroll: {
-      y: Math.round(content.scrollTop),
-      viewportHeight: Math.round(content.clientHeight),
-      contentHeight: Math.round(content.scrollHeight)
-    },
-    blocks
+    top: state.top,
+    activeSection: state.activeSection,
+    activeWorkspaceId: state.activeWorkspaceId,
+    activeTabId: state.activeTabId,
+    workspaceSidebarCollapsed: state.workspaceSidebarCollapsed,
+    aiPanelWidth: state.aiPanelWidth,
+    aiPanelMinimized: state.aiPanelMinimized,
+    workspaces: Array.isArray(workspaces)
+      ? workspaces.map(workspace => ({
+          id: workspace.id,
+          name: workspace.name,
+          description: workspace.description
+        }))
+      : [],
+    tabs: Array.isArray(state.tabs)
+      ? state.tabs.map(tab => ({
+          id: tab.id,
+          type: tab.type,
+          label: tab.label,
+          workspaceId: tab.workspaceId,
+          url: tab.url || "",
+          canvasMode: tab.canvasMode,
+          courseId: tab.courseId || "",
+          courseSection: tab.courseSection || "",
+          canvasNativePage: tab.canvasNativePage || ""
+        }))
+      : [],
+    workspaceSessions: workspaceSessions
   };
 }
 
 function syncContextUiState() {
   if (!window.nucleus || typeof window.nucleus.pushUiState !== "function") return;
   try {
-    window.nucleus.pushUiState({
-      top: state.top,
-      activeSection: state.activeSection,
-      activeWorkspaceId: state.activeWorkspaceId,
-      activeTabId: state.activeTabId,
-      workspaceSidebarCollapsed: state.workspaceSidebarCollapsed,
-      aiPanelWidth: state.aiPanelWidth,
-      aiPanelMinimized: state.aiPanelMinimized,
-      workspaces: Array.isArray(workspaces)
-        ? workspaces.map(workspace => ({
-            id: workspace.id,
-            name: workspace.name,
-            description: workspace.description
-          }))
-        : [],
-      tabs: Array.isArray(state.tabs)
-        ? state.tabs.map(tab => ({
-            id: tab.id,
-            type: tab.type,
-            label: tab.label,
-            workspaceId: tab.workspaceId,
-            url: tab.url || "",
-            canvasMode: tab.canvasMode
-          }))
-        : []
-    });
+    const payload = buildContextUiStatePayload();
+    const key = JSON.stringify(payload);
+    if (key === lastContextUiStateKey) return;
+    lastContextUiStateKey = key;
+    window.nucleus.pushUiState(payload);
   } catch (error) {
     console.error("Unable to push UI state context:", error);
   }
 }
 
-function syncContextScreenText() {
-  if (!window.nucleus || typeof window.nucleus.pushScreenText !== "function") return;
-  const kind = getRendererSurfaceKind();
-  if (!kind) return; // WebContentsView surface; main process owns the screen slice.
-  const extracted = extractRendererVisibleText();
-  if (!extracted) return;
-  try {
-    window.nucleus.pushScreenText({
-      kind,
-      url: "",
-      title: document.title || "",
-      scroll: extracted.scroll,
-      blocks: extracted.blocks
-    });
-  } catch (error) {
-    console.error("Unable to push screen-text context:", error);
-  }
-}
-
-// Called from the global render() funnel (app.js) so any app-state change refreshes
-// the relevant context slices.
 function syncRenderContext() {
   syncContextUiState();
-  syncContextScreenText();
-}
-
-let screenTextScrollScheduled = false;
-function scheduleRendererScreenTextSync() {
-  if (screenTextScrollScheduled) return;
-  screenTextScrollScheduled = true;
-  requestAnimationFrame(() => {
-    screenTextScrollScheduled = false;
-    syncContextScreenText();
-  });
 }
 
 // ─── Navigation ───────────────────────────────────────────────────────────────
+
+function queueSyncActiveTab() {
+  if (!window.nucleus || typeof window.nucleus.newactivetab !== "function") {
+    return;
+  }
+  Promise.resolve(syncActiveTab()).catch(error => {
+    console.error("Unable to sync active tab:", error);
+  });
+}
 
 async function setActiveSection(section) {
   rememberActiveWorkspaceTab();
@@ -385,19 +556,41 @@ async function setActiveSection(section) {
   state.activeTabId = null;
   state.activeCourseId = null;
   state.top = 'section';
-  await syncActiveTab();
+  if (window.nucleusViewTransition) {
+    window.nucleusViewTransition.beginTransition();
+  }
   render();
+  queueSyncActiveTab();
 }
 
-async function setActiveWorkspace(workspaceId) {
+function setActiveWorkspace(workspaceId) {
+  const switchGen = bumpTabSurfaceSyncGeneration();
   rememberActiveWorkspaceTab();
   state.top = 'workspace';
   state.activeCourseId = null;
   state.activeWorkspaceId = workspaceId;
   state.activeTabId = getRememberedWorkspaceTabId(workspaceId);
-  await syncTabs();
-  await syncActiveTab();
-  render();
+
+  patchOptimisticWorkspaceTabActive(state.activeTabId);
+
+  renderWorkspaceSidebarCollapseState();
+  renderPrimaryTabs();
+  renderWorkspaceTabs();
+  if (typeof updateWorkspacePageTabs === "function") {
+    updateWorkspacePageTabs({ tabBar: "full" });
+  } else {
+    patchWorkspacePageTabs();
+  }
+
+  renderBrowserToolbar();
+  renderCanvasToolbar();
+  beginPendingViewTransition();
+  paintActiveView({ fast: true });
+
+  if (typeof syncRenderContext === "function") {
+    syncRenderContext();
+  }
+  deferWorkspaceSurfaceSync(switchGen);
 }
 
 function addworkspace(workspaceid, name) {
@@ -447,9 +640,8 @@ async function manuallyAddWorkspace() {
   state.activeWorkspaceId = workspaceId;
   state.activeTabId = ensureWorkspaceCenter(workspaceId);
   state.activeTabByWorkspace[workspaceId] = state.activeTabId;
-  syncTabs();
-  syncActiveTab();
   render();
+  queueTabSyncAfterRender();
 }
 
 function showNewWorkspaceForm() {
@@ -520,6 +712,7 @@ async function deleteWorkspace(workspaceId) {
 
   await syncTabs();
   syncActiveTab();
+  render();
 }
 
 // ─── Task Actions ─────────────────────────────────────────────────────────────
@@ -643,6 +836,10 @@ async function startTask(taskId) {
     return;
   }
 
+  if (typeof recordWorkspaceActivity === "function") {
+    recordWorkspaceActivity(workspaceId, "task_start", `Started ${task.title || "task"}`, { taskId: task.id });
+  }
+
   if (isCanvasSourceTask(task)) {
     const result = await openCanvasAppTab(workspaceId, task.courseId, {
       courseSection: canvasTaskSection(task)
@@ -686,16 +883,133 @@ async function startTask(taskId) {
 function startagent() {
   const input = document.getElementById("ai-input");
   const messages = document.getElementById("ai-messages");
-  const sendButton = document.querySelector(".ai-send-button");
+  const sendButton = document.getElementById("ai-send-button") || document.querySelector(".ai-send-button");
+  const usageToast = document.getElementById("ai-usage-toast");
+  const usageToastCopy = document.getElementById("ai-usage-toast-copy");
+  const usageToastDismiss = document.getElementById("ai-usage-toast-dismiss");
   const attachButton = document.getElementById("ai-attach-button");
   const fileInput = document.getElementById("ai-file-input");
   const attachmentsContainer = document.getElementById("ai-attachments");
   let currentResponse = null;
+  let responseTextEl = null;
+  let responseBuffer = "";
+  let deltaBuffer = "";
+  let deltaRaf = 0;
+  let scrollTarget = 0;
+  let scrollAnimFrame = 0;
   let sidekickResponseInFlight = false;
+  let sidekickAnswerMode = "grounded";
+  let sidekickModel = "claude-sonnet-4-6";
+  const SIDEKICK_MODE_STORAGE_KEY = "nucleus.sidekickAnswerMode";
+  const SIDEKICK_MODEL_STORAGE_KEY = "nucleus.sidekickModel";
+  let sidekickComposerControls = null;
   let pendingAttachments = [];
   let pendingRegionContext = null;
   let pendingRegionAttachmentId = null;
   const MAX_ATTACHMENT_BYTES = 8 * 1024 * 1024;
+
+  function updateAnswerModeUi() {
+    const inputEl = document.getElementById("ai-input");
+    const sub = document.querySelector(".ai-panel-header-sub");
+    if (inputEl) {
+      inputEl.placeholder = sidekickAnswerMode === "grounded"
+        ? "Ask about your courses, tasks, or screen…"
+        : "Ask anything (general knowledge)…";
+    }
+    if (sub) {
+      sub.textContent = sidekickAnswerMode === "grounded"
+        ? "Grounded in your Canvas"
+        : "General answers";
+    }
+  }
+
+  function setAnswerMode(mode) {
+    sidekickAnswerMode = window.SidekickComposerControls
+      ? window.SidekickComposerControls.normalizeMode(mode)
+      : (String(mode || "").trim().toLowerCase() === "general" ? "general" : "grounded");
+    try {
+      localStorage.setItem(SIDEKICK_MODE_STORAGE_KEY, sidekickAnswerMode);
+    } catch (_error) {}
+    if (sidekickComposerControls) sidekickComposerControls.setAnswerMode(sidekickAnswerMode);
+    updateAnswerModeUi();
+  }
+
+  function setSidekickModel(model) {
+    sidekickModel = window.SidekickComposerControls
+      ? window.SidekickComposerControls.normalizeModel(model)
+      : String(model || "claude-sonnet-4-6");
+    try {
+      localStorage.setItem(SIDEKICK_MODEL_STORAGE_KEY, sidekickModel);
+    } catch (_error) {}
+    if (sidekickComposerControls) sidekickComposerControls.setSidekickModel(sidekickModel);
+  }
+
+  let storedMode = "grounded";
+  let storedModel = "claude-sonnet-4-6";
+  try {
+    storedMode = localStorage.getItem(SIDEKICK_MODE_STORAGE_KEY) || "grounded";
+    storedModel = localStorage.getItem(SIDEKICK_MODEL_STORAGE_KEY) || "claude-sonnet-4-6";
+  } catch (_error) {}
+
+  if (window.SidekickComposerControls) {
+    sidekickComposerControls = window.SidekickComposerControls.init({
+      answerMode: storedMode,
+      sidekickModel: storedModel,
+      onModeChange: function (mode) {
+        sidekickAnswerMode = mode;
+        try {
+          localStorage.setItem(SIDEKICK_MODE_STORAGE_KEY, mode);
+        } catch (_error) {}
+        updateAnswerModeUi();
+      },
+      onModelChange: function (model) {
+        sidekickModel = model;
+        try {
+          localStorage.setItem(SIDEKICK_MODEL_STORAGE_KEY, model);
+        } catch (_error) {}
+      }
+    });
+    sidekickAnswerMode = sidekickComposerControls.getAnswerMode();
+    sidekickModel = sidekickComposerControls.getSidekickModel();
+  } else {
+    sidekickAnswerMode = String(storedMode).trim().toLowerCase() === "general" ? "general" : "grounded";
+    sidekickModel = storedModel;
+  }
+  updateAnswerModeUi();
+
+  function showAiUsageToast(message) {
+    if (!usageToast) return;
+    const text = String(message || "").trim();
+    if (usageToastCopy && text) usageToastCopy.textContent = text;
+    usageToast.classList.remove("is-hidden");
+  }
+
+  function hideAiUsageToast() {
+    if (!usageToast) return;
+    usageToast.classList.add("is-hidden");
+  }
+
+  window.showAiUsageToast = showAiUsageToast;
+  window.hideAiUsageToast = hideAiUsageToast;
+
+  if (usageToastDismiss) {
+    usageToastDismiss.addEventListener("click", hideAiUsageToast);
+  }
+
+  if (sendButton) {
+    sendButton.addEventListener("click", () => {
+      submitPrompt();
+    });
+  }
+
+  if (window.nucleus && typeof window.nucleus.on === "function") {
+    window.nucleus.on("prompt:usage-warning", (payload) => {
+      const message = payload && typeof payload === "object"
+        ? payload.message
+        : payload;
+      showAiUsageToast(message || "Usage limit reached. Responses may be slower.");
+    });
+  }
 
   function setSidekickInFlight(value) {
     sidekickResponseInFlight = value;
@@ -706,20 +1020,212 @@ function startagent() {
     if (attachButton) {
       attachButton.disabled = value;
     }
+    document.querySelectorAll(".ai-dropdown-trigger").forEach(trigger => {
+      trigger.disabled = value;
+    });
+  }
+
+  function smoothScrollStep() {
+    if (!messages) {
+      scrollAnimFrame = 0;
+      return;
+    }
+    scrollTarget = Math.max(0, messages.scrollHeight - messages.clientHeight);
+    const current = messages.scrollTop;
+    const diff = scrollTarget - current;
+    if (Math.abs(diff) < 0.5) {
+      messages.scrollTop = scrollTarget;
+      scrollAnimFrame = 0;
+      return;
+    }
+    messages.scrollTop = current + diff * 0.14;
+    scrollAnimFrame = requestAnimationFrame(smoothScrollStep);
+  }
+
+  function scrollMessagesToBottom(immediate = false) {
+    if (!messages) return;
+    scrollTarget = Math.max(0, messages.scrollHeight - messages.clientHeight);
+    if (immediate) {
+      if (scrollAnimFrame) {
+        cancelAnimationFrame(scrollAnimFrame);
+        scrollAnimFrame = 0;
+      }
+      messages.scrollTop = scrollTarget;
+      return;
+    }
+    if (!scrollAnimFrame) {
+      scrollAnimFrame = requestAnimationFrame(smoothScrollStep);
+    }
+  }
+
+  function appendStreamChunk(textEl, text) {
+    if (!textEl || !text) return;
+    const span = document.createElement("span");
+    span.className = "ai-stream-chunk";
+    span.textContent = text;
+    textEl.appendChild(span);
+  }
+
+  function dismissHero() {
+    messages.querySelectorAll(".ai-hero-card, .ai-quick-actions").forEach(node => node.remove());
+  }
+
+  function beginThinkingBubble(initialStatus = 'Thinking…') {
+    const node = document.createElement("div");
+    node.classList.add("ai-message", "response", "ai-thinking");
+    node.innerHTML =
+      `<div class="ai-agent-status" aria-live="polite">${escapeHtml(initialStatus)}</div>` +
+      '<div class="ai-thinking-dots" aria-hidden="true"><span></span><span></span><span></span></div>';
+    messages.appendChild(node);
+    currentResponse = node;
+    responseTextEl = null;
+    responseBuffer = "";
+    scrollMessagesToBottom();
+  }
+
+  function setAgentStatus(label) {
+    const text = String(label || "").trim();
+    if (!text) return;
+    if (!currentResponse || !currentResponse.classList.contains("ai-thinking")) {
+      beginThinkingBubble(text);
+      return;
+    }
+    let statusEl = currentResponse.querySelector(".ai-agent-status");
+    if (!statusEl) {
+      statusEl = document.createElement("div");
+      statusEl.className = "ai-agent-status";
+      statusEl.setAttribute("aria-live", "polite");
+      currentResponse.insertBefore(statusEl, currentResponse.firstChild);
+    }
+    statusEl.textContent = text;
+    scrollMessagesToBottom();
+  }
+
+  function transitionThinkingToStream() {
+    if (!currentResponse) return;
+    if (!currentResponse.classList.contains("ai-thinking")) return;
+    currentResponse.classList.remove("ai-thinking");
+    currentResponse.classList.add("ai-streaming");
+    currentResponse.innerHTML =
+      '<div class="ai-response-text"></div><span class="ai-stream-cursor" aria-hidden="true"></span>';
+    responseTextEl = currentResponse.querySelector(".ai-response-text");
+    responseBuffer = "";
+    deltaBuffer = "";
+  }
+
+  function ensureStreamingBubble() {
+    if (currentResponse && responseTextEl) return;
+    if (currentResponse && currentResponse.classList.contains("ai-thinking")) {
+      transitionThinkingToStream();
+      return;
+    }
+    const node = document.createElement("div");
+    node.classList.add("ai-message", "response", "ai-streaming");
+    node.innerHTML =
+      '<div class="ai-response-text"></div><span class="ai-stream-cursor" aria-hidden="true"></span>';
+    messages.appendChild(node);
+    currentResponse = node;
+    responseTextEl = node.querySelector(".ai-response-text");
+    responseBuffer = "";
+    deltaBuffer = "";
+    scrollMessagesToBottom();
+  }
+
+  function flushDelta() {
+    if (deltaRaf) {
+      cancelAnimationFrame(deltaRaf);
+      deltaRaf = 0;
+    }
+    if (!responseTextEl || !deltaBuffer) return;
+    appendStreamChunk(responseTextEl, deltaBuffer);
+    deltaBuffer = "";
+    scrollMessagesToBottom();
+  }
+
+  function pushChunk(chunk) {
+    const text = String(chunk || "");
+    if (!text) return;
+    ensureStreamingBubble();
+    responseBuffer += text;
+    deltaBuffer += text;
+    if (deltaRaf) return;
+    deltaRaf = requestAnimationFrame(() => {
+      deltaRaf = 0;
+      if (!responseTextEl || !deltaBuffer) return;
+      const batch = deltaBuffer;
+      deltaBuffer = "";
+      appendStreamChunk(responseTextEl, batch);
+      scrollMessagesToBottom();
+    });
+  }
+
+  function finalizeResponse() {
+    flushDelta();
+    if (!currentResponse) return;
+    currentResponse.classList.remove("ai-thinking", "ai-streaming");
+    const cursor = currentResponse.querySelector(".ai-stream-cursor");
+    if (cursor) cursor.remove();
   }
 
   window.nucleus.on('prompt:response-chunk', (chunk) => {
-    if (!currentResponse) {
-      currentResponse = document.createElement("div");
-      currentResponse.classList.add("ai-message", "response");
-      messages.appendChild(currentResponse);
-    }
-    currentResponse.innerText += chunk;
-    messages.scrollTop = messages.scrollHeight;
+    pushChunk(chunk);
   });
 
+  window.nucleus.on('prompt:status', (payload) => {
+    const label = payload && typeof payload === 'object' ? payload.label : payload;
+    setAgentStatus(label);
+  });
+
+  window.nucleus.on('prompt:response-replace', (text) => {
+    flushDelta();
+    ensureStreamingBubble();
+    responseBuffer = String(text || "");
+    if (responseTextEl) {
+      responseTextEl.textContent = responseBuffer;
+    }
+    currentResponse.classList.remove("ai-streaming");
+    const cursor = currentResponse.querySelector(".ai-stream-cursor");
+    if (cursor) cursor.remove();
+    highlightInlineCitations(currentResponse);
+    scrollMessagesToBottom();
+  });
+
+  window.nucleus.on('prompt:response-citations', (citations) => {
+    if (!currentResponse || !Array.isArray(citations) || !citations.length) return;
+    highlightInlineCitations(currentResponse);
+    const footer = document.createElement("div");
+    footer.className = "ai-citations";
+    footer.innerHTML = citations.map(citation => {
+      const label = escapeHtml(citation.citeLabel || "");
+      const hint = escapeHtml(citation.weekLabel || citation.itemName || citation.fileid || "source");
+      const title = escapeHtml(citation.text || "");
+      return `<span class="ai-citation-chip" title="${title}">[${label}] ${hint}</span>`;
+    }).join(" ");
+    currentResponse.appendChild(footer);
+    scrollMessagesToBottom();
+  });
+
+  function highlightInlineCitations(element) {
+    if (!element) return;
+    const textEl = element.querySelector(".ai-response-text") || element;
+    const raw = textEl.textContent || "";
+    if (!/\[(?:C|R)\d+\]/.test(raw)) return;
+    textEl.innerHTML = escapeHtml(raw).replace(
+      /\[(C|R)(\d+)\]/g,
+      '<span class="ai-cite-inline" title="Grounded source">[$1$2]</span>'
+    );
+  }
+
   window.nucleus.on('prompt:response-done', () => {
+    if (currentResponse && currentResponse.classList.contains("ai-thinking")) {
+      currentResponse.remove();
+    } else {
+      finalizeResponse();
+    }
     currentResponse = null;
+    responseTextEl = null;
+    responseBuffer = "";
+    deltaBuffer = "";
     setSidekickInFlight(false);
     input.focus();
   });
@@ -775,49 +1281,12 @@ function startagent() {
     return null;
   }
 
-  function regionVisibleTextLines(result) {
-    const blocks = result && Array.isArray(result.visibleText) ? result.visibleText : [];
-    if (!blocks.length) return [];
-    const lines = ["Visible text in region:"];
-    blocks.slice(0, 20).forEach((block, index) => {
-      lines.push(`${index + 1}. [${block.tag || "text"}] ${block.text}`);
-    });
-    return lines;
-  }
-
   function applyRegionCaptureResult(result, activeTab) {
-    if (result.mode === "indexed" && result.indexedContext) {
-      const context = result.indexedContext;
-      const pageLabel = Array.isArray(context.pages) && context.pages.length
-        ? context.pages.map(page => page.pageNumber || page.pageid || "").filter(Boolean).join(", ")
-        : "none";
+    if (result.mode === "screenshot" && result.image && result.image.data) {
       const contextText = [
-        "Selected screen region context (indexed):",
+        "Selected screen region:",
         `URL: ${result.url || activeTab.url || ""}`,
-        `Region (app px): x=${result.region && result.region.x}, y=${result.region && result.region.y}, w=${result.region && result.region.width}, h=${result.region && result.region.height}`,
-        `Pages: ${pageLabel}`,
-        `Concepts: ${Array.isArray(context.concepts) ? context.concepts.map(item => item.name).filter(Boolean).join("; ") : ""}`,
-        `Details: ${Array.isArray(context.details) ? context.details.map(item => item.name).filter(Boolean).join("; ") : ""}`,
-        `Examples: ${Array.isArray(context.examples) ? context.examples.map(item => item.name).filter(Boolean).join("; ") : ""}`,
-        `Problems: ${Array.isArray(context.problems) ? context.problems.map(item => item.name).filter(Boolean).join("; ") : ""}`,
-        ...regionVisibleTextLines(result)
-      ].join("\n");
-      upsertRegionAttachment({
-        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-        name: `Screen context${pageLabel && pageLabel !== "none" ? ` · pages ${pageLabel}` : ""}`,
-        type: "application/x-nucleus-region-context",
-        size: 0,
-        kind: "metadata",
-        note: "Indexed context capture",
-        source: "region"
-      }, contextText);
-    } else if (result.mode === "screenshot" && result.image && result.image.data) {
-      const contextText = [
-        "Selected screen region context:",
-        `URL: ${result.url || activeTab.url || ""}`,
-        `Region (app px): x=${result.region && result.region.x}, y=${result.region && result.region.y}, w=${result.region && result.region.width}, h=${result.region && result.region.height}`,
-        "Indexed context unavailable; attached screenshot instead.",
-        ...regionVisibleTextLines(result)
+        `Region (app px): x=${result.region && result.region.x}, y=${result.region && result.region.y}, w=${result.region && result.region.width}, h=${result.region && result.region.height}`
       ].join("\n");
       upsertRegionAttachment({
         id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -828,48 +1297,22 @@ function startagent() {
         data: result.image.data,
         source: "region"
       }, contextText);
-    } else {
-      const contextText = [
-        "Selected screen region context:",
-        `URL: ${result.url || activeTab.url || ""}`,
-        `Region (app px): x=${result.region && result.region.x}, y=${result.region && result.region.y}, w=${result.region && result.region.width}, h=${result.region && result.region.height}`,
-        ...regionVisibleTextLines(result)
-      ].join("\n");
-      upsertRegionAttachment({
-        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-        name: "Screen context",
-        type: "application/x-nucleus-region-context",
-        size: 0,
-        kind: "metadata",
-        note: "Context capture",
-        source: "region"
-      }, contextText);
     }
     const systemMessage = document.createElement("div");
     systemMessage.classList.add("ai-message", "system");
-    systemMessage.innerText = result.mode === "indexed"
-      ? "Captured indexed context and added it to input as a removable object."
-      : "Captured selected region and added it to input as a removable object.";
+    systemMessage.innerText = "Captured selected region and added it to input as a removable object.";
     messages.appendChild(systemMessage);
     messages.scrollTop = messages.scrollHeight;
   }
 
   async function captureRegionFromShortcut(payload = {}) {
-    // TODO(remove): temporary region-capture shortcut diagnostics
-    console.log('[DEBUG][TODO_REMOVE] region_capture', {
-      stage: 'renderer_shortcut_received',
-      payloadTabId: payload && payload.tabId ? payload.tabId : '',
-      activeTabId: state && state.activeTabId ? state.activeTabId : ''
-    })
     if (!window.nucleus || typeof window.nucleus.captureRegionShortcut !== "function") {
-      console.log('[DEBUG][TODO_REMOVE] region_capture', { stage: 'renderer_missing_ipc_bridge' })
       return;
     }
     const activeTab = payload && payload.tabId
       ? (Array.isArray(state.tabs) ? state.tabs.find(item => sameTabId(item.id, payload.tabId)) : null)
       : getActiveWebLikeTab();
     if (!activeTab) {
-      console.log('[DEBUG][TODO_REMOVE] region_capture', { stage: 'renderer_no_active_web_tab' })
       const systemMessage = document.createElement("div");
       systemMessage.classList.add("ai-message", "system");
       systemMessage.innerText = "Region capture needs an active browser or Canvas web tab.";
@@ -877,22 +1320,8 @@ function startagent() {
       messages.scrollTop = messages.scrollHeight;
       return;
     }
-    console.log('[DEBUG][TODO_REMOVE] region_capture', {
-      stage: 'renderer_capture_start',
-      tabId: activeTab.id,
-      tabType: activeTab.type,
-      url: activeTab.url || ''
-    })
     try {
       const result = await window.nucleus.captureRegionShortcut({ tabId: activeTab.id });
-      console.log('[DEBUG][TODO_REMOVE] region_capture', {
-        stage: 'renderer_capture_finished',
-        tabId: activeTab.id,
-        ok: Boolean(result && result.ok),
-        mode: result && result.mode ? result.mode : '',
-        cancelled: Boolean(result && result.cancelled),
-        error: result && result.error ? result.error : ''
-      })
       if (!result || !result.ok) {
         if (result && result.cancelled) return;
         throw new Error((result && result.error) || "Unable to capture region.");
@@ -909,11 +1338,9 @@ function startagent() {
 
   if (window.nucleus && typeof window.nucleus.on === "function") {
     window.nucleus.on("shortcut:region_capture", (payload) => {
-      console.log('[DEBUG][TODO_REMOVE] region_capture', { stage: 'renderer_ipc_event_received', payload })
       captureRegionFromShortcut(payload || {});
     });
     window.nucleus.on("shortcut:region_capture_failed", (payload) => {
-      console.log('[DEBUG][TODO_REMOVE] region_capture', { stage: 'renderer_ipc_event_failed', payload })
       const systemMessage = document.createElement("div");
       systemMessage.classList.add("ai-message", "system");
       systemMessage.innerText = payload && payload.message
@@ -1005,7 +1432,7 @@ function startagent() {
     const promptText = input.value.trim();
     if (sidekickResponseInFlight || (promptText === "" && pendingAttachments.length === 0)) return;
 
-    currentResponse = null;
+    dismissHero();
 
     const attachmentsToSend = pendingAttachments.slice();
     const message = document.createElement("div");
@@ -1014,9 +1441,17 @@ function startagent() {
     renderUserAttachmentSummary(message, attachmentsToSend);
     messages.appendChild(message);
 
+    beginThinkingBubble();
+
     setSidekickInFlight(true);
     window.nucleus.sendprompt({
       text: promptText,
+      answerMode: sidekickComposerControls
+        ? sidekickComposerControls.getAnswerMode()
+        : sidekickAnswerMode,
+      sidekickModel: sidekickComposerControls
+        ? sidekickComposerControls.getSidekickModel()
+        : sidekickModel,
       attachments: attachmentsToSend,
       systemContext: "",
       regionContext: pendingRegionContext || ""
@@ -1026,7 +1461,7 @@ function startagent() {
     pendingRegionContext = null;
     pendingRegionAttachmentId = null;
     renderPendingAttachments();
-    messages.scrollTop = messages.scrollHeight;
+    scrollMessagesToBottom();
   }
 
   window.sendMessage = submitPrompt;
@@ -1068,6 +1503,7 @@ function applyThemeStylesheets(stylesheets) {
   if (!Array.isArray(stylesheets) || !stylesheets.length) return;
   const head = document.head;
   const previous = Array.from(head.querySelectorAll('link[data-theme-style]'));
+  document.documentElement.classList.add("theme-switching");
   // Cache-bust so the same path under a new theme reloads even if cached.
   const stamp = Date.now();
   const fresh = stylesheets.map(href => {
@@ -1079,7 +1515,12 @@ function applyThemeStylesheets(stylesheets) {
     return link;
   });
   // Remove the old sheets once the new ones are in the DOM to avoid a flash.
-  requestAnimationFrame(() => previous.forEach(link => link.remove()));
+  requestAnimationFrame(() => {
+    previous.forEach(link => link.remove());
+    requestAnimationFrame(() => {
+      document.documentElement.classList.remove("theme-switching");
+    });
+  });
   return fresh;
 }
 
@@ -1177,11 +1618,51 @@ async function logoutCanvas() {
   }
 }
 
+async function syncCanvasData() {
+  const confirmed = window.confirm(
+    "Download courses, files, and assignments from Canvas now?\n\n" +
+    "This runs a full sync in the main process console ([canvas] logs). " +
+    "It can take several minutes while the parser runs."
+  );
+  if (!confirmed) return;
+
+  const button = document.getElementById("sync-canvas-button");
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Syncing…";
+  }
+
+  try {
+    if (!window.nucleus || typeof window.nucleus.syncCanvasData !== "function") {
+      throw new Error("Sync is unavailable in this build.");
+    }
+    const result = await window.nucleus.syncCanvasData();
+    if (!result || !result.ok) {
+      throw new Error(result && result.error ? result.error : "Sync failed.");
+    }
+    if (typeof resetCanvasAppBootstrap === "function") {
+      resetCanvasAppBootstrap();
+    }
+    window.alert(
+      "Canvas API download finished. The parser is still running in the background — " +
+      "watch the terminal for [canvas] logs until you see \"parser all passes completed\"."
+    );
+  } catch (error) {
+    console.error("Unable to sync Canvas data:", error);
+    window.alert(error && error.message ? error.message : "Unable to sync Canvas data.");
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = "Sync Canvas now";
+    }
+  }
+}
+
 async function clearCanvasSyncData() {
   const confirmed = window.confirm(
     "Clear all Canvas sync data from disk?\n\n" +
     "This removes course snapshots, downloaded files, parsed graph, and homepage caches. " +
-    "Canvas login is not affected. You can sync again later to rebuild."
+    "Your Canvas login stays saved. Use Settings → Sync Canvas now when you want to download again."
   );
   if (!confirmed) return;
 
@@ -1196,12 +1677,19 @@ async function clearCanvasSyncData() {
     if (!result || !result.ok) {
       throw new Error(result && result.error ? result.error : "Clear failed.");
     }
+    if (typeof resetCanvasAppBootstrap === "function") {
+      resetCanvasAppBootstrap();
+    }
     const removedCount = Array.isArray(result.removed) ? result.removed.length : 0;
     const taskCount = Number(result.removedTasks) || 0;
-    window.alert(
+    let message =
       `Canvas sync data cleared.${removedCount ? ` Removed ${removedCount} path(s).` : ""}` +
-      `${taskCount ? ` Removed ${taskCount} Canvas task(s).` : ""}`
-    );
+      `${taskCount ? ` Removed ${taskCount} Canvas task(s).` : ""}` +
+      "\n\nNothing will re-download until you click Sync Canvas now in Settings.";
+    if (Array.isArray(result.lingering) && result.lingering.length) {
+      message += `\n\nWarning: these files could not be removed: ${result.lingering.join(", ")}`;
+    }
+    window.alert(message);
   } catch (error) {
     console.error("Unable to clear Canvas sync data:", error);
     window.alert(error && error.message ? error.message : "Unable to clear Canvas sync data.");
@@ -1228,6 +1716,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (profileCard) profileCard.addEventListener("click", openSettings);
   const closeSettingsButton = document.getElementById("close-settings-button");
   if (closeSettingsButton) closeSettingsButton.addEventListener("click", closeSettings);
+  const syncCanvasButton = document.getElementById("sync-canvas-button");
+  if (syncCanvasButton) syncCanvasButton.addEventListener("click", syncCanvasData);
   const clearCanvasSyncButton = document.getElementById("clear-canvas-sync-button");
   if (clearCanvasSyncButton) clearCanvasSyncButton.addEventListener("click", clearCanvasSyncData);
   const canvasLogoutButton = document.getElementById("canvas-logout-button");
@@ -1251,28 +1741,42 @@ document.addEventListener("DOMContentLoaded", async () => {
     manuallyAddWorkspace();
   });
   document.querySelector(".content").addEventListener("scroll", rememberActiveCanvasYIndex);
-  // Refresh on-screen text for renderer-painted (native app / home) surfaces on
-  // every y-scroll, mirroring the WebContentsView scroll-driven refresh.
-  document.querySelector(".content").addEventListener("scroll", scheduleRendererScreenTextSync);
   setupAiPanelControls();
 
-  const data = await window.nucleus.getData();
-  tasks = data.tasks || [];
-  workspaces = data.workspaces || [];
-  projectGroups = data.projectGroups || [];
-  canvasData = data.canvasData || {};
-  ensureWorkspaceCenters();
-  syncTabs();
+  function safeRender(reason) {
+    if (typeof render !== "function") {
+      console.error("render() is unavailable during startup:", reason);
+      return;
+    }
+    try {
+      render();
+    } catch (error) {
+      console.error("Render failed during startup:", reason, error);
+    }
+  }
 
-  startagent();
+  if (!window.nucleus) {
+    console.error("window.nucleus preload bridge is unavailable; UI will remain static.");
+    safeRender("missing-preload");
+    return;
+  }
 
+  safeRender("initial-defaults");
+
+  let tasksUpdateRenderFrame = null;
   window.nucleus.on('tasks:update', updatedTasks => {
     tasks = updatedTasks;
-    render();
+    if (tasksUpdateRenderFrame) return;
+    tasksUpdateRenderFrame = requestAnimationFrame(() => {
+      tasksUpdateRenderFrame = null;
+      safeRender("tasks-update");
+    });
   });
 
   window.nucleus.on('workspaces:update', updatedWorkspaces => {
-    workspaces = updatedWorkspaces;
+    workspaces = (updatedWorkspaces && updatedWorkspaces.length)
+      ? updatedWorkspaces
+      : DEFAULT_WORKSPACES.slice();
     state.tabs = state.tabs.filter(tab => workspaces.some(workspace => workspace.id === tab.workspaceId));
     Object.keys(state.activeTabByWorkspace).forEach(workspaceId => {
       const rememberedTabId = state.activeTabByWorkspace[workspaceId];
@@ -1283,7 +1787,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
     });
     ensureWorkspaceCenters();
-    syncTabs();
+    syncTabs().catch(error => {
+      console.error("Unable to sync tabs after workspace update:", error);
+    });
     if (renderafterupdate) {
       state.top = 'workspace';
       state.activeWorkspaceId = pendingworkspaceID;
@@ -1292,24 +1798,34 @@ document.addEventListener("DOMContentLoaded", async () => {
       renderafterupdate = false;
       pendingworkspaceID = null;
       pendingtabID = null;
-      syncActiveTab();
+      queueSyncActiveTab();
     }
-    render();
+    safeRender("workspaces-update");
   });
 
   window.nucleus.on('canvas:update', data => {
     if (!data) return;
-    tasks = data.tasks || tasks || [];
-    workspaces = data.workspaces || workspaces || [];
-    projectGroups = data.projectGroups || projectGroups || [];
-    canvasData = data.canvasData || {};
+    if (data.canvasWiped) {
+      tasks = Array.isArray(data.tasks) ? data.tasks : [];
+      workspaces = (data.workspaces && data.workspaces.length)
+        ? data.workspaces
+        : (workspaces.length ? workspaces : DEFAULT_WORKSPACES.slice());
+      projectGroups = Array.isArray(data.projectGroups) ? data.projectGroups : projectGroups;
+      canvasData = {};
+    } else {
+      tasks = mergeSnapshotTasks(data.tasks);
+      workspaces = (data.workspaces && data.workspaces.length)
+        ? data.workspaces
+        : (workspaces.length ? workspaces : DEFAULT_WORKSPACES.slice());
+      projectGroups = mergeSnapshotList(data.projectGroups, projectGroups);
+      canvasData = mergeSnapshotRecord(data.canvasData, canvasData);
+    }
     ensureWorkspaceCenters();
-    syncTabs();
-    render();
+    syncTabs().catch(error => {
+      console.error("Unable to sync tabs after canvas update:", error);
+    });
+    safeRender("canvas-update");
   });
-
-  nucleusCanvasCSS = await window.nucleus.getinjection()
-
 
   window.nucleus.on('tabs:url_update', payload => {
     const tab = state.tabs.find(item => sameTabId(item.id, payload.id));
@@ -1351,13 +1867,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       tabSnapshotOverlay.snapshotDataUrl = payload.snapshotDataUrl;
     }
     if (sameTabId(payload.tabId, state.activeTabId)) {
-      renderView();
+      if (typeof paintActiveView === "function") {
+        paintActiveView({ skipTransition: true });
+      } else if (typeof renderView === "function") {
+        renderView();
+      }
     }
-  });
-
-  window.nucleus.on('canvas:visible_context', payload => {
-    state.currentCanvasPageContext = payload || null;
-    window.currentCanvasPageContext = state.currentCanvasPageContext;
   });
 
   window.nucleus.on('tabs:open_browser_window', payload => {
@@ -1376,8 +1891,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       openCanvasAppTab(payload.workspaceId, payload.courseId || null);
       return;
     }
-    newCanvasTab(payload.url, payload.workspaceId, true, getCanvasInjectionConfig()).then(result => {
-      if (result && result.ok === false) {
+    openCanvasBrowserUrl(payload.url, payload.workspaceId, {
+      setActive: true,
+      courseId: payload.courseId || null
+    }).then(result => {
+      if (result && result.ok === false && result.reason !== "cancelled" && result.reason !== "busy") {
         showStartTaskError(result.error || "Unable to open Canvas link.");
       }
     });
@@ -1390,8 +1908,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     state.activeWorkspaceId = tab.workspaceId;
     state.activeTabId = tab.id;
     state.activeTabByWorkspace[tab.workspaceId] = tab.id;
-    syncActiveTab();
     render();
+    queueSyncActiveTab();
   });
   window.nucleus.on('tabs:tool_close_tab', payload => {
     if (!payload || !payload.tabId) return;
@@ -1418,14 +1936,101 @@ document.addEventListener("DOMContentLoaded", async () => {
   window.nucleus.on("canvas:view-ready", payload => {
     if (payload && payload.id) {
       const tab = state.tabs.find(item => sameTabId(item.id, payload.id));
-      if (tab) {
-        tab.loading = false;
-        if (sameTabId(tab.id, state.activeTabId)) {
-          renderView();
+      if (tab && sameTabId(tab.id, state.activeTabId)) {
+        if (window.__nucleusTabSnapshot) {
+          window.__nucleusTabSnapshot.clear();
+        }
+        if (typeof renderBrowserToolbar === "function") {
+          renderBrowserToolbar();
+        }
+        if (typeof renderCanvasToolbar === "function") {
+          renderCanvasToolbar();
+        }
+        if (tab.type === "canvastab" && tab.canvasMode === "browser") {
+          if (typeof paintActiveView === "function") {
+            paintActiveView({ skipTransition: true, fast: true });
+          } else if (typeof renderView === "function") {
+            renderView();
+          }
         }
       }
     }
   });
 
-  render();
+  const readyPromise = typeof window.nucleus.notifyRendererReady === "function"
+    ? window.nucleus.notifyRendererReady().catch(error => {
+      console.error("Unable to notify main process that renderer is ready:", error);
+      return { ok: false, taskCount: 0 };
+    })
+    : Promise.resolve({ taskCount: 0 });
+  if (typeof window.nucleus.getCanvasCachePolicy === "function") {
+    try {
+      canvasCachePolicy = window.nucleus.getCanvasCachePolicy() || canvasCachePolicy;
+    } catch (error) {
+      console.error("Unable to read Canvas cache policy:", error);
+    }
+  }
+  const dataPromise = typeof window.nucleus.getData === "function"
+    ? window.nucleus.getData().catch(error => {
+      console.error("Unable to bootstrap renderer data:", error);
+      return null;
+    })
+    : Promise.resolve(null);
+
+  const [ready, data] = await Promise.all([readyPromise, dataPromise]);
+  const readyTaskCount = Number(ready && ready.taskCount) || 0;
+
+  await loadWorkspaceSessions();
+
+  try {
+    if (data) {
+      tasks = Array.isArray(data.tasks) ? data.tasks : [];
+      workspaces = (data.workspaces && data.workspaces.length)
+        ? data.workspaces
+        : DEFAULT_WORKSPACES.slice();
+      projectGroups = Array.isArray(data.projectGroups) ? data.projectGroups : projectGroups;
+      canvasData = (data.canvasData && Array.isArray(data.canvasData.courses) && data.canvasData.courses.length)
+        ? data.canvasData
+        : {};
+    } else {
+      workspaces = DEFAULT_WORKSPACES.slice();
+    }
+    ensureWorkspaceCenters();
+    safeRender("after-get-data");
+    syncTabs().catch(error => {
+      console.error("Unable to sync tabs on startup:", error);
+    });
+    queueSyncActiveTab();
+  } catch (error) {
+    console.error("Unable to apply bootstrap renderer data:", error);
+    workspaces = DEFAULT_WORKSPACES.slice();
+    safeRender("bootstrap-fallback");
+  }
+
+  if (typeof window.nucleus.requestCanvasUpdate === "function") {
+    window.nucleus.requestCanvasUpdate().catch(error => {
+      console.error("Unable to request Canvas data update:", error);
+    });
+  }
+
+  if (canvasCachePolicy.diskRecoveryEnabled && !tasks.length) {
+    try {
+      const pulled = await pullTasksFromMain();
+      if (pulled > 0) {
+        safeRender("after-pull-tasks");
+      }
+    } catch (error) {
+      console.error("Unable to pull cached tasks on startup:", error);
+    }
+  }
+
+  if (canvasCachePolicy.diskRecoveryEnabled) {
+    void waitForCachedTasks(readyTaskCount || tasks.length);
+  }
+
+  try {
+    startagent();
+  } catch (error) {
+    console.error("Unable to start LUMI agent UI:", error);
+  }
 });

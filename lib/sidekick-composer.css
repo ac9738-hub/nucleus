@@ -1,0 +1,178 @@
+/* Sidekick composer dropdowns — compact ghost controls (theme tokens). */
+
+.ai-input-section:has(.ai-composer-toolbar) {
+  overflow: visible;
+  position: relative;
+  z-index: 4;
+}
+
+.ai-composer-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  position: relative;
+  width: 100%;
+}
+
+.ai-composer-dropdown {
+  flex: 0 1 auto;
+  min-width: 0;
+  position: relative;
+}
+
+.ai-composer-dropdown.ai-dropdown.is-open {
+  z-index: 12;
+}
+
+.ai-composer-btn {
+  align-items: center;
+  appearance: none;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  gap: 6px;
+  min-height: 30px;
+  padding: 5px 10px;
+  text-align: left;
+  transition:
+    background var(--motion-fast) var(--ease-out),
+    border-color var(--motion-fast) var(--ease-out),
+    color var(--motion-fast) var(--ease-out);
+  width: auto;
+}
+
+.ai-composer-btn:hover:not(:disabled) {
+  background: var(--surface-inset);
+  border-color: rgba(var(--accent-rgb), 0.24);
+  color: var(--text-primary);
+}
+
+.ai-dropdown.is-open > .ai-composer-btn {
+  background: var(--surface-inset);
+  border-color: rgba(var(--accent-rgb), 0.32);
+  color: var(--text-primary);
+}
+
+.ai-composer-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.ai-composer-btn:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.35);
+  outline-offset: 2px;
+}
+
+.ai-composer-btn-kicker {
+  color: var(--text-tertiary);
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.ai-composer-btn .ai-dropdown-value {
+  flex: 0 1 auto;
+  font-size: var(--font-meta);
+  font-weight: var(--weight-semibold);
+  max-width: 120px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-composer-btn-chevron {
+  border-bottom: 1.5px solid var(--text-tertiary);
+  border-right: 1.5px solid var(--text-tertiary);
+  flex: 0 0 auto;
+  height: 5px;
+  margin-top: 1px;
+  transform: rotate(45deg);
+  width: 5px;
+}
+
+.ai-dropdown.is-open .ai-composer-btn-chevron {
+  border-color: var(--accent);
+  margin-top: 3px;
+  transform: rotate(-135deg);
+}
+
+.ai-composer-menu {
+  background: var(--surface-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  bottom: calc(100% + 6px);
+  box-shadow: var(--shadow-md);
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+  left: 0;
+  max-height: min(240px, 42vh);
+  min-width: 220px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-1);
+  position: absolute;
+  right: auto;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+  scrollbar-width: thin;
+  top: auto;
+  z-index: 50;
+}
+
+.ai-composer-menu::-webkit-scrollbar {
+  width: 6px;
+}
+
+.ai-composer-menu::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 999px;
+}
+
+.ai-composer-menu::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
+
+.ai-dropdown.is-open > .ai-composer-menu {
+  display: flex;
+}
+
+.ai-composer-menu .ai-dropdown-option {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  gap: 2px;
+  padding: 8px 10px;
+  text-align: left;
+  transition: background var(--motion-fast) var(--ease-out);
+  width: 100%;
+}
+
+.ai-composer-menu .ai-dropdown-option:hover,
+.ai-composer-menu .ai-dropdown-option.is-active {
+  background: rgba(var(--accent-rgb), 0.12);
+}
+
+.ai-composer-menu .ai-dropdown-option-title {
+  font-size: var(--font-meta);
+  font-weight: var(--weight-semibold);
+}
+
+.ai-composer-menu .ai-dropdown-option-desc {
+  color: var(--text-tertiary);
+  font-size: var(--font-label);
+  line-height: 1.35;
+}

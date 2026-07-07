@@ -1,0 +1,384 @@
+{
+  "courseId": "19097",
+  "syllabi": {
+    "19097": {
+      "courseid": "19097",
+      "classtimes": "",
+      "assignments": [
+        {
+          "name": "PSET 1",
+          "assignmentid": "6a08065d33765feb",
+          "unlockdate": "",
+          "duedate": "2025-12-10T04:59:59Z",
+          "gradepercentage": null,
+          "description": "PSET12-1.pdf",
+          "embedded": {},
+          "problems": [],
+          "downloadurl": "https://princeton.instructure.com/courses/19097/assignments/173754",
+          "canvaspreviewurl": "https://princeton.instructure.com/courses/19097/assignments/173754",
+          "filechildren": [
+            "3999837",
+            "4194117",
+            "4230491",
+            "4266327"
+          ],
+          "lookingfor": [],
+          "submissionTypes": [
+            "none"
+          ],
+          "submissionLinks": [
+            {
+              "url": "https://princeton.instructure.com/courses/19097/files/3999837?wrap=1",
+              "label": "PSET1-1.pdf",
+              "platform": "canvas"
+            },
+            {
+              "url": "https://princeton.instructure.com/courses/19097/files/4194117?wrap=1",
+              "label": "PSET10.pdf",
+              "platform": "canvas"
+            },
+            {
+              "url": "https://princeton.instructure.com/courses/19097/files/4230491?wrap=1",
+              "label": "PSET11-1.pdf",
+              "platform": "canvas"
+            },
+            {
+              "url": "https://princeton.instructure.com/courses/19097/files/4266327?wrap=1",
+              "label": "PSET12-1.pdf",
+              "platform": "canvas"
+            }
+          ],
+          "submissionDependencies": [
+            {
+              "type": "file",
+              "fileId": "3999837"
+            },
+            {
+              "type": "file",
+              "fileId": "4194117"
+            },
+            {
+              "type": "file",
+              "fileId": "4230491"
+            },
+            {
+              "type": "file",
+              "fileId": "4266327"
+            }
+          ],
+          "conceptRequirements": [],
+          "canvasAssignmentId": "173754"
+        },
+        {
+          "name": "PSET 2",
+          "assignmentid": "9aa806ddf556d2be",
+          "unlockdate": "2025-09-10T04:00:00Z",
+          "duedate": "2025-09-17T03:59:00Z",
+          "gradepercentage": null,
+          "description": "PSET2.pdf",
+          "embedded": {},
+          "problems": [],
+          "downloadurl": "https://princeton.instructure.com/courses/19097/assignments/166805",
+          "canvaspreviewurl": "https://princeton.instructure.com/courses/19097/assignments/166805",
+          "filechildren": [
+            "3999843"
+          ],
+          "lookingfor": [],
+          "submissionTypes": [
+            "none"
+          ],
+          "submissionLinks": [
+            {
+              "url": "https://princeton.instructure.com/courses/19097/files/3999843?wrap=1",
+              "label": "PSET2.pdf",
+              "platform": "canvas"
+            }
+          ],
+          "submissionDependencies": [
+            {
+              "type": "file",
+              "fileId": "3999843"
+            }
+          ],
+          "conceptRequirements": [],
+          "canvasAssignmentId": "166805"
+        },
+        {
+          "name": "PSET 3",
+          "assignmentid": "005dc1e7034102df",
+          "unlockdate": "2025-09-17T04:00:00Z",
+          "duedate": "2025-09-24T03:59:59Z",
+          "gradepercentage": null,
+          "description": "PSET3.pdf",
+          "embedded": {},
+          "problems": [],
+          "downloadurl": "https://princeton.instructure.com/courses/19097/assignments/167442",
+          "canvaspreviewurl": "https://princeton.instructure.com/courses/19097/assignments/167442",
+          "filechildren": [
+            "4006614"
+          ],
+          "lookingfor": [],
+          "submissionTypes": [
+            "none"
+          ],
+          "submissionLinks": [
+            {
+              "url": "https://princeton.instructure.com/courses/19097/files/4006614?wrap=1",
+              "label": "PSET3.pdf",
+              "platform": "canvas"
+            }
+          ],
+          "submissionDependencies": [
+            {
+              "type": "file",
+              "fileId": "4006614"
+            }
+          ],
+          "conceptRequirements": [],
+          "canvasAssignmentId": "167442"
+        },
+        {
+          "name": "PSET 4",
+          "assignmentid": "fc1b740fbf0f77c3",
+          "unlockdate": "2025-09-23T04:00:00Z",
+          "duedate": "2025-10-01T03:59:00Z",
+          "gradepercentage": null,
+          "description": "PSET4-2.pdf",
+          "embedded": {},
+          "problems": [],
+          "downloadurl": "https://princeton.instructure.com/courses/19097/assignments/168877",
+          "canvaspreviewurl": "https://princeton.instructure.com/courses/19097/assignments/168877",
+          "filechildren": [
+            "4058371"
+          ],
+          "lookingfor": [],
+          "submissionTypes": [
+            "none"
+          ],
+          "submissionLinks": [
+            {
+              "url": "https://princeton.instructure.com/courses/19097/files/4058371?wrap=1",
+              "label": "PSET4-2.pdf",
+              "platform": "canvas"
+            }
+          ],
+          "submissionDependencies": [
+            {
+              "type": "file",
+              "fileId": "4058371"
+            }
+          ],
+          "conceptRequirements": [],
+          "canvasAssignmentId": "168877"
+        },
+        {
+          "name": "PSET 5",
+          "assignmentid": "295e46cf31db7b6d",
+          "unlockdate": "2025-09-30T04:00:00Z",
+          "duedate": "2025-10-22T03:59:59Z",
+          "gradepercentage": null,
+          "description": "PSET5-1.pdf",
+          "embedded": {},
+          "problems": [],
+          "downloadurl": "https://princeton.instructure.com/courses/19097/assignments/169365",
+          "canvaspreviewurl": "https://princeton.instructure.com/courses/19097/assignments/169365",
+          "filechildren": [
+            "4137866"
+          ],
+          "lookingfor": [],
+          "submissionTypes": [
+            "none"
+          ],
+          "submissionLinks": [
+            {
+              "url": "https://princeton.instructure.com/courses/19097/files/4137866?wrap=1",
+              "label": "PSET5-1.pdf",
+              "platform": "canvas"
+            }
+          ],
+          "submissionDependencies": [
+            {
+              "type": "file",
+              "fileId": "4137866"
+            }
+          ],
+          "conceptRequirements": [],
+          "canvasAssignmentId": "169365"
+        },
+        {
+          "name": "PSET 6",
+          "assignmentid": "1336aec65823336d",
+          "unlockdate": "",
+          "duedate": "2025-10-29T03:59:00Z",
+          "gradepercentage": null,
+          "description": "PSET6-1.pdf",
+          "embedded": {},
+          "problems": [],
+          "downloadurl": "https://princeton.instructure.com/courses/19097/assignments/170700",
+          "canvaspreviewurl": "https://princeton.instructure.com/courses/19097/assignments/170700",
+          "filechildren": [
+            "4118747"
+          ],
+          "lookingfor": [],
+          "submissionTypes": [
+            "none"
+          ],
+          "submissionLinks": [
+            {
+              "url": "https://princeton.instructure.com/courses/19097/files/4118747?wrap=1",
+              "label": "PSET6-1.pdf",
+              "platform": "canvas"
+            }
+          ],
+          "submissionDependencies": [
+            {
+              "type": "file",
+              "fileId": "4118747"
+            }
+          ],
+          "conceptRequirements": [],
+          "canvasAssignmentId": "170700"
+        },
+        {
+          "name": "PSET 7",
+          "assignmentid": "be8dc0963b7f6567",
+          "unlockdate": "",
+          "duedate": "2025-11-05T04:59:59Z",
+          "gradepercentage": null,
+          "description": "PSET7-1.pdf",
+          "embedded": {},
+          "problems": [],
+          "downloadurl": "https://princeton.instructure.com/courses/19097/assignments/171004",
+          "canvaspreviewurl": "https://princeton.instructure.com/courses/19097/assignments/171004",
+          "filechildren": [
+            "4171333"
+          ],
+          "lookingfor": [],
+          "submissionTypes": [
+            "none"
+          ],
+          "submissionLinks": [
+            {
+              "url": "https://princeton.instructure.com/courses/19097/files/4171333?wrap=1",
+              "label": "PSET7-1.pdf",
+              "platform": "canvas"
+            }
+          ],
+          "submissionDependencies": [
+            {
+              "type": "file",
+              "fileId": "4171333"
+            }
+          ],
+          "conceptRequirements": [],
+          "canvasAssignmentId": "171004"
+        },
+        {
+          "name": "PSET 8",
+          "assignmentid": "c4579e6aec70397b",
+          "unlockdate": "",
+          "duedate": "2025-11-12T04:59:59Z",
+          "gradepercentage": null,
+          "description": "PSET8-1.pdf",
+          "embedded": {},
+          "problems": [],
+          "downloadurl": "https://princeton.instructure.com/courses/19097/assignments/171900",
+          "canvaspreviewurl": "https://princeton.instructure.com/courses/19097/assignments/171900",
+          "filechildren": [
+            "4171334"
+          ],
+          "lookingfor": [],
+          "submissionTypes": [
+            "none"
+          ],
+          "submissionLinks": [
+            {
+              "url": "https://princeton.instructure.com/courses/19097/files/4171334?wrap=1",
+              "label": "PSET8-1.pdf",
+              "platform": "canvas"
+            }
+          ],
+          "submissionDependencies": [
+            {
+              "type": "file",
+              "fileId": "4171334"
+            }
+          ],
+          "conceptRequirements": [],
+          "canvasAssignmentId": "171900"
+        },
+        {
+          "name": "PSET 9",
+          "assignmentid": "e8e83b75669f5e91",
+          "unlockdate": "",
+          "duedate": "2025-11-19T04:59:00Z",
+          "gradepercentage": null,
+          "description": "PSET9.pdf",
+          "embedded": {},
+          "problems": [],
+          "downloadurl": "https://princeton.instructure.com/courses/19097/assignments/172641",
+          "canvaspreviewurl": "https://princeton.instructure.com/courses/19097/assignments/172641",
+          "filechildren": [
+            "4188831"
+          ],
+          "lookingfor": [],
+          "submissionTypes": [
+            "none"
+          ],
+          "submissionLinks": [
+            {
+              "url": "https://princeton.instructure.com/courses/19097/files/4188831?wrap=1",
+              "label": "PSET9.pdf",
+              "platform": "canvas"
+            }
+          ],
+          "submissionDependencies": [
+            {
+              "type": "file",
+              "fileId": "4188831"
+            }
+          ],
+          "conceptRequirements": [],
+          "canvasAssignmentId": "172641"
+        }
+      ],
+      "other": "",
+      "filechildren": [],
+      "downloadurl": "",
+      "canvaspreviewurl": "",
+      "embedded": {},
+      "participationgrade": null
+    }
+  },
+  "concepts": [],
+  "events": [
+    {
+      "name": "Quiz",
+      "eventid": "Quizeventid",
+      "startdate": "",
+      "enddate": "",
+      "gradepercentage": null,
+      "description": "Inferred from study material: MAT202_Quiz1_Fall2025.pdf",
+      "type": "test",
+      "embedded": {},
+      "dependencies": [],
+      "coveredConcepts": [],
+      "courseid": "19097"
+    },
+    {
+      "name": "Midterm",
+      "eventid": "Midtermeventid",
+      "startdate": "",
+      "enddate": "",
+      "gradepercentage": null,
+      "description": "Inferred from study material: Midterm_F2011.pdf",
+      "type": "test",
+      "embedded": {},
+      "dependencies": [],
+      "coveredConcepts": [],
+      "courseid": "19097"
+    }
+  ],
+  "problems": [],
+  "files": {}
+}

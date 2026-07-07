@@ -1,0 +1,648 @@
+{
+  "version": 1,
+  "courseId": "15237",
+  "fileId": "3273406",
+  "filename": "Lecture 7_wiring the brain_slides.pdf",
+  "expectedFileType": "lecture_slides",
+  "passPlan": {
+    "courseId": "15237",
+    "fileId": "3273406",
+    "filename": "Lecture 7_wiring the brain_slides.pdf",
+    "resolvedType": "lecture_slides",
+    "heuristicConfidence": 0.92,
+    "neededPasses": [
+      "extract_pages",
+      "heuristic_classify",
+      "llm_pass1",
+      "finalize"
+    ],
+    "skippedPasses": [
+      "llm_classify",
+      "llm_pass2"
+    ],
+    "estLlmCalls": 1,
+    "estRealisticLlmCalls": 1.0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "needed": true,
+        "reason": "Required local PDF/HTML extraction; no LLM.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "heuristic_classify",
+        "needed": true,
+        "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_classify",
+        "needed": false,
+        "reason": "Heuristic confidence 0.92 sufficient; skip flash classify call.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_pass1",
+        "needed": true,
+        "reason": "Type lecture_slides: pass1 extracts concepts=True, problems=True, events=False.",
+        "llmCall": true,
+        "estCostTier": "high"
+      },
+      {
+        "pass": "llm_pass2",
+        "needed": false,
+        "reason": "Type lecture_slides disables pass2 (single-pass type-specific or link-only profile).",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "finalize",
+        "needed": true,
+        "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+        "llmCall": false,
+        "estCostTier": "free"
+      }
+    ]
+  },
+  "passAudit": {
+    "plan": {
+      "courseId": "15237",
+      "fileId": "3273406",
+      "filename": "Lecture 7_wiring the brain_slides.pdf",
+      "resolvedType": "lecture_slides",
+      "heuristicConfidence": 0.92,
+      "neededPasses": [
+        "extract_pages",
+        "heuristic_classify",
+        "llm_pass1",
+        "finalize"
+      ],
+      "skippedPasses": [
+        "llm_classify",
+        "llm_pass2"
+      ],
+      "estLlmCalls": 1,
+      "estRealisticLlmCalls": 1.0,
+      "steps": [
+        {
+          "pass": "extract_pages",
+          "needed": true,
+          "reason": "Required local PDF/HTML extraction; no LLM.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "heuristic_classify",
+          "needed": true,
+          "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_classify",
+          "needed": false,
+          "reason": "Heuristic confidence 0.92 sufficient; skip flash classify call.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_pass1",
+          "needed": true,
+          "reason": "Type lecture_slides: pass1 extracts concepts=True, problems=True, events=False.",
+          "llmCall": true,
+          "estCostTier": "high"
+        },
+        {
+          "pass": "llm_pass2",
+          "needed": false,
+          "reason": "Type lecture_slides disables pass2 (single-pass type-specific or link-only profile).",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "finalize",
+          "needed": true,
+          "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+          "llmCall": false,
+          "estCostTier": "free"
+        }
+      ]
+    },
+    "actualType": "lecture_slides",
+    "deepseekPasses": 1,
+    "conceptCount": 80,
+    "detailCount": 29,
+    "totalLlmTokens": 0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "ran": true,
+        "useful": true,
+        "verdict": "required",
+        "note": "Local I/O; pages present means extract succeeded."
+      },
+      {
+        "pass": "heuristic_classify",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "Routed to lecture_slides (free)."
+      },
+      {
+        "pass": "llm_classify",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Skipped; heuristic confidence sufficient.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass1",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "No pass1 tool trace.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass2",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Correctly skipped: profile disables pass2, type-specific pass1 only, or no log_* tools.",
+        "tokens": 0
+      },
+      {
+        "pass": "finalize",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "logged_details promoted to concept details."
+      }
+    ],
+    "cutCandidates": [],
+    "recommendations": [
+      "Pass2 correctly skipped for this type/pass1 tool pattern."
+    ]
+  },
+  "passes": [
+    "extract_pages",
+    "heuristic_classify",
+    "teaching_units",
+    "type_structure",
+    "concept_candidates",
+    "problem_scan",
+    "detail_attach",
+    "reconcile"
+  ],
+  "buildMode": "template_multi_pass_offline",
+  "builtAt": "2026-07-01T22:49:37Z",
+  "concepts": [
+    {
+      "name": "Lecture 7_wiring the brain_slides",
+      "details": []
+    },
+    {
+      "name": "17 days post-conception (human)22 days post-conception",
+      "details": []
+    },
+    {
+      "name": "5 fluid-filled vesicles the ventricles",
+      "details": []
+    },
+    {
+      "name": "can make many kinds of glia and neurons",
+      "details": []
+    },
+    {
+      "name": "7 month old fetus: nissl stain (myelin)complete ~4.5 years",
+      "details": []
+    },
+    {
+      "name": "After neurons are generated and cell bodies are in the right spots",
+      "details": []
+    },
+    {
+      "name": "Sperry’s chemoaffinity hypothesis",
+      "details": []
+    },
+    {
+      "name": "Problem 1",
+      "details": []
+    },
+    {
+      "name": "Problem 2",
+      "details": []
+    },
+    {
+      "name": "Effect of disrupting input depends on when the disruption happened",
+      "details": []
+    },
+    {
+      "name": "pathfinding and pruning",
+      "details": [
+        "Wiring the brain:Pathfinding and pruning"
+      ]
+    },
+    {
+      "name": "tomorrow, friday 9/27, 3-5 pm, guyot 10",
+      "details": [
+        "AI-lead review session: TOMORROW, Friday 9/27, 3-5 pm, Guyot 10"
+      ]
+    },
+    {
+      "name": "summary of last lecture",
+      "details": []
+    },
+    {
+      "name": "wishreality",
+      "details": []
+    },
+    {
+      "name": "some questions about constructing circuits",
+      "details": []
+    },
+    {
+      "name": "outline for today",
+      "details": []
+    },
+    {
+      "name": "closure of the neural tube (“neurulation”)",
+      "details": [
+        "Early nervous system development: closure of the neural tube (“neurulation”)"
+      ]
+    },
+    {
+      "name": "neural tube defects",
+      "details": [
+        "Disrupted neurulation: neural tube defects"
+      ]
+    },
+    {
+      "name": "anencephaly(usually fatal)",
+      "details": [
+        "Failure to close: Anencephaly(usually fatal)"
+      ]
+    },
+    {
+      "name": "spina bifida",
+      "details": [
+        "Failure to close: Spina bifida"
+      ]
+    },
+    {
+      "name": "forebrainmidbrainhindbrain",
+      "details": []
+    },
+    {
+      "name": "additional proliferative layer (svz)",
+      "details": [
+        "Primates: additional proliferative layer (SVZ)"
+      ]
+    },
+    {
+      "name": "cell division",
+      "details": []
+    },
+    {
+      "name": "dna copying",
+      "details": []
+    },
+    {
+      "name": "false",
+      "details": []
+    },
+    {
+      "name": "(a) true(b) false",
+      "details": [
+        "Clickers: (A) True(B) False"
+      ]
+    },
+    {
+      "name": "label dividing cells(mature neurons are post-mitotic)",
+      "details": [
+        "Neuronal birthdating: label dividing cells(mature neurons are post-mitotic)"
+      ]
+    },
+    {
+      "name": "accidental human neuronal birthdating",
+      "details": [
+        "Oops: accidental human neuronal birthdating"
+      ]
+    },
+    {
+      "name": "massive neocortical expansion relative to other brain areas",
+      "details": [
+        "Humans: massive neocortical expansion relative to other brain areas"
+      ]
+    },
+    {
+      "name": "inside-out generation of cortical layers",
+      "details": []
+    },
+    {
+      "name": "new cells migrate past older layers",
+      "details": []
+    },
+    {
+      "name": "making different cell typesand cellular domains",
+      "details": [
+        "Differentiation: making different cell typesand cellular domains"
+      ]
+    },
+    {
+      "name": "diffusible semaphorinattracts dendrites, repels axons",
+      "details": [
+        "Oriented growth of neurites: diffusible semaphorinattracts dendrites, repels axons"
+      ]
+    },
+    {
+      "name": "uneven distribution of cell fate determinants",
+      "details": [
+        "Asymmetrical cleavage: uneven distribution of cell fate determinants"
+      ]
+    },
+    {
+      "name": "sewing the patchwork quilt of the neocortex",
+      "details": [
+        "Regional differentiation: sewing the patchwork quilt of the neocortex"
+      ]
+    },
+    {
+      "name": "emx2(posterior)pax6(anterior)",
+      "details": []
+    },
+    {
+      "name": "fetal telencephalon",
+      "details": []
+    },
+    {
+      "name": "inputs instruct cortical specificity",
+      "details": [
+        "Regional differentiation: inputs instruct cortical specificity"
+      ]
+    },
+    {
+      "name": "somatosensory cortexvisual cortex",
+      "details": []
+    },
+    {
+      "name": "visual cortex receiving somatosensory inputs",
+      "details": []
+    },
+    {
+      "name": "constructing circuits",
+      "details": []
+    },
+    {
+      "name": "spinal motor neuron axons",
+      "details": []
+    },
+    {
+      "name": "just startedextending",
+      "details": []
+    },
+    {
+      "name": "netrins attract axons to cross the midline",
+      "details": [
+        "Diffusible chemoattractant: netrins attract axons to cross the midline"
+      ]
+    },
+    {
+      "name": "wildtype mousenetrin knockout mouse",
+      "details": []
+    },
+    {
+      "name": "dorsal horn neurons cross",
+      "details": [
+        "Spinal cord: dorsal horn neurons cross"
+      ]
+    },
+    {
+      "name": "no callosum",
+      "details": [
+        "Wildtype mouseNetrin knockout mouse: no callosum"
+      ]
+    },
+    {
+      "name": "stretching and question break",
+      "details": []
+    },
+    {
+      "name": "tonotopic map",
+      "details": [
+        "Auditory cortex: tonotopic map"
+      ]
+    },
+    {
+      "name": "retinotopic map",
+      "details": [
+        "Visual cortex: retinotopic map"
+      ]
+    },
+    {
+      "name": "body mapsomatosensory cortex: somatotopic map",
+      "details": [
+        "Motor cortex: body mapSomatosensory cortex: somatotopic map"
+      ]
+    },
+    {
+      "name": "retinotopic maps in the frog visual system",
+      "details": [
+        "Map development: retinotopic maps in the frog visual system"
+      ]
+    },
+    {
+      "name": "roger sperry (1913-1994)nobel laureate",
+      "details": []
+    },
+    {
+      "name": "testing the chemoaffinity hypothesis",
+      "details": []
+    },
+    {
+      "name": "normal",
+      "details": []
+    },
+    {
+      "name": "no chemoaffinity",
+      "details": []
+    },
+    {
+      "name": "rotate",
+      "details": []
+    },
+    {
+      "name": "chemoaffinity",
+      "details": []
+    },
+    {
+      "name": "retinatectum",
+      "details": []
+    },
+    {
+      "name": "temporal axons either",
+      "details": []
+    },
+    {
+      "name": "x-y coordinate system",
+      "details": [
+        "Result: X-Y coordinate system"
+      ]
+    },
+    {
+      "name": "receptor",
+      "details": []
+    },
+    {
+      "name": "ligand",
+      "details": []
+    },
+    {
+      "name": "cnsnmj (pns)",
+      "details": []
+    },
+    {
+      "name": "nissl stain (myelin)complete ~4.5 years",
+      "details": [
+        "7 month old fetus: Nissl stain (myelin)Complete ~4.5 years"
+      ]
+    },
+    {
+      "name": "primary somatosensoryprimary motor",
+      "details": []
+    },
+    {
+      "name": "myelination is largely postnatal in humans",
+      "details": []
+    },
+    {
+      "name": "1 in 500 live births",
+      "details": [
+        "Polydactyly: 1 in 500 live births"
+      ]
+    },
+    {
+      "name": "dying cell stain",
+      "details": []
+    },
+    {
+      "name": "nucleus stain(all cells)",
+      "details": []
+    },
+    {
+      "name": "neuron survival and trophic interactions",
+      "details": []
+    },
+    {
+      "name": "limiting target-derived factorsfor competitive pruning?",
+      "details": [
+        "Neurotrophins: limiting target-derived factorsfor competitive pruning?"
+      ]
+    },
+    {
+      "name": "trkabdnf, nt4: trkbnt3: trkcgdnf: gfra1",
+      "details": [
+        "Neurotrophins and receptorsNGF: trkABDNF, NT4: trkBNT3: trkCGDNF: Gfra1"
+      ]
+    },
+    {
+      "name": "trophic interactions weed out extra neurons",
+      "details": []
+    },
+    {
+      "name": "birthage 7age 15",
+      "details": []
+    },
+    {
+      "name": "3h-prolinehrp",
+      "details": [
+        "Anterograde transport: 3H-prolineHRP"
+      ]
+    },
+    {
+      "name": "human adult ocular dominance columns",
+      "details": []
+    },
+    {
+      "name": "co stain1 eye enucleated before death",
+      "details": []
+    },
+    {
+      "name": "eyes openeyes closed",
+      "details": []
+    },
+    {
+      "name": "critical period",
+      "details": []
+    }
+  ],
+  "conceptCount": 80,
+  "detailCount": 29,
+  "events": [],
+  "problems": [
+    "Problem 1",
+    "Problem 2"
+  ],
+  "sections": [
+    "After neurons are generated and cell bodies are in the right spots",
+    "Sperry’s chemoaffinity hypothesis",
+    "Temporal axons either",
+    "Problem 1",
+    "Problem 2",
+    "Effect of disrupting input depends on when the disruption happened",
+    "Correction of congenital cataracts",
+    "Strabismus corrections"
+  ],
+  "deepseekPasses": 1,
+  "expectsPass2": false,
+  "gtProvenance": {
+    "typeSource": "heuristic_high",
+    "typeConfidence": 0.92,
+    "offlinePassAudit": {
+      "extract_pages": {
+        "localPdf": true,
+        "pageCount": 73,
+        "pdfPath": "C:\\Allen\\nucleus\\canvasfiles\\3273406"
+      },
+      "heuristic_classify": {
+        "expectedFileType": "lecture_slides",
+        "source": "heuristic_high",
+        "confidence": 0.92
+      },
+      "teaching_units": {
+        "sectionCount": 8
+      },
+      "type_structure": {
+        "slideRows": 112,
+        "readingSections": 0,
+        "syllabusWeeks": 0
+      },
+      "concept_candidates": {
+        "candidateCount": 80
+      },
+      "problem_scan": {
+        "problemCount": 2
+      },
+      "detail_attach": {
+        "conceptKeysWithDetails": 45,
+        "detailCount": 45
+      },
+      "reconcile": {
+        "inputTitles": 80,
+        "accepted": 80,
+        "capped": 0,
+        "detailAttached": 29
+      }
+    },
+    "reconcileStats": {
+      "inputTitles": 80,
+      "accepted": 80,
+      "capped": 0,
+      "detailAttached": 29
+    }
+  }
+}

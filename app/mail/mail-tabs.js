@@ -2,7 +2,7 @@
 // Functionality: owns mail UI state, loads Gmail data through IPC, and patches
 // the mail DOM in place instead of rerendering the whole workspace.
 
-let mailState = {
+var mailState = {
   loading: false,
   detailLoading: false,
   sending: false,
@@ -15,6 +15,12 @@ let mailState = {
   allMessages: [],
   selectedId: null,
   selectedMessage: null,
+  selectedIds: [],
+  threadMessages: [],
+  nextPageToken: "",
+  loadingMore: false,
+  sidebarCollapsed: false,
+  contactsPanelOpen: false,
   compose: null,
   statusMessage: "",
   contactsData: {
@@ -37,6 +43,8 @@ let mailStatusTimer = null;
 let mailContactsUnsubscribe = null;
 let mailInboxDeltaUnsubscribe = null;
 let mailWatchStarted = false;
+const mailDetailCache = new Map();
+const mailPrefetchQueued = new Set();
 
 function getActiveMailTab() {
   const activeTab = typeof getActiveTab === "function" ? getActiveTab() : null;
@@ -126,8 +134,10 @@ function applyContactRoutingToInbox() {
   const source = Array.isArray(mailState.allMessages) ? mailState.allMessages : mailState.messages;
   let visible = source.filter(Boolean);
   if (mailState.folder === "inbox" && !mailState.searchQuery) {
-    visible = visible.filter(message => message.inboxCategory !== "non_academic");
+    visible = visible.filter(message => message.inboxCategory === "academic");
     visible = visible.filter(message => !routedIds.has(message.id));
+  } else if (mailState.folder === "campus_events" && !mailState.searchQuery) {
+    visible = visible.filter(message => message.inboxCategory === "campus_events");
   } else if (mailState.folder === "secondary" && !mailState.searchQuery) {
     visible = visible.filter(message => message.inboxCategory === "non_academic");
   }
@@ -308,12 +318,34 @@ function bindMailContactsUpdates() {
   });
 }
 
+function isPrimaryInboxMessage(message) {
+  return Boolean(message && message.inboxCategory === "academic");
+}
+
+function isCampusEventsMessage(message) {
+  return Boolean(message && message.inboxCategory === "campus_events");
+}
+
+function isSecondaryInboxMessage(message) {
+  return Boolean(message && message.inboxCategory === "non_academic");
+}
+
+function messageMatchesMailFolder(message, folder, searchQuery) {
+  if (searchQuery) return true;
+  if (folder === "campus_events") return isCampusEventsMessage(message);
+  if (folder === "secondary") return isSecondaryInboxMessage(message);
+  if (folder === "inbox") return isPrimaryInboxMessage(message);
+  return false;
+}
+
 function bindMailInboxDelta() {
   if (mailInboxDeltaUnsubscribe || !window.nucleus || typeof window.nucleus.on !== "function") {
     return;
   }
   mailInboxDeltaUnsubscribe = window.nucleus.on("mail:inbox_delta", payload => {
-    handleInboxDelta(payload);
+    handleInboxDelta(payload).catch(error => {
+      console.warn("Mail inbox delta failed:", error);
+    });
   });
 }
 
@@ -326,19 +358,40 @@ async function ensureMailWatchStarted() {
     const result = await window.nucleus.startMailWatch({ intervalMs: 15000 });
     if (!result || !result.ok) {
       mailWatchStarted = false;
+      console.warn(
+        "Mail watch did not start:",
+        result && result.error ? result.error : "unknown error"
+      );
     }
-  } catch (_) {
+  } catch (error) {
     mailWatchStarted = false;
+    console.warn("Unable to start mail watch:", error);
   }
 }
 
-function handleInboxDelta(delta) {
+async function syncMailWatchLifecycle() {
+  if (isMailTabActive()) {
+    await ensureMailWatchStarted();
+    return;
+  }
+  if (!mailWatchStarted || !window.nucleus || typeof window.nucleus.stopMailWatch !== "function") {
+    return;
+  }
+  try {
+    await window.nucleus.stopMailWatch();
+  } catch (error) {
+    console.warn("Unable to stop mail watch:", error);
+  }
+  mailWatchStarted = false;
+}
+
+async function handleInboxDelta(delta) {
   if (!delta) return;
   const active = isMailTabActive();
 
   // historyId aged out of Gmail's window: resync from scratch.
   if (delta.reset) {
-    if (active && (mailState.folder === "inbox" || mailState.folder === "secondary") && !mailState.searchQuery) {
+    if (active && (mailState.folder === "inbox" || mailState.folder === "secondary" || mailState.folder === "campus_events") && !mailState.searchQuery) {
       refreshMailInbox();
     } else {
       mailState.initialized = false;
@@ -353,35 +406,40 @@ function handleInboxDelta(delta) {
     changed = true;
   }
 
-  const onInbox = (mailState.folder === "inbox" || mailState.folder === "secondary") && !mailState.searchQuery;
+  const onInboxView = (mailState.folder === "inbox" || mailState.folder === "secondary" || mailState.folder === "campus_events") && !mailState.searchQuery;
   let freshMessages = [];
 
-  if (onInbox) {
-    const added = Array.isArray(delta.added) ? delta.added : [];
-    if (added.length) {
-      const existing = new Set(mailState.allMessages.map(item => item.id));
-      freshMessages = added.filter(item => item && item.id && !existing.has(item.id));
-      if (freshMessages.length) {
-        mailState.allMessages = sortMailByReceivedDate(freshMessages.concat(mailState.allMessages));
-        changed = true;
-      }
+  const added = Array.isArray(delta.added) ? delta.added : [];
+  if (added.length) {
+    const existing = new Set(mailState.allMessages.map(item => item.id));
+    freshMessages = added.filter(item => item && item.id && !existing.has(item.id));
+    if (freshMessages.length) {
+      mailState.allMessages = sortMailByReceivedDate(freshMessages.concat(mailState.allMessages));
+      changed = true;
     }
+  }
 
-    const removedIds = Array.isArray(delta.removedIds) ? delta.removedIds : [];
-    if (removedIds.length) {
-      const removeSet = new Set(removedIds);
-      const before = mailState.allMessages.length;
-      mailState.allMessages = mailState.allMessages.filter(item => !removeSet.has(item.id));
-      mailState.allMessages = sortMailByReceivedDate(mailState.allMessages);
-      if (mailState.allMessages.length !== before) changed = true;
-      if (mailState.selectedId && removeSet.has(mailState.selectedId)) {
-        mailState.selectedId = null;
-        mailState.selectedMessage = null;
-        if (active) updateMailUI("reading");
-      }
+  const removedIds = Array.isArray(delta.removedIds) ? delta.removedIds : [];
+  if (removedIds.length) {
+    const removeSet = new Set(removedIds);
+    const before = mailState.allMessages.length;
+    mailState.allMessages = mailState.allMessages.filter(item => !removeSet.has(item.id));
+    mailState.allMessages = sortMailByReceivedDate(mailState.allMessages);
+    if (mailState.allMessages.length !== before) changed = true;
+    if (mailState.selectedId && removeSet.has(mailState.selectedId)) {
+      mailState.selectedId = null;
+      mailState.selectedMessage = null;
+      if (active) updateMailUI("reading");
     }
+  }
 
-    if (changed) applyContactRoutingToInbox();
+  const primaryFresh = freshMessages.filter(isPrimaryInboxMessage);
+  if (primaryFresh.length) {
+    await syncMailContactsFromInbox(primaryFresh);
+  }
+
+  if (changed && onInboxView) {
+    applyContactRoutingToInbox();
   }
 
   if (changed) {
@@ -392,13 +450,95 @@ function handleInboxDelta(delta) {
     }
   }
 
-  if (freshMessages.length) {
-    if (active) {
-      const count = freshMessages.length;
+  if (active && onInboxView && freshMessages.length) {
+    const routedIds = getRoutedMessageIdSet();
+    const visibleFresh = freshMessages.filter(message => {
+      if (!messageMatchesMailFolder(message, mailState.folder, mailState.searchQuery)) return false;
+      if (mailState.folder === "inbox" && routedIds.has(message.id)) return false;
+      return true;
+    });
+    if (visibleFresh.length) {
+      const count = visibleFresh.length;
       setMailStatus(count === 1 ? "1 new message" : `${count} new messages`);
-      syncMailContactsFromInbox(mailState.allMessages);
     }
   }
+}
+
+function buildMailPreviewFromList(id) {
+  const summary = mailState.messages.find(item => item.id === id)
+    || mailState.allMessages.find(item => item.id === id);
+  if (!summary) return null;
+  return {
+    ...summary,
+    bodyHtml: summary.bodyHtml || `<p>${escapeMailPreviewText(summary.snippet || "")}</p>`,
+    bodyText: summary.bodyText || String(summary.snippet || ""),
+    attachments: Array.isArray(summary.attachments) ? summary.attachments : [],
+    preview: true
+  };
+}
+
+function escapeMailPreviewText(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function rememberMailDetail(message) {
+  if (!message || !message.id) return;
+  mailDetailCache.set(message.id, message);
+}
+
+function queueMailPrefetch(ids = []) {
+  if (!window.nucleus || typeof window.nucleus.prefetchMailMessages !== "function") return;
+  const unique = [...new Set((Array.isArray(ids) ? ids : []).filter(Boolean))]
+    .filter(id => !mailDetailCache.has(id) && !mailPrefetchQueued.has(id));
+  if (!unique.length) return;
+  unique.forEach(id => mailPrefetchQueued.add(id));
+  void window.nucleus.prefetchMailMessages({ ids: unique, limit: 24 }).finally(() => {
+    unique.forEach(id => mailPrefetchQueued.delete(id));
+  });
+}
+
+function prefetchVisibleMailMessages() {
+  queueMailPrefetch(mailState.messages.slice(0, 20).map(item => item.id));
+}
+
+async function markMailMessageRead(id) {
+  if (!id || !window.nucleus || typeof window.nucleus.modifyMail !== "function") return;
+  const modified = await window.nucleus.modifyMail({ id, remove: ["UNREAD"] });
+  if (!modified || !modified.ok || !modified.message) return;
+  updateMessageInList(modified.message);
+  if (mailState.selectedMessage && mailState.selectedMessage.id === id) {
+    mailState.selectedMessage = { ...mailState.selectedMessage, unread: false };
+  }
+  if (Array.isArray(mailState.threadMessages)) {
+    mailState.threadMessages = mailState.threadMessages.map(item =>
+      item.id === id ? { ...item, unread: false } : item
+    );
+  }
+  const root = window.nucleusMailApp && window.nucleusMailApp.getMailRoot
+    ? window.nucleusMailApp.getMailRoot()
+    : null;
+  if (root && window.nucleusMailApp.patchMailRow) {
+    window.nucleusMailApp.patchMailRow(root, modified.message, mailState);
+  }
+}
+
+async function loadMailThreadInBackground(threadId, selectedId) {
+  if (!threadId || !window.nucleus || typeof window.nucleus.getMailThread !== "function") return;
+  try {
+    const threadResult = await window.nucleus.getMailThread({ threadId });
+    if (!threadResult || !threadResult.ok || !threadResult.thread || !Array.isArray(threadResult.thread.messages)) {
+      return;
+    }
+    if (mailState.selectedId !== selectedId) return;
+    mailState.threadMessages = threadResult.thread.messages;
+    threadResult.thread.messages.forEach(rememberMailDetail);
+    syncMailStateToTab();
+    updateMailUI("content");
+  } catch (_) {}
 }
 
 async function ensureMailAuthReady() {
@@ -427,9 +567,14 @@ async function loadMailView(options = {}) {
   mailState.error = null;
   mailState.folder = folder;
   mailState.searchQuery = q;
+  if (!options.pageToken) {
+    mailState.nextPageToken = "";
+  }
   if (!keepSelection) {
     mailState.selectedId = null;
     mailState.selectedMessage = null;
+    mailState.threadMessages = [];
+    mailState.selectedIds = [];
   }
   syncMailStateToTab();
   updateMailUI("full");
@@ -440,18 +585,19 @@ async function loadMailView(options = {}) {
     bindMailInboxDelta();
     ensureMailWatchStarted();
     await loadMailContactsState();
-    const result = await window.nucleus.getMailView({ folder, q });
+    const result = await window.nucleus.getMailView({ folder, q, pageToken: options.pageToken || "" });
     if (!result || !result.ok) {
       throw new Error((result && result.error) || "Unable to load mail.");
     }
 
     mailState.view = result.view;
+    mailState.nextPageToken = result.view && result.view.nextPageToken ? result.view.nextPageToken : "";
     mailState.allMessages = sortMailByReceivedDate(
       result.view && Array.isArray(result.view.messages) ? result.view.messages : []
     );
     mailState.messages = mailState.allMessages.slice();
 
-    if ((folder === "inbox" || folder === "secondary") && !q) {
+    if ((folder === "inbox" || folder === "secondary" || folder === "campus_events") && !q) {
       await syncMailContactsFromInbox(mailState.allMessages);
     } else {
       applyContactRoutingToInbox();
@@ -474,6 +620,7 @@ async function loadMailView(options = {}) {
     mailState.initialized = true;
     syncMailStateToTab();
     updateMailUI("full");
+    prefetchVisibleMailMessages();
   }
 }
 
@@ -495,10 +642,22 @@ async function openMailMessage(id) {
   if (!id || !window.nucleus || typeof window.nucleus.getMailMessage !== "function") return;
 
   mailState.selectedId = id;
-  mailState.detailLoading = true;
   mailState.compose = null;
-  syncMailStateToTab();
-  updateMailUI("content");
+
+  const cached = mailDetailCache.get(id) || buildMailPreviewFromList(id);
+  if (cached) {
+    mailState.selectedMessage = cached;
+    mailState.detailLoading = !cached.bodyHtml && !cached.bodyText;
+    mailState.threadMessages = cached.threadId ? [cached] : [];
+    syncMailStateToTab();
+    updateMailUI("content");
+  } else {
+    mailState.selectedMessage = null;
+    mailState.detailLoading = true;
+    mailState.threadMessages = [];
+    syncMailStateToTab();
+    updateMailUI("content");
+  }
 
   try {
     const result = await window.nucleus.getMailMessage({ id });
@@ -506,24 +665,29 @@ async function openMailMessage(id) {
       throw new Error((result && result.error) || "Unable to open message.");
     }
 
+    rememberMailDetail(result.message);
     mailState.selectedMessage = result.message;
-    if (result.message && result.message.unread && typeof window.nucleus.modifyMail === "function") {
-      const modified = await window.nucleus.modifyMail({ id, remove: ["UNREAD"] });
-      if (modified && modified.ok && modified.message) {
-        updateMessageInList(modified.message);
-        mailState.selectedMessage = { ...mailState.selectedMessage, unread: false };
-        const root = window.nucleusMailApp && window.nucleusMailApp.getMailRoot
-          ? window.nucleusMailApp.getMailRoot()
-          : null;
-        if (root && window.nucleusMailApp.patchMailRow) {
-          window.nucleusMailApp.patchMailRow(root, modified.message, mailState);
-        }
-      }
+    mailState.detailLoading = false;
+
+    if (result.message && result.message.threadId) {
+      void loadMailThreadInBackground(result.message.threadId, id);
+    }
+
+    syncMailStateToTab();
+    updateMailUI("content");
+
+    if (result.message && result.message.unread) {
+      void markMailMessageRead(id);
     }
   } catch (error) {
-    setMailStatus(error && error.message ? error.message : String(error));
-    mailState.selectedId = null;
-    mailState.selectedMessage = null;
+    if (!mailState.selectedMessage) {
+      setMailStatus(error && error.message ? error.message : String(error));
+      mailState.selectedId = null;
+      mailState.selectedMessage = null;
+      mailState.threadMessages = [];
+    } else {
+      setMailStatus(error && error.message ? error.message : String(error));
+    }
   } finally {
     mailState.detailLoading = false;
     syncMailStateToTab();
@@ -534,6 +698,7 @@ async function openMailMessage(id) {
 function closeMailMessage() {
   mailState.selectedId = null;
   mailState.selectedMessage = null;
+  mailState.threadMessages = [];
   syncMailStateToTab();
   updateMailUI("content");
 }
@@ -549,7 +714,9 @@ function openMailCompose(options = {}) {
     inReplyTo: options.inReplyTo || "",
     references: options.references || "",
     threadId: options.threadId || "",
-    replyToId: options.replyToId || ""
+    replyToId: options.replyToId || "",
+    minimized: false,
+    showCcBcc: Boolean(options.cc || options.bcc)
   };
   updateMailUI("compose");
 }
@@ -558,6 +725,49 @@ function closeMailCompose() {
   mailState.compose = null;
   mailState.sending = false;
   updateMailUI("compose");
+}
+
+function toggleMailComposeMinimize() {
+  if (!mailState.compose) return;
+  mailState.compose.minimized = !mailState.compose.minimized;
+  updateMailUI("compose");
+}
+
+function toggleMailComposeCcBcc() {
+  if (!mailState.compose) return;
+  mailState.compose.showCcBcc = true;
+  updateMailUI("compose");
+}
+
+function toggleMailSidebar() {
+  mailState.sidebarCollapsed = !mailState.sidebarCollapsed;
+  updateMailUI("sidebar");
+  updateMailUI("shell");
+}
+
+function toggleMailContactsPanel() {
+  mailState.contactsPanelOpen = !mailState.contactsPanelOpen;
+  updateMailUI("contacts");
+  updateMailUI("sidebar");
+}
+
+function parseAddressList(value) {
+  return String(value || "")
+    .split(",")
+    .map(item => extractMailAddress(item.trim()))
+    .filter(Boolean);
+}
+
+function buildReplyAllRecipients(message) {
+  const selfEmail = mailState.view && mailState.view.profile
+    ? String(mailState.view.profile.emailAddress || "").toLowerCase()
+    : "";
+  const recipients = new Set();
+  parseAddressList(message.from).forEach(addr => recipients.add(addr.toLowerCase()));
+  parseAddressList(message.to).forEach(addr => recipients.add(addr.toLowerCase()));
+  parseAddressList(message.cc).forEach(addr => recipients.add(addr.toLowerCase()));
+  if (selfEmail) recipients.delete(selfEmail);
+  return [...recipients].join(", ");
 }
 
 function replyToSelectedMessage(mode = "reply") {
@@ -574,6 +784,22 @@ function replyToSelectedMessage(mode = "reply") {
       mode: "forward",
       subject: /^fwd:/i.test(message.subject || "") ? message.subject : `Fwd: ${message.subject || ""}`,
       body: `\n\n---------- Forwarded message ----------\nFrom: ${message.from || ""}\nDate: ${message.date || ""}\nSubject: ${message.subject || ""}\n\n${plainBody}`
+    });
+    return;
+  }
+
+  if (mode === "replyAll") {
+    openMailCompose({
+      mode: "replyAll",
+      to: buildReplyAllRecipients(message),
+      cc: "",
+      subject,
+      body: `\n\nOn ${message.date || ""}, ${message.from || ""} wrote:\n${plainBody}`,
+      inReplyTo: message.messageId || "",
+      references: message.references ? `${message.references} ${message.messageId || ""}`.trim() : (message.messageId || ""),
+      threadId: message.threadId || "",
+      replyToId: message.id,
+      showCcBcc: true
     });
     return;
   }
@@ -764,6 +990,320 @@ async function refreshMailInbox() {
   }
 }
 
+function toggleMessageSelection(id, checked) {
+  const set = new Set(mailState.selectedIds || []);
+  if (checked) set.add(id);
+  else set.delete(id);
+  mailState.selectedIds = [...set];
+  updateMailUI("list");
+  updateMailUI("list-toolbar");
+}
+
+function toggleSelectAllMessages(checked) {
+  mailState.selectedIds = checked ? mailState.messages.map(item => item.id) : [];
+  updateMailUI("list");
+  updateMailUI("list-toolbar");
+}
+
+function clearMessageSelection() {
+  mailState.selectedIds = [];
+  updateMailUI("list");
+  updateMailUI("list-toolbar");
+}
+
+async function modifyMessagesBulk(ids, changes) {
+  if (!window.nucleus || typeof window.nucleus.modifyMail !== "function") return [];
+  const results = [];
+  for (const id of ids) {
+    try {
+      const result = await window.nucleus.modifyMail({ id, ...changes });
+      if (result && result.ok) results.push(result.message);
+    } catch (_) {}
+  }
+  return results;
+}
+
+async function bulkArchiveMessages() {
+  const ids = mailState.selectedIds || [];
+  if (!ids.length) return;
+  await modifyMessagesBulk(ids, { remove: ["INBOX"] });
+  ids.forEach(removeMessageFromList);
+  clearMessageSelection();
+  if (ids.includes(mailState.selectedId)) closeMailMessage();
+  updateMailUI("list");
+  setMailStatus(ids.length === 1 ? "Message archived." : `${ids.length} messages archived.`);
+}
+
+async function bulkSpamMessages() {
+  const ids = mailState.selectedIds || [];
+  if (!ids.length) return;
+  await modifyMessagesBulk(ids, { add: ["SPAM"], remove: ["INBOX"] });
+  ids.forEach(removeMessageFromList);
+  clearMessageSelection();
+  if (ids.includes(mailState.selectedId)) closeMailMessage();
+  updateMailUI("list");
+  setMailStatus(ids.length === 1 ? "Message marked as spam." : `${ids.length} messages marked as spam.`);
+}
+
+async function bulkDeleteMessages() {
+  const ids = mailState.selectedIds || [];
+  if (!ids.length) return;
+  const inTrash = mailState.folder === "trash";
+  for (const id of ids) {
+    if (inTrash && window.nucleus.deleteMail) {
+      await window.nucleus.deleteMail({ id });
+    } else if (window.nucleus.trashMail) {
+      await window.nucleus.trashMail({ id });
+    }
+    removeMessageFromList(id);
+  }
+  clearMessageSelection();
+  if (ids.includes(mailState.selectedId)) closeMailMessage();
+  updateMailUI("list");
+  setMailStatus(inTrash ? "Messages deleted." : "Messages moved to trash.");
+}
+
+async function bulkMarkMessagesRead(read = true) {
+  const ids = mailState.selectedIds || [];
+  if (!ids.length) return;
+  const changes = read ? { remove: ["UNREAD"] } : { add: ["UNREAD"] };
+  const updated = await modifyMessagesBulk(ids, changes);
+  updated.forEach(updateMessageInList);
+  clearMessageSelection();
+  updateMailUI("list");
+  setMailStatus(read ? "Marked as read." : "Marked as unread.");
+}
+
+async function archiveMessageById(id) {
+  if (!id || !window.nucleus || typeof window.nucleus.modifyMail !== "function") return;
+  const result = await window.nucleus.modifyMail({ id, remove: ["INBOX"] });
+  if (!result || !result.ok) {
+    setMailStatus((result && result.error) || "Unable to archive message.");
+    return;
+  }
+  removeMessageFromList(id);
+  if (mailState.selectedId === id) closeMailMessage();
+  updateMailUI("list");
+  setMailStatus("Message archived.");
+}
+
+async function trashMessageById(id) {
+  if (!id || !window.nucleus || typeof window.nucleus.trashMail !== "function") return;
+  const result = await window.nucleus.trashMail({ id });
+  if (!result || !result.ok) {
+    setMailStatus((result && result.error) || "Unable to delete message.");
+    return;
+  }
+  removeMessageFromList(id);
+  if (mailState.selectedId === id) closeMailMessage();
+  updateMailUI("list");
+  setMailStatus("Message moved to trash.");
+}
+
+async function deleteMessageById(id) {
+  if (!id || !window.nucleus || typeof window.nucleus.deleteMail !== "function") return;
+  const result = await window.nucleus.deleteMail({ id });
+  if (!result || !result.ok) {
+    setMailStatus((result && result.error) || "Unable to delete message.");
+    return;
+  }
+  removeMessageFromList(id);
+  if (mailState.selectedId === id) closeMailMessage();
+  updateMailUI("list");
+  setMailStatus("Message deleted.");
+}
+
+async function toggleUnreadById(id) {
+  const message = mailState.messages.find(item => item.id === id);
+  if (!message || !window.nucleus || typeof window.nucleus.modifyMail !== "function") return;
+  const changes = message.unread ? { remove: ["UNREAD"] } : { add: ["UNREAD"] };
+  const result = await window.nucleus.modifyMail({ id, ...changes });
+  if (!result || !result.ok) return;
+  updateMessageInList(result.message);
+  const root = window.nucleusMailApp && window.nucleusMailApp.getMailRoot
+    ? window.nucleusMailApp.getMailRoot()
+    : null;
+  if (root && window.nucleusMailApp.patchMailRow) {
+    window.nucleusMailApp.patchMailRow(root, result.message, mailState);
+  }
+}
+
+async function spamSelectedMessage() {
+  const id = mailState.selectedId;
+  if (!id || !window.nucleus || typeof window.nucleus.modifyMail !== "function") return;
+  const result = await window.nucleus.modifyMail({ id, add: ["SPAM"], remove: ["INBOX"] });
+  if (!result || !result.ok) {
+    setMailStatus((result && result.error) || "Unable to mark as spam.");
+    return;
+  }
+  removeMessageFromList(id);
+  closeMailMessage();
+  updateMailUI("list");
+  setMailStatus("Message marked as spam.");
+}
+
+async function notSpamSelectedMessage() {
+  const id = mailState.selectedId;
+  if (!id || !window.nucleus || typeof window.nucleus.modifyMail !== "function") return;
+  const result = await window.nucleus.modifyMail({ id, remove: ["SPAM"], add: ["INBOX"] });
+  if (!result || !result.ok) {
+    setMailStatus((result && result.error) || "Unable to move out of spam.");
+    return;
+  }
+  removeMessageFromList(id);
+  closeMailMessage();
+  updateMailUI("list");
+  setMailStatus("Message moved to inbox.");
+}
+
+function toggleThreadMessage(id) {
+  if (!id) return;
+  mailState.selectedId = id;
+  const threadMsg = Array.isArray(mailState.threadMessages)
+    ? mailState.threadMessages.find(item => item.id === id)
+    : null;
+  if (threadMsg) {
+    mailState.selectedMessage = threadMsg;
+    updateMailUI("reading");
+    return;
+  }
+  openMailMessage(id);
+}
+
+async function loadMoreMailMessages() {
+  if (!mailState.nextPageToken || mailState.loadingMore) return;
+  if (!window.nucleus || typeof window.nucleus.getMailView !== "function") return;
+
+  mailState.loadingMore = true;
+  updateMailUI("list");
+
+  try {
+    const result = await window.nucleus.getMailView({
+      folder: mailState.folder,
+      q: mailState.searchQuery,
+      pageToken: mailState.nextPageToken
+    });
+    if (!result || !result.ok) {
+      throw new Error((result && result.error) || "Unable to load more messages.");
+    }
+    const incoming = sortMailByReceivedDate(
+      result.view && Array.isArray(result.view.messages) ? result.view.messages : []
+    );
+    const existing = new Set(mailState.allMessages.map(item => item.id));
+    const fresh = incoming.filter(item => item && item.id && !existing.has(item.id));
+    mailState.allMessages = sortMailByReceivedDate(mailState.allMessages.concat(fresh));
+    mailState.nextPageToken = result.view && result.view.nextPageToken ? result.view.nextPageToken : "";
+    applyContactRoutingToInbox();
+  } catch (error) {
+    setMailStatus(error && error.message ? error.message : String(error));
+  } finally {
+    mailState.loadingMore = false;
+    updateMailUI("list");
+  }
+}
+
+function getVisibleMessageIndex() {
+  if (!mailState.selectedId) return -1;
+  return mailState.messages.findIndex(item => item.id === mailState.selectedId);
+}
+
+function openMessageAtOffset(offset) {
+  const index = getVisibleMessageIndex();
+  const nextIndex = index < 0 ? (offset > 0 ? 0 : mailState.messages.length - 1) : index + offset;
+  if (nextIndex < 0 || nextIndex >= mailState.messages.length) return;
+  openMailMessage(mailState.messages[nextIndex].id);
+}
+
+function showMailShortcutsHelp() {
+  setMailStatus("Shortcuts: j/k navigate · r reply · a reply all · f forward · e archive · # trash · c compose · / search · Esc close");
+}
+
+function handleMailShortcut(event) {
+  const key = event.key;
+  if (key === "/" && !event.ctrlKey && !event.metaKey) {
+    event.preventDefault();
+    const root = window.nucleusMailApp && window.nucleusMailApp.getMailRoot
+      ? window.nucleusMailApp.getMailRoot()
+      : null;
+    const search = root ? root.querySelector("[data-mail-search]") : null;
+    if (search) search.focus();
+    return;
+  }
+
+  if (key === "Escape") {
+    if (mailState.compose) {
+      closeMailCompose();
+      return;
+    }
+    if (mailState.selectedIds && mailState.selectedIds.length) {
+      clearMessageSelection();
+      return;
+    }
+    if (mailState.selectedId) {
+      closeMailMessage();
+      return;
+    }
+    return;
+  }
+
+  if (mailState.compose) return;
+
+  if (key === "c" && !event.ctrlKey && !event.metaKey) {
+    event.preventDefault();
+    openMailCompose({ mode: "new" });
+    return;
+  }
+
+  if (key === "j") {
+    event.preventDefault();
+    openMessageAtOffset(1);
+    return;
+  }
+
+  if (key === "k") {
+    event.preventDefault();
+    openMessageAtOffset(-1);
+    return;
+  }
+
+  if (!mailState.selectedMessage) return;
+
+  if (key === "r" && !event.shiftKey) {
+    event.preventDefault();
+    replyToSelectedMessage("reply");
+    return;
+  }
+
+  if (key === "a" || (key === "r" && event.shiftKey)) {
+    event.preventDefault();
+    replyToSelectedMessage("replyAll");
+    return;
+  }
+
+  if (key === "f") {
+    event.preventDefault();
+    replyToSelectedMessage("forward");
+    return;
+  }
+
+  if (key === "e") {
+    event.preventDefault();
+    archiveSelectedMessage();
+    return;
+  }
+
+  if (key === "#" || key === "Delete") {
+    event.preventDefault();
+    trashSelectedMessage();
+    return;
+  }
+
+  if (key === "u") {
+    event.preventDefault();
+    toggleSelectedUnread();
+  }
+}
+
 async function openMailAppTab(workspaceId = getBrowserWorkspaceId()) {
   const existing = state.tabs.find(tab => tab.type === "mailtab" && tab.workspaceId === workspaceId);
   const tab = existing || {
@@ -786,13 +1326,15 @@ async function openMailAppTab(workspaceId = getBrowserWorkspaceId()) {
   state.activeWorkspaceId = workspaceId;
   state.activeTabId = tab.id;
   state.activeTabByWorkspace[workspaceId] = tab.id;
-  await syncTabs();
-  await syncActiveTab();
   render();
-  await ensureMailLoaded(false);
-  if (mailState.selectedId && !mailState.selectedMessage) {
-    await openMailMessage(mailState.selectedId);
-  }
+  queueTabSyncAfterRender();
+  ensureMailLoaded(false).catch(error => {
+    console.error("Unable to load mail after opening tab:", error);
+  }).then(async () => {
+    if (mailState.selectedId && !mailState.selectedMessage) {
+      await openMailMessage(mailState.selectedId);
+    }
+  });
 }
 
 async function openMailAppInExistingTab(tabId) {
@@ -817,10 +1359,11 @@ async function openMailAppInExistingTab(tabId) {
   state.activeWorkspaceId = tab.workspaceId;
   state.activeTabId = tab.id;
   state.activeTabByWorkspace[tab.workspaceId] = tab.id;
-  await syncTabs();
-  await syncActiveTab();
   render();
-  await ensureMailLoaded(true);
+  queueTabSyncAfterRender();
+  ensureMailLoaded(true).catch(error => {
+    console.error("Unable to load mail after converting tab:", error);
+  });
 }
 
 bindMailContactsUpdates();

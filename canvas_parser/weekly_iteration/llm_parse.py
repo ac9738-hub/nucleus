@@ -18,6 +18,161 @@ from .limits import MAX_PARSER_BATCH_ITEMS
 
 PARSER_DONE_MARKER = 'parser all passes completed__________________________________________________'
 
+PARSER_BATCH_TYPE_ORDER = (
+    'syllabus',
+    'assignment',
+    'page',
+    'module_item',
+    'file',
+    'external_submission',
+)
+
+
+def merge_parser_batches_by_type(batches: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Coalesce per-course batches so file/page work keeps parse concurrency saturated."""
+    buckets: dict[str, list[Any]] = {}
+    for batch in batches:
+        batch_type = str(batch.get('type') or 'unknown')
+        content = batch.get('content')
+        if not isinstance(content, list):
+            continue
+        buckets.setdefault(batch_type, []).extend(content)
+    if not buckets:
+        return batches
+    merged: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for batch_type in PARSER_BATCH_TYPE_ORDER:
+        content = buckets.get(batch_type)
+        if content:
+            merged.append({'type': batch_type, 'content': content})
+            seen.add(batch_type)
+    for batch_type, content in buckets.items():
+        if batch_type not in seen and content:
+            merged.append({'type': batch_type, 'content': content})
+    return merged
+
+
+def _is_parseable_file(file_item: dict[str, Any]) -> bool:
+    from canvas_parser.content.extractors import detect_extractor
+
+    content_type = file_item.get('content-type') or file_item.get('content_type') or ''
+    filename = file_item.get('display_name') or file_item.get('filename') or file_item.get('name') or ''
+    return bool(detect_extractor(content_type, filename))
+
+
+def _synthesize_module_only_files(
+    files: list[dict[str, Any]],
+    module_items: dict[str, list[dict[str, Any]]],
+) -> list[dict[str, Any]]:
+    merged = list(files or [])
+    seen = {str(row.get('id')) for row in merged if row.get('id') is not None}
+    for items in (module_items or {}).values():
+        for item in items or []:
+            if str(item.get('type') or '').lower() != 'file':
+                continue
+            file_id = str(item.get('content_id') or item.get('id') or '')
+            if not file_id or file_id in seen:
+                continue
+            title = str(item.get('title') or item.get('name') or '').strip()
+            if not title:
+                continue
+            merged.append({
+                'id': file_id,
+                'display_name': title,
+                'filename': title,
+                'content-type': item.get('content-type') or item.get('content_type') or '',
+            })
+            seen.add(file_id)
+    return merged
+
+
+def _extract_canvas_file_ids_from_html(html: str) -> list[str]:
+    import re
+
+    ids: set[str] = set()
+    source = str(html or '')
+    if not source:
+        return []
+    patterns = (
+        r'/files/(\d+)',
+        r'preview=(\d+)',
+        r'data-api-endpoint="[^"]*/files/(\d+)',
+    )
+    for pattern in patterns:
+        for match in re.finditer(pattern, source, flags=re.IGNORECASE):
+            ids.add(str(match.group(1)))
+    return list(ids)
+
+
+_BARE_FILE_DOWNLOAD_RE = re.compile(
+    r'^(https?://[^/]+)/files/(\d+)/download/?(?:\?.*)?$',
+    re.I,
+)
+_BARE_FILE_PREVIEW_RE = re.compile(
+    r'^(https?://[^/]+)/files/(\d+)/preview/?(?:\?.*)?$',
+    re.I,
+)
+_CANVAS_FILE_DOWNLOAD_RE = re.compile(r'/files/\d+/download', re.I)
+
+
+def normalize_canvas_file_download_url(
+    base_url: str,
+    course_id: str,
+    file_id: str,
+    raw_url: str = '',
+) -> str:
+    """Return Canvas download URL, matching app ``buildParserFileRecord`` behavior.
+
+    Prefer the Canvas Files API ``url`` as-is (includes ``download_frd=1`` redirect
+    hop). Only synthesize a course-scoped download URL when the snapshot omits one.
+    """
+    cid = str(course_id or '').strip()
+    fid = str(file_id or '').strip()
+    base = str(base_url or '').rstrip('/')
+    raw = str(raw_url or '').strip()
+    if raw and _CANVAS_FILE_DOWNLOAD_RE.search(raw):
+        return raw
+    fallback = f'{base}/courses/{cid}/files/{fid}/download?download_frd=1' if base and cid and fid else ''
+    if not raw:
+        return fallback
+    bare = _BARE_FILE_DOWNLOAD_RE.match(raw.split('?')[0].rstrip('/'))
+    if bare and cid:
+        host = bare.group(1)
+        use_id = fid or bare.group(2)
+        return f'{host}/courses/{cid}/files/{use_id}/download?download_frd=1'
+    return raw if raw else fallback
+
+
+def normalize_canvas_file_preview_url(
+    base_url: str,
+    course_id: str,
+    file_id: str,
+    raw_url: str = '',
+    *,
+    download_url: str = '',
+) -> str:
+    cid = str(course_id or '').strip()
+    fid = str(file_id or '').strip()
+    base = str(base_url or '').rstrip('/')
+    fallback = f'{base}/courses/{cid}/files?preview={fid}' if base and cid and fid else ''
+    raw = str(raw_url or '').strip()
+    if not raw:
+        if download_url:
+            return download_url.replace(f'/files/{fid}/download', f'/files?preview={fid}')
+        return fallback
+    if cid and f'/courses/{cid}/files' in raw:
+        return raw
+    bare = _BARE_FILE_PREVIEW_RE.match(raw.split('?')[0].rstrip('/'))
+    if bare and cid:
+        host = bare.group(1)
+        use_id = fid or bare.group(2)
+        return f'{host}/courses/{cid}/files?preview={use_id}'
+    if raw and '/files/' in raw and '/courses/' not in raw and cid and fid:
+        host_match = re.match(r'(https?://[^/]+)', raw)
+        if host_match:
+            return f'{host_match.group(1)}/courses/{cid}/files?preview={fid}'
+    return raw if raw else fallback
+
 
 def _strip_html(value: str) -> str:
     text = unescape(re.sub(r'<[^>]+>', ' ', str(value or '')))
@@ -163,14 +318,53 @@ def build_parser_batches(snapshot: dict[str, Any], base_url: str) -> list[dict[s
         batches.append({'type': 'module_item', 'content': parsing_module_items})
 
     parsing_files = []
-    for file_item in snapshot.get('files') or []:
+    linked_ids: set[str] = set()
+    for assignment in snapshot.get('assignments') or []:
+        linked_ids.update(_extract_canvas_file_ids_from_html(str(assignment.get('description') or '')))
+    for body_html in page_bodies.values():
+        linked_ids.update(_extract_canvas_file_ids_from_html(str(body_html or '')))
+    for page in snapshot.get('pages') or []:
+        linked_ids.update(_extract_canvas_file_ids_from_html(str(page.get('body') or '')))
+
+    snapshot_files = list(snapshot.get('files') or [])
+    for file_id in linked_ids:
+        if any(str(row.get('id') or '') == file_id for row in snapshot_files):
+            continue
+        snapshot_files.append({
+            'id': file_id,
+            'display_name': f'Linked file {file_id}',
+            'filename': f'file-{file_id}',
+            'url': f'{base_url}/courses/{course_id}/files/{file_id}/download',
+        })
+
+    snapshot_files = _synthesize_module_only_files(
+        snapshot_files,
+        snapshot.get('module_items') or {},
+    )
+
+    for file_item in snapshot_files:
         file_id = file_item.get('id')
         if not file_id:
             continue
+        if not _is_parseable_file(file_item):
+            continue
         content_type = file_item.get('content-type') or file_item.get('content_type') or ''
+        download_url = normalize_canvas_file_download_url(
+            base_url,
+            course_id,
+            str(file_id),
+            str(file_item.get('url') or ''),
+        )
+        preview_url = normalize_canvas_file_preview_url(
+            base_url,
+            course_id,
+            str(file_id),
+            str(file_item.get('previewurl') or ''),
+            download_url=download_url,
+        )
         parsing_files.append({
-            'url': file_item.get('url') or '',
-            'previewurl': file_item.get('previewurl') or file_item.get('url') or '',
+            'url': download_url,
+            'previewurl': preview_url,
             'id': file_id,
             'name': file_item.get('display_name') or file_item.get('filename') or file_item.get('name') or '',
             'courseid': course_id,
@@ -185,9 +379,11 @@ def build_parser_batches(snapshot: dict[str, Any], base_url: str) -> list[dict[s
 def chunk_parser_batches(
     batches: list[dict[str, Any]],
     *,
-    max_items: int = MAX_PARSER_BATCH_ITEMS,
+    max_items: int | None = None,
 ) -> list[dict[str, Any]]:
     """Split large parser batches so each stdin line stays within a fair item cap."""
+    if max_items is None:
+        max_items = int(os.getenv('PARSER_MAX_BATCH_ITEMS', str(MAX_PARSER_BATCH_ITEMS)))
     if max_items <= 0:
         return batches
     chunked: list[dict[str, Any]] = []
@@ -227,13 +423,16 @@ def run_parser_batches(
     *,
     timeout_seconds: int = 2100,
     keep_graph: bool = False,
+    resume_graph: bool = False,
+    restore_on_failure: bool = True,
+    extra_env: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     if not batches:
         return {}
 
-    backup_path = _backup_graph(root_dir)
+    backup_path = _backup_graph(root_dir) if not resume_graph else None
     graph_path = root_dir / 'canvas_graph.json'
-    if graph_path.is_file():
+    if not resume_graph and graph_path.is_file():
         graph_path.unlink()
 
     env = os.environ.copy()
@@ -245,6 +444,8 @@ def run_parser_batches(
         'CANVAS_AUTH_CSRF': auth.csrf,
         'CANVAS_BASE_URL': auth.base_url,
     })
+    if extra_env:
+        env.update(extra_env)
 
     proc = subprocess.Popen(
         [sys.executable, str(root_dir / 'parser.py')],
@@ -261,16 +462,22 @@ def run_parser_batches(
     assert proc.stdout is not None
 
     done = threading.Event()
+    parser_success = {'ok': False}
 
     def _watch_stdout() -> None:
-        for line in proc.stdout:
-            try:
-                sys.stdout.write(line)
-            except UnicodeEncodeError:
-                sys.stdout.buffer.write(line.encode('utf-8', errors='replace'))
-            if PARSER_DONE_MARKER in line:
+        try:
+            for line in proc.stdout:
+                try:
+                    sys.stdout.write(line)
+                except UnicodeEncodeError:
+                    sys.stdout.buffer.write(line.encode('utf-8', errors='replace'))
+                if PARSER_DONE_MARKER in line:
+                    parser_success['ok'] = True
+                    done.set()
+                    break
+        finally:
+            if not parser_success['ok']:
                 done.set()
-                break
 
     watcher = threading.Thread(target=_watch_stdout, daemon=True)
     watcher.start()
@@ -285,16 +492,31 @@ def run_parser_batches(
 
     if not done.wait(timeout=timeout_seconds):
         proc.kill()
-        _restore_graph(root_dir, backup_path)
+        if restore_on_failure:
+            _restore_graph(root_dir, backup_path)
         raise RuntimeError(f'parser timed out after {timeout_seconds}s')
 
+    watcher.join(timeout=30)
     proc.wait(timeout=60)
+    if proc.returncode == 2:
+        if restore_on_failure:
+            _restore_graph(root_dir, backup_path)
+        raise RuntimeError(
+            'parser aborted: DeepSeek insufficient balance (402) — top up DEEP_SEEK_API_KEY'
+        )
+    if not parser_success['ok']:
+        if restore_on_failure:
+            _restore_graph(root_dir, backup_path)
+        code = proc.returncode if proc.returncode is not None else 'unknown'
+        raise RuntimeError(f'parser exited without completing (code {code})')
     if proc.returncode not in (0, None):
-        _restore_graph(root_dir, backup_path)
+        if restore_on_failure:
+            _restore_graph(root_dir, backup_path)
         raise RuntimeError(f'parser exited with code {proc.returncode}')
 
     if not graph_path.is_file():
-        _restore_graph(root_dir, backup_path)
+        if restore_on_failure:
+            _restore_graph(root_dir, backup_path)
         return {}
 
     graph = json.loads(graph_path.read_text(encoding='utf-8'))

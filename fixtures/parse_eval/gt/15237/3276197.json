@@ -1,0 +1,340 @@
+{
+  "version": 1,
+  "courseId": "15237",
+  "fileId": "3276197",
+  "filename": "Precept 3_problem set 2.pdf",
+  "expectedFileType": "problem_set",
+  "passPlan": {
+    "courseId": "15237",
+    "fileId": "3276197",
+    "filename": "Precept 3_problem set 2.pdf",
+    "resolvedType": "problem_set",
+    "heuristicConfidence": 0.86,
+    "neededPasses": [
+      "extract_pages",
+      "heuristic_classify",
+      "llm_pass1",
+      "finalize"
+    ],
+    "skippedPasses": [
+      "llm_classify",
+      "llm_pass2"
+    ],
+    "estLlmCalls": 1,
+    "estRealisticLlmCalls": 1.0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "needed": true,
+        "reason": "Required local PDF/HTML extraction; no LLM.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "heuristic_classify",
+        "needed": true,
+        "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_classify",
+        "needed": false,
+        "reason": "Heuristic confidence 0.86 sufficient; skip flash classify call.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_pass1",
+        "needed": true,
+        "reason": "Type problem_set: pass1 extracts concepts=False, problems=True, events=False.",
+        "llmCall": true,
+        "estCostTier": "high"
+      },
+      {
+        "pass": "llm_pass2",
+        "needed": false,
+        "reason": "Type problem_set disables pass2 (single-pass type-specific or link-only profile).",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "finalize",
+        "needed": true,
+        "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+        "llmCall": false,
+        "estCostTier": "free"
+      }
+    ]
+  },
+  "passAudit": {
+    "plan": {
+      "courseId": "15237",
+      "fileId": "3276197",
+      "filename": "Precept 3_problem set 2.pdf",
+      "resolvedType": "problem_set",
+      "heuristicConfidence": 0.86,
+      "neededPasses": [
+        "extract_pages",
+        "heuristic_classify",
+        "llm_pass1",
+        "finalize"
+      ],
+      "skippedPasses": [
+        "llm_classify",
+        "llm_pass2"
+      ],
+      "estLlmCalls": 1,
+      "estRealisticLlmCalls": 1.0,
+      "steps": [
+        {
+          "pass": "extract_pages",
+          "needed": true,
+          "reason": "Required local PDF/HTML extraction; no LLM.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "heuristic_classify",
+          "needed": true,
+          "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_classify",
+          "needed": false,
+          "reason": "Heuristic confidence 0.86 sufficient; skip flash classify call.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_pass1",
+          "needed": true,
+          "reason": "Type problem_set: pass1 extracts concepts=False, problems=True, events=False.",
+          "llmCall": true,
+          "estCostTier": "high"
+        },
+        {
+          "pass": "llm_pass2",
+          "needed": false,
+          "reason": "Type problem_set disables pass2 (single-pass type-specific or link-only profile).",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "finalize",
+          "needed": true,
+          "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+          "llmCall": false,
+          "estCostTier": "free"
+        }
+      ]
+    },
+    "actualType": "problem_set",
+    "deepseekPasses": 1,
+    "conceptCount": 15,
+    "detailCount": 4,
+    "totalLlmTokens": 0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "ran": true,
+        "useful": true,
+        "verdict": "required",
+        "note": "Local I/O; pages present means extract succeeded."
+      },
+      {
+        "pass": "heuristic_classify",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "Routed to problem_set (free)."
+      },
+      {
+        "pass": "llm_classify",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Skipped; heuristic confidence sufficient.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass1",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "No pass1 tool trace.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass2",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Correctly skipped: profile disables pass2, type-specific pass1 only, or no log_* tools.",
+        "tokens": 0
+      },
+      {
+        "pass": "finalize",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "logged_details promoted to concept details."
+      }
+    ],
+    "cutCandidates": [],
+    "recommendations": [
+      "Pass2 correctly skipped for this type/pass1 tool pattern."
+    ]
+  },
+  "passes": [
+    "extract_pages",
+    "heuristic_classify",
+    "teaching_units",
+    "type_structure",
+    "concept_candidates",
+    "problem_scan",
+    "detail_attach",
+    "reconcile"
+  ],
+  "buildMode": "template_multi_pass_offline",
+  "builtAt": "2026-07-01T22:49:38Z",
+  "concepts": [
+    {
+      "name": "Precept 3_problem set 2",
+      "details": []
+    },
+    {
+      "name": "Our view of the main idea of this whole unit",
+      "details": []
+    },
+    {
+      "name": "Problem 1",
+      "details": []
+    },
+    {
+      "name": "Problem 3",
+      "details": []
+    },
+    {
+      "name": "Problem 5",
+      "details": []
+    },
+    {
+      "name": "Problem 6",
+      "details": []
+    },
+    {
+      "name": "neu 201 - precept 3",
+      "details": []
+    },
+    {
+      "name": "problem set 2",
+      "details": []
+    },
+    {
+      "name": "core concepts",
+      "details": []
+    },
+    {
+      "name": "presynaptic terminalpostsynaptic terminalsynaptic cleftvesicle/dense core vesiclepaired-pulse facilitation/depressioneps",
+      "details": [
+        "Vocabulary:Presynaptic terminalPostsynaptic terminalSynaptic CleftVesicle/Dense core vesiclePaired-pulse facilitation/depressionEPSP/IPSP"
+      ]
+    },
+    {
+      "name": "gap junctionsconnexins",
+      "details": []
+    },
+    {
+      "name": "vreversal of a channelexcitatory/inhibitoryagonist/antagonist",
+      "details": [
+        "Vocabulary:Vreversal of a channelExcitatory/inhibitoryAgonist/Antagonist"
+      ]
+    },
+    {
+      "name": "acetylcholine (ach)acetylcholinesterase (ache)glutamategabaneuromodulators",
+      "details": [
+        "Vocabulary:Acetylcholine (ACh)Acetylcholinesterase (AChE)GlutamateGABANeuromodulators"
+      ]
+    },
+    {
+      "name": "administer ache inhibitor",
+      "details": []
+    },
+    {
+      "name": "myelination increases membrane resistance and therefore the length constant λ",
+      "details": [
+        "Answer: Myelination increases membrane resistance and therefore the length constant λ"
+      ]
+    }
+  ],
+  "conceptCount": 15,
+  "detailCount": 4,
+  "events": [],
+  "problems": [
+    "Problem 1",
+    "Problem 3",
+    "Problem 5",
+    "Problem 6"
+  ],
+  "sections": [
+    "Our view of the main idea of this whole unit",
+    "-This week",
+    "Problem 1",
+    "ACh opens a K+ channel and hyperpolarizes heart muscle, but opens an Na+ channel and depolarizes skeletal muscle.",
+    "Problem 3",
+    "Problem 5",
+    "Problem 6",
+    "If we want to increase λ"
+  ],
+  "deepseekPasses": 1,
+  "expectsPass2": false,
+  "gtProvenance": {
+    "typeSource": "heuristic_high",
+    "typeConfidence": 0.86,
+    "offlinePassAudit": {
+      "extract_pages": {
+        "localPdf": true,
+        "pageCount": 21,
+        "pdfPath": "C:\\Allen\\nucleus\\canvasfiles\\3276197"
+      },
+      "heuristic_classify": {
+        "expectedFileType": "problem_set",
+        "source": "heuristic_high",
+        "confidence": 0.86
+      },
+      "teaching_units": {
+        "sectionCount": 8
+      },
+      "type_structure": {
+        "slideRows": 14,
+        "readingSections": 0,
+        "syllabusWeeks": 0
+      },
+      "concept_candidates": {
+        "candidateCount": 15
+      },
+      "problem_scan": {
+        "problemCount": 4
+      },
+      "detail_attach": {
+        "conceptKeysWithDetails": 7,
+        "detailCount": 7
+      },
+      "reconcile": {
+        "inputTitles": 15,
+        "accepted": 15,
+        "capped": 0,
+        "detailAttached": 4
+      }
+    },
+    "reconcileStats": {
+      "inputTitles": 15,
+      "accepted": 15,
+      "capped": 0,
+      "detailAttached": 4
+    }
+  }
+}

@@ -5,6 +5,10 @@
 // Dependencies: axios (already a Nucleus dependency); main.js injects getApiKey
 // and forwards deltas to the renderer over IPC. The API key never leaves main.
 const axios = require('axios')
+const {
+  ARTIFACT_TOOLS,
+  SYNAPSE_ARTIFACT_SYSTEM_SUFFIX
+} = require('../../lib/artifact-tool-defs')
 
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages'
 const ANTHROPIC_VERSION = '2023-06-01'
@@ -20,7 +24,10 @@ const KNOWN_MODELS = [
 
 const DEFAULT_SYSTEM_PROMPT =
   'You are Synapse, the in-app assistant for Nucleus, a student workspace. ' +
-  'Be direct and concise. Use plain language and only format code in fenced code blocks.'
+  'Be direct and concise. Use plain language and only format code in fenced code blocks. ' +
+  SYNAPSE_ARTIFACT_SYSTEM_SUFFIX
+
+const MAX_ARTIFACT_TOOL_ROUNDS = 4
 
 // Normalize a renderer transcript into Anthropic message blocks.
 function toAnthropicMessages(messages) {
@@ -105,7 +112,106 @@ function createSynapseClient(config = {}) {
     return parseSseStream(response.data, onDelta)
   }
 
-  return { route, send, listModels, defaultModel }
+  // Streaming send with artifact tool loop. toolHandler(name, input) -> result string.
+  async function sendWithArtifactTools(payload = {}, handlers = {}) {
+    const apiKey = getApiKey()
+    if (!apiKey) {
+      return { ok: false, error: 'ANTHROPIC_API_KEY is not set.' }
+    }
+
+    const decision = route(payload)
+    const onDelta = typeof handlers.onDelta === 'function' ? handlers.onDelta : null
+    const toolHandler = typeof handlers.toolHandler === 'function' ? handlers.toolHandler : null
+    if (!toolHandler) {
+      return { ok: false, error: 'Artifact tool handler is not configured.' }
+    }
+
+    const transcript = toAnthropicMessages(payload.messages)
+    if (!transcript.length) {
+      return { ok: false, error: 'No messages to send.' }
+    }
+
+    const artifacts = []
+    let fullText = ''
+
+    for (let round = 0; round < MAX_ARTIFACT_TOOL_ROUNDS; round += 1) {
+      const body = {
+        model: decision.model,
+        max_tokens: payload.maxTokens || DEFAULT_MAX_TOKENS,
+        system: payload.system || systemPrompt,
+        messages: transcript,
+        tools: ARTIFACT_TOOLS,
+        stream: true
+      }
+
+      let response
+      try {
+        response = await axios({
+          method: 'post',
+          url: ANTHROPIC_URL,
+          responseType: 'stream',
+          validateStatus: () => true,
+          headers: {
+            'content-type': 'application/json',
+            'x-api-key': apiKey,
+            'anthropic-version': anthropicVersion
+          },
+          data: body
+        })
+      } catch (error) {
+        return { ok: false, error: (error && error.message) || 'Request failed.' }
+      }
+
+      if (response.status >= 400) {
+        const errorBody = await collectStream(response.data)
+        return { ok: false, error: extractErrorMessage(errorBody, response.status) }
+      }
+
+      const roundDelta = round === 0 ? onDelta : null
+      const parsed = await parseSseStreamWithTools(response.data, roundDelta)
+      if (!parsed.ok) {
+        return parsed
+      }
+
+      if (parsed.text) {
+        fullText += parsed.text
+      }
+
+      if (!parsed.toolUses.length) {
+        return { ok: true, text: fullText, artifacts }
+      }
+
+      const assistantContent = []
+      if (parsed.text) {
+        assistantContent.push({ type: 'text', text: parsed.text })
+      }
+      parsed.toolUses.forEach(toolUse => {
+        assistantContent.push({
+          type: 'tool_use',
+          id: toolUse.id,
+          name: toolUse.name,
+          input: toolUse.input
+        })
+      })
+      transcript.push({ role: 'assistant', content: assistantContent })
+
+      const toolResults = []
+      for (const toolUse of parsed.toolUses) {
+        const result = await toolHandler(toolUse.name, toolUse.input || {})
+        toolResults.push({
+          type: 'tool_result',
+          tool_use_id: toolUse.id,
+          content: typeof result === 'string' ? result : JSON.stringify(result)
+        })
+        collectArtifactFromToolResult(toolUse.name, result, artifacts)
+      }
+      transcript.push({ role: 'user', content: toolResults })
+    }
+
+    return { ok: true, text: fullText, artifacts }
+  }
+
+  return { route, send, sendWithArtifactTools, listModels, defaultModel }
 }
 
 // Read a whole stream into a string (used for non-200 error bodies).
@@ -132,6 +238,99 @@ function extractErrorMessage(rawBody, status) {
     // fall through
   }
   return `Anthropic API error (${status}).`
+}
+
+// Parse SSE stream; collect text deltas and completed tool_use blocks.
+function parseSseStreamWithTools(stream, onDelta) {
+  return new Promise(resolve => {
+    let buffer = ''
+    let text = ''
+    let streamError = null
+    const toolBlocks = new Map()
+
+    function handleEvent(data) {
+      if (!data || data === '[DONE]') return
+      let evt
+      try {
+        evt = JSON.parse(data)
+      } catch (_error) {
+        return
+      }
+
+      if (evt.type === 'content_block_start' && evt.content_block && evt.content_block.type === 'tool_use') {
+        toolBlocks.set(evt.index, {
+          id: evt.content_block.id,
+          name: evt.content_block.name,
+          inputJson: ''
+        })
+      } else if (evt.type === 'content_block_delta' && evt.delta) {
+        if (evt.delta.type === 'text_delta') {
+          const chunk = evt.delta.text || ''
+          if (chunk) {
+            text += chunk
+            if (onDelta) onDelta(chunk)
+          }
+        } else if (evt.delta.type === 'input_json_delta' && toolBlocks.has(evt.index)) {
+          const block = toolBlocks.get(evt.index)
+          block.inputJson += evt.delta.partial_json || ''
+        }
+      } else if (evt.type === 'error') {
+        streamError = (evt.error && evt.error.message) || 'Stream error.'
+      }
+    }
+
+    stream.on('data', chunk => {
+      buffer += chunk.toString('utf8')
+      let newlineIndex
+      while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
+        const line = buffer.slice(0, newlineIndex).trim()
+        buffer = buffer.slice(newlineIndex + 1)
+        if (line.startsWith('data:')) {
+          handleEvent(line.slice(5).trim())
+        }
+      }
+    })
+
+    stream.on('end', () => {
+      if (streamError) {
+        resolve({ ok: false, error: streamError })
+        return
+      }
+      const toolUses = []
+      for (const block of toolBlocks.values()) {
+        let input = {}
+        if (block.inputJson) {
+          try {
+            input = JSON.parse(block.inputJson)
+          } catch (_error) {
+            input = {}
+          }
+        }
+        toolUses.push({ id: block.id, name: block.name, input })
+      }
+      resolve({ ok: true, text, toolUses })
+    })
+
+    stream.on('error', error => {
+      resolve({ ok: false, error: (error && error.message) || 'Stream interrupted.' })
+    })
+  })
+}
+
+function collectArtifactFromToolResult(toolName, result, artifacts) {
+  if (!Array.isArray(artifacts)) return
+  let parsed = result
+  if (typeof result === 'string') {
+    try {
+      parsed = JSON.parse(result)
+    } catch (_error) {
+      return
+    }
+  }
+  if (!parsed || typeof parsed !== 'object') return
+  if ((toolName === 'create_artifact' || toolName === 'update_artifact') && parsed.ok && parsed.artifact) {
+    artifacts.push(parsed.artifact)
+  }
 }
 
 // Parse the Anthropic SSE stream, emit text deltas, resolve with full text.

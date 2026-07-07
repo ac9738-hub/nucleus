@@ -1,0 +1,671 @@
+{
+  "version": 1,
+  "courseId": "15237",
+  "fileId": "3404513",
+  "filename": "Lecture 16_habituation learning memory_slides.pdf",
+  "expectedFileType": "lecture_slides",
+  "passPlan": {
+    "courseId": "15237",
+    "fileId": "3404513",
+    "filename": "Lecture 16_habituation learning memory_slides.pdf",
+    "resolvedType": "lecture_slides",
+    "heuristicConfidence": 0.92,
+    "neededPasses": [
+      "extract_pages",
+      "heuristic_classify",
+      "llm_pass1",
+      "finalize"
+    ],
+    "skippedPasses": [
+      "llm_classify",
+      "llm_pass2"
+    ],
+    "estLlmCalls": 1,
+    "estRealisticLlmCalls": 1.0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "needed": true,
+        "reason": "Required local PDF/HTML extraction; no LLM.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "heuristic_classify",
+        "needed": true,
+        "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_classify",
+        "needed": false,
+        "reason": "Heuristic confidence 0.92 sufficient; skip flash classify call.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_pass1",
+        "needed": true,
+        "reason": "Type lecture_slides: pass1 extracts concepts=True, problems=True, events=False.",
+        "llmCall": true,
+        "estCostTier": "high"
+      },
+      {
+        "pass": "llm_pass2",
+        "needed": false,
+        "reason": "Type lecture_slides disables pass2 (single-pass type-specific or link-only profile).",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "finalize",
+        "needed": true,
+        "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+        "llmCall": false,
+        "estCostTier": "free"
+      }
+    ]
+  },
+  "passAudit": {
+    "plan": {
+      "courseId": "15237",
+      "fileId": "3404513",
+      "filename": "Lecture 16_habituation learning memory_slides.pdf",
+      "resolvedType": "lecture_slides",
+      "heuristicConfidence": 0.92,
+      "neededPasses": [
+        "extract_pages",
+        "heuristic_classify",
+        "llm_pass1",
+        "finalize"
+      ],
+      "skippedPasses": [
+        "llm_classify",
+        "llm_pass2"
+      ],
+      "estLlmCalls": 1,
+      "estRealisticLlmCalls": 1.0,
+      "steps": [
+        {
+          "pass": "extract_pages",
+          "needed": true,
+          "reason": "Required local PDF/HTML extraction; no LLM.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "heuristic_classify",
+          "needed": true,
+          "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_classify",
+          "needed": false,
+          "reason": "Heuristic confidence 0.92 sufficient; skip flash classify call.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_pass1",
+          "needed": true,
+          "reason": "Type lecture_slides: pass1 extracts concepts=True, problems=True, events=False.",
+          "llmCall": true,
+          "estCostTier": "high"
+        },
+        {
+          "pass": "llm_pass2",
+          "needed": false,
+          "reason": "Type lecture_slides disables pass2 (single-pass type-specific or link-only profile).",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "finalize",
+          "needed": true,
+          "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+          "llmCall": false,
+          "estCostTier": "free"
+        }
+      ]
+    },
+    "actualType": "lecture_slides",
+    "deepseekPasses": 1,
+    "conceptCount": 80,
+    "detailCount": 44,
+    "totalLlmTokens": 0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "ran": true,
+        "useful": true,
+        "verdict": "required",
+        "note": "Local I/O; pages present means extract succeeded."
+      },
+      {
+        "pass": "heuristic_classify",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "Routed to lecture_slides (free)."
+      },
+      {
+        "pass": "llm_classify",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Skipped; heuristic confidence sufficient.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass1",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "No pass1 tool trace.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass2",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Correctly skipped: profile disables pass2, type-specific pass1 only, or no log_* tools.",
+        "tokens": 0
+      },
+      {
+        "pass": "finalize",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "logged_details promoted to concept details."
+      }
+    ],
+    "cutCandidates": [],
+    "recommendations": [
+      "Pass2 correctly skipped for this type/pass1 tool pattern."
+    ]
+  },
+  "passes": [
+    "extract_pages",
+    "heuristic_classify",
+    "teaching_units",
+    "type_structure",
+    "concept_candidates",
+    "problem_scan",
+    "detail_attach",
+    "reconcile"
+  ],
+  "buildMode": "template_multi_pass_offline",
+  "builtAt": "2026-07-01T22:49:36Z",
+  "concepts": [
+    {
+      "name": "Lecture 16_habituation learning memory_slides",
+      "details": []
+    },
+    {
+      "name": "firing pattern changes as habit develops",
+      "details": []
+    },
+    {
+      "name": "learnedWrong guesses don’t suggest correctionGuess right: DA reinforcement signal!Includes Pavlovian and Operant",
+      "details": [
+        "Goal learnedWrong guesses don’t suggest correctionGuess right: DA reinforcement signal!Includes Pavlovian and Operant"
+      ]
+    },
+    {
+      "name": "knownMistakes correction When you hit target, no error signal",
+      "details": [
+        "Goal knownMistakes correction When you hit target, no error signal",
+        "Goal knownMistakes -> correction When you hit target, no error signal"
+      ]
+    },
+    {
+      "name": "types of memory",
+      "details": [
+        "LEARNING AND MEMORY I: TYPES OF MEMORY"
+      ]
+    },
+    {
+      "name": "summary of last lecture",
+      "details": []
+    },
+    {
+      "name": "outline for today",
+      "details": []
+    },
+    {
+      "name": "types of memory and where it is stored",
+      "details": []
+    },
+    {
+      "name": "working memory, short-term memory, consolidation",
+      "details": [
+        "Declarative memory: working memory, short-term memory, consolidation"
+      ]
+    },
+    {
+      "name": "amnesia",
+      "details": []
+    },
+    {
+      "name": "concussion, alcoholism, brain injury, encephalitis, tumor, stroke…dissociated amnesia: no other deficits",
+      "details": [
+        "Causes: concussion, alcoholism, brain injury, encephalitis, tumor, stroke…Dissociated amnesia: no other deficits"
+      ]
+    },
+    {
+      "name": "(a) true(b) false",
+      "details": [
+        "Clickers: (A) True(B) False"
+      ]
+    },
+    {
+      "name": "conscious recall of names, facts, events; formed & forgotten easily",
+      "details": [
+        "•Declarative (explicit): conscious recall of names, facts, events; formed & forgotten easily"
+      ]
+    },
+    {
+      "name": "autobiographical life experiences•semantic: facts•spatial: maps",
+      "details": [
+        "•Episodic: autobiographical life experiences•Semantic: facts•Spatial: maps"
+      ]
+    },
+    {
+      "name": "unconscious recall; take longer to form & forget",
+      "details": [
+        "•Non-declarative (implicit): unconscious recall; take longer to form & forget"
+      ]
+    },
+    {
+      "name": "motor skill learning.cerebellum: motor skill learning.",
+      "details": [
+        "Cerebellum: motor skill learning.Cerebellum: motor skill learning."
+      ]
+    },
+    {
+      "name": "reinforcement and habit learningbasal ganglia:reinforcement and habit learning",
+      "details": [
+        "Basal ganglia:Reinforcement and habit learningBasal ganglia:Reinforcement and habit learning"
+      ]
+    },
+    {
+      "name": "many types of learning.learns relatively slowly.",
+      "details": [
+        "Cortex:Many types of learning.Learns relatively slowly."
+      ]
+    },
+    {
+      "name": "types of memory and where they are stored",
+      "details": []
+    },
+    {
+      "name": "declarative memory",
+      "details": []
+    },
+    {
+      "name": "stm (short term) ltm (long term)",
+      "details": [
+        "Consolidation: STM (short term) LTM (long term)"
+      ]
+    },
+    {
+      "name": "memory operates on different timescales",
+      "details": []
+    },
+    {
+      "name": "consolidation",
+      "details": []
+    },
+    {
+      "name": "working memory",
+      "details": [
+        "The briefest memories: working memory"
+      ]
+    },
+    {
+      "name": "fires when animal sees foodin delayed-response task",
+      "details": [
+        "Cell A: fires when animal sees foodin delayed-response task"
+      ]
+    },
+    {
+      "name": "fires during delay period",
+      "details": [
+        "Cell B: fires during delay period"
+      ]
+    },
+    {
+      "name": "sees foodchooses",
+      "details": []
+    },
+    {
+      "name": "activity in human pfc during working memory tasks",
+      "details": []
+    },
+    {
+      "name": "different areas for identity, location of face",
+      "details": []
+    },
+    {
+      "name": "what we usually mean when we talk about memory",
+      "details": [
+        "Long-term declarative memory: what we usually mean when we talk about memory"
+      ]
+    },
+    {
+      "name": "semantic (facts, concepts)",
+      "details": []
+    },
+    {
+      "name": "episodic (events, experiences)",
+      "details": []
+    },
+    {
+      "name": "association areas of cortex (e.g., it)",
+      "details": [
+        "Inputs: association areas of cortex (e.g., IT)"
+      ]
+    },
+    {
+      "name": "fornixthalamus, hypothalamus",
+      "details": [
+        "Major output: fornixthalamus, hypothalamus"
+      ]
+    },
+    {
+      "name": "people/places",
+      "details": []
+    },
+    {
+      "name": "lonnie sue johnson",
+      "details": []
+    },
+    {
+      "name": "bilateral hippocampal damage: moderate anterograde amnesia",
+      "details": [
+        "R.B.: bilateral hippocampal damage: moderate anterograde amnesia"
+      ]
+    },
+    {
+      "name": "medial temporal encephalitis",
+      "details": []
+    },
+    {
+      "name": "medial temporal lobe",
+      "details": []
+    },
+    {
+      "name": "memories may migrate from hippocampus to cortex over time",
+      "details": [
+        "Systems consolidation: memories may migrate from hippocampus to cortex over time"
+      ]
+    },
+    {
+      "name": "standard model",
+      "details": []
+    },
+    {
+      "name": "lost hippocampus: anterograde amnesia, but also some",
+      "details": [
+        "(HM: lost hippocampus: anterograde amnesia, but also some"
+      ]
+    },
+    {
+      "name": "multiple trace model",
+      "details": []
+    },
+    {
+      "name": "helps explain extended retrograde amnesia",
+      "details": []
+    },
+    {
+      "name": "reconsolidation(consistent with multiple trace model?)",
+      "details": [
+        "Modifying existing memories: reconsolidation(consistent with multiple trace model?)"
+      ]
+    },
+    {
+      "name": "stretching and question break",
+      "details": []
+    },
+    {
+      "name": "radial arm maze and morris water maze",
+      "details": [
+        "Testing memory in rodents: radial arm maze and Morris water maze"
+      ]
+    },
+    {
+      "name": "re-visit same arms (working memory deficit, procedural ok)",
+      "details": [
+        "Hippocampal lesions: re-visit same arms (working memory deficit, procedural OK)"
+      ]
+    },
+    {
+      "name": "fail to remember platform location",
+      "details": [
+        "Hippocampal lesions: fail to remember platform location"
+      ]
+    },
+    {
+      "name": "hippocampal place cells",
+      "details": [
+        "Spatial memory: hippocampal place cells"
+      ]
+    },
+    {
+      "name": "larger posterior hippocampus",
+      "details": [
+        "London taxi drivers: larger posterior hippocampus"
+      ]
+    },
+    {
+      "name": "upstream of hippocampus, in entorhinal cortex",
+      "details": [
+        "•Grid cells: upstream of hippocampus, in entorhinal cortex"
+      ]
+    },
+    {
+      "name": "different grid spacings",
+      "details": [
+        "•Different grid cells: different grid spacings"
+      ]
+    },
+    {
+      "name": "place cellgrid cell",
+      "details": []
+    },
+    {
+      "name": "place cells fire at a given location",
+      "details": []
+    },
+    {
+      "name": "different grid sizes",
+      "details": [
+        "Different cells: different grid sizes"
+      ]
+    },
+    {
+      "name": "false",
+      "details": []
+    },
+    {
+      "name": "engaging spatial memory may improve learning",
+      "details": []
+    },
+    {
+      "name": "extraordinary memory",
+      "details": []
+    },
+    {
+      "name": "detailed cityscapes from memory",
+      "details": [
+        "Artist Stephen Wiltshire:Detailed cityscapes from memory"
+      ]
+    },
+    {
+      "name": "about 60 known",
+      "details": [
+        "•HSAM: about 60 known"
+      ]
+    },
+    {
+      "name": "procedures, associations, habits and sensitivities",
+      "details": [
+        "Nondeclarative memory: procedures, associations, habits and sensitivities"
+      ]
+    },
+    {
+      "name": "reinforcement and habit learning (basal ganglia)",
+      "details": []
+    },
+    {
+      "name": "two types of trial-and-error associative learning",
+      "details": []
+    },
+    {
+      "name": "supervised learning (cerebellum)",
+      "details": []
+    },
+    {
+      "name": "next time i should throw more left",
+      "details": []
+    },
+    {
+      "name": "categories of nondeclarative memory",
+      "details": []
+    },
+    {
+      "name": "connecting multiple events•classical (pavlovian) conditioning – involuntary•instrumental (operant) conditioning - volunt",
+      "details": [
+        "•Associative: connecting multiple events•Classical (Pavlovian) conditioning – involuntary•Instrumental (Operant) conditioning - voluntary"
+      ]
+    },
+    {
+      "name": "associating neutral stimulus (conditioned stimulus, cs) with",
+      "details": [
+        "Pavlovian (aka classical) conditioning: associating neutral stimulus (conditioned stimulus, CS) with"
+      ]
+    },
+    {
+      "name": "reward or punishment (unconditioned stimulus, us)",
+      "details": []
+    },
+    {
+      "name": "•cued fear conditioning (amygdala)",
+      "details": [
+        "Also: •Cued fear conditioning (amygdala)"
+      ]
+    },
+    {
+      "name": "associating an action",
+      "details": [
+        "Operant (aka instrumental) conditioning: associating an action"
+      ]
+    },
+    {
+      "name": "extinction(stop reinforcing, behavior diminishes)",
+      "details": [
+        "Shared between both: extinction(stop reinforcing, behavior diminishes)"
+      ]
+    },
+    {
+      "name": "pavlovian vs operant conditioning",
+      "details": [
+        "Nondeclarative memory: Pavlovian vs operant conditioning"
+      ]
+    },
+    {
+      "name": "reinforcement learning isassociative learning",
+      "details": []
+    },
+    {
+      "name": "pathological reinforcement learning in the brain’s reward circuits",
+      "details": [
+        "Addiction: pathological reinforcement learning in the brain’s reward circuits"
+      ]
+    },
+    {
+      "name": "alcohol",
+      "details": []
+    },
+    {
+      "name": "habit / procedural learning",
+      "details": [
+        "Nondeclarative memory: Habit / procedural learning"
+      ]
+    },
+    {
+      "name": "hm could still learn new habits",
+      "details": []
+    },
+    {
+      "name": "•impaired nondeclarative / procedural memory formation",
+      "details": [
+        "Both: •Impaired nondeclarative / procedural memory formation"
+      ]
+    }
+  ],
+  "conceptCount": 80,
+  "detailCount": 44,
+  "events": [],
+  "problems": [],
+  "sections": [
+    "Medial temporal lobe",
+    "Standard model",
+    "Multiple trace model",
+    "learnedWrong guesses don’t suggest correctionGuess right: DA reinforcement signal!Includes Pavlovian and Operant",
+    "knownMistakes correction When you hit target, no error signal"
+  ],
+  "deepseekPasses": 1,
+  "expectsPass2": false,
+  "gtProvenance": {
+    "typeSource": "heuristic_high",
+    "typeConfidence": 0.92,
+    "offlinePassAudit": {
+      "extract_pages": {
+        "localPdf": true,
+        "pageCount": 66,
+        "pdfPath": "C:\\Allen\\nucleus\\canvasfiles\\3404513"
+      },
+      "heuristic_classify": {
+        "expectedFileType": "lecture_slides",
+        "source": "heuristic_high",
+        "confidence": 0.92
+      },
+      "teaching_units": {
+        "sectionCount": 5
+      },
+      "type_structure": {
+        "slideRows": 91,
+        "readingSections": 0,
+        "syllabusWeeks": 0
+      },
+      "concept_candidates": {
+        "candidateCount": 80
+      },
+      "problem_scan": {
+        "problemCount": 0
+      },
+      "detail_attach": {
+        "conceptKeysWithDetails": 51,
+        "detailCount": 52
+      },
+      "reconcile": {
+        "inputTitles": 80,
+        "accepted": 80,
+        "capped": 0,
+        "detailAttached": 43
+      }
+    },
+    "reconcileStats": {
+      "inputTitles": 80,
+      "accepted": 80,
+      "capped": 0,
+      "detailAttached": 43
+    }
+  }
+}

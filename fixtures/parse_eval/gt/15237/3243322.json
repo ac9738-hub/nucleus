@@ -1,0 +1,623 @@
+{
+  "version": 1,
+  "courseId": "15237",
+  "fileId": "3243322",
+  "filename": "Lecture 4_synaptic transmission I presynaptic electrical chemical_slides",
+  "expectedFileType": "lecture_slides",
+  "passPlan": {
+    "courseId": "15237",
+    "fileId": "3243322",
+    "filename": "Lecture 4_synaptic transmission I presynaptic electrical chemical_slides",
+    "resolvedType": "lecture_slides",
+    "heuristicConfidence": 0.92,
+    "neededPasses": [
+      "extract_pages",
+      "heuristic_classify",
+      "llm_pass1",
+      "finalize"
+    ],
+    "skippedPasses": [
+      "llm_classify",
+      "llm_pass2"
+    ],
+    "estLlmCalls": 1,
+    "estRealisticLlmCalls": 1.0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "needed": true,
+        "reason": "Required local PDF/HTML extraction; no LLM.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "heuristic_classify",
+        "needed": true,
+        "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_classify",
+        "needed": false,
+        "reason": "Heuristic confidence 0.92 sufficient; skip flash classify call.",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "llm_pass1",
+        "needed": true,
+        "reason": "Type lecture_slides: pass1 extracts concepts=True, problems=True, events=False.",
+        "llmCall": true,
+        "estCostTier": "high"
+      },
+      {
+        "pass": "llm_pass2",
+        "needed": false,
+        "reason": "Type lecture_slides disables pass2 (single-pass type-specific or link-only profile).",
+        "llmCall": false,
+        "estCostTier": "free"
+      },
+      {
+        "pass": "finalize",
+        "needed": true,
+        "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+        "llmCall": false,
+        "estCostTier": "free"
+      }
+    ]
+  },
+  "passAudit": {
+    "plan": {
+      "courseId": "15237",
+      "fileId": "3243322",
+      "filename": "Lecture 4_synaptic transmission I presynaptic electrical chemical_slides",
+      "resolvedType": "lecture_slides",
+      "heuristicConfidence": 0.92,
+      "neededPasses": [
+        "extract_pages",
+        "heuristic_classify",
+        "llm_pass1",
+        "finalize"
+      ],
+      "skippedPasses": [
+        "llm_classify",
+        "llm_pass2"
+      ],
+      "estLlmCalls": 1,
+      "estRealisticLlmCalls": 1.0,
+      "steps": [
+        {
+          "pass": "extract_pages",
+          "needed": true,
+          "reason": "Required local PDF/HTML extraction; no LLM.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "heuristic_classify",
+          "needed": true,
+          "reason": "Free filename/snippet routing; drives pass1 tool profile.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_classify",
+          "needed": false,
+          "reason": "Heuristic confidence 0.92 sufficient; skip flash classify call.",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "llm_pass1",
+          "needed": true,
+          "reason": "Type lecture_slides: pass1 extracts concepts=True, problems=True, events=False.",
+          "llmCall": true,
+          "estCostTier": "high"
+        },
+        {
+          "pass": "llm_pass2",
+          "needed": false,
+          "reason": "Type lecture_slides disables pass2 (single-pass type-specific or link-only profile).",
+          "llmCall": false,
+          "estCostTier": "free"
+        },
+        {
+          "pass": "finalize",
+          "needed": true,
+          "reason": "Deterministic promote: logged_details, typeExtractions (slides/textbook/reading), and events — never defer per-file in llm-cost/GT/eval.",
+          "llmCall": false,
+          "estCostTier": "free"
+        }
+      ]
+    },
+    "actualType": "lecture_slides",
+    "deepseekPasses": 1,
+    "conceptCount": 80,
+    "detailCount": 17,
+    "totalLlmTokens": 0,
+    "steps": [
+      {
+        "pass": "extract_pages",
+        "ran": true,
+        "useful": true,
+        "verdict": "required",
+        "note": "Local I/O; pages present means extract succeeded."
+      },
+      {
+        "pass": "heuristic_classify",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "Routed to lecture_slides (free)."
+      },
+      {
+        "pass": "llm_classify",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Skipped; heuristic confidence sufficient.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass1",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "No pass1 tool trace.",
+        "tokens": 0
+      },
+      {
+        "pass": "llm_pass2",
+        "ran": false,
+        "useful": true,
+        "verdict": "skipped_ok",
+        "note": "Correctly skipped: profile disables pass2, type-specific pass1 only, or no log_* tools.",
+        "tokens": 0
+      },
+      {
+        "pass": "finalize",
+        "ran": true,
+        "useful": true,
+        "verdict": "keep",
+        "note": "logged_details promoted to concept details."
+      }
+    ],
+    "cutCandidates": [],
+    "recommendations": [
+      "Pass2 correctly skipped for this type/pass1 tool pattern."
+    ]
+  },
+  "passes": [
+    "extract_pages",
+    "heuristic_classify",
+    "teaching_units",
+    "type_structure",
+    "concept_candidates",
+    "problem_scan",
+    "detail_attach",
+    "reconcile"
+  ],
+  "buildMode": "template_multi_pass_offline",
+  "builtAt": "2026-07-01T22:49:37Z",
+  "concepts": [
+    {
+      "name": "Lecture 4_synaptic transmission I presynaptic electrical chemical_slides",
+      "details": []
+    },
+    {
+      "name": "vesicle release can change",
+      "details": []
+    },
+    {
+      "name": "•Key to understanding",
+      "details": []
+    },
+    {
+      "name": "Problem 1",
+      "details": []
+    },
+    {
+      "name": "Problem 2",
+      "details": []
+    },
+    {
+      "name": "Electrical synapses connect neurons through channels",
+      "details": []
+    },
+    {
+      "name": "synaptic transmission i",
+      "details": []
+    },
+    {
+      "name": "electrical and chemical synapses",
+      "details": []
+    },
+    {
+      "name": "important properties of action potentials",
+      "details": [
+        "Summary of last lecture: important properties of action potentials"
+      ]
+    },
+    {
+      "name": "outout",
+      "details": []
+    },
+    {
+      "name": "invrest",
+      "details": []
+    },
+    {
+      "name": "how is information propagated within a",
+      "details": [
+        "Previous lectures: How is information propagated within a"
+      ]
+    },
+    {
+      "name": "how is information propagated between",
+      "details": [
+        "Next two lectures: How is information propagated between"
+      ]
+    },
+    {
+      "name": "outline of today",
+      "details": []
+    },
+    {
+      "name": "synapses are sites of cellular connection",
+      "details": []
+    },
+    {
+      "name": "pns, cns and immunological",
+      "details": [
+        "Synapses: PNS, CNS and immunological"
+      ]
+    },
+    {
+      "name": "presynaptic",
+      "details": []
+    },
+    {
+      "name": "postsynaptic",
+      "details": []
+    },
+    {
+      "name": "electrical synapse",
+      "details": []
+    },
+    {
+      "name": "gap junctions connect the two membranes",
+      "details": []
+    },
+    {
+      "name": "psp is small",
+      "details": []
+    },
+    {
+      "name": "electrical synapses allow faster transmission",
+      "details": []
+    },
+    {
+      "name": "astrocytes are connected by gap junctions",
+      "details": []
+    },
+    {
+      "name": "gap junctions are common early in development",
+      "details": []
+    },
+    {
+      "name": "coordinate neural growth and maturation",
+      "details": []
+    },
+    {
+      "name": "properties of electrical synapses",
+      "details": [
+        "Summary: properties of electrical synapses"
+      ]
+    },
+    {
+      "name": "common features",
+      "details": [
+        "Chemical synapses: common features"
+      ]
+    },
+    {
+      "name": "10x wider than gap junction",
+      "details": [
+        "Cleft:10x wider than gap junction"
+      ]
+    },
+    {
+      "name": "receptors for neurotransmitter",
+      "details": [
+        "Postsynaptic terminal(often on dendrite):receptors for neurotransmitter"
+      ]
+    },
+    {
+      "name": "central versus peripheral",
+      "details": [
+        "Chemical synapse structure: central versus peripheral"
+      ]
+    },
+    {
+      "name": "cns synapse",
+      "details": []
+    },
+    {
+      "name": "pns synapse(among largest in the body)",
+      "details": []
+    },
+    {
+      "name": "axo-dendriticaxo-somaticaxo-axonic",
+      "details": []
+    },
+    {
+      "name": "synapses vary in postsynaptic location",
+      "details": []
+    },
+    {
+      "name": "axo-spinous",
+      "details": []
+    },
+    {
+      "name": "synapses vary in size and shape",
+      "details": []
+    },
+    {
+      "name": "cns synapses vary in size and shape",
+      "details": []
+    },
+    {
+      "name": "usually excitatoryusually inhibitory",
+      "details": []
+    },
+    {
+      "name": "chemical synapses transmit information in 2 steps",
+      "details": []
+    },
+    {
+      "name": "classes of neurotransmitters",
+      "details": []
+    },
+    {
+      "name": "amino acids(synaptic vesicles)",
+      "details": []
+    },
+    {
+      "name": "amines(synaptic vesicles)",
+      "details": []
+    },
+    {
+      "name": "peptides(secretory granules)",
+      "details": []
+    },
+    {
+      "name": "released by vagus nerve to affect muscle",
+      "details": []
+    },
+    {
+      "name": "neuropeptides",
+      "details": []
+    },
+    {
+      "name": "amino acids and amines",
+      "details": []
+    },
+    {
+      "name": "stretching and question break",
+      "details": []
+    },
+    {
+      "name": "large, accessible, fast, reliable synapse",
+      "details": [
+        "Neuromuscular junction:Large, accessible, fast, reliable synapse"
+      ]
+    },
+    {
+      "name": "postsynapticpotential",
+      "details": []
+    },
+    {
+      "name": "postsynapticpotential (epp)",
+      "details": []
+    },
+    {
+      "name": "acetylcholine (ach)",
+      "details": [
+        "Hypothesis: Acetylcholine (ACh)"
+      ]
+    },
+    {
+      "name": "katz recorded electrically evoked epps",
+      "details": []
+    },
+    {
+      "name": "acetylcholine (ach) is released from the presynaptic terminal",
+      "details": [
+        "Hypothesis:Acetylcholine (ACh) is released from the presynaptic terminal"
+      ]
+    },
+    {
+      "name": "curare blocks acetylcholine receptors",
+      "details": []
+    },
+    {
+      "name": "causes muscle paralysis",
+      "details": []
+    },
+    {
+      "name": "strychnos toxifera",
+      "details": []
+    },
+    {
+      "name": "suggests ach release is causing epp",
+      "details": []
+    },
+    {
+      "name": "pipette of acetylcholine",
+      "details": []
+    },
+    {
+      "name": "ptosis",
+      "details": []
+    },
+    {
+      "name": "after neostigmine",
+      "details": []
+    },
+    {
+      "name": "caused by antibodies that attack the achr",
+      "details": []
+    },
+    {
+      "name": "ca2+ influx somehow causes ach release from presynaptic terminal",
+      "details": [
+        "Hypothesis: Ca2+ influx somehow causes ACh release from presynaptic terminal"
+      ]
+    },
+    {
+      "name": "puffs of calcium increase the size of epp",
+      "details": []
+    },
+    {
+      "name": "presynaptic calcium is necessary for",
+      "details": []
+    },
+    {
+      "name": "neurotransmitter release",
+      "details": []
+    },
+    {
+      "name": "presynaptic calcium is sufficient to cause",
+      "details": []
+    },
+    {
+      "name": "into presynaptic neuron",
+      "details": []
+    },
+    {
+      "name": "v-snares",
+      "details": []
+    },
+    {
+      "name": "t-snares",
+      "details": []
+    },
+    {
+      "name": "presynaptic vesicle fusion occurs via snares",
+      "details": []
+    },
+    {
+      "name": "reduces acetylcholine degradation",
+      "details": []
+    },
+    {
+      "name": "mepp amplitude",
+      "details": []
+    },
+    {
+      "name": "smalllarge",
+      "details": []
+    },
+    {
+      "name": "amplitude in units of mepps",
+      "details": []
+    },
+    {
+      "name": "neurotransmitter is released in discrete packets (vesicles)",
+      "details": [
+        "The quantal hypothesis: neurotransmitter is released in discrete packets (vesicles)"
+      ]
+    },
+    {
+      "name": "all large",
+      "details": [
+        "High Ca2+: all large"
+      ]
+    },
+    {
+      "name": "seeing neurotransmitter exocytosis at the nmj",
+      "details": [
+        "Freeze-fracture electron microscopy: seeing neurotransmitter exocytosis at the NMJ"
+      ]
+    },
+    {
+      "name": "depolarization of presynaptic terminal",
+      "details": []
+    },
+    {
+      "name": "1) presynaptic ca2+ accumulation 2) running out of synaptic vesicles",
+      "details": [
+        "Two contributing factors:1) presynaptic Ca2+ accumulation 2) running out of synaptic vesicles"
+      ]
+    },
+    {
+      "name": "paired-pulse facilitation",
+      "details": []
+    }
+  ],
+  "conceptCount": 80,
+  "detailCount": 17,
+  "events": [],
+  "problems": [
+    "Problem 1",
+    "Problem 2"
+  ],
+  "sections": [
+    "•Key to understanding",
+    "Problem 1",
+    "Problem 2",
+    "Paired-pulse Facilitation",
+    "Paired-pulse Depression",
+    "Electrical synapses connect neurons through channels",
+    "Chemical synapses involve two steps"
+  ],
+  "deepseekPasses": 1,
+  "expectsPass2": false,
+  "gtProvenance": {
+    "typeSource": "heuristic_high",
+    "typeConfidence": 0.92,
+    "offlinePassAudit": {
+      "extract_pages": {
+        "localPdf": true,
+        "pageCount": 82,
+        "pdfPath": "C:\\Allen\\nucleus\\canvasfiles\\3243322"
+      },
+      "heuristic_classify": {
+        "expectedFileType": "lecture_slides",
+        "source": "heuristic_high",
+        "confidence": 0.92
+      },
+      "teaching_units": {
+        "sectionCount": 7
+      },
+      "type_structure": {
+        "slideRows": 87,
+        "readingSections": 0,
+        "syllabusWeeks": 0
+      },
+      "concept_candidates": {
+        "candidateCount": 80
+      },
+      "problem_scan": {
+        "problemCount": 2
+      },
+      "detail_attach": {
+        "conceptKeysWithDetails": 21,
+        "detailCount": 21
+      },
+      "reconcile": {
+        "inputTitles": 80,
+        "accepted": 80,
+        "capped": 0,
+        "detailAttached": 17
+      }
+    },
+    "reconcileStats": {
+      "inputTitles": 80,
+      "accepted": 80,
+      "capped": 0,
+      "detailAttached": 17
+    }
+  }
+}

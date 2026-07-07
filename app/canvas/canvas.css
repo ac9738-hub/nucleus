@@ -1,0 +1,91 @@
+/* Canvas native app — course dashboard cards.
+   Functionality: Canvas-style course tiles with image header and fallback color.
+   Dependencies: themes/<name>/styles.css tokens. */
+
+.project-grid.canvas-course-grid {
+  gap: 18px;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+
+.canvas-course-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0;
+}
+
+.canvas-course-card-media {
+  aspect-ratio: 16 / 9;
+  background: var(--canvas-course-color, #0374b5);
+  flex-shrink: 0;
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+}
+
+.canvas-course-card-image {
+  display: block;
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
+.canvas-course-card-image.is-hidden {
+  display: none;
+}
+
+.canvas-course-card-fallback {
+  align-items: center;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 55%),
+    var(--canvas-course-color, #0374b5);
+  color: rgba(255, 255, 255, 0.92);
+  display: flex;
+  font-size: 28px;
+  font-weight: 700;
+  height: 100%;
+  justify-content: center;
+  letter-spacing: 0.04em;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+  width: 100%;
+}
+
+.canvas-course-card-fallback.is-hidden {
+  display: none;
+}
+
+.canvas-course-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 14px 16px 16px;
+}
+
+.canvas-course-card-body h3 {
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  color: var(--text);
+  display: -webkit-box;
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1.35;
+  margin: 0;
+  overflow: hidden;
+}
+
+.canvas-course-card-body p {
+  color: var(--text-mute);
+  font-size: 12px;
+  line-height: 1.4;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.canvas-course-card .project-chip,
+.canvas-course-card .project-source {
+  display: none;
+}

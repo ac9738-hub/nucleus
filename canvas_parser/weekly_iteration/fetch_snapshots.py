@@ -44,10 +44,18 @@ def main(argv: list[str] | None = None) -> int:
         action='store_true',
         help='Use holdout student Canvas auth (CANVAS_AUTH_COOKIE_HOLDOUT) and holdout cache paths',
     )
+    parser.add_argument(
+        '--harvard',
+        action='store_true',
+        help='Use Harvard Canvas auth (CANVAS_AUTH_COOKIE_HARVARD) and Harvard cache paths',
+    )
     args = parser.parse_args(argv)
 
     root = Path(args.root)
-    profile = get_profile(root, 'holdout' if args.holdout else 'primary')
+    if args.holdout and args.harvard:
+        raise SystemExit('Use only one of --holdout or --harvard.')
+    profile_name = 'harvard' if args.harvard else ('holdout' if args.holdout else 'primary')
+    profile = get_profile(root, profile_name)
     auth = load_auth_from_env(root, profile=profile.name)
     save_path = Path(args.save) if args.save else profile.snapshot_path
     if not save_path.is_absolute():

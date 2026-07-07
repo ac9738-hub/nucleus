@@ -2,6 +2,8 @@
 import sys
 import types
 
+import numpy as np
+
 if not hasattr(sys.stdin, "reconfigure"):
     sys.stdin = types.SimpleNamespace(reconfigure=lambda **kwargs: None)
 
@@ -23,6 +25,8 @@ from vector_retreival import (
     passes_retrieval_cutoff,
     query_ranking_adjustment,
     week_query_file_boost,
+    _format_problem_steps,
+    problem_context_fields,
 )
 
 
@@ -84,6 +88,35 @@ def test_week_query_file_boost():
     assert week_query_file_boost("CHI 108 course slides for week 3", "file", other_file) == 0.0
 
 
+def test_type_extraction_boosts_file_ranking_text():
+    node = DummyNode(
+        name="Course Syllabus.pdf",
+        typeExtractions={
+            "syllabus": {
+                "weeks": [{"weekNumber": 2, "topic": "Linear Algebra", "readings": ["Strang 2.1"]}],
+            },
+        },
+    )
+    text = node_ranking_text("file", node, "123")
+    assert "Linear Algebra" in text
+
+
+def test_type_extraction_query_boost_on_file():
+    from canvas_parser.content.type_extraction_retrieval import type_extraction_query_boost
+
+    node = DummyNode(
+        name="Lecture 3 Slides.pdf",
+        academicFileType="lecture_slides",
+        typeExtractions={
+            "lecture": {
+                "slides": [{"slideOrder": 7, "title": "Eigenvalues", "summary": "Diagonalization"}],
+            },
+        },
+    )
+    boost = type_extraction_query_boost("slide 7 eigenvalues", "file", node)
+    assert boost > 0.25
+
+
 def test_event_concept_neighbors_resolves_covered_concepts(monkeypatch):
     concept = DummyNode(conceptid="abc123", name="Eigenvalues", courseid="123")
     import vector_retreival as vr
@@ -113,6 +146,132 @@ def test_course_code_match_score():
         "course_codes": ["chm 201", "chm201"],
     }
     assert course_code_match_score("CHM 201 syllabus", entry) >= 0.95
+
+
+def test_narrow_course_pool_prefers_focus():
+    from vector_retreival import narrow_course_pool
+
+    pool, mode = narrow_course_pool({"100", "200", "300"}, ["200"], pool_mode="moderate")
+    assert pool == {"200"}
+    assert mode == "focus"
+
+
+def test_should_skip_fast_rank():
+    from vector_retreival import should_skip_fast_rank
+
+    assert should_skip_fast_rank(True, "agent", 0.01, 0.1)
+    assert not should_skip_fast_rank(True, "agent", 0.5, 0.1)
+    assert not should_skip_fast_rank(True, "agent", 0.01, 0.5)
+    assert not should_skip_fast_rank(False, "agent", 0.01, 0.1)
+    assert should_skip_fast_rank(
+        True, "agent", 0.08, 0.9, pool_mode="focus", intent="general"
+    )
+    assert not should_skip_fast_rank(
+        True, "agent", 0.08, 0.9, pool_mode="focus", intent="deadline"
+    )
+
+
+def test_fast_rank_limits_focus_pool():
+    from vector_retreival import AGENT_FOCUS_MAX_HEAP_POPS, AGENT_FOCUS_MAX_RANK_NODES, fast_rank_limits
+
+    max_rank, max_pops = fast_rank_limits("focus", {"200"}, True, "agent")
+    assert max_rank == AGENT_FOCUS_MAX_RANK_NODES
+    assert max_pops == AGENT_FOCUS_MAX_HEAP_POPS
+
+
+def test_focus_embed_prefilter_enabled():
+    from vector_retreival import focus_embed_prefilter_enabled
+
+    assert focus_embed_prefilter_enabled(True, "agent", {"200"}, "focus")
+    assert focus_embed_prefilter_enabled(True, "agent", {"200", "201"}, "moderate")
+    assert not focus_embed_prefilter_enabled(True, "agent", {"200", "201", "202"}, "moderate")
+    assert not focus_embed_prefilter_enabled(True, "agent", {"200"}, "all")
+
+
+def test_quick_fuzzy_prefilter_score():
+    from vector_retreival import fuzzy_query_terms, quick_fuzzy_prefilter_score
+
+    terms = fuzzy_query_terms("office hours NEU 201")
+    assert quick_fuzzy_prefilter_score(terms, "Office Hours - Professor Boulanger") >= 0.3
+
+
+def test_batch_node_embedding_similarities():
+    from vector_retreival import batch_node_embedding_similarities
+
+    class Dummy:
+        embedded = {"name": np.array([1.0, 0.0], dtype=np.float32)}
+
+    scores = batch_node_embedding_similarities(np.array([1.0, 0.0], dtype=np.float32), [Dummy(), Dummy()])
+    assert scores.shape == (2,)
+    assert float(scores[0]) == 1.0
+
+
+def test_select_vector_prefilter_indices():
+    from vector_retreival import select_vector_prefilter_indices
+
+    semantic = np.array([0.1, 0.9, 0.2, 0.8, 0.05], dtype=np.float32)
+    has_embedding = np.array([True, True, True, True, False], dtype=bool)
+    texts = ["a", "b", "c", "d", "office hours schedule"]
+    indices = select_vector_prefilter_indices(
+        semantic,
+        has_embedding,
+        prefilter_limit=2,
+        query_terms=["office", "hours"],
+        ranking_texts=texts,
+        unembedded_limit=2,
+    )
+    assert indices[:2] == [1, 3]
+    assert 4 in indices
+
+
+def test_collect_pool_retrieval_rows_filters_browser_types():
+    from vector_retreival import BROWSER_RANK_NODE_TYPES, collect_pool_retrieval_rows
+
+    rows = collect_pool_retrieval_rows(None, browser_rank_types=BROWSER_RANK_NODE_TYPES)
+    assert rows["entries"]
+    assert all(nodetype in BROWSER_RANK_NODE_TYPES for nodetype, _, _ in rows["entries"])
+
+
+def test_focus_scan_helpers():
+    from vector_retreival import (
+        focus_quick_scan_limit,
+        focus_scan_type_order,
+        should_stop_focus_quick_scan,
+    )
+
+    assert focus_scan_type_order("deadline")[0] == "event"
+    assert focus_scan_type_order("general", grounded=True)[0] == "concept"
+    assert focus_quick_scan_limit({"200"}) == 750
+    assert focus_quick_scan_limit({"200", "201"}) == 1200
+    assert not should_stop_focus_quick_scan(700, [(0.2, 0, object())], 750)
+    assert should_stop_focus_quick_scan(750, [(0.2, 0, object())] * 140, 750)
+
+
+def test_retrieval_cache_key_stable():
+    from vector_retreival import get_cached_retrieval, retrieval_cache_key, store_cached_retrieval
+
+    key = retrieval_cache_key(
+        "Explain neurons",
+        k=5,
+        mode="agent",
+        fast=True,
+        grounded=True,
+        focus_course_ids=["200", "100"],
+    )
+    assert "100,200" in key
+    assert get_cached_retrieval(key) is None
+    store_cached_retrieval(key, [{"type": "concept"}])
+    assert get_cached_retrieval(key) == [{"type": "concept"}]
+
+
+def test_warm_retrieval(monkeypatch):
+    from vector_retreival import warm_retrieval
+
+    monkeypatch.setattr("vector_retreival.get_course_embeddings", lambda catalog=None: {"1": object()})
+    monkeypatch.setattr("vector_retreival.COURSE_CATALOG", {"1": {"name": "Demo"}})
+    info = warm_retrieval()
+    assert info["ok"] is True
+    assert info["courses"] == 1
 
 
 def test_classify_material_intent():
@@ -190,3 +349,40 @@ def test_enrich_catalog_entry_from_graph():
     entry = enrich_catalog_entry_from_graph("15160", {"name": "Canvas 15160", "keyword_name": "canvas 15160"}, nodes)
     assert "chm 201" in entry["course_codes"]
     assert "CHM201" in entry["keyword_name"]
+
+
+def test_format_problem_steps():
+    steps = _format_problem_steps([
+        "Set up the characteristic polynomial",
+        {"text": "Solve for lambda"},
+    ])
+    assert steps == [
+        "1. Set up the characteristic polynomial",
+        "2. Solve for lambda",
+    ]
+
+
+def test_problem_context_fields_without_graph_links():
+    node = DummyNode(
+        name="Problem 2",
+        steps=["Differentiate", "Simplify"],
+        answer="42",
+        incomingConceptNodeIds=[],
+        outgoingConceptNodeIds=[],
+        assignmentNodeIds=[],
+    )
+    fields = problem_context_fields(node)
+    assert fields["steps"] == ["1. Differentiate", "2. Simplify"]
+    assert fields["hasOfficialAnswer"] is True
+    assert fields["relatedConcepts"] == []
+    assert fields["relatedAssignments"] == []
+
+
+def test_reconstruct_nodes_missing_graph(tmp_path, monkeypatch):
+    import vector_retreival as vr
+
+    missing = tmp_path / "missing_graph.json"
+    nodes = vr.reconstruct_nodes(missing)
+    assert nodes["concepts"] == []
+    assert nodes["files"] == {}
+    assert nodes["syllabi"] == {}

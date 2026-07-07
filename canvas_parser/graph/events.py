@@ -187,6 +187,30 @@ def build_snapshot_exam_text(snapshot):
     return build_syllabus_exam_text(other='\n'.join(part for part in parts if part), assignments=snapshot.get('assignments'))
 
 
+def build_graph_exam_text(graph, course_id):
+    """Collect exam-relevant prose from indexed graph files and syllabus metadata."""
+    if not isinstance(graph, dict):
+        return ''
+    course_id = str(course_id or '')
+    parts = []
+    syllabi = graph.get('syllabi') or {}
+    syllabus = syllabi.get(course_id) or syllabi.get(int(course_id) if course_id.isdigit() else course_id) or {}
+    for key in ('other', 'classtimes'):
+        value = str(syllabus.get(key) or '').strip()
+        if value:
+            parts.append(value)
+    course_files = (graph.get('files') or {}).get(course_id) or {}
+    for file_node in course_files.values():
+        if not isinstance(file_node, dict):
+            continue
+        for page in file_node.get('pages') or []:
+            if isinstance(page, dict):
+                text = str(page.get('text') or '').strip()
+                if text:
+                    parts.append(text)
+    return '\n'.join(part for part in parts if part)
+
+
 def build_syllabus_exam_text(classtimes='', other='', assignments=None):
     parts = [
         str(classtimes or '').strip(),

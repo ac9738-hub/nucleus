@@ -215,7 +215,7 @@ function internalResultUrl(item) {
 
 function internalCanvasRoute(item) {
   const url = internalResultUrl(item)
-  if (!url || url === "#") return "#"
+  if (!url || url === "#" || !/^https?:/i.test(String(url))) return "#"
   const route = new URL("nucleus://canvas")
   route.searchParams.set("url", url)
   if (item && item.courseid) route.searchParams.set("courseId", item.courseid)
@@ -331,7 +331,7 @@ function renderInternalResultsPanel(results) {
     const sourceContext = renderInternalSourceContext(item)
 
     return `
-      <a class="side-card internal-side-card" href="${escapeHtml(href)}">
+      <a class="side-card internal-side-card" href="${escapeHtml(href)}"${href === "#" ? ' aria-disabled="true" tabindex="-1"' : ""}>
         <span class="canvas-thumb">
           ${canvasLogo ? `<img src="${escapeHtml(canvasLogo)}" alt="" loading="lazy">` : "C"}
         </span>
@@ -346,7 +346,7 @@ function renderInternalResultsPanel(results) {
   }).join("")
 
   return `
-    <section class="side-module">
+    <section class="side-module" id="nucleus-internal-panel">
       <div class="module-heading">
         ${internalLogo ? `<img src="${escapeHtml(internalLogo)}" alt="">` : ""}
         <h2>Internal results</h2>
@@ -356,11 +356,25 @@ function renderInternalResultsPanel(results) {
   `
 }
 
+function renderInternalEmptyPanel(message = "No Canvas matches found.") {
+  const internalLogo = assetUrl('internal_results_logo.png')
+
+  return `
+    <section class="side-module" id="nucleus-internal-panel">
+      <div class="module-heading">
+        ${internalLogo ? `<img src="${escapeHtml(internalLogo)}" alt="">` : ""}
+        <h2>Internal results</h2>
+      </div>
+      <p class="internal-empty-message">${escapeHtml(message)}</p>
+    </section>
+  `
+}
+
 function renderInternalPendingPanel() {
   const internalLogo = assetUrl('internal_results_logo.png')
 
   return `
-    <section class="side-module internal-pending-panel">
+    <section class="side-module internal-pending-panel" id="nucleus-internal-panel">
       <div class="module-heading">
         ${internalLogo ? `<img src="${escapeHtml(internalLogo)}" alt="">` : ""}
         <h2>Internal results</h2>
@@ -1528,6 +1542,8 @@ function renderwebsearchresult(result, query = "", mode = "all") {
 module.exports = {
   getBraveApiKey,
   loadEnv,
+  renderInternalEmptyPanel,
+  renderInternalResultsPanel,
   renderwebsearchresult,
   searchweb
 }

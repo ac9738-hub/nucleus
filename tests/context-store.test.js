@@ -2,14 +2,17 @@ const test = require('node:test')
 const assert = require('node:assert/strict')
 const { createContextStore, SCHEMA_VERSION, SLICE_NAMES } = require('../context-store')
 
-test('context store initializes all slices with schema version 1', () => {
+test('context store initializes all slices with schema version 2', () => {
   const store = createContextStore()
   const snapshot = store.getSnapshot()
   assert.equal(snapshot.schemaVersion, SCHEMA_VERSION)
+  assert.equal(SCHEMA_VERSION, 2)
   for (const name of SLICE_NAMES) {
-    assert.ok(Object.prototype.hasOwnProperty.call(snapshot, name))
+    assert.ok(Object.prototype.hasOwnProperty.call(snapshot, name), `missing slice ${name}`)
     assert.equal(typeof snapshot.versions[name], 'number')
   }
+  assert.ok(Array.isArray(snapshot.index.courses))
+  assert.ok(Array.isArray(snapshot.index.tasks))
 })
 
 test('context store update is a no-op when slice value is unchanged', () => {
@@ -23,24 +26,6 @@ test('context store update is a no-op when slice value is unchanged', () => {
   const after = store.getVersions()
   assert.equal(changed, false)
   assert.deepEqual(before, after)
-})
-
-test('context store update bumps only the changed slice version', () => {
-  const store = createContextStore()
-  const before = store.getVersions().screen
-  store.update('screen', {
-    source: 'renderer-dom',
-    surfaceKind: 'mail',
-    url: '',
-    title: 'Inbox',
-    scroll: { y: 0, ratio: 0, viewportHeight: 800, contentHeight: 1600 },
-    text: [{ tag: 'p', text: 'Hello', y: 0, x: 0 }],
-    canvas: null,
-    truncated: false,
-    charCount: 5
-  })
-  assert.equal(store.getVersions().screen, before + 1)
-  assert.equal(store.getVersions().app, 0)
 })
 
 test('context store onChange fires only for changed slices', () => {

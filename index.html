@@ -8,19 +8,32 @@
 <html lang="en">
 
 <head>
+  <link rel="stylesheet" href="styles.css" data-theme-style="1">
+  <link rel="stylesheet" href="lib/nucleus-ui.css" data-theme-style="1">
+  <link rel="stylesheet" href="lib/context-controller.css" data-theme-style="1">
+  <link rel="stylesheet" href="lib/sidekick-composer.css" data-theme-style="1">
+  <link rel="stylesheet" href="lib/lumi-panel.css" data-theme-style="1">
+  <link rel="stylesheet" href="app/synapse/synapse.css" data-theme-style="1">
+  <link rel="stylesheet" href="app/mail/mail.css" data-theme-style="1">
+  <link rel="stylesheet" href="app/artifacts/artifacts.css" data-theme-style="1">
+  <link rel="stylesheet" href="app/canvas/canvas.css" data-theme-style="1">
+  <link rel="stylesheet" href="lib/feature-shell.css" data-theme-style="1">
   <script>
     (() => {
+      const defaults = ["styles.css", "lib/nucleus-ui.css", "lib/context-controller.css", "lib/sidekick-composer.css", "lib/lumi-panel.css", "app/synapse/synapse.css", "app/mail/mail.css", "lib/feature-shell.css", "app/artifacts/artifacts.css", "app/canvas/canvas.css"];
       const theme = window.nucleus && typeof window.nucleus.getThemeConfig === "function"
         ? window.nucleus.getThemeConfig()
         : null;
       const stylesheets = theme && Array.isArray(theme.rendererStylesheets)
         ? theme.rendererStylesheets
-        : ["styles.css", "app/synapse/synapse.css", "app/mail/mail.css"];
-      // The active theme's stylesheet is authoritative for the renderer: its own
-      // :root defines the tokens, so editing themes/<name>/styles.css changes the
-      // shell directly. We intentionally do NOT inject the manifest palette here
-      // (that injection is only for the no-stylesheet surfaces: engine, canvas,
-      // slate, mail, title bar). Theme switching swaps these links in render.js.
+        : defaults;
+      const existing = Array.from(document.querySelectorAll("link[data-theme-style]"))
+        .map(link => link.getAttribute("href"));
+      if (existing.length === stylesheets.length
+        && existing.every((href, index) => href === stylesheets[index])) {
+        return;
+      }
+      document.querySelectorAll("link[data-theme-style]").forEach(link => link.remove());
       stylesheets.forEach(href => {
         const link = document.createElement("link");
         link.rel = "stylesheet";
@@ -45,10 +58,12 @@
         <span>nucleus</span>
       </div>
 
-      <nav class="primary-tabs" id="primary-tabs">
-        <button type="button" class="active" data-section="home">Home</button>
-        <button type="button" data-section="tasks">Tasks</button>
-        <button type="button" data-section="calendar">Calendar</button>
+      <nav class="primary-tabs" id="primary-tabs" role="tablist" aria-label="Primary navigation">
+        <div class="primary-tabs-segment">
+          <button type="button" class="active" data-section="home" role="tab" aria-selected="true">Home</button>
+          <button type="button" data-section="tasks" role="tab" aria-selected="false">Tasks</button>
+          <button type="button" data-section="calendar" role="tab" aria-selected="false">Calendar</button>
+        </div>
         <span class="primary-tabs-separator" aria-hidden="true"></span>
       </nav>
     </header>
@@ -103,37 +118,122 @@
         <div class="ai-panel-resize-handle" id="ai-panel-resize-handle" role="separator" aria-orientation="vertical" aria-label="Resize LUMI panel"></div>
 
         <div class="ai-panel-header">
-          <span>LUMI Assistant</span>
-          <button type="button" class="ai-panel-icon-button" id="ai-panel-minimize" aria-label="Minimize assistant">-</button>
+          <div class="ai-panel-header-label">
+            <span class="ai-panel-header-title">LUMI</span>
+            <span class="ai-panel-header-sub">Study assistant</span>
+          </div>
+          <button type="button" class="ai-panel-icon-button" id="ai-panel-minimize" aria-label="Minimize assistant">−</button>
+        </div>
+
+        <div class="ai-artifact-preview is-hidden" id="ai-artifact-preview" aria-label="Artifact preview">
+          <button type="button" class="nui-btn nui-btn-disclosure" id="ai-artifact-preview-toggle" aria-expanded="false">
+            <span class="ai-artifact-preview-toggle-copy">
+              <span class="ai-artifact-preview-eyebrow">Artifact</span>
+              <span class="ai-artifact-preview-title" id="ai-artifact-preview-title">Preview</span>
+              <span class="ai-artifact-preview-meta" id="ai-artifact-preview-meta"></span>
+            </span>
+            <span class="ai-artifact-preview-chevron" aria-hidden="true"></span>
+          </button>
+          <div class="ai-artifact-preview-body" id="ai-artifact-preview-body">
+            <div class="ai-artifact-preview-toolbar nui-btn-row">
+              <button type="button" class="nui-btn nui-btn-primary nui-btn-compact" id="ai-artifact-preview-open-tab">Open tab</button>
+              <button type="button" class="nui-btn nui-btn-secondary nui-btn-compact" id="ai-artifact-preview-open-window">New window</button>
+              <button type="button" class="nui-btn nui-btn-secondary nui-btn-compact" id="ai-artifact-preview-download">Download</button>
+            </div>
+            <iframe class="ai-artifact-preview-frame" id="ai-artifact-preview-frame" title="Artifact preview"></iframe>
+          </div>
         </div>
 
         <div class="ai-messages" id="ai-messages">
           <div class="ai-hero-card">
             <div class="ai-hero-mark" aria-hidden="true"></div>
-            <h2>Hi, I'm LUMI.</h2>
-            <p>I can help you add tasks, create workspaces, or organize your schedule.</p>
+            <h2>How can I help?</h2>
+            <p>Tasks, workspaces, study artifacts, and schedule planning — all in one place.</p>
           </div>
           <div class="ai-quick-actions" aria-label="Assistant shortcuts">
-            <button type="button">Add task</button>
-            <button type="button">Create workspace</button>
-            <button type="button">Plan my day</button>
+            <button type="button" class="ai-suggestion-chip">Add task</button>
+            <button type="button" class="ai-suggestion-chip">Create workspace</button>
+            <button type="button" class="ai-suggestion-chip">Plan my day</button>
           </div>
         </div>
 
         <div class="ai-input-section">
+          <div class="ai-usage-toast is-hidden" id="ai-usage-toast" role="status" aria-live="polite">
+            <p class="ai-usage-toast-copy" id="ai-usage-toast-copy">Usage limit reached. Responses may be slower.</p>
+            <button type="button" class="ai-usage-toast-dismiss" id="ai-usage-toast-dismiss" aria-label="Dismiss notice">×</button>
+          </div>
+          <div class="ai-composer-box">
+            <div class="ai-composer-toolbar" id="ai-composer-toolbar" role="toolbar" aria-label="Composer settings">
+            <div class="ai-composer-dropdown ai-dropdown" id="ai-answer-mode-dropdown" data-dropdown="answer-mode">
+              <button
+                type="button"
+                class="ai-composer-btn ai-dropdown-trigger"
+                id="ai-answer-mode-trigger"
+                aria-haspopup="listbox"
+                aria-expanded="false"
+                aria-controls="ai-answer-mode-panel"
+              >
+                <span class="ai-composer-btn-kicker">Mode</span>
+                <span class="ai-dropdown-value" id="ai-answer-mode-value">Grounded</span>
+                <span class="ai-composer-btn-chevron" aria-hidden="true"></span>
+              </button>
+              <div class="ai-composer-menu ai-dropdown-panel" id="ai-answer-mode-panel" role="listbox" aria-label="Answer mode">
+                <button type="button" class="ai-dropdown-option is-active" data-value="grounded" role="option" aria-selected="true">
+                  <span class="ai-dropdown-option-title">Grounded</span>
+                  <span class="ai-dropdown-option-desc">Canvas search and course citations</span>
+                </button>
+                <button type="button" class="ai-dropdown-option" data-value="general" role="option" aria-selected="false">
+                  <span class="ai-dropdown-option-title">General</span>
+                  <span class="ai-dropdown-option-desc">General knowledge, no Canvas RAG</span>
+                </button>
+              </div>
+            </div>
+            <div class="ai-composer-dropdown ai-dropdown" id="ai-model-dropdown" data-dropdown="model">
+              <button
+                type="button"
+                class="ai-composer-btn ai-dropdown-trigger"
+                id="ai-model-trigger"
+                aria-haspopup="listbox"
+                aria-expanded="false"
+                aria-controls="ai-model-panel"
+              >
+                <span class="ai-composer-btn-kicker">Model</span>
+                <span class="ai-dropdown-value" id="ai-model-value">Sonnet 4.6</span>
+                <span class="ai-composer-btn-chevron" aria-hidden="true"></span>
+              </button>
+              <div class="ai-composer-menu ai-dropdown-panel" id="ai-model-panel" role="listbox" aria-label="Model">
+                <button type="button" class="ai-dropdown-option is-active" data-value="claude-sonnet-4-6" role="option" aria-selected="true">
+                  <span class="ai-dropdown-option-title">Sonnet 4.6</span>
+                  <span class="ai-dropdown-option-desc">Balanced speed and quality</span>
+                </button>
+                <button type="button" class="ai-dropdown-option" data-value="claude-opus-4-8" role="option" aria-selected="false">
+                  <span class="ai-dropdown-option-title">Opus 4.8</span>
+                  <span class="ai-dropdown-option-desc">Strongest reasoning</span>
+                </button>
+                <button type="button" class="ai-dropdown-option" data-value="claude-haiku-4-5-20251001" role="option" aria-selected="false">
+                  <span class="ai-dropdown-option-title">Haiku 4.5</span>
+                  <span class="ai-dropdown-option-desc">Fastest responses</span>
+                </button>
+                <button type="button" class="ai-dropdown-option" data-value="deepseek-chat" role="option" aria-selected="false">
+                  <span class="ai-dropdown-option-title">DeepSeek</span>
+                  <span class="ai-dropdown-option-desc">Fast and economical</span>
+                </button>
+              </div>
+            </div>
+          </div>
           <div class="ai-attachments" id="ai-attachments" aria-live="polite"></div>
-          <div class="ai-input-wrapper">
+          <div class="ai-input-row">
             <button type="button" class="ai-attach-button" id="ai-attach-button" aria-label="Attach file">+</button>
             <input type="file" id="ai-file-input" multiple hidden>
             <input
               type="text"
               id="ai-input"
-              placeholder="Ask LUMI anything..."
+              placeholder="Message LUMI..."
             >
-
-            <button type="button" class="ai-send-button" onclick="sendMessage()">
-              Send
+            <button type="button" class="ai-send-button" id="ai-send-button" aria-label="Send message">
+              <span aria-hidden="true">↑</span>
             </button>
+          </div>
           </div>
         </div>
 
@@ -162,27 +262,61 @@
         </section>
         <section class="settings-section">
           <h3>Canvas data</h3>
-          <p class="settings-section-desc">Remove synced course files, parsed graph, and homepage caches from disk. Canvas login is kept. Sync again to rebuild.</p>
+          <p class="settings-section-desc">Remove synced course files, parsed graph, and homepage caches from disk. Your Canvas login stays saved. After clearing, use Sync Canvas now — opening the Canvas tab alone will not re-download.</p>
+          <button type="button" class="settings-clear-canvas-button" id="sync-canvas-button">Sync Canvas now</button>
           <button type="button" class="settings-clear-canvas-button" id="clear-canvas-sync-button">Clear Canvas sync data</button>
         </section>
       </div>
     </div>
   </div>
 
+  <script src="lib/clock-browser.js"></script>
+  <script src="lib/diagnostics-renderer.js"></script>
+  <script src="lib/view-transition.js"></script>
+  <script src="lib/canvas-course-image.js"></script>
   <script src="lib/dom-utils.js"></script>
+  <script src="lib/artifact-preview.js"></script>
+  <script src="lib/artifact-actions.js"></script>
   <script src="lib/renderer-overlay.js"></script>
   <script src="lib/mail-folders.js"></script>
   <script src="app/canvas/course.js"></script>
   <script src="app/canvas/dashboard.js"></script>
   <script src="app/synapse/chat.js"></script>
+  <script src="app/synapse/course-teacher.js"></script>
+  <script src="app/synapse/synapse-textbook.js"></script>
   <script src="app/synapse/synapse.js"></script>
+  <script src="app/synapse/synapse-artifacts.js"></script>
   <script src="app/mail/mail.js"></script>
   <script src="study-sections.js"></script>
   <script src="taskoptimizer.js"></script>
+  <script src="lib/canvas-preload-pointer.js"></script>
+  <script src="lib/canvas-preload-pointer-input.js"></script>
+  <script src="lib/canvas-preload-dom.js" onerror="window.__nucleusDomScriptError=true"></script>
+  <script src="lib/canvas-preload-native-tracker.js"></script>
+  <script>
+    (function () {
+      var g = typeof globalThis !== 'undefined' ? globalThis : window
+      ;['nucleusCanvasPreloadPointer', 'nucleusCanvasPreloadPointerInput', 'nucleusCanvasPreloadDom', 'nucleusCanvasNativeTracker'].forEach(function (key) {
+        if (g && g[key] && typeof window !== 'undefined') window[key] = g[key]
+      })
+      // #region agent log
+      if (typeof fetch === 'function') {
+        fetch('http://127.0.0.1:7283/ingest/c1155abf-8302-4940-9722-19bb0cae0569',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'9a1d9e'},body:JSON.stringify({sessionId:'9a1d9e',location:'index.html:preload-bootstrap',message:'preload_scripts_status',data:{pointer:Boolean(g&&g.nucleusCanvasPreloadPointer),pointerInput:Boolean(g&&g.nucleusCanvasPreloadPointerInput),dom:Boolean(g&&g.nucleusCanvasPreloadDom),native:Boolean(g&&g.nucleusCanvasNativeTracker),onWindow:Boolean(window&&window.nucleusCanvasNativeTracker),domScriptError:Boolean(window&&window.__nucleusDomScriptError)},hypothesisId:'A',timestamp:Date.now()})}).catch(function(){})
+      }
+      // #endregion
+    })()
+  </script>
+  <script src="lib/canvas-preload-debug-panel.js"></script>
   <script src="renderer/workspace-page-tabs.js"></script>
+  <script src="renderer/sidekick-composer-controls.js"></script>
   <script src="renderer/render.js"></script>
+  <script src="renderer/artifact-tabs.js"></script>
+  <script src="renderer/artifacts.js"></script>
   <script src="app/synapse/synapse-tabs.js"></script>
   <script src="app/mail/mail-tabs.js"></script>
+  <script src="lib/workspace-session.js"></script>
+  <script src="renderer/context-controller.js"></script>
+  <script src="renderer/workspace-control-center.js"></script>
   <script src="renderer/app.js"></script>
 </body>
 
