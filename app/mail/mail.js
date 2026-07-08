@@ -285,10 +285,120 @@
     return `<div class="mail-attachments">${chips}</div>`;
   }
 
+  const SAFE_MAIL_HTML_TAGS = new Set([
+    "a", "abbr", "b", "blockquote", "br", "caption", "code", "col", "colgroup",
+    "dd", "del", "div", "dl", "dt", "em", "h1", "h2", "h3", "h4", "h5", "h6",
+    "hr", "i", "li", "ol", "p", "pre", "s", "small", "span", "strong", "sub",
+    "sup", "table", "tbody", "td", "tfoot", "th", "thead", "tr", "u", "ul"
+  ]);
+  const DROP_MAIL_HTML_TAGS = new Set([
+    "base", "button", "embed", "form", "iframe", "input", "link", "math", "meta",
+    "object", "script", "select", "slot", "style", "svg", "template", "textarea"
+  ]);
+  const SAFE_MAIL_GLOBAL_ATTRS = new Set(["aria-label", "dir", "lang", "title"]);
+  const SAFE_MAIL_TAG_ATTRS = {
+    a: new Set(["href"]),
+    col: new Set(["span"]),
+    td: new Set(["colspan", "rowspan"]),
+    th: new Set(["colspan", "rowspan", "scope"])
+  };
+
+  function isSafeMailUrl(value, options = {}) {
+    const raw = String(value || "").trim();
+    if (!raw) return false;
+    if (/[\u0000-\u001f\u007f]/.test(raw)) return false;
+    const lowered = raw.toLowerCase();
+    if (lowered.startsWith("#")) return true;
+    if (options.allowMailto && lowered.startsWith("mailto:")) return true;
+    try {
+      const parsed = new URL(raw, "https://mail.local/");
+      return parsed.protocol === "http:" || parsed.protocol === "https:";
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function isSafeNumericAttr(value) {
+    const raw = String(value || "").trim();
+    return /^\d{1,4}$/.test(raw);
+  }
+
+  function sanitizeMailElementAttributes(element, tagName) {
+    const tagAttrs = SAFE_MAIL_TAG_ATTRS[tagName] || new Set();
+    Array.from(element.attributes || []).forEach(attribute => {
+      const name = attribute.name.toLowerCase();
+      const value = attribute.value;
+      if (name.startsWith("on") || name === "style" || name === "srcdoc") {
+        element.removeAttribute(attribute.name);
+        return;
+      }
+      if (name === "href") {
+        if (tagName === "a" && isSafeMailUrl(value, { allowMailto: true })) {
+          element.setAttribute("rel", "noreferrer noopener");
+          element.setAttribute("target", "_blank");
+        } else {
+          element.removeAttribute(attribute.name);
+        }
+        return;
+      }
+      if ((name === "colspan" || name === "rowspan" || name === "span") && !isSafeNumericAttr(value)) {
+        element.removeAttribute(attribute.name);
+        return;
+      }
+      if (!SAFE_MAIL_GLOBAL_ATTRS.has(name) && !tagAttrs.has(name)) {
+        element.removeAttribute(attribute.name);
+      }
+    });
+  }
+
+  function sanitizeMailNode(node) {
+    if (!node) return;
+    if (node.nodeType === 8) {
+      node.remove();
+      return;
+    }
+    if (node.nodeType !== 1) return;
+
+    const tagName = String(node.tagName || "").toLowerCase();
+    if (DROP_MAIL_HTML_TAGS.has(tagName)) {
+      node.remove();
+      return;
+    }
+
+    Array.from(node.childNodes || []).forEach(sanitizeMailNode);
+
+    if (!SAFE_MAIL_HTML_TAGS.has(tagName)) {
+      const parent = node.parentNode;
+      if (!parent) {
+        node.remove();
+        return;
+      }
+      while (node.firstChild) {
+        parent.insertBefore(node.firstChild, node);
+      }
+      node.remove();
+      return;
+    }
+
+    sanitizeMailElementAttributes(node, tagName);
+  }
+
+  function sanitizeMailHtml(html) {
+    const raw = String(html || "");
+    if (!raw) return "";
+    if (typeof document === "undefined" || typeof document.createElement !== "function") {
+      return escapeHtml(raw);
+    }
+    const template = document.createElement("template");
+    template.innerHTML = raw;
+    Array.from(template.content.childNodes || []).forEach(sanitizeMailNode);
+    return template.innerHTML;
+  }
+
   function renderMessageBody(message) {
     if (!message) return "";
     if (message.bodyHtml) {
-      return `<div class="mail-message-body mail-message-body-html">${message.bodyHtml}</div>`;
+      return `<div class="mail-message-body mail-message-body-html">${sanitizeMailHtml(message.bodyHtml)}</div>`;
     }
     if (message.bodyText) {
       return `<pre class="mail-message-body mail-message-body-text">${escapeHtml(message.bodyText)}</pre>`;
@@ -1241,7 +1351,8 @@
       mountMailControllerIfNeeded,
       patchMailView,
       patchMailRow,
-      getMailRoot
+      getMailRoot,
+      sanitizeMailHtml
     };
   }
 
@@ -1251,7 +1362,8 @@
       mountMailControllerIfNeeded,
       patchMailView,
       patchMailRow,
-      getMailRoot
+      getMailRoot,
+      sanitizeMailHtml
     };
   }
 })();

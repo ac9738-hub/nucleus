@@ -4510,6 +4510,11 @@ async function runfunction(data) {
     const workspaceId = data.input.workspaceid
     const url = normalizeBrowserUrl(data.input.url)
 
+    if (!isNavigableWebUrl(url, { blankWarmUrl: canvasBlankWarmUrl })) {
+      tool_response.push("ERROR opening browser tab: unsupported URL scheme")
+      return tool_response
+    }
+
     if (!dataStore.hasWorkspaceId(workspaceId)) {
       tool_response.push("ERROR opening browser tab: workspace not found: " + workspaceId)
       return tool_response
@@ -8499,6 +8504,9 @@ app.whenReady().then(() => {
       return { ok: true, url: value, app: appRoute }
     }
     const url = normalizeBrowserUrl(value)
+    if (!isNavigableWebUrl(url, { blankWarmUrl: canvasBlankWarmUrl })) {
+      return { ok: false, error: "Unsupported URL scheme.", url }
+    }
     foundtab.url = url
     if (foundtab.type === "canvastab") {
       if (isLikelyDownloadUrl(url)) {
