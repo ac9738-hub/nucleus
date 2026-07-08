@@ -43,6 +43,40 @@ test('renderMailApp escapes malicious subjects in list rows', () => {
   assert.match(root.innerHTML, /&lt;img/)
 })
 
+test('renderMailApp sanitizes message body HTML before insertion', () => {
+  const harness = createHarness()
+  const state = sampleMailState()
+  state.selectedId = 'bad-body'
+  state.selectedMessage = {
+    id: 'bad-body',
+    subject: 'Injected body',
+    snippet: 'Hello',
+    from: 'Attacker <bad@example.com>',
+    to: 'Student <student@example.edu>',
+    dateLabel: 'Today',
+    bodyHtml: [
+      '<p onclick="window.__mailXss = true" style="background:url(javascript:alert(1))">Hello <strong>student</strong></p>',
+      '<script>window.__mailXss = true</script>',
+      '<svg><script>window.__mailXss = true</script></svg>',
+      '<a href="javascript:window.__mailXss = true">bad link</a>',
+      '<a href="https://example.edu/course">safe link</a>'
+    ].join('')
+  }
+  state.threadMessages = [state.selectedMessage]
+
+  mountMail(harness, state)
+  const root = harness.window.nucleusMailApp.getMailRoot()
+  const body = root.querySelector('.mail-message-body-html')
+  assert.ok(body)
+  assert.equal(harness.window.__mailXss, undefined)
+  assert.equal(body.querySelector('script'), null)
+  assert.equal(body.querySelector('svg'), null)
+  assert.doesNotMatch(body.innerHTML, /onclick|javascript:|style=/i)
+  assert.equal(body.querySelector('a[href^="javascript:"]'), null)
+  assert.equal(body.querySelector('a[href="https://example.edu/course"]').textContent, 'safe link')
+  assert.match(body.textContent, /Hello student/)
+})
+
 test('patchMailView updates list scope without full rerender', () => {
   const harness = createHarness()
   const { state } = mountMail(harness)
