@@ -4,6 +4,7 @@ const test = require('node:test')
 const assert = require('node:assert/strict')
 const {
   createCanvasNavStackStore,
+  isNavigableWebUrl,
   navEntriesEqual,
   snapshotNativeEntry,
   snapshotNativeFromForward,
@@ -66,6 +67,14 @@ test('snapshotNativeFromForward builds native entries from navForwardFrom payloa
       yindex: 12
     }
   )
+})
+
+test('isNavigableWebUrl allows only http and https browser loads', () => {
+  assert.equal(isNavigableWebUrl('https://example.edu/course'), true)
+  assert.equal(isNavigableWebUrl('http://example.edu/course'), true)
+  assert.equal(isNavigableWebUrl('file:///etc/passwd'), false)
+  assert.equal(isNavigableWebUrl('data:text/html,<script>alert(1)</script>'), false)
+  assert.equal(isNavigableWebUrl('javascript:alert(1)'), false)
 })
 
 test('canvas nav stack peekParent returns entry below top', () => {
