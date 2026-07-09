@@ -20,7 +20,7 @@ from canvas_parser.weekly_iteration.llm_parse import PARSER_DONE_MARKER  # noqa:
 
 
 def archive_live_graph(root: Path) -> Path | None:
-    """Move the active graph off the live path (kept under .cache/graph_archive/)."""
+    """Back up the active graph while leaving the live graph readable until replacement."""
     graph = root / 'canvas_graph.json'
     if not graph.is_file():
         return None
@@ -28,11 +28,11 @@ def archive_live_graph(root: Path) -> Path | None:
     archive_root.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
     dest = archive_root / f'canvas_graph_{stamp}.json'
-    shutil.move(str(graph), str(dest))
+    shutil.copy2(str(graph), str(dest))
     tasks = root / 'canvas_graph_tasks.json'
     if tasks.is_file():
-        shutil.move(str(tasks), archive_root / f'canvas_graph_tasks_{stamp}.json')
-    print(f'parser archived live graph -> {dest}', flush=True)
+        shutil.copy2(str(tasks), archive_root / f'canvas_graph_tasks_{stamp}.json')
+    print(f'parser backed up live graph -> {dest}', flush=True)
     return dest
 
 

@@ -8,6 +8,7 @@ const os = require('os')
 const { spawnSync } = require('child_process')
 
 const {
+  createCanvasApi,
   beginCanvasSyncWipe,
   endCanvasSyncWipe,
   setParserBatchGate
@@ -84,4 +85,71 @@ test('clearCanvasSyncData removes graph sidecar and pdf cache dirs', () => {
   assert.equal(fs.existsSync(graphPath), false)
   assert.equal(fs.existsSync(sidecarPath), false)
   assert.equal(fs.existsSync(pdfCachePath), false)
+})
+
+test('Canvas sync started before wipe cannot repopulate Canvas data', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nucleus-wipe-race-'))
+  const canvasDataPath = path.join(root, 'canvas_data.json')
+  const originalFetch = global.fetch
+  let releaseCourses
+  const messages = []
+
+  function response(body) {
+    return {
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      headers: { get: () => '' },
+      json: async () => body,
+      text: async () => JSON.stringify(body)
+    }
+  }
+
+  global.fetch = async url => {
+    const value = String(url)
+    if (value.includes('/api/v1/users/self')) {
+      return response({ id: 1, name: 'Canvas User' })
+    }
+    if (value.includes('/api/v1/courses?')) {
+      return new Promise(resolve => {
+        releaseCourses = () => resolve(response([]))
+      })
+    }
+    throw new Error(`Unexpected Canvas fetch: ${value}`)
+  }
+
+  try {
+    const api = createCanvasApi({
+      canvasDataPath,
+      rootDir: root,
+      getAuthState: () => ({
+        canvasAuthCookie: 'cookie=value',
+        canvasAuthCsrf: '',
+        canvasBaseUrl: 'https://canvas.example.edu'
+      }),
+      sendCanvasDataUpdate: () => messages.push('canvas:update'),
+      onCanvasTasks: () => {}
+    })
+
+    const setup = api.setupCanvasData().then(
+      () => ({ ok: true }),
+      error => ({ ok: false, error })
+    )
+
+    while (!releaseCourses) {
+      await new Promise(resolve => setImmediate(resolve))
+    }
+
+    beginCanvasSyncWipe()
+    endCanvasSyncWipe()
+    releaseCourses()
+
+    const result = await setup
+    assert.equal(result.ok, false)
+    assert.match(String(result.error && result.error.message || result.error), /wiped/i)
+    assert.equal(messages.length, 0)
+    assert.equal(fs.readFileSync(canvasDataPath, 'utf8'), '')
+  } finally {
+    global.fetch = originalFetch
+  }
 })
