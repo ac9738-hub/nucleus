@@ -113,6 +113,7 @@ let activeFlushParserBatchQueue = null
 let parserTaskRefreshTimer = null
 let parserTaskRefreshRestartVector = false
 let canvasSyncWipePending = false
+let canvasSyncWipeGeneration = 0
 let canvasDiskReadsBlockedFn = () => false
 
 function setCanvasDiskReadBlock(checkFn) {
@@ -303,6 +304,7 @@ function clearParserBatchQueue() {
 }
 
 function beginCanvasSyncWipe() {
+  canvasSyncWipeGeneration += 1
   canvasSyncWipePending = true
   cancelParserTaskRefresh()
   clearParserBatchQueue()
@@ -2131,6 +2133,13 @@ ${html}
     }
 
     canvasSetupInProgress = (async () => {
+    const setupWipeGeneration = canvasSyncWipeGeneration
+    function assertSyncNotSupersededByWipe() {
+      if (setupWipeGeneration === canvasSyncWipeGeneration) return
+      clearLiveCanvasSession()
+      throw new Error('Canvas sync was canceled because Canvas sync data was wiped.')
+    }
+
     invalidateWeeklyScheduleCache()
     invalidateCanvasDataCache()
     const authState = getAuthState()
@@ -2153,6 +2162,7 @@ ${html}
       profileresponse,
       coursesresponse
     ])
+    assertSyncNotSupersededByWipe()
     saveCanvasAuthToEnv(envPath, authState)
     const lambdaParse = usesLambdaParserPlacement()
     const proc = lambdaParse ? null : getParserProcess(authState, canvasRootDir, onCanvasTasks, options)
@@ -2241,6 +2251,7 @@ ${html}
       fetchCanvasCourseBuckets(syncCourses, 'files', canvasErrors),
       fetchCanvasPages(syncCourses, canvasErrors)
     ])
+    assertSyncNotSupersededByWipe()
     data1.assignments = assignmentsByCourse
     data1.file = filesByCourse
     data1.pages = pagesByCourse
@@ -2302,7 +2313,9 @@ ${html}
     }
 
     data1.modules = await fetchCanvasCourseBuckets(syncCourses, 'modules', canvasErrors)
+    assertSyncNotSupersededByWipe()
     data1.module_items = await fetchCanvasModuleItemBuckets(data1.modules, canvasErrors)
+    assertSyncNotSupersededByWipe()
     for (const [courseid, modules] of Object.entries(data1.module_items || {})) {
       const moduleNameById = {}
       ;(data1.modules[courseid] || []).forEach(module => {
@@ -2376,6 +2389,7 @@ ${html}
     try {
       const { syncGradescopeState } = require('../platforms/gradescope/sync')
       const gradescopeResult = await syncGradescopeState(data1)
+      assertSyncNotSupersededByWipe()
       if (gradescopeResult.synced) {
         data1.gradescope = gradescopeResult.state
         const parsingExternalSubmissions = []
@@ -2405,9 +2419,11 @@ ${html}
         }
       }
     } catch (error) {
+      assertSyncNotSupersededByWipe()
       console.warn('Gradescope sync skipped:', error.message || error)
     }
 
+    assertSyncNotSupersededByWipe()
     const homepagesRoot = path.join(__dirname, 'canvas_homepages')
     if (fs.existsSync(homepagesRoot)) {
       course.forEach(courseItem => {
