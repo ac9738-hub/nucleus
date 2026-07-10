@@ -5,7 +5,8 @@ const assert = require('node:assert/strict')
 
 const {
   parseOAuthCallbackUrl,
-  getGmailRedirectUri
+  getGmailRedirectUri,
+  createOAuthClient
 } = require('../app/mail/api')
 
 test('parseOAuthCallbackUrl extracts authorization code', () => {
@@ -26,4 +27,17 @@ test('parseOAuthCallbackUrl surfaces Google OAuth errors', () => {
 test('parseOAuthCallbackUrl rejects unexpected redirect hosts', () => {
   const parsed = parseOAuthCallbackUrl('http://evil.example/callback?code=abc', getGmailRedirectUri())
   assert.match(parsed.error, /Unexpected Gmail OAuth redirect URL/)
+})
+
+test('createOAuthClient requires configured Gmail credentials', () => {
+  assert.throws(
+    () => createOAuthClient({ clientId: 'test-client', clientSecret: '' }),
+    /Gmail OAuth is not configured/
+  )
+
+  assert.doesNotThrow(() => createOAuthClient({
+    clientId: 'test-client',
+    clientSecret: 'test-secret',
+    redirectUri: 'http://localhost:3000/callback'
+  }))
 })
