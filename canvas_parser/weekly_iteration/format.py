@@ -118,8 +118,7 @@ def format_ground_truth_date(value: str, default_year: int | None = None) -> str
     if not parsed:
         return ''
     has_time = 'T' in text
-    is_midnight = parsed.hour == parsed.minute == parsed.second == parsed.microsecond == 0
-    local = parsed if not has_time or is_midnight else parsed.astimezone(LOCAL_TZ)
+    local = parsed.astimezone(LOCAL_TZ) if has_time else parsed
     return f'{local.month}/{local.day}/{local.year}'
 
 
