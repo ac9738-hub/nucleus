@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Tests for Canvas file ingestion gaps (chunks, extractors, parser batches)."""
+import json
 import sys
 import unittest
 import unittest.mock
@@ -29,6 +30,7 @@ from parser import (  # noqa: E402
     persist_file_node_text_chunks,
     summarize_file_chunks_for_embedding,
 )
+from scripts.build_harvard_snapshots_from_canvas_data import build_snapshot  # noqa: E402
 
 
 class FileIngestionTests(unittest.TestCase):
@@ -168,6 +170,56 @@ class FileIngestionTests(unittest.TestCase):
         file_ids = {str(item['id']) for item in file_batch['content']}
         self.assertIn('55', file_ids)
         self.assertIn('1', file_ids)
+
+    def test_canvas_data_snapshot_keeps_module_pages_and_front_page(self):
+        canvas_data = {
+            'courses': [{'id': 101, 'name': 'Demo', 'default_view': 'wiki'}],
+            'assignments': {'101': []},
+            'files': {'101': []},
+            'modules': {'101': [{'id': '10', 'name': 'Week 1', 'position': 1}]},
+            'module_items': {
+                '101': {
+                    '10': [{
+                        'id': '200',
+                        'type': 'Page',
+                        'title': 'Week 1 module page',
+                        'url': 'https://canvas.example.edu/api/v1/courses/101/pages/week-1',
+                        'page_url': 'week-1',
+                        'html_url': 'https://canvas.example.edu/courses/101/pages/week-1',
+                    }],
+                },
+            },
+            'pages': {
+                '101': [{
+                    'page_id': '300',
+                    'url': 'week-1',
+                    'title': 'Week 1',
+                    'html_url': 'https://canvas.example.edu/courses/101/pages/week-1',
+                    'body': '<p>Module page exam schedule.</p>',
+                }],
+            },
+            'front_pages': {
+                '101': {
+                    'page_id': '400',
+                    'url': 'home',
+                    'title': 'Home',
+                    'html_url': 'https://canvas.example.edu/courses/101/pages/home',
+                    'body': '<p>Homepage syllabus links and overview.</p>',
+                },
+            },
+        }
+
+        snapshot = build_snapshot(canvas_data, 101)
+        batches = build_parser_batches(snapshot, 'https://canvas.example.edu')
+        page_batch = next(batch for batch in batches if batch.get('type') == 'page')
+        page_texts = [
+            json.loads(item['content'])['body_text']
+            for item in page_batch['content']
+        ]
+
+        self.assertEqual(len(page_texts), 2)
+        self.assertTrue(any('Module page exam schedule' in text for text in page_texts))
+        self.assertTrue(any('Homepage syllabus links' in text for text in page_texts))
 
 
 if __name__ == '__main__':

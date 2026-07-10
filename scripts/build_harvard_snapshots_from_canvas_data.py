@@ -43,6 +43,40 @@ def _module_items(data: dict, course_id: int) -> dict[str, list]:
     return {str(module_id): list(items or []) for module_id, items in raw.items()}
 
 
+def _page_key_values(page: dict) -> set[str]:
+    keys: set[str] = set()
+    for key in (page.get('url'), page.get('page_id'), page.get('html_url')):
+        text = str(key or '').strip()
+        if not text:
+            continue
+        keys.add(text.lower())
+        if '/' in text:
+            keys.add(text.rstrip('/').rsplit('/', 1)[-1].lower())
+    return keys
+
+
+def _front_page(data: dict, course_id: int) -> dict | None:
+    raw = data.get('front_pages') or {}
+    if not isinstance(raw, dict):
+        return None
+    page = raw.get(str(course_id)) or raw.get(course_id)
+    return page if isinstance(page, dict) else None
+
+
+def _append_front_page(pages: list[dict], front_page: dict | None) -> list[dict]:
+    if not front_page or not front_page.get('body'):
+        return pages
+    merged = list(pages or [])
+    existing_keys: set[str] = set()
+    for page in merged:
+        existing_keys.update(_page_key_values(page))
+    front_keys = _page_key_values(front_page)
+    if front_keys and existing_keys.intersection(front_keys):
+        return merged
+    merged.append(dict(front_page))
+    return merged
+
+
 def build_snapshot(data: dict, course_id: int) -> dict:
     course = _course_record(data, course_id)
     course_key = str(course_id)
@@ -52,11 +86,14 @@ def build_snapshot(data: dict, course_id: int) -> dict:
             if course_details.get(field) and not course.get(field):
                 course[field] = course_details[field]
     modules = sorted(_bucket(data, 'modules', course_id), key=lambda row: row.get('position') or 0)
+    pages = _append_front_page(_bucket(data, 'pages', course_id), _front_page(data, course_id))
     page_bodies: dict[str, str] = {}
-    for page in _bucket(data, 'pages', course_id):
-        api_url = str(page.get('url') or '').strip()
-        if api_url:
-            page_bodies[api_url] = page.get('body') or ''
+    for page in pages:
+        body = page.get('body') or ''
+        if not body:
+            continue
+        for key in _page_key_values(page):
+            page_bodies[key] = body
     files = _files(data, course_id)
     module_items = _module_items(data, course_id)
     files = _synthesize_files_from_module_items(files, module_items)
@@ -64,7 +101,7 @@ def build_snapshot(data: dict, course_id: int) -> dict:
         'course': course,
         'assignments': _bucket(data, 'assignments', course_id),
         'files': files,
-        'pages': _bucket(data, 'pages', course_id),
+        'pages': pages,
         'modules': modules,
         'module_items': module_items,
         'page_bodies': page_bodies,
