@@ -19,6 +19,6 @@ test('normalizeBrowserUrl converts unsupported schemes into search queries', () 
   ]) {
     const normalized = normalizeBrowserUrl(value)
     assert.match(normalized, /^https:\/\/www\.google\.com\/search\?q=/)
-    assert.doesNotEqual(normalized, value)
+    assert.notEqual(normalized, value)
   }
 })
