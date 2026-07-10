@@ -118,6 +118,7 @@ function createHarness(options = {}) {
     loadDomUtils()
     runScript('app/synapse/chat.js')
     runScript('app/synapse/course-teacher.js')
+    runScript('app/synapse/synapse-textbook.js')
     runScript('app/synapse/synapse.js')
     return context
   }

@@ -64,6 +64,10 @@ contextBridge.exposeInMainWorld('nucleus', {
 
   synapseSend:  (payload) => ipcRenderer.invoke('synapse:send', payload),
 
+  synapseListCourses: (payload) => ipcRenderer.invoke('synapse:list_courses', payload || {}),
+
+  synapseGetCurriculum: (courseId, payload = {}) => ipcRenderer.invoke('synapse:get_curriculum', { courseId, ...payload }),
+
   ensureCanvasAuth: () => ipcRenderer.invoke('canvas:ensure_auth'),
 
   clearCanvasSyncData: () => ipcRenderer.invoke('canvas:clear_sync_data'),
