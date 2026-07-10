@@ -378,6 +378,7 @@ def build_parser_batches(snapshot: dict[str, Any], base_url: str) -> list[dict[s
             'name': file_item.get('display_name') or file_item.get('filename') or file_item.get('name') or '',
             'courseid': course_id,
             'content_type': content_type,
+            'linked_discovered': bool(file_item.get('linked_discovered')),
         })
     if parsing_files:
         batches.append({'type': 'file', 'content': parsing_files})
