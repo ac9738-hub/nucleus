@@ -63,13 +63,30 @@ function getFrameSnapshotName(frame, index) {
   return `${String(index).padStart(2, "0")}-${safeLabel}.html`
 }
 
+function normalizeExplicitBrowserUrl(text) {
+  try {
+    const url = new URL(text)
+    const protocol = url.protocol.toLowerCase()
+    if (protocol === "http:" || protocol === "https:" || protocol === "nucleus:") {
+      return url.href
+    }
+    if (protocol === "about:" && url.pathname.toLowerCase() === "blank") {
+      return "about:blank"
+    }
+  } catch (_error) {
+    return ""
+  }
+  return ""
+}
+
 function normalizeBrowserUrl(value) {
   const text = String(value || "").trim()
   if (!text) {
     return "https://www.google.com"
   }
   if (/^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(text)) {
-    return text
+    return normalizeExplicitBrowserUrl(text)
+      || "https://www.google.com/search?q=" + encodeURIComponent(text)
   }
   if (text.includes(".") && !text.includes(" ")) {
     return "https://" + text

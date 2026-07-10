@@ -34,6 +34,81 @@
     return MAIL_ICONS[name] || "";
   }
 
+  const MAIL_HTML_BLOCKED_SELECTOR = [
+    "script",
+    "style",
+    "iframe",
+    "object",
+    "embed",
+    "meta",
+    "link",
+    "base",
+    "form",
+    "input",
+    "button",
+    "select",
+    "textarea",
+    "svg",
+    "math",
+    "template"
+  ].join(",");
+
+  const MAIL_HTML_URL_ATTRIBUTES = new Set([
+    "href",
+    "src",
+    "xlink:href",
+    "action",
+    "formaction",
+    "poster",
+    "background"
+  ]);
+
+  function isSafeMailHtmlUrl(value, attrName) {
+    const text = String(value || "").trim();
+    if (!text) return false;
+    if (text.startsWith("#")) return true;
+    if ((attrName === "src" || attrName === "poster" || attrName === "background")
+      && /^data:image\/(?:png|gif|jpe?g|webp);base64,/i.test(text)) {
+      return true;
+    }
+    try {
+      const parsed = new URL(text);
+      return ["http:", "https:", "mailto:", "tel:", "cid:"].includes(parsed.protocol.toLowerCase());
+    } catch (_error) {
+      return false;
+    }
+  }
+
+  function sanitizeMailHtml(value) {
+    const raw = String(value || "");
+    if (!raw) return "";
+    if (typeof document === "undefined" || !document.createElement) {
+      return escapeHtml(raw);
+    }
+
+    const template = document.createElement("template");
+    template.innerHTML = raw;
+    template.content.querySelectorAll(MAIL_HTML_BLOCKED_SELECTOR).forEach(node => node.remove());
+    template.content.querySelectorAll("*").forEach(element => {
+      Array.from(element.attributes).forEach(attribute => {
+        const attrName = attribute.name.toLowerCase();
+        if (attrName.startsWith("on") || attrName === "style" || attrName === "srcdoc") {
+          element.removeAttribute(attribute.name);
+          return;
+        }
+        if (MAIL_HTML_URL_ATTRIBUTES.has(attrName) && !isSafeMailHtmlUrl(attribute.value, attrName)) {
+          element.removeAttribute(attribute.name);
+        }
+      });
+
+      if (element.tagName && element.tagName.toLowerCase() === "a" && element.getAttribute("href")) {
+        element.setAttribute("target", "_blank");
+        element.setAttribute("rel", "noopener noreferrer");
+      }
+    });
+    return template.innerHTML;
+  }
+
   function getMailFolders(state) {
     if (state.view && Array.isArray(state.view.folders) && state.view.folders.length) {
       return state.view.folders;
@@ -288,7 +363,7 @@
   function renderMessageBody(message) {
     if (!message) return "";
     if (message.bodyHtml) {
-      return `<div class="mail-message-body mail-message-body-html">${message.bodyHtml}</div>`;
+      return `<div class="mail-message-body mail-message-body-html">${sanitizeMailHtml(message.bodyHtml)}</div>`;
     }
     if (message.bodyText) {
       return `<pre class="mail-message-body mail-message-body-text">${escapeHtml(message.bodyText)}</pre>`;
