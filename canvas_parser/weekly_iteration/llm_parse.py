@@ -104,6 +104,65 @@ def _extract_canvas_file_ids_from_html(html: str) -> list[str]:
     return list(ids)
 
 
+def _page_lookup_keys(*values: Any) -> set[str]:
+    keys: set[str] = set()
+    for value in values:
+        text = str(value or '').strip()
+        if not text:
+            continue
+        trimmed = text.rstrip('/')
+        keys.add(text.lower())
+        keys.add(trimmed.lower())
+        if '/' in trimmed:
+            keys.add(trimmed.rsplit('/', 1)[-1].lower())
+    keys.discard('')
+    return keys
+
+
+def _page_record_keys(page: dict[str, Any]) -> set[str]:
+    return _page_lookup_keys(
+        page.get('url'),
+        page.get('page_url'),
+        page.get('page_id'),
+        page.get('html_url'),
+    )
+
+
+def _build_page_body_index(snapshot: dict[str, Any]) -> dict[str, str]:
+    index: dict[str, str] = {}
+    for key, body in (snapshot.get('page_bodies') or {}).items():
+        body_text = str(body or '')
+        if not body_text:
+            continue
+        for lookup_key in _page_lookup_keys(key):
+            index[lookup_key] = body_text
+    for page in snapshot.get('pages') or []:
+        body_text = str(page.get('body') or '')
+        if not body_text:
+            continue
+        for lookup_key in _page_record_keys(page):
+            index[lookup_key] = body_text
+    front_pages = snapshot.get('front_pages') or {}
+    if isinstance(front_pages, dict):
+        for page in front_pages.values():
+            if not isinstance(page, dict):
+                continue
+            body_text = str(page.get('body') or '')
+            if not body_text:
+                continue
+            for lookup_key in _page_record_keys(page):
+                index[lookup_key] = body_text
+    return index
+
+
+def _lookup_page_body(page_body_index: dict[str, str], *values: Any) -> str:
+    for lookup_key in _page_lookup_keys(*values):
+        body = page_body_index.get(lookup_key)
+        if body:
+            return body
+    return ''
+
+
 _BARE_FILE_DOWNLOAD_RE = re.compile(
     r'^(https?://[^/]+)/files/(\d+)/download/?(?:\?.*)?$',
     re.I,
@@ -249,12 +308,49 @@ def build_parser_batches(snapshot: dict[str, Any], base_url: str) -> list[dict[s
         batches.append({'type': 'assignment', 'content': parsing_assignments})
 
     parsing_pages = []
-    seen_page_ids: set[str] = set()
-    page_bodies = snapshot.get('page_bodies') or {}
+    seen_page_keys: set[str] = set()
+    page_body_index = _build_page_body_index(snapshot)
     module_name_by_id = {
         str(module.get('id') or ''): str(module.get('name') or '')
         for module in (snapshot.get('modules') or [])
     }
+
+    def add_page_item(
+        *,
+        page_id: str,
+        page_url: str,
+        preview_url: str,
+        name: str,
+        title: str,
+        html_url: str,
+        body_html: str,
+        module_name: str = '',
+        seen_values: tuple[Any, ...] = (),
+    ) -> None:
+        body_text = _strip_html(body_html)
+        if not body_text:
+            return
+        keys = _page_lookup_keys(page_id, page_url, preview_url, html_url, *seen_values)
+        if keys and seen_page_keys.intersection(keys):
+            return
+        seen_page_keys.update(keys)
+        parsing_pages.append({
+            'id': page_id,
+            'url': page_url,
+            'previewurl': preview_url,
+            'courseid': course_id,
+            'name': name,
+            'content': json.dumps({
+                'documenttype': 'page',
+                'title': title,
+                'url': page_url,
+                'body_html': body_html,
+                'body_text': body_text,
+                'html_url': html_url,
+                'moduleName': module_name,
+            }, ensure_ascii=False),
+        })
+
     for module_id, items in (snapshot.get('module_items') or {}).items():
         module_name = module_name_by_id.get(str(module_id), '')
         for item in items or []:
@@ -262,29 +358,52 @@ def build_parser_batches(snapshot: dict[str, Any], base_url: str) -> list[dict[s
                 continue
             page_url = str(item.get('url') or '').strip()
             page_id = str(item.get('page_url') or item.get('id') or page_url)
-            if not page_id or page_id in seen_page_ids:
+            if not page_id:
                 continue
-            body_html = page_bodies.get(page_url) or ''
-            body_text = _strip_html(body_html)
-            if not body_text:
-                continue
-            seen_page_ids.add(page_id)
-            parsing_pages.append({
-                'id': page_id,
-                'url': page_url,
-                'previewurl': item.get('html_url') or page_url,
-                'courseid': course_id,
-                'name': item.get('title') or page_id,
-                'content': json.dumps({
-                    'documenttype': 'page',
-                    'title': item.get('title') or '',
-                    'url': item.get('page_url') or '',
-                    'body_html': body_html,
-                    'body_text': body_text,
-                    'html_url': item.get('html_url') or '',
-                    'moduleName': module_name,
-                }, ensure_ascii=False),
-            })
+            body_html = _lookup_page_body(
+                page_body_index,
+                page_url,
+                item.get('page_url'),
+                item.get('html_url'),
+            )
+            add_page_item(
+                page_id=page_id,
+                page_url=page_url,
+                preview_url=item.get('html_url') or page_url,
+                name=item.get('title') or page_id,
+                title=item.get('title') or '',
+                html_url=item.get('html_url') or '',
+                body_html=body_html,
+                module_name=module_name,
+                seen_values=(item.get('page_url'), item.get('html_url')),
+            )
+
+    for page in snapshot.get('pages') or []:
+        body_html = str(page.get('body') or '') or _lookup_page_body(
+            page_body_index,
+            page.get('url'),
+            page.get('page_id'),
+            page.get('html_url'),
+        )
+        page_id = str(
+            page.get('page_id')
+            or page.get('url')
+            or page.get('html_url')
+            or ''
+        ).strip()
+        if not page_id:
+            continue
+        page_url = str(page.get('html_url') or page.get('url') or '').strip()
+        add_page_item(
+            page_id=page_id,
+            page_url=page_url,
+            preview_url=page.get('html_url') or page_url,
+            name=page.get('title') or page.get('url') or page_id,
+            title=page.get('title') or page.get('url') or '',
+            html_url=page.get('html_url') or '',
+            body_html=body_html,
+            seen_values=(page.get('url'), page.get('page_id'), page.get('html_url')),
+        )
     if parsing_pages:
         batches.append({'type': 'page', 'content': parsing_pages})
 
@@ -321,7 +440,7 @@ def build_parser_batches(snapshot: dict[str, Any], base_url: str) -> list[dict[s
     linked_ids: set[str] = set()
     for assignment in snapshot.get('assignments') or []:
         linked_ids.update(_extract_canvas_file_ids_from_html(str(assignment.get('description') or '')))
-    for body_html in page_bodies.values():
+    for body_html in page_body_index.values():
         linked_ids.update(_extract_canvas_file_ids_from_html(str(body_html or '')))
     for page in snapshot.get('pages') or []:
         linked_ids.update(_extract_canvas_file_ids_from_html(str(page.get('body') or '')))
