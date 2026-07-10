@@ -68,6 +68,14 @@ def _parse_any_date(value: str, default_year: int | None = None) -> datetime | N
         return None
     if ISO_DATE.match(text):
         return datetime.strptime(text, '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=timezone.utc)
+    if re.match(r'^\d{4}-\d{2}-\d{2}(?:T|$)', text):
+        try:
+            parsed = datetime.fromisoformat(text.replace('Z', '+00:00'))
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            return parsed
+        except ValueError:
+            pass
     for fmt in (
         '%Y-%m-%dT%H:%M:%SZ',
         '%Y-%m-%d',
@@ -105,10 +113,12 @@ def _parse_any_date(value: str, default_year: int | None = None) -> datetime | N
 
 
 def format_ground_truth_date(value: str, default_year: int | None = None) -> str:
+    text = str(value or '').strip()
     parsed = _parse_any_date(value, default_year=default_year)
     if not parsed:
         return ''
-    local = parsed.astimezone(LOCAL_TZ)
+    has_time = 'T' in text
+    local = parsed.astimezone(LOCAL_TZ) if has_time else parsed
     return f'{local.month}/{local.day}/{local.year}'
 
 
@@ -252,17 +262,51 @@ def _extract_page_file_names(snapshot: dict[str, Any]) -> list[str]:
     return names
 
 
+def _clean_reading_title_candidate(value: str) -> str:
+    candidate = re.sub(r'\.pdf$', '', str(value or '').strip(), flags=re.IGNORECASE)
+    candidate = candidate.strip('"\' ')
+    candidate = re.sub(
+        r'\s*(?:\((?:excerpt|excerpts?)\)|ch\.?\s*\d+.*|chapter\s+\d+.*)$',
+        '',
+        candidate,
+        flags=re.IGNORECASE,
+    )
+    candidate = re.sub(r'\s+', ' ', candidate).strip(' "\',')
+    return candidate
+
+
+def _looks_like_author_prefix(value: str) -> bool:
+    text = str(value or '').strip()
+    if not text:
+        return False
+    if re.search(r'\bet\s+al\.?$', text, re.IGNORECASE):
+        return True
+    words = re.findall(r'[A-Za-z][A-Za-z.\'-]*', text)
+    return 0 < len(words) <= 4
+
+
 def _reading_title_to_discussion_name(title: str) -> str:
     text = unicodedata.normalize('NFKC', str(title or '').strip())
-    text = re.sub(r'\.pdf$', '', text, flags=re.IGNORECASE).strip()
-    text = text.strip('"\' ')
+    text = _clean_reading_title_candidate(text)
     if READING_SKIP_PATTERN.search(text):
         return ''
 
+    if ' - ' in text:
+        left, right = text.split(' - ', 1)
+        if _looks_like_author_prefix(left):
+            candidate = _clean_reading_title_candidate(right.split(',', 1)[0])
+            if candidate:
+                return candidate
+        candidate = _clean_reading_title_candidate(left)
+        if candidate:
+            return candidate
+
     if re.search(r',\s*', text):
-        _, after = re.split(r',\s*', text, maxsplit=1)
-        candidate = re.sub(r'\s*(?:\(excerpt\)|ch\.?\s*\d+.*|chapter\s+\d+.*)$', '', after, flags=re.IGNORECASE)
-        candidate = candidate.strip(' "')
+        before, after = re.split(r',\s*', text, maxsplit=1)
+        if _looks_like_author_prefix(before):
+            candidate = _clean_reading_title_candidate(after.split(',', 1)[0])
+        else:
+            candidate = _clean_reading_title_candidate(text)
         if re.search(r'\bintimacies of four continents\b', candidate, re.IGNORECASE):
             return 'The Intimacies of Four Continents'
         if re.search(r'\bmushroom at the end of the world\b', candidate, re.IGNORECASE):
@@ -270,25 +314,6 @@ def _reading_title_to_discussion_name(title: str) -> str:
         if candidate and not candidate.lower().startswith('the '):
             return candidate
         return candidate
-
-    if ' - ' in text:
-        if re.search(r'\bnothing ever dies\b', text, re.IGNORECASE):
-            return 'Nothing Ever Dies'
-        left, right = text.split(' - ', 1)
-        candidate = left.strip()
-        if re.search(r'\bcollateral damage\b', candidate, re.IGNORECASE):
-            return 'Collateral Damage'
-        if re.search(r'\bflavors of empire\b', candidate, re.IGNORECASE):
-            return 'Flavors of Empire'
-        if re.search(r'\balien capital\b', candidate, re.IGNORECASE):
-            return 'Alien Capital'
-        if re.search(r'\bstranger intimacy\b', candidate, re.IGNORECASE):
-            return 'Stranger Intimacy'
-        if re.search(r'\bturbulent circulation\b', candidate, re.IGNORECASE):
-            return 'Turbulent Circulation'
-        if re.search(r'\btrespassers\b', candidate, re.IGNORECASE):
-            return 'Trespassers?'
-        return candidate or right.strip()
 
     return text
 
@@ -462,6 +487,39 @@ def _parse_filename_date(name: str, default_year: int | None) -> datetime | None
     return None
 
 
+def _date_is_plausible_for_course(value: datetime, default_year: int | None) -> bool:
+    if not default_year:
+        return True
+    return default_year - 1 <= value.year <= default_year + 1
+
+
+def _assignment_handout_name(name: str) -> str:
+    text = re.sub(r'\.pdf$', '', str(name or '').strip(), flags=re.IGNORECASE)
+    text = re.sub(r'\s+', ' ', text).strip()
+    if not re.search(r'\b(?:assignment|project|problem\s*set|pset)\s*\d+\b', text, re.IGNORECASE):
+        return ''
+    if re.search(r'\b(?:answer\s*key|solution|solutions|rubric)\b', text, re.IGNORECASE):
+        return ''
+    return text
+
+
+def _is_event_like_module_item(name: str, module_name: str) -> bool:
+    text = str(name or '').strip()
+    if not text:
+        return False
+    lowered = text.lower()
+    if re.search(r'\bpractice\b', lowered):
+        return False
+    event_type = normalize_event_type('', text)
+    if event_type == 'test':
+        return True
+    if re.search(r'\b(?:field\s*trip|presentation)\b', lowered):
+        return True
+    if str(module_name or '').strip().lower() in {'event', 'events'}:
+        return bool(FILENAME_MONTH_DAY.search(text) or MONTH_DAY_NAME.search(text))
+    return False
+
+
 def _resolve_item_date(
     *,
     name: str,
@@ -475,7 +533,7 @@ def _resolve_item_date(
             if parsed:
                 return parsed
     parsed = _parse_filename_date(name, default_year)
-    if parsed:
+    if parsed and _date_is_plausible_for_course(parsed, default_year):
         return parsed
     module_week = WEEK_MODULE_PATTERN.search(module_name or '')
     if module_week and default_year:
@@ -674,9 +732,19 @@ def _build_weekly_schedule(snapshot: dict[str, Any], categorized: dict[str, Any]
                         linked_files = [{'name': name}]
                     add_assignment(bucket, name, linked_files)
             elif item_type == 'file':
-                add_file(bucket, name)
+                if _is_event_like_module_item(name, module_name):
+                    add_event(bucket, name)
+                    continue
+                handout_name = _assignment_handout_name(name)
+                if handout_name:
+                    add_assignment(bucket, handout_name, [{'name': name}])
+                else:
+                    add_file(bucket, name)
             elif item_type in {'page', 'externalurl', 'external_url', 'externaltool'}:
-                add_file(bucket, name)
+                if _is_event_like_module_item(name, module_name):
+                    add_event(bucket, name)
+                else:
+                    add_file(bucket, name)
 
     if not buckets:
         return []
