@@ -69,7 +69,16 @@ function normalizeBrowserUrl(value) {
     return "https://www.google.com"
   }
   if (/^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(text)) {
-    return text
+    try {
+      const url = new URL(text)
+      if (url.protocol === "http:" || url.protocol === "https:" || url.protocol === "nucleus:") {
+        return url.href
+      }
+      if (url.protocol === "about:" && text.toLowerCase() === "about:blank") {
+        return "about:blank"
+      }
+    } catch (_error) {}
+    return "https://www.google.com/search?q=" + encodeURIComponent(text)
   }
   if (text.includes(".") && !text.includes(" ")) {
     return "https://" + text
