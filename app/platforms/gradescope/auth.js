@@ -21,6 +21,7 @@ function saveGradescopeAuth(auth) {
 function openGradescopeAuthWindow(window, onAuth, getAuthView) {
   return openPlatformAuthWindow(window, {
     loginUrl: 'https://www.gradescope.com/',
+    allowedPopupHosts: ['gradescope.com'],
     urlFilter: ['*://*.gradescope.com/*'],
     onAuth: auth => {
       const payload = {

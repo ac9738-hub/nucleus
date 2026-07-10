@@ -1,4 +1,5 @@
 const { WebContentsView } = require('electron')
+const { handleTrustedAuthPopup } = require('./auth-popup-policy')
 
 function getHeader(headers, name) {
   const target = name.toLowerCase()
@@ -8,6 +9,7 @@ function getHeader(headers, name) {
 
 function openPlatformAuthWindow(window, {
   loginUrl,
+  allowedPopupHosts = [],
   urlFilter,
   onAuth,
   getAuthView,
@@ -17,8 +19,10 @@ function openPlatformAuthWindow(window, {
   let captured = false
 
   view.webContents.setWindowOpenHandler(({ url }) => {
-    view.webContents.loadURL(url)
-    return { action: 'deny' }
+    return handleTrustedAuthPopup(view.webContents, url, {
+      loginUrl,
+      allowedHosts: allowedPopupHosts
+    })
   })
 
   const session = view.webContents.session

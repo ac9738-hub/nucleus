@@ -4,6 +4,9 @@
 // Dependencies: main.js owns the view lifecycle callbacks and persists auth via
 // app/canvas/api.js after setup.
 const { WebContentsView } = require('electron')
+const { handleTrustedAuthPopup } = require('../platforms/auth-popup-policy')
+
+const CANVAS_LOGIN_URL = 'https://www.instructure.com/canvas/login'
 
 module.exports = {
   open_canvas_auth_window,
@@ -66,8 +69,10 @@ function open_canvas_auth_window (window, onauth, getauthview, setup = false) {
     const [contentWidth, contentHeight] = window.getContentSize()
     const view = new WebContentsView()
     view.webContents.setWindowOpenHandler(({ url }) => {
-        view.webContents.loadURL(url);
-        return { action: 'deny' };
+        return handleTrustedAuthPopup(view.webContents, url, {
+            loginUrl: CANVAS_LOGIN_URL,
+            allowCanvasHosts: true
+        })
     });
     const ses = view.webContents.session
     ses.webRequest.onBeforeSendHeaders(filter, (details, callback) => {
@@ -115,7 +120,7 @@ function open_canvas_auth_window (window, onauth, getauthview, setup = false) {
             console.error("Unable to process Canvas auth interception:", error)
         })
     })
-    view.webContents.loadURL("https://www.instructure.com/canvas/login")
+    view.webContents.loadURL(CANVAS_LOGIN_URL)
     view.setBounds({
         x: 220,
         y: 0,
