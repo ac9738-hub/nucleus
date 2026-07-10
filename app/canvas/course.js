@@ -19,6 +19,88 @@ function sanitizeurl(url) {
   return '#'
 }
 
+const SAFE_HOMEPAGE_TAGS = new Set([
+  'a', 'abbr', 'b', 'blockquote', 'br', 'caption', 'code', 'dd', 'div', 'dl', 'dt',
+  'em', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'i', 'img', 'li', 'ol', 'p',
+  'pre', 'small', 'span', 'strong', 'sub', 'sup', 'table', 'tbody', 'td', 'tfoot',
+  'th', 'thead', 'tr', 'u', 'ul'
+])
+
+const DANGEROUS_HOMEPAGE_BLOCKS = /<\s*(script|style|iframe|object|embed|applet|svg|math|form|textarea|select|button|canvas|video|audio|template)\b[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi
+const DANGEROUS_HOMEPAGE_VOID_TAGS = /<\s*(?:base|link|meta|input|source|track|param)\b[^>]*\/?>/gi
+const HOMEPAGE_TAG_PATTERN = /<[^>]*>/g
+const HOMEPAGE_ATTR_PATTERN = /([^\s"'<>/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g
+const SAFE_GLOBAL_HOMEPAGE_ATTRS = new Set([
+  'align', 'aria-label', 'aria-describedby', 'aria-hidden', 'class', 'colspan',
+  'height', 'id', 'role', 'rowspan', 'scope', 'title', 'width'
+])
+
+function sanitizeHomepageAttribute(tagName, name, rawValue) {
+  const attrName = String(name || '').toLowerCase()
+  if (!attrName || attrName.startsWith('on') || attrName === 'style' || attrName === 'srcdoc') {
+    return ''
+  }
+
+  const value = rawValue == null ? '' : String(rawValue)
+  if (tagName === 'a' && attrName === 'href') {
+    const safeHref = sanitizeurl(value)
+    return ` href="${escapeHtml(safeHref === '#' ? '#' : safeHref)}"`
+  }
+
+  if (tagName === 'img' && attrName === 'src') {
+    const safeSrc = sanitizeurl(value)
+    return safeSrc === '#' ? '' : ` src="${escapeHtml(safeSrc)}"`
+  }
+
+  if (tagName === 'img' && (attrName === 'alt' || attrName === 'title')) {
+    return ` ${attrName}="${escapeHtml(value)}"`
+  }
+
+  if (SAFE_GLOBAL_HOMEPAGE_ATTRS.has(attrName)) {
+    return ` ${attrName}="${escapeHtml(value)}"`
+  }
+
+  return ''
+}
+
+function sanitizeHomepageTag(tag) {
+  const match = String(tag || '').match(/^<\s*(\/)?\s*([a-zA-Z][\w:-]*)([\s\S]*?)>$/)
+  if (!match) return escapeHtml(tag)
+
+  const closing = Boolean(match[1])
+  const tagName = match[2].toLowerCase()
+  if (!SAFE_HOMEPAGE_TAGS.has(tagName)) return ''
+  if (closing) return `</${tagName}>`
+
+  const rawAttrs = match[3] || ''
+  const attrs = []
+  rawAttrs.replace(HOMEPAGE_ATTR_PATTERN, (_attr, name, doubleQuoted, singleQuoted, bareValue) => {
+    const rawValue = doubleQuoted ?? singleQuoted ?? bareValue ?? ''
+    const sanitized = sanitizeHomepageAttribute(tagName, name, rawValue)
+    if (sanitized) attrs.push(sanitized)
+    return ''
+  })
+
+  return `<${tagName}${attrs.join('')}>`
+}
+
+function sanitizeCanvasHomepageHtml(html) {
+  const source = String(html || '')
+    .replace(DANGEROUS_HOMEPAGE_BLOCKS, '')
+    .replace(DANGEROUS_HOMEPAGE_VOID_TAGS, '')
+
+  let output = ''
+  let cursor = 0
+  source.replace(HOMEPAGE_TAG_PATTERN, (tag, offset) => {
+    output += escapeHtml(source.slice(cursor, offset))
+    output += sanitizeHomepageTag(tag)
+    cursor = offset + tag.length
+    return ''
+  })
+  output += escapeHtml(source.slice(cursor))
+  return output.trim()
+}
+
 function stripHtml(value) {
   return String(value ?? "")
     .replace(/<[^>]*>/g, " ")
@@ -368,7 +450,7 @@ function getCourseFrontPage(canvasData, courseId) {
   const frontPage = frontPages[courseId] || frontPages[String(courseId)] || null
   if (!frontPage) return null
 
-  const body = normalizeHomepageBody(frontPage.body)
+  const body = sanitizeCanvasHomepageHtml(normalizeHomepageBody(frontPage.body))
   if (body === String(frontPage.body || "").trim()) return frontPage
   return { ...frontPage, body }
 }
@@ -500,7 +582,8 @@ if (typeof module !== "undefined") {
   module.exports = {
     createCourseHtmlTemplate,
     createAllCourseHtmlTemplates,
-    renderCourseSectionHtml
+    renderCourseSectionHtml,
+    sanitizeCanvasHomepageHtml
   };
 }
 
