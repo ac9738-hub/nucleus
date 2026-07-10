@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import io
 import json
 import os
@@ -319,6 +320,71 @@ def _merge_syllabus_course(existing: Any, incoming: Any) -> Any:
     return existing
 
 
+def _node_payload_size(value: Any) -> int:
+    try:
+        return len(json.dumps(value, sort_keys=True, default=str))
+    except TypeError:
+        return len(str(value))
+
+
+def _file_node_score(node: Any) -> int:
+    if not isinstance(node, dict):
+        return 0
+    score = 0
+    for key, weight in (
+        ('pages', 100),
+        ('textChunks', 100),
+        ('typeExtractions', 80),
+        ('concepts', 30),
+        ('details', 30),
+        ('examples', 30),
+        ('problems', 30),
+        ('embedded', 20),
+    ):
+        value = node.get(key)
+        if isinstance(value, list) and value:
+            score += weight * len(value) + _node_payload_size(value)
+        elif isinstance(value, dict) and value:
+            score += weight * len(value) + _node_payload_size(value)
+    searchtext = str(node.get('searchtext') or '')
+    if searchtext:
+        score += min(len(searchtext), 10000)
+    if str(node.get('academicFileType') or '').strip():
+        score += 20
+    return score
+
+
+def _merge_file_node(existing: Any, incoming: Any) -> Any:
+    if not isinstance(existing, dict):
+        return copy.deepcopy(incoming)
+    if not isinstance(incoming, dict):
+        return copy.deepcopy(existing)
+
+    primary, secondary = (
+        (incoming, existing)
+        if _file_node_score(incoming) > _file_node_score(existing)
+        else (existing, incoming)
+    )
+    merged = copy.deepcopy(primary)
+    for key, value in secondary.items():
+        current = merged.get(key)
+        if current in (None, '', [], {}):
+            merged[key] = copy.deepcopy(value)
+    return merged
+
+
+def _merge_file_course(existing: Any, incoming: Any) -> dict[str, Any]:
+    result = copy.deepcopy(existing) if isinstance(existing, dict) else {}
+    if not isinstance(incoming, dict):
+        return result
+    for fileid, node in incoming.items():
+        if fileid in result:
+            result[fileid] = _merge_file_node(result[fileid], node)
+        else:
+            result[fileid] = copy.deepcopy(node)
+    return result
+
+
 def merge_graph_fragments(fragments: list[dict[str, Any]]) -> dict[str, Any]:
     merged: dict[str, Any] = {
         'concepts': [],
@@ -368,9 +434,7 @@ def merge_graph_fragments(fragments: list[dict[str, Any]]) -> dict[str, Any]:
             bucket = merged[key]
             for cid, value in (fragment.get(key) or {}).items():
                 if key == 'files':
-                    bucket.setdefault(cid, {})
-                    if isinstance(value, dict):
-                        bucket[cid].update(value)
+                    bucket[cid] = _merge_file_course(bucket.get(cid), value)
                 elif key == 'syllabi':
                     bucket[cid] = _merge_syllabus_course(bucket.get(cid), value)
                 else:
