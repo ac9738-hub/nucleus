@@ -57,7 +57,15 @@ def _is_parseable_file(file_item: dict[str, Any]) -> bool:
 
     content_type = file_item.get('content-type') or file_item.get('content_type') or ''
     filename = file_item.get('display_name') or file_item.get('filename') or file_item.get('name') or ''
-    return bool(detect_extractor(content_type, filename))
+    if detect_extractor(content_type, filename):
+        return True
+
+    # Canvas links embedded in assignment/page HTML can expose only a file id.
+    # Let the parser download and sniff those bytes instead of dropping them
+    # before the content type or original filename is known.
+    if file_item.get('linked_discovered') and file_item.get('id'):
+        return bool(file_item.get('url') or file_item.get('courseid'))
+    return False
 
 
 def _synthesize_module_only_files(
@@ -335,6 +343,7 @@ def build_parser_batches(snapshot: dict[str, Any], base_url: str) -> list[dict[s
             'display_name': f'Linked file {file_id}',
             'filename': f'file-{file_id}',
             'url': f'{base_url}/courses/{course_id}/files/{file_id}/download',
+            'linked_discovered': True,
         })
 
     snapshot_files = _synthesize_module_only_files(
@@ -369,6 +378,7 @@ def build_parser_batches(snapshot: dict[str, Any], base_url: str) -> list[dict[s
             'name': file_item.get('display_name') or file_item.get('filename') or file_item.get('name') or '',
             'courseid': course_id,
             'content_type': content_type,
+            'linked_discovered': bool(file_item.get('linked_discovered')),
         })
     if parsing_files:
         batches.append({'type': 'file', 'content': parsing_files})

@@ -115,6 +115,36 @@ class FileIngestionTests(unittest.TestCase):
             'https://princeton.instructure.com/files/3555446/download?download_frd=1',
         )
 
+    def test_build_parser_batches_keeps_linked_only_canvas_file_ids(self):
+        snapshot = {
+            'course': {'id': '101', 'name': 'Demo'},
+            'assignments': [{
+                'id': 'a1',
+                'description': '<a href="/courses/101/files/999/download">Week 1 handout</a>',
+            }],
+            'files': [],
+            'modules': [],
+            'module_items': {},
+            'page_bodies': {},
+            'pages': [],
+        }
+        batches = build_parser_batches(snapshot, 'https://canvas.example.edu')
+        file_batch = next(batch for batch in batches if batch.get('type') == 'file')
+        linked = next(item for item in file_batch['content'] if str(item['id']) == '999')
+        self.assertEqual(
+            linked['url'],
+            'https://canvas.example.edu/courses/101/files/999/download',
+        )
+        self.assertTrue(linked.get('linked_discovered'))
+
+    def test_linked_discovered_file_is_parseable_before_extension_known(self):
+        self.assertTrue(_is_parseable_file({
+            'id': '999',
+            'courseid': '101',
+            'name': 'Linked file 999',
+            'linked_discovered': True,
+        }))
+
     def test_summarize_file_chunks_for_embedding(self):
         node = fileNode('55', '101', 'Lecture.pdf', '', '')
         node.textChunks = [

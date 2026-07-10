@@ -177,6 +177,13 @@ def hydrate_parser_seed(seed: dict[str, Any] | None) -> None:
         path.unlink(missing_ok=True)
 
 
+async def drain_pending_linked_canvas_files(parser_mod: Any) -> None:
+    pending = getattr(parser_mod, 'pending_linked_canvas_files', {}) or {}
+    if not any(pending.values()):
+        return
+    await parser_mod.parse_pending_linked_canvas_files()
+
+
 async def process_single_item(
     batch_type: str,
     item: dict[str, Any],
@@ -224,6 +231,7 @@ async def process_single_item(
     stdout_buf = io.StringIO()
     with redirect_stdout(stdout_buf):
         await parser_mod.process_parse_item(item, batch_type)
+        await drain_pending_linked_canvas_files(parser_mod)
     parser_lines = stdout_buf.getvalue().splitlines()
     thread_lines = list(getattr(parser_mod, 'parser_thread_log_lines', []) or [])
     parser_skip_lines = collect_parser_skip_lines(parser_lines + thread_lines)
@@ -478,4 +486,5 @@ async def run_deterministic_course_items(
 
     for batch_type, item, _key in course_items:
         await parser_mod.process_parse_item(item, batch_type)
+    await drain_pending_linked_canvas_files(parser_mod)
     return export_parser_state()
