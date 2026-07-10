@@ -278,9 +278,6 @@ function composeActiveViewHtml() {
       });
     }
     if (activeTab.type === "canvastab" && activeTab.canvasMode === "browser") {
-      // #region agent log
-      fetch('http://127.0.0.1:7283/ingest/c1155abf-8302-4940-9722-19bb0cae0569',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'5b3c30'},body:JSON.stringify({sessionId:'5b3c30',location:'renderer/app.js:composeActiveViewHtml',message:'canvas browser empty shell',data:{tabId:activeTab.id,loading:Boolean(activeTab.loading),viewTier:activeTab.viewTier||'',url:activeTab.url||''},timestamp:Date.now(),hypothesisId:'H3'})}).catch(()=>{});
-      // #endregion
       return "";
     }
     if (window.__nucleusDiag && window.__nucleusDiag.isEnabled("render")) {
