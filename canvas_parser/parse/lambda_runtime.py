@@ -28,6 +28,9 @@ from canvas_parser.parse.parse_trial import (
 )
 
 
+_PARSER_STATE_LOCK = asyncio.Lock()
+
+
 def item_key(batch_type: str, item: dict[str, Any]) -> str:
     courseid = str(item.get('courseid') or '')
     item_id = str(item.get('id') or '')
@@ -178,6 +181,28 @@ def hydrate_parser_seed(seed: dict[str, Any] | None) -> None:
 
 
 async def process_single_item(
+    batch_type: str,
+    item: dict[str, Any],
+    *,
+    placement: str,
+    phase: str | None = None,
+    canvasfiles_dir: Path | None = None,
+    production: bool | None = None,
+    seed_state: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    async with _PARSER_STATE_LOCK:
+        return await _process_single_item_locked(
+            batch_type,
+            item,
+            placement=placement,
+            phase=phase,
+            canvasfiles_dir=canvasfiles_dir,
+            production=production,
+            seed_state=seed_state,
+        )
+
+
+async def _process_single_item_locked(
     batch_type: str,
     item: dict[str, Any],
     *,
@@ -471,11 +496,12 @@ async def run_deterministic_course_items(
     """Process assignments/pages/module_items in one session (no per-item reset)."""
     if not course_items:
         return {}
-    configure_runtime(placement=placement, production=production)
-    reset_parser_state()
-    hydrate_parser_seed(seed_state)
-    import parser as parser_mod
+    async with _PARSER_STATE_LOCK:
+        configure_runtime(placement=placement, production=production)
+        reset_parser_state()
+        hydrate_parser_seed(seed_state)
+        import parser as parser_mod
 
-    for batch_type, item, _key in course_items:
-        await parser_mod.process_parse_item(item, batch_type)
-    return export_parser_state()
+        for batch_type, item, _key in course_items:
+            await parser_mod.process_parse_item(item, batch_type)
+        return export_parser_state()
