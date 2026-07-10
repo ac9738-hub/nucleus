@@ -18,7 +18,7 @@ SYLLABUS_NAME_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
-DETERMINISTIC_BATCH_TYPES = frozenset({'assignment', 'module_item', 'page'})
+DETERMINISTIC_BATCH_TYPES = frozenset({'assignment', 'module_item', 'page', 'external_submission'})
 
 
 def syllabus_tier(batch_type: str, item: dict[str, Any]) -> str:

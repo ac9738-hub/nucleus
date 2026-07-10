@@ -319,6 +319,47 @@ def _merge_syllabus_course(existing: Any, incoming: Any) -> Any:
     return existing
 
 
+def _stable_row_key(row: Any) -> str:
+    if isinstance(row, dict):
+        for fields in (
+            ('courseId', 'canvasAssignmentId', 'gradescopeAssignmentId'),
+            ('id',),
+            ('url',),
+        ):
+            values = [str(row.get(field) or '') for field in fields]
+            if any(values):
+                return '|'.join(values)
+        return json.dumps(row, sort_keys=True, default=str)
+    return repr(row)
+
+
+def _merge_unique_rows(existing: list[Any], incoming: list[Any]) -> list[Any]:
+    merged: dict[str, Any] = {}
+    for row in existing or []:
+        merged[_stable_row_key(row)] = row
+    for row in incoming or []:
+        merged[_stable_row_key(row)] = row
+    return list(merged.values())
+
+
+def _merge_external_platforms(target: dict[str, Any], source: dict[str, Any]) -> None:
+    for platform, incoming in (source or {}).items():
+        if not isinstance(incoming, dict):
+            target[platform] = incoming
+            continue
+        existing = target.setdefault(platform, {})
+        if not isinstance(existing, dict):
+            target[platform] = dict(incoming)
+            continue
+        for field, value in incoming.items():
+            if isinstance(value, list):
+                existing[field] = _merge_unique_rows(existing.get(field) or [], value)
+            elif field == 'synced_at':
+                existing[field] = max(str(existing.get(field) or ''), str(value or ''))
+            elif value not in (None, '', {}, []):
+                existing[field] = value
+
+
 def merge_graph_fragments(fragments: list[dict[str, Any]]) -> dict[str, Any]:
     merged: dict[str, Any] = {
         'concepts': [],
@@ -373,6 +414,8 @@ def merge_graph_fragments(fragments: list[dict[str, Any]]) -> dict[str, Any]:
                         bucket[cid].update(value)
                 elif key == 'syllabi':
                     bucket[cid] = _merge_syllabus_course(bucket.get(cid), value)
+                elif key == 'external_platforms':
+                    _merge_external_platforms(bucket, {cid: value})
                 else:
                     bucket[cid] = value
         for key in (

@@ -32,3 +32,24 @@ def test_collect_parseable_file_items_excludes_syllabus_keys():
     keys = {key for _bt, _item, key in rows}
     assert syllabus_key not in keys
     assert lecture_key in keys
+
+
+def test_external_submission_runs_as_deterministic_course_item():
+    course_id = '999'
+    key = f'external_submission__{course_id}__gradescope-999-1'
+    plans = build_course_parse_plans([
+        ('external_submission', {
+            'id': 'gradescope-999-1',
+            'courseid': course_id,
+            'name': 'Problem Set 1',
+        }, key),
+    ])
+
+    assert len(plans) == 1
+    assert plans[0].deterministic_items == [
+        ('external_submission', {
+            'id': 'gradescope-999-1',
+            'courseid': course_id,
+            'name': 'Problem Set 1',
+        }, key),
+    ]
