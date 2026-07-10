@@ -251,9 +251,8 @@ const MAIL_AUTH_PATH = path.join(__dirname, '..', '..', 'mail_auth.json')
 const MAIL_ENV_PATH = path.join(__dirname, '..', '..', '.env')
 const GMAIL_AUTH_PARTITION = 'persist:nucleus-gmail-oauth'
 const GMAIL_OAUTH_TIMEOUT_MS = 5 * 60 * 1000
-const DEFAULT_GMAIL_CLIENT_ID = '184291192111-g8r7ul70jbvn0jhsv64ums89q47udebb.apps.googleusercontent.com'
-const DEFAULT_GMAIL_CLIENT_SECRET = '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'
 const DEFAULT_GMAIL_REDIRECT_URI = 'http://localhost:3000/callback'
+let oauth2Client = null
 
 function parseEnvValue(value) {
     const text = String(value || '').trim()
@@ -281,15 +280,35 @@ function getGmailRedirectUri() {
     return loadEnvValue('GMAIL_REDIRECT_URI', DEFAULT_GMAIL_REDIRECT_URI)
 }
 
-function createOAuthClient() {
-    return new google.auth.OAuth2(
-        loadEnvValue('GMAIL_CLIENT_ID', DEFAULT_GMAIL_CLIENT_ID),
-        loadEnvValue('GMAIL_CLIENT_SECRET', DEFAULT_GMAIL_CLIENT_SECRET),
-        getGmailRedirectUri()
-    )
+function createOAuthClient(options = {}) {
+    const clientId = Object.prototype.hasOwnProperty.call(options, 'clientId')
+        ? String(options.clientId || '').trim()
+        : loadEnvValue('GMAIL_CLIENT_ID')
+    const clientSecret = Object.prototype.hasOwnProperty.call(options, 'clientSecret')
+        ? String(options.clientSecret || '').trim()
+        : loadEnvValue('GMAIL_CLIENT_SECRET')
+    const redirectUri = Object.prototype.hasOwnProperty.call(options, 'redirectUri')
+        ? String(options.redirectUri || '').trim()
+        : getGmailRedirectUri()
+
+    if (!clientId || !clientSecret) {
+        throw new Error('Gmail OAuth is not configured. Set GMAIL_CLIENT_ID and GMAIL_CLIENT_SECRET in .env.')
+    }
+
+    return new google.auth.OAuth2(clientId, clientSecret, redirectUri || DEFAULT_GMAIL_REDIRECT_URI)
 }
 
-const oauth2Client = createOAuthClient()
+function getOAuthClient() {
+    if (!oauth2Client) {
+        oauth2Client = createOAuthClient()
+        oauth2Client.on('tokens', (tokens) => {
+            const next = mergeMailAuthTokens(token || loadSavedMailAuth(), tokens)
+            setMailAuthTokens(next)
+            saveMailAuth(next)
+        })
+    }
+    return oauth2Client
+}
 
 function parseOAuthCallbackUrl(callbackUrl, redirectUri = getGmailRedirectUri()) {
     const url = new URL(String(callbackUrl || ''))
@@ -330,7 +349,7 @@ function saveMailAuth(tokens) {
 
 function clearSavedMailAuth() {
     token = null
-    oauth2Client.setCredentials({})
+    if (oauth2Client) oauth2Client.setCredentials({})
     try {
         if (fs.existsSync(MAIL_AUTH_PATH)) {
             fs.unlinkSync(MAIL_AUTH_PATH)
@@ -349,12 +368,12 @@ function mergeMailAuthTokens(existing, incoming) {
 function setMailAuthTokens(tokens) {
     if (!tokens || !tokens.access_token) {
         token = null
-        oauth2Client.setCredentials({})
+        if (oauth2Client) oauth2Client.setCredentials({})
         return false
     }
 
     token = tokens
-    oauth2Client.setCredentials(tokens)
+    if (oauth2Client) oauth2Client.setCredentials(tokens)
     return true
 }
 
@@ -364,7 +383,7 @@ async function refreshMailAccessToken() {
 
     setMailAuthTokens(saved)
     try {
-        const { credentials } = await oauth2Client.refreshAccessToken()
+        const { credentials } = await getOAuthClient().refreshAccessToken()
         const merged = mergeMailAuthTokens(saved, credentials)
         setMailAuthTokens(merged)
         saveMailAuth(merged)
@@ -377,12 +396,6 @@ async function refreshMailAccessToken() {
         return false
     }
 }
-
-oauth2Client.on('tokens', (tokens) => {
-    const next = mergeMailAuthTokens(token || loadSavedMailAuth(), tokens)
-    setMailAuthTokens(next)
-    saveMailAuth(next)
-})
 
 const savedMailAuth = loadSavedMailAuth()
 if (savedMailAuth && savedMailAuth.access_token) {
@@ -1082,7 +1095,7 @@ async function getInboxHtml(options = {}) {
 
 async function exchangeGmailAuthCode(code) {
     const saved = loadSavedMailAuth()
-    const { tokens } = await oauth2Client.getToken(code)
+    const { tokens } = await getOAuthClient().getToken(code)
     const merged = mergeMailAuthTokens(saved, tokens)
     if (!merged.access_token && !merged.refresh_token) {
         throw new Error('Google did not return Gmail tokens.')
@@ -1096,8 +1109,9 @@ async function runGmailOAuthFlow() {
     const redirectUri = getGmailRedirectUri()
     const redirectPrefix = `${new URL(redirectUri).origin}${new URL(redirectUri).pathname}`
     const saved = loadSavedMailAuth()
+    const client = getOAuthClient()
 
-    const authUrl = oauth2Client.generateAuthUrl({
+    const authUrl = client.generateAuthUrl({
         access_type: 'offline',
         include_granted_scopes: true,
         scope: [
@@ -1430,6 +1444,7 @@ module.exports = {
     FOLDER_LABELS,
     parseOAuthCallbackUrl,
     getGmailRedirectUri,
+    createOAuthClient,
     exchangeGmailAuthCode,
     classifyInboxMessages
 }
