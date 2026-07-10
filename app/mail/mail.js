@@ -59,6 +59,95 @@
     return message.dateLabel || message.date || "";
   }
 
+  const MAIL_ALLOWED_HTML_TAGS = new Set([
+    "A", "B", "BLOCKQUOTE", "BR", "CODE", "DIV", "EM", "H1", "H2", "H3",
+    "H4", "H5", "H6", "HR", "I", "IMG", "LI", "OL", "P", "PRE", "SMALL",
+    "SPAN", "STRONG", "SUB", "SUP", "TABLE", "TBODY", "TD", "TFOOT", "TH",
+    "THEAD", "TR", "U", "UL"
+  ]);
+  const MAIL_DROP_HTML_TAGS = new Set([
+    "APPLET", "BASE", "EMBED", "FORM", "IFRAME", "INPUT", "LINK", "META",
+    "OBJECT", "SCRIPT", "STYLE", "SVG", "TEMPLATE"
+  ]);
+  const MAIL_ALLOWED_IMAGE_SRC_PATTERN = /^(https?:|cid:|data:image\/(?:gif|png|jpe?g|webp);base64,)/i;
+
+  function isSafeMailLink(value) {
+    try {
+      const url = new URL(String(value || ""), window.location && window.location.href ? window.location.href : "https://mail.local/");
+      return ["http:", "https:", "mailto:", "tel:"].includes(url.protocol);
+    } catch (_error) {
+      return false;
+    }
+  }
+
+  function sanitizeMailHtml(html) {
+    const raw = String(html || "");
+    if (!raw) return "";
+    if (typeof document === "undefined" || !document.createElement) {
+      return escapeHtml(raw);
+    }
+
+    const template = document.createElement("template");
+    template.innerHTML = raw;
+
+    Array.from(template.content.querySelectorAll("*")).forEach(element => {
+      if (MAIL_DROP_HTML_TAGS.has(element.tagName)) {
+        element.remove();
+        return;
+      }
+
+      if (!MAIL_ALLOWED_HTML_TAGS.has(element.tagName)) {
+        const fragment = document.createDocumentFragment();
+        while (element.firstChild) {
+          fragment.appendChild(element.firstChild);
+        }
+        element.replaceWith(fragment);
+        return;
+      }
+
+      Array.from(element.attributes).forEach(attribute => {
+        const name = attribute.name.toLowerCase();
+        const value = attribute.value || "";
+        if (name.startsWith("on") || name === "style" || name === "srcdoc") {
+          element.removeAttribute(attribute.name);
+          return;
+        }
+        if (element.tagName === "A") {
+          if (name === "href") {
+            if (isSafeMailLink(value)) {
+              element.setAttribute("target", "_blank");
+              element.setAttribute("rel", "noopener noreferrer");
+            } else {
+              element.removeAttribute(attribute.name);
+            }
+            return;
+          }
+          if (!["title", "target", "rel"].includes(name)) {
+            element.removeAttribute(attribute.name);
+          }
+          return;
+        }
+        if (element.tagName === "IMG") {
+          if (name === "src") {
+            if (!MAIL_ALLOWED_IMAGE_SRC_PATTERN.test(value.trim())) {
+              element.removeAttribute(attribute.name);
+            }
+            return;
+          }
+          if (!["alt", "title", "width", "height"].includes(name)) {
+            element.removeAttribute(attribute.name);
+          }
+          return;
+        }
+        if (!["align", "alt", "colspan", "rowspan", "title"].includes(name)) {
+          element.removeAttribute(attribute.name);
+        }
+      });
+    });
+
+    return template.innerHTML;
+  }
+
   function getSelectedIds(state) {
     return Array.isArray(state.selectedIds) ? state.selectedIds : [];
   }
@@ -288,7 +377,7 @@
   function renderMessageBody(message) {
     if (!message) return "";
     if (message.bodyHtml) {
-      return `<div class="mail-message-body mail-message-body-html">${message.bodyHtml}</div>`;
+      return `<div class="mail-message-body mail-message-body-html">${sanitizeMailHtml(message.bodyHtml)}</div>`;
     }
     if (message.bodyText) {
       return `<pre class="mail-message-body mail-message-body-text">${escapeHtml(message.bodyText)}</pre>`;
