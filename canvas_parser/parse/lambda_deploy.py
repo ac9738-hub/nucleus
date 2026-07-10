@@ -614,6 +614,7 @@ def invoke_and_wait_s3_items(
     invoke_thread = threading.Thread(target=_invoke, name='lambda-invoke', daemon=True)
     invoke_thread.start()
     try:
+        expected_keys = expected_s3_item_result_keys(run_id, items)
         return wait_for_s3_items(
             s3_client,
             bucket,
@@ -622,6 +623,7 @@ def invoke_and_wait_s3_items(
             timeout_sec=timeout_sec,
             poll_sec=poll_sec,
             on_progress=on_progress,
+            expected_keys=expected_keys,
         )
     finally:
         invoke_thread.join()
@@ -649,6 +651,14 @@ def _list_s3_json_keys(s3_client, bucket: str, prefix: str) -> list[str]:
     return keys
 
 
+def s3_item_result_key(run_id: str, item_key: str) -> str:
+    return f'runs/{run_id}/items/{item_key}.json'
+
+
+def expected_s3_item_result_keys(run_id: str, items: list[tuple[str, dict[str, Any], str]]) -> set[str]:
+    return {s3_item_result_key(run_id, key_suffix) for _batch_type, _item, key_suffix in items}
+
+
 def wait_for_s3_items(
     s3_client,
     bucket: str,
@@ -658,18 +668,39 @@ def wait_for_s3_items(
     timeout_sec: int = 3600,
     poll_sec: int = 5,
     on_progress=None,
+    expected_keys: set[str] | None = None,
 ) -> list[str]:
     prefix = f'runs/{run_id}/items/'
+    expected_key_set = set(expected_keys or [])
+    expected_total = len(expected_key_set) if expected_key_set else expected
     deadline = time.time() + timeout_sec
     while time.time() < deadline:
         keys = _list_s3_json_keys(s3_client, bucket, prefix)
+        if expected_key_set:
+            matched = [key for key in keys if key in expected_key_set]
+            if on_progress:
+                on_progress(len(matched), expected_total)
+            if len(matched) >= expected_total:
+                return matched
+            time.sleep(poll_sec)
+            continue
         if on_progress:
-            on_progress(len(keys), expected)
+            on_progress(len(keys), expected_total)
         if len(keys) >= expected:
             return keys
         time.sleep(poll_sec)
     keys = _list_s3_json_keys(s3_client, bucket, prefix)
-    raise TimeoutError(f'Timed out waiting for {expected} Lambda results; got {len(keys)}')
+    if expected_key_set:
+        found = {key for key in keys if key in expected_key_set}
+        missing = sorted(expected_key_set - found)
+        sample = ', '.join(missing[:5])
+        suffix = f'; missing {len(missing)} expected item keys'
+        if sample:
+            suffix += f' (first: {sample})'
+        raise TimeoutError(
+            f'Timed out waiting for {expected_total} Lambda results; got {len(found)} matched keys{suffix}'
+        )
+    raise TimeoutError(f'Timed out waiting for {expected_total} Lambda results; got {len(keys)}')
 
 
 def download_fragments(s3_client, bucket: str, keys: list[str]) -> list[dict[str, Any]]:
