@@ -133,7 +133,7 @@ class FileIngestionTests(unittest.TestCase):
         linked = next(item for item in file_batch['content'] if str(item['id']) == '999')
         self.assertEqual(
             linked['url'],
-            'https://canvas.example.edu/courses/101/files/999/download?download_frd=1',
+            'https://canvas.example.edu/courses/101/files/999/download',
         )
         self.assertTrue(linked.get('linked_discovered'))
 
