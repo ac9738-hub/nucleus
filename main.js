@@ -78,6 +78,10 @@ const {
 } = require('./lib/canvas-cache-policy')
 const { createSynapseClient } = require('./app/synapse/client')
 const {
+  listTeachingCourses,
+  getTeachingCurriculum
+} = require('./app/synapse/teaching-curriculum')
+const {
   getThemeSelection,
   getRendererStylesheets,
   getCanvasThemeConfig,
@@ -8028,6 +8032,23 @@ app.whenReady().then(() => {
       })
     } finally {
       resourceGovernor.clearSynapseBusy()
+    }
+  });
+
+  ipcMain.handle('synapse:list_courses', async (_event, payload = {}) => {
+    try {
+      return await listTeachingCourses({ refresh: Boolean(payload && payload.refresh) })
+    } catch (error) {
+      return { ok: false, error: String(error && error.message ? error.message : error) }
+    }
+  });
+
+  ipcMain.handle('synapse:get_curriculum', async (_event, payload = {}) => {
+    try {
+      const courseId = payload && payload.courseId
+      return await getTeachingCurriculum(courseId, { refresh: Boolean(payload && payload.refresh) })
+    } catch (error) {
+      return { ok: false, error: String(error && error.message ? error.message : error) }
     }
   });
 
