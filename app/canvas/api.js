@@ -24,10 +24,6 @@ const {
   canvasMemoryCacheEnabled,
   parserDiskRecoveryEnabled
 } = require('../../lib/canvas-cache-policy')
-const {
-  archiveLiveGraph,
-  unwireLiveGraphIfNeeded
-} = require('../../lib/parser-graph-archive')
 
 const LAMBDA_PARSER_PLACEMENTS = new Set([
   'local_download_lambda_parse',
@@ -1371,7 +1367,6 @@ function startLambdaParserProcess(authState, rootDir, onCanvasTasks, options = {
     return parserProc
   }
 
-  archiveLiveGraph(rootDir)
   parserAllPassesCompleted = false
   onCanvasTasks([], { restartVector: false })
   const timeoutSec = Number(process.env.PARSER_TIMEOUT_SEC || 7200)
@@ -1407,9 +1402,6 @@ function startLambdaParserProcess(authState, rootDir, onCanvasTasks, options = {
 function createCanvasApi({ canvasDataPath, getAuthState, sendCanvasDataUpdate, rootDir, onCanvasTasks = () => {}, shouldBlockCanvasDiskReads = () => false }) {
   setCanvasDiskReadBlock(shouldBlockCanvasDiskReads)
   const canvasRootDir = rootDir || path.resolve(__dirname, '..', '..')
-  if (usesLambdaParserPlacement()) {
-    unwireLiveGraphIfNeeded(canvasRootDir)
-  }
   const envPath = path.join(canvasRootDir, '.env')
   let parsedCanvasCache = { mtimeMs: null, data: null }
   let liveCanvasDataSnapshot = null
