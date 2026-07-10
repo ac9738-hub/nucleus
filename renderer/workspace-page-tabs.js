@@ -64,9 +64,6 @@ async function goBackActiveCanvasTab() {
   if (!activeTab) return;
 
   const result = await window.nucleus.backCanvasTab(activeTab.id);
-  // #region agent log
-  fetch('http://127.0.0.1:7283/ingest/c1155abf-8302-4940-9722-19bb0cae0569',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'5b3c30'},body:JSON.stringify({sessionId:'5b3c30',location:'renderer/workspace-page-tabs.js:goBackActiveCanvasTab',message:'undo_result',data:{wentBack:Boolean(result&&result.wentBack),kind:result&&result.kind,urlBefore:activeTab.url,urlAfter:result&&result.tab?result.tab.url:result&&result.url,loadingBefore:activeTab.loading,loadingAfter:result&&result.tab?result.tab.loading:null,canvasModeBefore:activeTab.canvasMode},timestamp:Date.now(),hypothesisId:'H8'})}).catch(()=>{});
-  // #endregion
   if (!result || !result.ok || !result.wentBack) return;
 
   if (result.tab) {
@@ -266,10 +263,6 @@ function revealActiveTabSurface() {
     tab: tabPayload,
     activeTabId: state.activeTabId || ""
   }).then(result => {
-    // #region agent log
-    const activeTab = getActiveTab();
-    fetch('http://127.0.0.1:7283/ingest/c1155abf-8302-4940-9722-19bb0cae0569',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'b5af5b'},body:JSON.stringify({sessionId:'b5af5b',location:'renderer/workspace-page-tabs.js:revealActiveTabSurface',message:'switch_active result',data:{tabId:tabPayload==='None'?'None':String(tabPayload.id||''),canvasMode:activeTab?activeTab.canvasMode:'',loading:Boolean(activeTab&&activeTab.loading),ok:Boolean(result&&result.ok),needsFullPush:Boolean(result&&result.needsFullPush)},timestamp:Date.now(),hypothesisId:'H3'})}).catch(()=>{});
-    // #endregion
     if (diag && diag.isEnabled("ipc")) {
       diag.logIpc("renderer", "tabs:switch_active", {
         phase: "done",

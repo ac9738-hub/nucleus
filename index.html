@@ -299,11 +299,6 @@
       ;['nucleusCanvasPreloadPointer', 'nucleusCanvasPreloadPointerInput', 'nucleusCanvasPreloadDom', 'nucleusCanvasNativeTracker'].forEach(function (key) {
         if (g && g[key] && typeof window !== 'undefined') window[key] = g[key]
       })
-      // #region agent log
-      if (typeof fetch === 'function') {
-        fetch('http://127.0.0.1:7283/ingest/c1155abf-8302-4940-9722-19bb0cae0569',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'9a1d9e'},body:JSON.stringify({sessionId:'9a1d9e',location:'index.html:preload-bootstrap',message:'preload_scripts_status',data:{pointer:Boolean(g&&g.nucleusCanvasPreloadPointer),pointerInput:Boolean(g&&g.nucleusCanvasPreloadPointerInput),dom:Boolean(g&&g.nucleusCanvasPreloadDom),native:Boolean(g&&g.nucleusCanvasNativeTracker),onWindow:Boolean(window&&window.nucleusCanvasNativeTracker),domScriptError:Boolean(window&&window.__nucleusDomScriptError)},hypothesisId:'A',timestamp:Date.now()})}).catch(function(){})
-      }
-      // #endregion
     })()
   </script>
   <script src="lib/canvas-preload-debug-panel.js"></script>

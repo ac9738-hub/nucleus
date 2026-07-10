@@ -146,6 +146,8 @@ const { createPerfEvalServer } = require('./lib/perf-eval-server')
 const { planPreloadUrls, summarizePlan } = require('./lib/canvas-preload-planner')
 
 const mainDiag = createMainDiagnostics({ rootDir: __dirname })
+const DEBUG_NAV_INGEST_URL = String(process.env.NUCLEUS_NAV_DEBUG_INGEST_URL || '').trim()
+const DEBUG_NAV_SESSION_ID = String(process.env.NUCLEUS_NAV_DEBUG_SESSION_ID || '').trim()
 
 function logSlateCover(event, data = {}) {
   if (!mainDiag || !mainDiag.isEnabled('tabs')) return
@@ -153,12 +155,13 @@ function logSlateCover(event, data = {}) {
 }
 
 function debugNavLog(location, message, data = {}, hypothesisId = '') {
-  // #region agent log
-  fetch('http://127.0.0.1:7283/ingest/c1155abf-8302-4940-9722-19bb0cae0569', {
+  if (!DEBUG_NAV_INGEST_URL) return
+  const sessionId = DEBUG_NAV_SESSION_ID || 'manual'
+  fetch(DEBUG_NAV_INGEST_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '5b3c30' },
+    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': sessionId },
     body: JSON.stringify({
-      sessionId: '5b3c30',
+      sessionId,
       location,
       message,
       data,
@@ -166,7 +169,6 @@ function debugNavLog(location, message, data = {}, hypothesisId = '') {
       hypothesisId
     })
   }).catch(() => {})
-  // #endregion
 }
 
 function mailError(error) {
@@ -7506,9 +7508,12 @@ function revealCanvasView(view, options = {}) {
     return
   }
 
-  // #region agent log
-  fetch('http://127.0.0.1:7283/ingest/c1155abf-8302-4940-9722-19bb0cae0569',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'5b3c30'},body:JSON.stringify({sessionId:'5b3c30',location:'main.js:revealCanvasView',message:'cover_path',data:{trigger:options.trigger||'',tabId:tab.id,url:view.webContents.isDestroyed()?'':view.webContents.getURL(),viewVisible:view.getVisible()},timestamp:Date.now(),hypothesisId:'H6'})}).catch(()=>{});
-  // #endregion
+  debugNavLog('main.js:revealCanvasView', 'cover_path', {
+    trigger: options.trigger || '',
+    tabId: tab.id,
+    url: view.webContents.isDestroyed() ? '' : view.webContents.getURL(),
+    viewVisible: view.getVisible()
+  }, 'H6')
 
   void (async () => {
     const anchorUrl = options.anchorUrl != null
