@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import io
 import json
 import os
@@ -319,6 +320,56 @@ def _merge_syllabus_course(existing: Any, incoming: Any) -> Any:
     return existing
 
 
+def _dedupe_key(value: Any, identity_keys: tuple[str, ...]) -> str:
+    if isinstance(value, dict):
+        for key in identity_keys:
+            item_id = value.get(key)
+            if item_id not in (None, ''):
+                return f'{key}:{item_id}'
+    try:
+        return json.dumps(value, sort_keys=True, default=str)
+    except TypeError:
+        return str(value)
+
+
+def _merge_unique_lists(existing: Any, incoming: Any, *, identity_keys: tuple[str, ...] = ()) -> list[Any]:
+    result = [copy.deepcopy(item) for item in existing] if isinstance(existing, list) else []
+    index = {
+        _dedupe_key(item, identity_keys): idx
+        for idx, item in enumerate(result)
+    }
+    for item in incoming if isinstance(incoming, list) else []:
+        key = _dedupe_key(item, identity_keys)
+        if key in index:
+            if isinstance(result[index[key]], dict) and isinstance(item, dict):
+                result[index[key]].update(copy.deepcopy(item))
+            continue
+        index[key] = len(result)
+        result.append(copy.deepcopy(item))
+    return result
+
+
+def _merge_nested_metadata(existing: Any, incoming: Any) -> Any:
+    if isinstance(existing, dict) and isinstance(incoming, dict):
+        result = copy.deepcopy(existing)
+        for key, value in incoming.items():
+            result[key] = _merge_nested_metadata(result.get(key), value)
+        return result
+    if isinstance(existing, list) or isinstance(incoming, list):
+        return _merge_unique_lists(existing, incoming)
+    if incoming not in (None, '', [], {}):
+        return copy.deepcopy(incoming)
+    return copy.deepcopy(existing)
+
+
+def _merge_learning_blocks(existing: Any, incoming: Any) -> list[Any]:
+    return _merge_unique_lists(
+        existing if isinstance(existing, list) else [],
+        incoming if isinstance(incoming, list) else [],
+        identity_keys=('blockId', 'conceptId'),
+    )
+
+
 def merge_graph_fragments(fragments: list[dict[str, Any]]) -> dict[str, Any]:
     merged: dict[str, Any] = {
         'concepts': [],
@@ -373,8 +424,10 @@ def merge_graph_fragments(fragments: list[dict[str, Any]]) -> dict[str, Any]:
                         bucket[cid].update(value)
                 elif key == 'syllabi':
                     bucket[cid] = _merge_syllabus_course(bucket.get(cid), value)
+                elif key == 'learningBlocks':
+                    bucket[cid] = _merge_learning_blocks(bucket.get(cid), value)
                 else:
-                    bucket[cid] = value
+                    bucket[cid] = _merge_nested_metadata(bucket.get(cid), value)
         for key in (
             'logged_details', 'logged_examples', 'logged_problems', 'logged_assignments',
             'logged_events', 'looking_for_files', 'looking_for_in_canvas', 'url_to_node',

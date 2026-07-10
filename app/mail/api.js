@@ -883,15 +883,30 @@ async function prefetchMailMessages(ids = [], options = {}) {
     return { ok: true, prefetched: unique.length }
 }
 
+function sanitizeMailHeaderValue(value, fieldName) {
+    const text = String(value || '').trim()
+    if (/[\r\n]/.test(text)) {
+        throw new Error(`${fieldName} header contains invalid newline characters.`)
+    }
+    return text
+}
+
 function buildRawEmail({ from, to, cc, bcc, subject, body, inReplyTo, references }) {
+    const safeFrom = sanitizeMailHeaderValue(from, 'From')
+    const safeTo = sanitizeMailHeaderValue(to, 'To')
+    const safeCc = sanitizeMailHeaderValue(cc, 'Cc')
+    const safeBcc = sanitizeMailHeaderValue(bcc, 'Bcc')
+    const safeSubject = sanitizeMailHeaderValue(subject, 'Subject')
+    const safeInReplyTo = sanitizeMailHeaderValue(inReplyTo, 'In-Reply-To')
+    const safeReferences = sanitizeMailHeaderValue(references, 'References')
     const lines = []
-    if (from) lines.push(`From: ${from}`)
-    lines.push(`To: ${to}`)
-    if (cc) lines.push(`Cc: ${cc}`)
-    if (bcc) lines.push(`Bcc: ${bcc}`)
-    lines.push(`Subject: ${subject}`)
-    if (inReplyTo) lines.push(`In-Reply-To: ${inReplyTo}`)
-    if (references) lines.push(`References: ${references}`)
+    if (safeFrom) lines.push(`From: ${safeFrom}`)
+    lines.push(`To: ${safeTo}`)
+    if (safeCc) lines.push(`Cc: ${safeCc}`)
+    if (safeBcc) lines.push(`Bcc: ${safeBcc}`)
+    lines.push(`Subject: ${safeSubject}`)
+    if (safeInReplyTo) lines.push(`In-Reply-To: ${safeInReplyTo}`)
+    if (safeReferences) lines.push(`References: ${safeReferences}`)
     lines.push('MIME-Version: 1.0')
     lines.push('Content-Type: text/html; charset="UTF-8"')
     lines.push('Content-Transfer-Encoding: 7bit')
@@ -1431,5 +1446,6 @@ module.exports = {
     parseOAuthCallbackUrl,
     getGmailRedirectUri,
     exchangeGmailAuthCode,
-    classifyInboxMessages
+    classifyInboxMessages,
+    buildRawEmail
 }
