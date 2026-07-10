@@ -5104,7 +5104,7 @@ def run_finalize_course_events(courseid):
     def merge_pair(primary, secondary):
         merge_event_pair(cid, primary, secondary)
         events = eventNodes.get(cid, [])
-        eventNodes[cid] = [event for event in events if event.eventid != secondary.eventid]
+        eventNodes[cid] = [event for event in events if event is not secondary]
 
     def set_file_type(file_node, filetype):
         file_node.type = filetype
