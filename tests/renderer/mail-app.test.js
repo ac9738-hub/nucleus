@@ -43,6 +43,35 @@ test('renderMailApp escapes malicious subjects in list rows', () => {
   assert.match(root.innerHTML, /&lt;img/)
 })
 
+test('renderMailApp sanitizes Gmail html bodies before rendering', () => {
+  const harness = createHarness()
+  const state = sampleMailState()
+  state.selectedId = 'bad-html'
+  state.selectedMessage = {
+    id: 'bad-html',
+    subject: 'HTML body',
+    from: 'Attacker <bad@example.com>',
+    to: 'student@example.edu',
+    bodyHtml: [
+      '<p>Hello <strong>student</strong></p>',
+      '<img src="x" onerror="window.__pwned=1">',
+      '<a href="javascript:alert(1)" onclick="window.__pwned=1">click</a>',
+      '<script>window.__pwned=1</script>'
+    ].join('')
+  }
+
+  mountMail(harness, state)
+  const root = harness.window.nucleusMailApp.getMailRoot()
+  const body = root.querySelector('.mail-message-body-html')
+
+  assert.ok(body)
+  assert.match(body.innerHTML, /<strong>student<\/strong>/)
+  assert.doesNotMatch(body.innerHTML, /<script/i)
+  assert.doesNotMatch(body.innerHTML, /onerror|onclick|javascript:/i)
+  assert.equal(body.querySelector('a').hasAttribute('href'), false)
+  assert.equal(harness.window.__pwned, undefined)
+})
+
 test('patchMailView updates list scope without full rerender', () => {
   const harness = createHarness()
   const { state } = mountMail(harness)
