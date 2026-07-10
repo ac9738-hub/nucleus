@@ -64,13 +64,14 @@ test('renderMailApp sanitizes Gmail HTML message bodies', () => {
 
   mountMail(harness, state)
 
-  const root = harness.window.nucleusMailApp.getMailRoot()
-  assert.match(root.textContent, /Hello student/)
-  assert.equal(root.querySelector('script'), null)
-  assert.equal(root.querySelector('iframe'), null)
-  assert.equal(root.querySelector('[onerror]'), null)
-  assert.equal(root.querySelector('[onclick]'), null)
-  assert.doesNotMatch(root.innerHTML, /javascript:alert/)
+  const body = harness.window.nucleusMailApp.getMailRoot().querySelector('.mail-message-body-html')
+  assert.ok(body)
+  assert.match(body.textContent, /Hello student/)
+  assert.equal(body.querySelector('script'), null)
+  assert.equal(body.querySelector('iframe'), null)
+  assert.equal(body.querySelector('[onerror]'), null)
+  assert.equal(body.querySelector('[onclick]'), null)
+  assert.doesNotMatch(body.innerHTML, /javascript:alert/)
 })
 
 test('patchMailView updates list scope without full rerender', () => {
