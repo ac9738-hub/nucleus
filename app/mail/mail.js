@@ -285,10 +285,56 @@
     return `<div class="mail-attachments">${chips}</div>`;
   }
 
+  function isSafeMailUrl(value) {
+    const text = String(value || "").trim();
+    if (!text || text.startsWith("#")) return true;
+    try {
+      const parsed = new URL(text, "https://mail.local/");
+      return ["http:", "https:", "mailto:", "tel:", "cid:"].includes(parsed.protocol);
+    } catch (_error) {
+      return false;
+    }
+  }
+
+  function sanitizeMailHtml(html) {
+    if (typeof document === "undefined" || !document.createElement) {
+      return escapeHtml(html || "");
+    }
+
+    const template = document.createElement("template");
+    template.innerHTML = String(html || "");
+
+    template.content
+      .querySelectorAll("script, style, iframe, object, embed, link, meta, base, form, input, button, textarea, select, svg, math")
+      .forEach(node => node.remove());
+
+    template.content.querySelectorAll("*").forEach(node => {
+      Array.from(node.attributes).forEach(attr => {
+        const name = attr.name.toLowerCase();
+        if (
+          name.startsWith("on") ||
+          name === "srcdoc" ||
+          name === "style" ||
+          name === "srcset" ||
+          ((name === "href" || name === "src" || name === "xlink:href" || name === "formaction") && !isSafeMailUrl(attr.value))
+        ) {
+          node.removeAttribute(attr.name);
+        }
+      });
+
+      if (node.tagName && node.tagName.toLowerCase() === "a") {
+        node.setAttribute("rel", "noopener noreferrer");
+        node.setAttribute("target", "_blank");
+      }
+    });
+
+    return template.innerHTML;
+  }
+
   function renderMessageBody(message) {
     if (!message) return "";
     if (message.bodyHtml) {
-      return `<div class="mail-message-body mail-message-body-html">${message.bodyHtml}</div>`;
+      return `<div class="mail-message-body mail-message-body-html">${sanitizeMailHtml(message.bodyHtml)}</div>`;
     }
     if (message.bodyText) {
       return `<pre class="mail-message-body mail-message-body-text">${escapeHtml(message.bodyText)}</pre>`;

@@ -6787,7 +6787,7 @@ function handleCanvasWindowOpen(window, tab, view, url) {
     return { action: 'deny' }
   }
   if (tab.type !== 'canvastab') {
-    view.webContents.loadURL(url)
+    view.webContents.loadURL(normalizeBrowserUrl(url))
     return { action: 'deny' }
   }
 
