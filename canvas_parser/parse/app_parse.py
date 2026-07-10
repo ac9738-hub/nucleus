@@ -44,6 +44,37 @@ def write_graph_atomic(root: Path, graph: dict[str, Any]) -> Path:
     return target
 
 
+def _run_reembed_graph() -> int:
+    from scripts.reembed_graph import reembed_graph
+
+    return reembed_graph(force=False)
+
+
+def finalize_deferred_embeddings() -> None:
+    if os.environ.get('PARSER_DEFER_FILE_EMBED') != '1':
+        return
+
+    print('parser embedding deferred — embedding graph before completion', flush=True)
+    restored_env: dict[str, str | None] = {
+        key: os.environ.get(key)
+        for key in ('PARSER_SKIP_DISK_RESUME', 'PARSER_SKIP_EMBEDDING_CACHE')
+    }
+    try:
+        # The app parser runs as a fresh sync, but re-embedding must load the
+        # graph we just wrote instead of honoring the parser subprocess skip flags.
+        os.environ.pop('PARSER_SKIP_DISK_RESUME', None)
+        os.environ.pop('PARSER_SKIP_EMBEDDING_CACHE', None)
+        result = _run_reembed_graph()
+    finally:
+        for key, value in restored_env.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+    if result != 0:
+        raise RuntimeError('Parser graph re-embed failed')
+
+
 async def run_app_parse(
     root: Path,
     *,
@@ -95,9 +126,7 @@ async def run_app_parse(
     )
     graph = postprocess_graph(graph, skip_volume_caps=False)
     write_graph_atomic(root, graph)
-
-    if os.environ.get('PARSER_DEFER_FILE_EMBED') == '1':
-        print('parser embedding deferred — run: python scripts/reembed_graph.py', flush=True)
+    finalize_deferred_embeddings()
 
     return {
         'placement': normalized,
