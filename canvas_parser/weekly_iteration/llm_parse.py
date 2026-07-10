@@ -179,6 +179,34 @@ def _strip_html(value: str) -> str:
     return re.sub(r'\s+', ' ', text).strip()
 
 
+def _iter_snapshot_syllabi(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
+    raw = snapshot.get('syllabi') or []
+    if isinstance(raw, dict):
+        if any(key in raw for key in ('syllabus_text', 'syllabus_body', 'syllabus', 'body', 'html')):
+            return [dict(raw)]
+        return [dict(value) for value in raw.values() if isinstance(value, dict)]
+    if isinstance(raw, list):
+        return [dict(value) for value in raw if isinstance(value, dict)]
+    return []
+
+
+def _syllabus_text(record: dict[str, Any]) -> str:
+    text = (
+        record.get('syllabus_text')
+        or record.get('syllabus')
+        or record.get('text')
+        or ''
+    )
+    if text:
+        return _strip_html(str(text))
+    return _strip_html(
+        record.get('syllabus_body')
+        or record.get('body')
+        or record.get('html')
+        or ''
+    )
+
+
 def snapshot_to_canvas_data(snapshot: dict[str, Any]) -> dict[str, Any]:
     course = snapshot.get('course') or {}
     course_id = str(course.get('id') or '')
@@ -199,25 +227,61 @@ def build_parser_batches(snapshot: dict[str, Any], base_url: str) -> list[dict[s
         return []
 
     batches: list[dict[str, Any]] = []
-    syllabus_html = course.get('syllabus_body') or ''
-    syllabus_text = _strip_html(syllabus_html)
-    if syllabus_text:
-        batches.append({
-            'type': 'syllabus',
-            'content': [{
-                'id': f'course-syllabus-{course_id}',
-                'url': f'{base_url}/courses/{course_id}/assignments/syllabus',
-                'previewurl': f'{base_url}/courses/{course_id}/assignments/syllabus',
-                'courseid': course_id,
-                'name': f"{course.get('name') or 'Course'} syllabus",
-                'content': json.dumps({
-                    'documenttype': 'syllabus',
-                    'coursename': course.get('name') or '',
-                    'html_url': f'{base_url}/courses/{course_id}/assignments/syllabus',
-                    'syllabus': syllabus_text,
-                }, ensure_ascii=False),
-            }],
+    syllabus_items: list[dict[str, Any]] = []
+    seen_syllabus_text: set[str] = set()
+
+    def append_syllabus_item(
+        *,
+        item_id: str,
+        text: str,
+        url: str,
+        name: str,
+        course_name: str,
+    ) -> None:
+        normalized = re.sub(r'\s+', ' ', text).strip().casefold()
+        if not normalized or normalized in seen_syllabus_text:
+            return
+        seen_syllabus_text.add(normalized)
+        use_id = item_id
+        if any(str(item.get('id') or '') == use_id for item in syllabus_items):
+            use_id = f'{use_id}-{len(syllabus_items) + 1}'
+        syllabus_items.append({
+            'id': use_id,
+            'url': url,
+            'previewurl': url,
+            'courseid': course_id,
+            'name': name,
+            'content': json.dumps({
+                'documenttype': 'syllabus',
+                'coursename': course_name,
+                'html_url': url,
+                'syllabus': text,
+            }, ensure_ascii=False),
         })
+
+    syllabus_url = f'{base_url}/courses/{course_id}/assignments/syllabus'
+    syllabus_html = course.get('syllabus_body') or ''
+    course_syllabus_text = _strip_html(syllabus_html)
+    if course_syllabus_text:
+        append_syllabus_item(
+            item_id=f'course-syllabus-{course_id}',
+            text=course_syllabus_text,
+            url=syllabus_url,
+            name=f"{course.get('name') or 'Course'} syllabus",
+            course_name=course.get('name') or '',
+        )
+    for syllabus in _iter_snapshot_syllabi(snapshot):
+        explicit_text = _syllabus_text(syllabus)
+        explicit_url = str(syllabus.get('html_url') or syllabus.get('url') or syllabus_url)
+        append_syllabus_item(
+            item_id=str(syllabus.get('id') or f'course-syllabus-{course_id}'),
+            text=explicit_text,
+            url=explicit_url,
+            name=f"{syllabus.get('name') or course.get('name') or 'Course'} syllabus",
+            course_name=str(syllabus.get('name') or course.get('name') or ''),
+        )
+    if syllabus_items:
+        batches.append({'type': 'syllabus', 'content': syllabus_items})
 
     parsing_assignments = []
     for assignment in snapshot.get('assignments') or []:
@@ -372,6 +436,36 @@ def build_parser_batches(snapshot: dict[str, Any], base_url: str) -> list[dict[s
         })
     if parsing_files:
         batches.append({'type': 'file', 'content': parsing_files})
+
+    parsing_external_submissions = []
+    for mapping in snapshot.get('external_submissions') or []:
+        if not isinstance(mapping, dict):
+            continue
+        canvas_assignment_id = str(mapping.get('canvasAssignmentId') or '').strip()
+        mapping_course_id = str(mapping.get('courseId') or course_id).strip()
+        if mapping_course_id != course_id or not canvas_assignment_id:
+            continue
+        parsing_external_submissions.append({
+            'id': f'gradescope-{mapping_course_id}-{canvas_assignment_id}',
+            'courseid': mapping_course_id,
+            'name': mapping.get('canvasAssignmentName') or mapping.get('gradescopeAssignmentTitle') or 'Gradescope assignment',
+            'url': mapping.get('gradescopeUrl') or '',
+            'previewurl': mapping.get('gradescopeUrl') or '',
+            'content': json.dumps({
+                'documenttype': 'external_submission',
+                'platform': 'gradescope',
+                'courseId': mapping_course_id,
+                'canvasAssignmentId': canvas_assignment_id,
+                'canvasAssignmentName': mapping.get('canvasAssignmentName') or '',
+                'gradescopeAssignmentId': mapping.get('gradescopeAssignmentId') or '',
+                'gradescopeUrl': mapping.get('gradescopeUrl') or '',
+                'gradescopeAssignmentTitle': mapping.get('gradescopeAssignmentTitle') or '',
+                'submissionStatus': mapping.get('submissionStatus') or 'unknown',
+                'dueText': mapping.get('dueText') or '',
+            }, ensure_ascii=False),
+        })
+    if parsing_external_submissions:
+        batches.append({'type': 'external_submission', 'content': parsing_external_submissions})
 
     return batches
 

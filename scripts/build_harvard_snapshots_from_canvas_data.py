@@ -43,6 +43,30 @@ def _module_items(data: dict, course_id: int) -> dict[str, list]:
     return {str(module_id): list(items or []) for module_id, items in raw.items()}
 
 
+def _syllabi(data: dict, course_id: int) -> list[dict]:
+    raw = (data.get('syllabi') or {}).get(str(course_id))
+    if isinstance(raw, dict):
+        return [dict(raw)]
+    if isinstance(raw, list):
+        return [dict(item) for item in raw if isinstance(item, dict)]
+    return []
+
+
+def _external_submissions(data: dict, course_id: int) -> list[dict]:
+    gradescope = data.get('gradescope') or {}
+    if not isinstance(gradescope, dict):
+        return []
+    course_key = str(course_id)
+    rows = []
+    for mapping in gradescope.get('mappings') or []:
+        if not isinstance(mapping, dict):
+            continue
+        if str(mapping.get('courseId') or '') != course_key:
+            continue
+        rows.append(dict(mapping))
+    return rows
+
+
 def build_snapshot(data: dict, course_id: int) -> dict:
     course = _course_record(data, course_id)
     course_key = str(course_id)
@@ -68,6 +92,8 @@ def build_snapshot(data: dict, course_id: int) -> dict:
         'modules': modules,
         'module_items': module_items,
         'page_bodies': page_bodies,
+        'syllabi': _syllabi(data, course_id),
+        'external_submissions': _external_submissions(data, course_id),
     }
 
 
