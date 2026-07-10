@@ -14,6 +14,7 @@ from canvas_parser.parse.lambda_runtime import apply_canvas_auth
 from canvas_parser.parse.lambda_deploy import (
     LambdaWorkerState,
     download_fragments,
+    expected_s3_item_result_keys,
     get_function_concurrency,
     invoke_and_wait_s3_items,
     upload_course_seeds,
@@ -198,7 +199,16 @@ async def run_course_orchestrated_lambda(
 
     if recover_run_id:
         prefix = f'runs/{run_id}/items/'
-        keys = _list_s3_json_keys(s3, worker.bucket, prefix)
+        expected_keys = expected_s3_item_result_keys(run_id, file_items)
+        listed_keys = _list_s3_json_keys(s3, worker.bucket, prefix)
+        keys = [key for key in listed_keys if key in expected_keys]
+        missing_keys = sorted(expected_keys - set(keys))
+        if missing_keys:
+            sample = ', '.join(missing_keys[:5])
+            raise RuntimeError(
+                f'Recovered Lambda run {run_id} is missing {len(missing_keys)} expected item results'
+                + (f' (first: {sample})' if sample else '')
+            )
         result_meta['invoke_sec'] = 0.0
     else:
         if progress:
