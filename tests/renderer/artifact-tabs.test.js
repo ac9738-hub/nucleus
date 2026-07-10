@@ -41,3 +41,25 @@ test('renderArtifactTabIcon returns inline svg markup', () => {
   assert.match(html, /workspace-page-tab-icon-artifact/)
   assert.match(html, /<svg/)
 })
+
+test('artifact cards do not inject title or id into preview markup', () => {
+  const harness = createHarness()
+  harness.runScript('lib/artifact-actions.js')
+  const container = harness.document.createElement('div')
+  const title = 'x" onload="window.__artifactTitleXss=1'
+  const id = 'a1" autofocus onfocus="window.__artifactIdXss=1'
+
+  const card = harness.window.nucleusArtifactActions.upsertCard(container, {
+    id,
+    title,
+    type: 'html'
+  })
+
+  assert.ok(card)
+  assert.equal(container.querySelectorAll('iframe').length, 1)
+  assert.equal(container.querySelectorAll('[onload], [onfocus]').length, 0)
+  const frame = container.querySelector('iframe[data-artifact-preview]')
+  assert.ok(frame)
+  assert.equal(frame.getAttribute('title'), `${title} preview`)
+  assert.equal(frame.getAttribute('data-artifact-preview'), id)
+})
