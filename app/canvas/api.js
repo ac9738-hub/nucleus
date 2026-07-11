@@ -1905,20 +1905,27 @@ function createCanvasApi({ canvasDataPath, getAuthState, sendCanvasDataUpdate, r
       )
       const pages = []
       let pageBodyFetches = 0
+      let pageBodyCapReported = false
+      const reportPageBodyCap = () => {
+        if (pageBodyCapReported) return
+        pageBodyCapReported = true
+        console.warn(
+          `Canvas page-body fetch cap reached for course ${tcourse.id} `
+          + `(${RESOURCE_LIMITS.MAX_PAGE_BODY_FETCHES})`
+        )
+        errors.push({
+          context: `course ${tcourse.id} pages`,
+          url: `${canvasBaseUrl}/api/v1/courses/${tcourse.id}/pages`,
+          message: `Page-body fetch cap reached (${RESOURCE_LIMITS.MAX_PAGE_BODY_FETCHES})`
+        })
+      }
       for (const page of pageList) {
-        if (pageBodyFetches >= RESOURCE_LIMITS.MAX_PAGE_BODY_FETCHES) {
-          console.warn(
-            `Canvas page-body fetch cap reached for course ${tcourse.id} `
-            + `(${RESOURCE_LIMITS.MAX_PAGE_BODY_FETCHES})`
-          )
-          errors.push({
-            context: `course ${tcourse.id} pages`,
-            url: `${canvasBaseUrl}/api/v1/courses/${tcourse.id}/pages`,
-            message: `Page-body fetch cap reached (${RESOURCE_LIMITS.MAX_PAGE_BODY_FETCHES})`
-          })
-          break
-        }
         if (!page || !page.url) continue
+        if (pageBodyFetches >= RESOURCE_LIMITS.MAX_PAGE_BODY_FETCHES) {
+          reportPageBodyCap()
+          pages.push({ ...page, body: page.body || '' })
+          continue
+        }
         const body = await fetchCanvasJsonOrNull(
           `${canvasBaseUrl}/api/v1/courses/${tcourse.id}/pages/${encodeURIComponent(page.url)}`,
           `course ${tcourse.id} page ${page.url}`,
@@ -1927,6 +1934,8 @@ function createCanvasApi({ canvasDataPath, getAuthState, sendCanvasDataUpdate, r
         pageBodyFetches += 1
         if (body) {
           pages.push(body)
+        } else {
+          pages.push({ ...page, body: page.body || '' })
         }
       }
       buckets[tcourse.id] = pages
@@ -2516,7 +2525,8 @@ ${html}
       if (activeFlushParserBatchQueue) activeFlushParserBatchQueue()
     },
     clearParserBatchQueue,
-    getParserBatchQueueDepth: () => parserBatchQueue.length
+    getParserBatchQueueDepth: () => parserBatchQueue.length,
+    _fetchCanvasPagesForTest: fetchCanvasPages
   }
 }
 
