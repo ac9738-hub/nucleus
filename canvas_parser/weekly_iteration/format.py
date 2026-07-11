@@ -788,8 +788,6 @@ def _build_weekly_schedule(snapshot: dict[str, Any], categorized: dict[str, Any]
                 module_name=module_name,
                 canvas_entity=canvas_entity,
                 default_year=default_year,
-                week_one_start=week_one_start,
-                prefix_one_start=prefix_one_start,
             )
             if not is_plausible_course_date(resolved):
                 resolved = anchor
