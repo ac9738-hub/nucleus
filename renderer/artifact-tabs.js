@@ -145,6 +145,8 @@ function renderArtifactTabView(tab) {
           class="artifact-tab-frame"
           title="${title}"
           data-artifact-preview="${escapeHtml(tab.artifactId)}"
+          sandbox="allow-scripts"
+          referrerpolicy="no-referrer"
           loading="lazy"
         ></iframe>
       </div>

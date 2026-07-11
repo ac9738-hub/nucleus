@@ -19,6 +19,8 @@ test('renderArtifactTabView escapes title and exposes action buttons', () => {
   assert.doesNotMatch(html, /<script>bad/)
   assert.match(html, /data-artifact-download/)
   assert.match(html, /data-artifact-preview/)
+  assert.match(html, /sandbox="allow-scripts"/)
+  assert.doesNotMatch(html, /allow-same-origin/)
 })
 
 test('findArtifactTab locates existing artifact tab in renderer state', () => {
