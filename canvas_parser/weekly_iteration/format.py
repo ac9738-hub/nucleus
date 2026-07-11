@@ -184,6 +184,25 @@ def _first_due_week_start(snapshot: dict[str, Any], default_year: int | None) ->
     return _monday_start(min(due_dates))
 
 
+def _week_number_due_starts(snapshot: dict[str, Any], default_year: int | None) -> dict[int, datetime]:
+    starts: dict[int, datetime] = {}
+    for assignment in snapshot.get('assignments') or []:
+        if assignment.get('workflow_state') == 'deleted' or assignment.get('published') is False:
+            continue
+        name = str(assignment.get('name') or '')
+        match = WEEK_MODULE_PATTERN.search(name)
+        if not match:
+            continue
+        parsed = _parse_any_date(assignment.get('due_at') or '', default_year=default_year)
+        if not parsed:
+            continue
+        week_num = int(match.group(1))
+        week_start = _monday_start(parsed)
+        if week_num not in starts or week_start < starts[week_num]:
+            starts[week_num] = week_start
+    return starts
+
+
 def _academic_week_one_start(snapshot: dict[str, Any], default_year: int | None) -> datetime | None:
     course = snapshot.get('course') or {}
     term = course.get('term') or {}
@@ -557,6 +576,7 @@ def _build_weekly_schedule(snapshot: dict[str, Any], categorized: dict[str, Any]
     term_start, term_end = _term_bounds(snapshot)
     week_one_start = _academic_week_one_start(snapshot, default_year)
     prefix_one_start = week_one_start
+    week_due_starts = _week_number_due_starts(snapshot, default_year)
     file_lookup = _build_file_lookup(snapshot.get('files') or [])
     assignment_lookup = {
         str(item.get('id') or ''): item for item in (snapshot.get('assignments') or [])
@@ -725,6 +745,10 @@ def _build_weekly_schedule(snapshot: dict[str, Any], categorized: dict[str, Any]
             if is_plausible_course_date(resolved):
                 anchor = resolved
                 break
+        if not anchor:
+            module_week = WEEK_MODULE_PATTERN.search(module_name)
+            if module_week:
+                anchor = week_due_starts.get(int(module_week.group(1)))
         if not anchor:
             anchor = _resolve_item_date(
                 name='',
