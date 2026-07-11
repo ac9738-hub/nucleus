@@ -40,7 +40,7 @@ MONTH_DAY_NAME = re.compile(
     re.IGNORECASE,
 )
 WEEK_MODULE_PATTERN = re.compile(r'\bweek\s*(\d+)\b', re.IGNORECASE)
-PREFIX_MODULE_PATTERN = re.compile(r'^(\d+)\s+')
+PREFIX_MODULE_PATTERN = re.compile(r'^(\d+)(?:\s+|[-:])')
 FILENAME_DATE_PATTERNS = [
     re.compile(
         r'\b(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|'
@@ -68,6 +68,14 @@ def _parse_any_date(value: str, default_year: int | None = None) -> datetime | N
         return None
     if ISO_DATE.match(text):
         return datetime.strptime(text, '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=timezone.utc)
+    if 'T' in text:
+        try:
+            parsed = datetime.fromisoformat(text.replace('Z', '+00:00'))
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            return parsed
+        except ValueError:
+            pass
     for fmt in (
         '%Y-%m-%dT%H:%M:%SZ',
         '%Y-%m-%d',
@@ -105,10 +113,11 @@ def _parse_any_date(value: str, default_year: int | None = None) -> datetime | N
 
 
 def format_ground_truth_date(value: str, default_year: int | None = None) -> str:
+    raw = str(value or '').strip()
     parsed = _parse_any_date(value, default_year=default_year)
     if not parsed:
         return ''
-    local = parsed.astimezone(LOCAL_TZ)
+    local = parsed.astimezone(LOCAL_TZ) if raw.endswith('Z') else parsed
     return f'{local.month}/{local.day}/{local.year}'
 
 
@@ -118,6 +127,12 @@ def _monday_start(value: datetime) -> datetime:
 
 def _week_end(start: datetime) -> datetime:
     return start + timedelta(days=6)
+
+
+def _first_monday_on_or_after(value: datetime) -> datetime:
+    start = value.replace(hour=0, minute=0, second=0, microsecond=0)
+    days_until_monday = (7 - start.weekday()) % 7
+    return start + timedelta(days=days_until_monday)
 
 
 def _infer_default_year(snapshot: dict[str, Any]) -> int | None:
@@ -140,6 +155,68 @@ def _infer_default_year(snapshot: dict[str, Any]) -> int | None:
     match = re.search(r'(20\d{2})', name)
     if match:
         return int(match.group(1))
+    return None
+
+
+def _term_bounds(snapshot: dict[str, Any]) -> tuple[datetime | None, datetime | None]:
+    course = snapshot.get('course') or {}
+    term = course.get('term') or {}
+    starts = [course.get('start_at')]
+    ends = [course.get('end_at')]
+    if isinstance(term, dict):
+        starts.append(term.get('start_at'))
+        ends.append(term.get('end_at'))
+    start = next((parsed for value in starts if (parsed := _parse_any_date(value or ''))), None)
+    end = next((parsed for value in ends if (parsed := _parse_any_date(value or ''))), None)
+    return start, end
+
+
+def _first_due_week_start(snapshot: dict[str, Any], default_year: int | None) -> datetime | None:
+    due_dates: list[datetime] = []
+    for assignment in snapshot.get('assignments') or []:
+        if assignment.get('workflow_state') == 'deleted' or assignment.get('published') is False:
+            continue
+        parsed = _parse_any_date(assignment.get('due_at') or '', default_year=default_year)
+        if parsed:
+            due_dates.append(parsed)
+    if not due_dates:
+        return None
+    return _monday_start(min(due_dates))
+
+
+def _week_number_due_starts(snapshot: dict[str, Any], default_year: int | None) -> dict[int, datetime]:
+    starts: dict[int, datetime] = {}
+    for assignment in snapshot.get('assignments') or []:
+        if assignment.get('workflow_state') == 'deleted' or assignment.get('published') is False:
+            continue
+        name = str(assignment.get('name') or '')
+        match = WEEK_MODULE_PATTERN.search(name)
+        if not match:
+            continue
+        parsed = _parse_any_date(assignment.get('due_at') or '', default_year=default_year)
+        if not parsed:
+            continue
+        week_num = int(match.group(1))
+        week_start = _monday_start(parsed)
+        if week_num not in starts or week_start < starts[week_num]:
+            starts[week_num] = week_start
+    return starts
+
+
+def _academic_week_one_start(snapshot: dict[str, Any], default_year: int | None) -> datetime | None:
+    course = snapshot.get('course') or {}
+    term = course.get('term') or {}
+    term_name = str(term.get('name') or course.get('name') or course.get('course_code') or '').lower()
+    if 'fall' in term_name and default_year:
+        return _first_monday_on_or_after(datetime(default_year, 9, 1, tzinfo=timezone.utc))
+
+    first_due = _first_due_week_start(snapshot, default_year)
+    if first_due:
+        return first_due
+
+    term_start, _ = _term_bounds(snapshot)
+    if term_start:
+        return _first_monday_on_or_after(term_start)
     return None
 
 
@@ -409,7 +486,7 @@ def _format_modules(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 FILENAME_MONTH_DAY = re.compile(
-    r'\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|'
+    r'(?<![A-Za-z])(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|'
     r'Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)[a-z]*[\s,.\'-]*(\d{1,2})(?:[\s,.\'-]*(\d{4}))?',
     re.IGNORECASE,
 )
@@ -468,6 +545,8 @@ def _resolve_item_date(
     module_name: str,
     canvas_entity: dict[str, Any] | None,
     default_year: int | None,
+    week_one_start: datetime | None = None,
+    prefix_one_start: datetime | None = None,
 ) -> datetime | None:
     for field in ('due_at', 'unlock_at', 'lock_at', 'updated_at', 'created_at'):
         if canvas_entity and canvas_entity.get(field):
@@ -478,18 +557,14 @@ def _resolve_item_date(
     if parsed:
         return parsed
     module_week = WEEK_MODULE_PATTERN.search(module_name or '')
-    if module_week and default_year:
+    if module_week and week_one_start:
         week_num = int(module_week.group(1))
-        base = _parse_any_date(f'January 1 {default_year}', default_year=default_year)
-        if base:
-            return base + timedelta(weeks=max(week_num - 1, 0))
+        return week_one_start + timedelta(weeks=max(week_num - 1, 0))
     prefix = PREFIX_MODULE_PATTERN.match(module_name or '')
-    if prefix and default_year:
+    if prefix and prefix_one_start:
         module_num = int(prefix.group(1))
-        if module_num >= 0:
-            base = _parse_any_date(f'August 15 {default_year}', default_year=default_year)
-            if base:
-                return base + timedelta(weeks=module_num)
+        if module_num > 0:
+            return prefix_one_start + timedelta(weeks=module_num - 1)
     parsed = _parse_any_date(module_name or '', default_year=default_year)
     if parsed:
         return parsed
@@ -498,13 +573,36 @@ def _resolve_item_date(
 
 def _build_weekly_schedule(snapshot: dict[str, Any], categorized: dict[str, Any]) -> list[dict[str, Any]]:
     default_year = _infer_default_year(snapshot)
+    term_start, term_end = _term_bounds(snapshot)
+    week_one_start = _academic_week_one_start(snapshot, default_year)
+    prefix_one_start = week_one_start
+    week_due_starts = _week_number_due_starts(snapshot, default_year)
     file_lookup = _build_file_lookup(snapshot.get('files') or [])
     assignment_lookup = {
         str(item.get('id') or ''): item for item in (snapshot.get('assignments') or [])
     }
+    modules = snapshot.get('modules') or []
+    has_dated_module_labels = any(MONTH_DAY_NAME.search(str(module.get('name') or '')) for module in modules)
+    has_ordinal_module_labels = any(
+        WEEK_MODULE_PATTERN.search(str(module.get('name') or ''))
+        or PREFIX_MODULE_PATTERN.match(str(module.get('name') or ''))
+        for module in modules
+    )
+    omit_week_boundaries = has_ordinal_module_labels and not has_dated_module_labels
 
     buckets: dict[str, dict[str, Any]] = {}
     dated_points: list[datetime] = []
+
+    def is_plausible_course_date(date_value: datetime | None) -> bool:
+        if not date_value:
+            return False
+        if term_start and date_value < term_start - timedelta(days=14):
+            return False
+        if term_end and date_value > term_end + timedelta(days=14):
+            return False
+        if default_year and not term_start and date_value.year not in {default_year, default_year + 1}:
+            return False
+        return True
 
     def bucket_for(date_value: datetime) -> dict[str, Any]:
         start = _monday_start(date_value)
@@ -609,11 +707,30 @@ def _build_weekly_schedule(snapshot: dict[str, Any], categorized: dict[str, Any]
 
     for file_name in _extract_page_file_names(snapshot):
         parsed = _parse_filename_date(file_name, default_year)
-        if parsed:
+        if is_plausible_course_date(parsed):
             add_file(bucket_for(parsed), file_name)
 
+    explicit_module_numbers: dict[int, int] = {}
+    for index, module in enumerate(modules):
+        match = PREFIX_MODULE_PATTERN.match(str(module.get('name') or ''))
+        if match:
+            module_num = int(match.group(1))
+            if module_num > 0:
+                explicit_module_numbers[index] = module_num
+
+    inferred_module_numbers = dict(explicit_module_numbers)
+    explicit_indexes = sorted(explicit_module_numbers)
+    for left_index, right_index in zip(explicit_indexes, explicit_indexes[1:]):
+        left_num = explicit_module_numbers[left_index]
+        right_num = explicit_module_numbers[right_index]
+        gap = right_index - left_index
+        if gap <= 1 or right_num - left_num != gap:
+            continue
+        for offset in range(1, gap):
+            inferred_module_numbers[left_index + offset] = left_num + offset
+
     module_anchor_dates: dict[str, datetime] = {}
-    for module in snapshot.get('modules') or []:
+    for module_index, module in enumerate(modules):
         module_id = str(module.get('id') or '')
         module_name = str(module.get('name') or '')
         items = (snapshot.get('module_items') or {}).get(module_id) or []
@@ -632,13 +749,32 @@ def _build_weekly_schedule(snapshot: dict[str, Any], categorized: dict[str, Any]
                 canvas_entity=canvas_entity,
                 default_year=default_year,
             )
-            if resolved:
+            if is_plausible_course_date(resolved):
                 anchor = resolved
                 break
+        if not anchor:
+            module_week = WEEK_MODULE_PATTERN.search(module_name)
+            if module_week:
+                anchor = week_due_starts.get(int(module_week.group(1)))
+        if not anchor:
+            anchor = _resolve_item_date(
+                name='',
+                module_name=module_name,
+                canvas_entity=None,
+                default_year=default_year,
+                week_one_start=week_one_start,
+                prefix_one_start=prefix_one_start,
+            )
+            if not is_plausible_course_date(anchor):
+                anchor = None
+        if not anchor and prefix_one_start and module_index in inferred_module_numbers:
+            anchor = prefix_one_start + timedelta(weeks=inferred_module_numbers[module_index] - 1)
+        if not anchor and week_one_start and re.search(r'\bcourse\s+orientation\b', module_name, re.IGNORECASE):
+            anchor = week_one_start
         if anchor:
             module_anchor_dates[module_id] = anchor
 
-    for module in snapshot.get('modules') or []:
+    for module in modules:
         module_id = str(module.get('id') or '')
         module_name = str(module.get('name') or '')
         anchor = module_anchor_dates.get(module_id)
@@ -659,7 +795,9 @@ def _build_weekly_schedule(snapshot: dict[str, Any], categorized: dict[str, Any]
                 module_name=module_name,
                 canvas_entity=canvas_entity,
                 default_year=default_year,
-            ) or anchor
+            )
+            if not is_plausible_course_date(resolved):
+                resolved = anchor
             if not resolved:
                 continue
 
@@ -701,8 +839,8 @@ def _build_weekly_schedule(snapshot: dict[str, Any], categorized: dict[str, Any]
         }
         schedule.append({
             'name': f'Week {week_index}',
-            'start_date': format_ground_truth_date(cursor.isoformat(), default_year=default_year),
-            'end_date': format_ground_truth_date(_week_end(cursor).isoformat(), default_year=default_year),
+            'start_date': '' if omit_week_boundaries else format_ground_truth_date(cursor.isoformat(), default_year=default_year),
+            'end_date': '' if omit_week_boundaries else format_ground_truth_date(_week_end(cursor).isoformat(), default_year=default_year),
             'files': bucket.get('files') or [],
             'assignments': bucket.get('assignments') or [],
             'events': bucket.get('events') or [],
