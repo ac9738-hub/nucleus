@@ -721,12 +721,21 @@ def _build_weekly_schedule(snapshot: dict[str, Any], categorized: dict[str, Any]
                 module_name=module_name,
                 canvas_entity=canvas_entity,
                 default_year=default_year,
-                week_one_start=week_one_start,
-                prefix_one_start=prefix_one_start,
             )
             if is_plausible_course_date(resolved):
                 anchor = resolved
                 break
+        if not anchor:
+            anchor = _resolve_item_date(
+                name='',
+                module_name=module_name,
+                canvas_entity=None,
+                default_year=default_year,
+                week_one_start=week_one_start,
+                prefix_one_start=prefix_one_start,
+            )
+            if not is_plausible_course_date(anchor):
+                anchor = None
         if not anchor and prefix_one_start and module_index in inferred_module_numbers:
             anchor = prefix_one_start + timedelta(weeks=inferred_module_numbers[module_index] - 1)
         if not anchor and week_one_start and re.search(r'\bcourse\s+orientation\b', module_name, re.IGNORECASE):
