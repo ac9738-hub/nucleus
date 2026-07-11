@@ -670,8 +670,8 @@ function findCanvasAssignment(lookup, courseid, assignment) {
   return null
 }
 
-function readCanvasGraphFromRoot(rootDir) {
-  if (!canvasDiskRecoveryEnabled()) return {}
+function readCanvasGraphFromRoot(rootDir, options = {}) {
+  if (!options.useGraph && !canvasDiskRecoveryEnabled()) return {}
   try {
     const readPath = resolveGraphReadPath(rootDir)
     if (!readPath) return {}
@@ -883,8 +883,8 @@ function adaptPythonWeek(pyWeek, weekNumber, courseId, context) {
   }
 }
 
-function adaptPythonWeeklySchedule(pythonSchedules, canvasData, rootDir) {
-  const graph = readCanvasGraphFromRoot(rootDir)
+function adaptPythonWeeklySchedule(pythonSchedules, canvasData, rootDir, options = {}) {
+  const graph = readCanvasGraphFromRoot(rootDir, options)
   const lookup = makeCanvasTaskLookup(rootDir)
   const schedule = {}
   const courses = Array.isArray(canvasData && canvasData.courses) ? canvasData.courses : []
@@ -905,10 +905,17 @@ function adaptPythonWeeklySchedule(pythonSchedules, canvasData, rootDir) {
   return schedule
 }
 
-function buildWeeklyScheduleViaPython(canvasData, rootDir) {
+function weeklyScheduleGraphPath(rootDir, options = {}) {
   const graphPath = path.join(rootDir, 'canvas_graph.json')
+  const shouldUseGraph = options.useGraph === true
+    || (options.useGraph !== false && canvasDiskRecoveryEnabled())
+  return shouldUseGraph && fs.existsSync(graphPath) ? graphPath : ''
+}
+
+function buildWeeklyScheduleViaPython(canvasData, rootDir, options = {}) {
+  const graphPath = weeklyScheduleGraphPath(rootDir, options)
   const args = ['-m', 'canvas_parser.weekly', '--canvas-data', '-']
-  if (canvasDiskRecoveryEnabled() && fs.existsSync(graphPath)) {
+  if (graphPath) {
     args.push('--graph', graphPath)
   } else {
     args.push('--no-graph')
@@ -931,13 +938,13 @@ function buildWeeklyScheduleViaPython(canvasData, rootDir) {
   }
   const stdout = String(proc.stdout || '').trim()
   if (!stdout) return {}
-  return adaptPythonWeeklySchedule(JSON.parse(stdout), canvasData, rootDir)
+  return adaptPythonWeeklySchedule(JSON.parse(stdout), canvasData, rootDir, options)
 }
 
-function buildWeeklyScheduleViaPythonAsync(canvasData, rootDir) {
-  const graphPath = path.join(rootDir, 'canvas_graph.json')
+function buildWeeklyScheduleViaPythonAsync(canvasData, rootDir, options = {}) {
+  const graphPath = weeklyScheduleGraphPath(rootDir, options)
   const args = ['-m', 'canvas_parser.weekly', '--canvas-data', '-']
-  if (canvasDiskRecoveryEnabled() && fs.existsSync(graphPath)) {
+  if (graphPath) {
     args.push('--graph', graphPath)
   } else {
     args.push('--no-graph')
@@ -965,7 +972,7 @@ function buildWeeklyScheduleViaPythonAsync(canvasData, rootDir) {
         return
       }
       try {
-        resolve(adaptPythonWeeklySchedule(JSON.parse(trimmed), canvasData, rootDir))
+        resolve(adaptPythonWeeklySchedule(JSON.parse(trimmed), canvasData, rootDir, options))
       } catch (error) {
         reject(error)
       }
@@ -975,8 +982,8 @@ function buildWeeklyScheduleViaPythonAsync(canvasData, rootDir) {
   })
 }
 
-function buildWeeklyScheduleJsFallback(canvasData, rootDir) {
-  const graph = readCanvasGraphFromRoot(rootDir)
+function buildWeeklyScheduleJsFallback(canvasData, rootDir, options = {}) {
+  const graph = readCanvasGraphFromRoot(rootDir, options)
   const graphFiles = graph.files || {}
   const lookup = makeCanvasTaskLookup(rootDir)
   return buildWeeklyScheduleFromCanvasData(canvasData, {
@@ -1030,16 +1037,16 @@ function invalidateWeeklyScheduleCache() {
   weeklyScheduleCache.pendingKey = ''
 }
 
-async function buildWeeklyScheduleAsync(canvasData, rootDir) {
+async function buildWeeklyScheduleAsync(canvasData, rootDir, options = {}) {
   try {
-    const pythonSchedule = await buildWeeklyScheduleViaPythonAsync(canvasData, rootDir)
+    const pythonSchedule = await buildWeeklyScheduleViaPythonAsync(canvasData, rootDir, options)
     if (pythonSchedule && Object.keys(pythonSchedule).length) {
       return pythonSchedule
     }
   } catch (error) {
     console.error('Python weekly schedule build failed; falling back to JS:', error.message || error)
   }
-  return buildWeeklyScheduleJsFallback(canvasData, rootDir)
+  return buildWeeklyScheduleJsFallback(canvasData, rootDir, options)
 }
 
 function scheduleWeeklyScheduleBuild(canvasData, rootDir, canvasDataPath, onReady) {
@@ -1069,9 +1076,9 @@ function scheduleWeeklyScheduleBuild(canvasData, rootDir, canvasDataPath, onRead
     })
 }
 
-function buildWeeklySchedule(canvasData, rootDir) {
+function buildWeeklySchedule(canvasData, rootDir, options = {}) {
   try {
-    const pythonSchedule = buildWeeklyScheduleViaPython(canvasData, rootDir)
+    const pythonSchedule = buildWeeklyScheduleViaPython(canvasData, rootDir, options)
     if (pythonSchedule && Object.keys(pythonSchedule).length) {
       return pythonSchedule
     }
@@ -1079,7 +1086,43 @@ function buildWeeklySchedule(canvasData, rootDir) {
     console.error('Python weekly schedule build failed; falling back to JS:', error.message || error)
   }
 
-  return buildWeeklyScheduleJsFallback(canvasData, rootDir)
+  return buildWeeklyScheduleJsFallback(canvasData, rootDir, options)
+}
+
+async function refreshWeeklyScheduleFromCompletedGraph({
+  canvasDataPath,
+  rootDir,
+  readCanvasData,
+  writeCanvasData,
+  shouldSkip = () => false,
+  onReady = null,
+  buildSchedule = null
+} = {}) {
+  if (!canvasDataPath || !rootDir || typeof readCanvasData !== 'function' || typeof writeCanvasData !== 'function') {
+    return { ok: false, skipped: true, reason: 'invalid_options' }
+  }
+  if (shouldSkip()) return { ok: false, skipped: true, reason: 'superseded' }
+  const graphPath = path.join(rootDir, 'canvas_graph.json')
+  if (!fs.existsSync(graphPath)) {
+    return { ok: false, skipped: true, reason: 'missing_graph' }
+  }
+  const current = readCanvasData()
+  if (!current || !Array.isArray(current.courses)) {
+    return { ok: false, skipped: true, reason: 'missing_canvas_data' }
+  }
+  const next = JSON.parse(JSON.stringify(current))
+  const scheduleBuilder = typeof buildSchedule === 'function'
+    ? buildSchedule
+    : data => buildWeeklyScheduleAsync(data, rootDir, { useGraph: true })
+  const schedule = await scheduleBuilder(next)
+  if (!schedule || typeof schedule !== 'object' || Array.isArray(schedule)) {
+    return { ok: false, skipped: true, reason: 'invalid_schedule' }
+  }
+  if (shouldSkip()) return { ok: false, skipped: true, reason: 'superseded' }
+  next.weekly_schedule = schedule
+  writeCanvasData(next)
+  if (typeof onReady === 'function') onReady()
+  return { ok: true, updated: true }
 }
 
 function make_canvas_tasks(rootDir) {
@@ -1249,9 +1292,12 @@ function usesLambdaParserPlacement(placement = resolveParserPlacement()) {
   return LAMBDA_PARSER_PLACEMENTS.has(placement)
 }
 
-function attachParserProcessHandlers(proc, rootDir, onCanvasTasks) {
+function attachParserProcessHandlers(proc, rootDir, onCanvasTasks, options = {}) {
   let stdoutBuffer = ''
   let handledCompletion = false
+  const onParserCompleted = typeof options.onParserCompleted === 'function'
+    ? options.onParserCompleted
+    : null
 
   proc.on('error', error => {
     console.error('parser process error:', error && error.message ? error.message : error)
@@ -1286,6 +1332,11 @@ function attachParserProcessHandlers(proc, rootDir, onCanvasTasks) {
         handledCompletion = true
         notifyParserAllPassesCompleted()
         scheduleCanvasTasksRefresh(true, rootDir, onCanvasTasks)
+        if (onParserCompleted) {
+          Promise.resolve(onParserCompleted()).catch(error => {
+            console.error('Unable to refresh weekly schedule after parser completion:', error.message || error)
+          })
+        }
       }
     }
   })
@@ -1339,7 +1390,7 @@ function getParserProcess(authState, rootDir, onCanvasTasks, options = {}) {
       NUCLEUS_DISABLE_CANVAS_DISK_RECOVERY: canvasDiskRecoveryEnabled() ? '' : '1'
     }
   })
-  attachParserProcessHandlers(parserProc, rootDir, onCanvasTasks)
+  attachParserProcessHandlers(parserProc, rootDir, onCanvasTasks, options)
 
   parserAuthSignature = authSignature
   console.log(`[canvas] Local parser subprocess started (pid=${parserProc.pid})`)
@@ -1397,7 +1448,7 @@ function startLambdaParserProcess(authState, rootDir, onCanvasTasks, options = {
       NUCLEUS_DISABLE_CANVAS_DISK_RECOVERY: canvasDiskRecoveryEnabled() ? '' : '1'
     }
   })
-  attachParserProcessHandlers(parserProc, rootDir, onCanvasTasks)
+  attachParserProcessHandlers(parserProc, rootDir, onCanvasTasks, options)
 
   parserAuthSignature = authSignature
   console.log(`[canvas] Lambda parser started (placement=${placement}, pid=${parserProc.pid})`)
@@ -1413,9 +1464,16 @@ function createCanvasApi({ canvasDataPath, getAuthState, sendCanvasDataUpdate, r
   const envPath = path.join(canvasRootDir, '.env')
   let parsedCanvasCache = { mtimeMs: null, data: null }
   let liveCanvasDataSnapshot = null
+  let parserCompletionRefreshGeneration = 0
 
   function setLiveCanvasDataSnapshot(data) {
     liveCanvasDataSnapshot = data ? JSON.parse(JSON.stringify(data)) : null
+  }
+
+  function writeCanvasDataSnapshot(data) {
+    fs.writeFileSync(canvasDataPath, JSON.stringify(data, null, 2))
+    setLiveCanvasDataSnapshot(data)
+    invalidateCanvasDataCache()
   }
 
   function clearLiveCanvasSession() {
@@ -1478,6 +1536,28 @@ function createCanvasApi({ canvasDataPath, getAuthState, sendCanvasDataUpdate, r
       scheduleWeeklyScheduleBuild(data, canvasRootDir, canvasDataPath, sendCanvasDataUpdate)
     }
     return data
+  }
+
+  async function refreshWeeklyScheduleAfterParserCompletion(expectedGeneration) {
+    return refreshWeeklyScheduleFromCompletedGraph({
+      canvasDataPath,
+      rootDir: canvasRootDir,
+      readCanvasData: readParsedCanvasData,
+      writeCanvasData: data => {
+        writeCanvasDataSnapshot(data)
+        if (canvasMemoryCacheEnabled()) {
+          setWeeklyScheduleCache(canvasRootDir, canvasDataPath, data.weekly_schedule || {})
+        } else {
+          invalidateWeeklyScheduleCache()
+        }
+      },
+      shouldSkip: () => (
+        expectedGeneration !== parserCompletionRefreshGeneration
+        || canvasSyncWipePending
+        || shouldBlockCanvasDiskReads()
+      ),
+      onReady: sendCanvasDataUpdate
+    })
   }
 
   function buildCanvasProjectGroups(canvasData) {
@@ -2155,7 +2235,12 @@ ${html}
     ])
     saveCanvasAuthToEnv(envPath, authState)
     const lambdaParse = usesLambdaParserPlacement()
-    const proc = lambdaParse ? null : getParserProcess(authState, canvasRootDir, onCanvasTasks, options)
+    const completionGeneration = ++parserCompletionRefreshGeneration
+    const parserOptions = {
+      ...options,
+      onParserCompleted: () => refreshWeeklyScheduleAfterParserCompletion(completionGeneration)
+    }
+    const proc = lambdaParse ? null : getParserProcess(authState, canvasRootDir, onCanvasTasks, parserOptions)
     const prof = responses[0]
     const course = responses[1]
     if (!Array.isArray(course)) {
@@ -2434,13 +2519,11 @@ ${html}
         })
       })
     }
-    fs.writeFileSync(canvasDataPath, JSON.stringify(data1, null, 2))
-    setLiveCanvasDataSnapshot(data1)
-    invalidateCanvasDataCache()
+    writeCanvasDataSnapshot(data1)
     if (lambdaParse) {
       activeFlushParserBatchQueue = () => {}
       clearParserBatchQueue()
-      startLambdaParserProcess(authState, canvasRootDir, onCanvasTasks, options)
+      startLambdaParserProcess(authState, canvasRootDir, onCanvasTasks, parserOptions)
       console.log('[canvas] Lambda parse started from canvas_data.json; graph build continues in background.')
     } else {
       flushParserBatchQueue()
@@ -2536,6 +2619,7 @@ module.exports = {
   resolveModuleAnchorWeekMs,
   startOfWeekMs,
   buildWeeklySchedule,
+  refreshWeeklyScheduleFromCompletedGraph,
   isIgnorableCanvasFetchError,
   filterCoursesForSync,
   coursesWithWikiHomepage,
