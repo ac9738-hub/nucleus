@@ -102,6 +102,7 @@ const { buildExtractVisibleCanvasLinksScript } = require('./lib/canvas-preload-d
 const { collectNativeSectionUrls } = require('./lib/canvas-preload-native')
 const { createCanvasPreloadMetrics } = require('./lib/canvas-preload-metrics')
 const { createCanvasNavTransition } = require('./lib/canvas-nav-transition')
+const { normalizeAllowedCanvasNavigationUrl } = require('./lib/canvas-navigation-policy')
 const {
   CANVAS_BACK_CACHE_SLOT_INDEX,
   CANVAS_PREDICTIVE_SLOT_COUNT,
@@ -2173,14 +2174,7 @@ function getEngineCanvasRoute(value) {
 }
 
 function isCanvasBrowserUrl(value) {
-  if (!value) return false
-  try {
-    const url = new URL(value)
-    const host = url.hostname.toLowerCase()
-    return host.includes('instructure.com') || host.includes('canvas')
-  } catch (_error) {
-    return false
-  }
+  return Boolean(normalizeAllowedCanvasTabUrl(value))
 }
 
 function openEngineAppInTab(tab, appName) {
@@ -2283,9 +2277,11 @@ function shouldKeepStashedWebContent(tab, loadedUrl) {
 
 function openEngineCanvasRoute(tab, canvasRoute) {
   if (!tab || !canvasRoute || !canvasRoute.url) return false
+  const url = normalizeAllowedCanvasTabUrl(canvasRoute.url)
+  if (!url) return false
   mainwindow.webContents.send('tabs:open_canvas_window', {
     workspaceId: tab.workspaceId,
-    url: canvasRoute.url,
+    url,
     courseId: canvasRoute.courseId,
     type: canvasRoute.type,
     id: canvasRoute.id
@@ -2757,7 +2753,10 @@ async function openCanvasTabFromTool(input = {}) {
       + (error && error.message ? error.message : String(error))
   }
 
-  const url = rawUrl || ''
+  const url = rawUrl ? normalizeAllowedCanvasTabUrl(rawUrl) : ''
+  if (rawUrl && !url) {
+    return "ERROR opening Canvas tab: URL is not on the configured Canvas host."
+  }
 
   BrowserWindow.getAllWindows()[0].webContents.send('tabs:open_canvas_window', {
     url,
@@ -4354,7 +4353,9 @@ async function navigateTabFromTool(input = {}) {
 
   const canvasRoute = getEngineCanvasRoute(value)
   if (canvasRoute !== null) {
-    openEngineCanvasRoute(foundtab, canvasRoute)
+    if (!openEngineCanvasRoute(foundtab, canvasRoute)) {
+      return { ok: false, error: "Canvas URL is not on the configured Canvas host.", tab: compactTab(foundtab) }
+    }
     return { ok: true, tab: compactTab(foundtab), canvas: canvasRoute.url }
   }
 
@@ -4365,8 +4366,12 @@ async function navigateTabFromTool(input = {}) {
   }
 
   const url = normalizeBrowserUrl(value)
-  foundtab.url = url
   if (foundtab.type === "canvastab") {
+    const canvasUrl = normalizeAllowedCanvasTabUrl(url)
+    if (!canvasUrl) {
+      return { ok: false, error: "Canvas URL is not on the configured Canvas host.", tab: compactTab(foundtab) }
+    }
+    foundtab.url = canvasUrl
     const hasAuth = await ensureCanvasAuthForNavigation(foundtab.view.webContents.session)
     if (!hasAuth) {
       mainwindow.webContents.send('canvas:navigation-finished', 'auth')
@@ -4374,14 +4379,15 @@ async function navigateTabFromTool(input = {}) {
       return { ok: false, error: "Canvas auth is not ready.", tab: compactTab(foundtab) }
     }
     await runCanvasNavAction(mainwindow, foundtab, foundtab.view, () => {
-      return loadCanvasTabURL(foundtab.view, url, status => {
+      return loadCanvasTabURL(foundtab.view, canvasUrl, status => {
         mainwindow.webContents.send('canvas:navigation-finished', status)
       })
-    }, { destUrl: url, reason: 'toolbar_nav' })
+    }, { destUrl: canvasUrl, reason: 'toolbar_nav' })
   } else {
+    foundtab.url = url
     await foundtab.view.webContents.loadURL(url)
   }
-  mainwindow.webContents.send('tabs:url_update', { id: foundtab.id, url })
+  mainwindow.webContents.send('tabs:url_update', { id: foundtab.id, url: foundtab.url })
   return { ok: true, tab: compactTab(foundtab) }
 }
 
@@ -4515,12 +4521,13 @@ async function runfunction(data) {
       return tool_response
     }
 
-    if (isCanvasBrowserUrl(url)) {
+    const canvasUrl = normalizeAllowedCanvasTabUrl(url)
+    if (canvasUrl) {
       BrowserWindow.getAllWindows()[0].webContents.send('tabs:open_canvas_window', {
-        url,
+        url: canvasUrl,
         workspaceId
       })
-      tool_response.push("Opened Canvas tab in workspace " + workspaceId + " at " + url)
+      tool_response.push("Opened Canvas tab in workspace " + workspaceId + " at " + canvasUrl)
     } else {
       BrowserWindow.getAllWindows()[0].webContents.send('tabs:open_browser_window', {
         url,
@@ -5520,7 +5527,7 @@ function getCachedPreloadSlotUrls() {
 
 function getCanvasPreloadAllowedHosts() {
   const hosts = new Set()
-  const bases = [canvas_base_url, process.env.CANVAS_BASE_URL_HOLDOUT].filter(Boolean)
+  const bases = [canvas_base_url, process.env.CANVAS_BASE_URL, process.env.CANVAS_BASE_URL_HOLDOUT].filter(Boolean)
   for (const base of bases) {
     try {
       hosts.add(new URL(base).hostname.toLowerCase())
@@ -5529,6 +5536,13 @@ function getCanvasPreloadAllowedHosts() {
     }
   }
   return [...hosts]
+}
+
+function normalizeAllowedCanvasTabUrl(url, baseUrl = '') {
+  return normalizeAllowedCanvasNavigationUrl(url, {
+    baseUrl: baseUrl || canvas_base_url || '',
+    allowedHosts: getCanvasPreloadAllowedHosts()
+  })
 }
 
 function buildPreloadFilterOptions(tab, options = {}) {
@@ -6227,7 +6241,12 @@ async function loadCanvasTabURLFast(view, url, sendsignal) {
     revealCanvasView(view, { skipFirstPaintSlate: true })
     return
   }
-  const normalizedUrl = normalizeCanvasNavigationUrl(url)
+  const normalizedUrl = normalizeAllowedCanvasTabUrl(url)
+  if (!normalizedUrl) {
+    sendsignal("fail")
+    revealCanvasView(view, { skipFirstPaintSlate: true })
+    return
+  }
   let liveUrl = ''
   try {
     liveUrl = view.webContents.getURL()
@@ -6358,17 +6377,19 @@ async function activateCanvasBrowserLinkSimple(window, tab, normalizedUrl, optio
 }
 
 async function activateCanvasBrowserLink(window, tab, normalizedUrl, options = {}) {
+  const allowedUrl = normalizeAllowedCanvasTabUrl(normalizedUrl)
+  if (!allowedUrl) return { ok: false, error: "blocked_canvas_url" }
   if (usesDedicatedCanvasTabViews()) {
-    return activateCanvasBrowserLinkSimple(window, tab, normalizedUrl, options)
+    return activateCanvasBrowserLinkSimple(window, tab, allowedUrl, options)
   }
-  tab.url = normalizedUrl
+  tab.url = allowedUrl
   tab.canvasMode = "browser"
   const view = tab.view || await ensureActiveWebContentTabView(tab, window)
   if (!view) return { ok: false, error: "no_view" }
-  await loadCanvasTabURL(view, normalizedUrl, status => {
+  await loadCanvasTabURL(view, allowedUrl, status => {
     window.webContents.send("canvas:navigation-finished", status)
   })
-  return { ok: true, url: normalizedUrl }
+  return { ok: true, url: allowedUrl }
 }
 
 async function restoreCanvasNativeSurface(window, tab, options = {}) {
@@ -6694,7 +6715,8 @@ async function handleCanvasInPageLinkNavigation(window, tab, view, rawUrl, sourc
 }
 
 async function handleCanvasPreloadLinkNavigation(window, tab, view, url) {
-  const destUrl = normalizeCanvasNavigationUrl(url)
+  const destUrl = normalizeAllowedCanvasTabUrl(url)
+  if (!destUrl) return
   if (!claimCanvasWebNavigation(view, destUrl, 'will_navigate_preload')) {
     // #region agent log
     debugNavLog('main.js:handleCanvasPreloadLinkNavigation', 'claim_blocked', {
@@ -6777,6 +6799,23 @@ async function handleCanvasPreloadLinkNavigation(window, tab, view, url) {
   }
 }
 
+function openExternalCanvasNavigationInBrowser(tab, url) {
+  if (!tab || !tab.workspaceId) return false
+  let parsed
+  try {
+    parsed = new URL(String(url || '').trim())
+  } catch (_error) {
+    return false
+  }
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return false
+  if (normalizeAllowedCanvasTabUrl(parsed.href)) return false
+  mainwindow.webContents.send('tabs:open_browser_window', {
+    url: parsed.href,
+    workspaceId: tab.workspaceId
+  })
+  return true
+}
+
 function handleCanvasWindowOpen(window, tab, view, url) {
   if (handleEngineInternalNavigation(tab, url)) {
     return { action: 'deny' }
@@ -6791,9 +6830,13 @@ function handleCanvasWindowOpen(window, tab, view, url) {
     return { action: 'deny' }
   }
 
-  const destUrl = normalizeCanvasNavigationUrl(url)
-  if (findPreloadSlot(url)) {
-    void handleCanvasPreloadLinkNavigation(window, tab, view, url).catch(error => {
+  const destUrl = normalizeAllowedCanvasTabUrl(url)
+  if (!destUrl) {
+    openExternalCanvasNavigationInBrowser(tab, url)
+    return { action: 'deny' }
+  }
+  if (findPreloadSlot(destUrl)) {
+    void handleCanvasPreloadLinkNavigation(window, tab, view, destUrl).catch(error => {
       console.error('Unable to swap canvas preload popup view:', error)
     })
     return { action: 'deny' }
@@ -6817,7 +6860,7 @@ function handleCanvasWindowOpen(window, tab, view, url) {
         destUrl,
         reason: 'window_open_load'
       })
-      await loadCanvasLinkFast(view, url, status => {
+      await loadCanvasLinkFast(view, destUrl, status => {
         window.webContents.send('canvas:navigation-finished', status)
       })
       await nav.waitForReveal(window, tab, view, destUrl)
@@ -6842,7 +6885,13 @@ function attachCanvasPredictiveNavigationHandlers(window, tab, view) {
   view.webContents.on("will-navigate", (event, url) => {
     if (tab.type !== "canvastab" || tab.view !== view) return
     if (isLikelyDownloadUrl(url)) return
-    if (!findPreloadSlot(url)) return
+    const destUrl = normalizeAllowedCanvasTabUrl(url)
+    if (!destUrl) {
+      event.preventDefault()
+      openExternalCanvasNavigationInBrowser(tab, url)
+      return
+    }
+    if (!findPreloadSlot(destUrl)) return
     if (hasCanvasWebNavigationClaim(view, url)) return
     if (getCanvasNav().isActive(view)) return
     event.preventDefault()
@@ -6853,7 +6902,7 @@ function attachCanvasPredictiveNavigationHandlers(window, tab, view) {
       postUndo: Boolean(tab._nucleusPostUndoNav)
     }, 'H19')
     // #endregion
-    void handleCanvasPreloadLinkNavigation(window, tab, view, url)
+    void handleCanvasPreloadLinkNavigation(window, tab, view, destUrl)
   })
 
   if (!view._nucleusCanvasWindowOpenAttached) {
@@ -7380,9 +7429,16 @@ async function loadCanvasTabURL(view, url, sendsignal) {
     return
   }
 
+  const allowedUrl = normalizeAllowedCanvasTabUrl(url)
+  if (!allowedUrl) {
+    sendsignal('fail')
+    revealCanvasView(view)
+    return
+  }
+
   const navpromise = waitForCanvasNavigation(view)
   canvaspageload(view, sendsignal)
-  view.webContents.loadURL(url).catch(error => {
+  view.webContents.loadURL(allowedUrl).catch(error => {
     console.error("Unable to load canvas tab URL:", error)
     sendsignal('fail')
   })
@@ -8232,7 +8288,8 @@ app.whenReady().then(() => {
   ipcMain.handle('canvas:open_link', async (_, payload = {}) => runSerializedTabOperation(async () => {
     try {
       const tabId = String(payload.tabId || '')
-      const url = normalizeCanvasNavigationUrl(payload.url || '')
+      const url = normalizeAllowedCanvasTabUrl(payload.url || '')
+      if (!url) return { ok: false, error: 'blocked_canvas_url' }
       let tab = currtabs.find(localtab => sameTabId(localtab.id, tabId))
       if (!tab) return { ok: false, error: 'invalid_tab' }
       return await activateCanvasBrowserLink(mainwindow, tab, url, payload)
@@ -8490,7 +8547,9 @@ app.whenReady().then(() => {
     }
     const canvasRoute = getEngineCanvasRoute(value)
     if (canvasRoute !== null) {
-      openEngineCanvasRoute(foundtab, canvasRoute)
+      if (!openEngineCanvasRoute(foundtab, canvasRoute)) {
+        return { ok: false, error: "Canvas URL is not on the configured Canvas host.", url: value }
+      }
       return { ok: true, url: value, canvas: canvasRoute.url }
     }
     const appRoute = getEngineAppRoute(value)
@@ -8499,28 +8558,33 @@ app.whenReady().then(() => {
       return { ok: true, url: value, app: appRoute }
     }
     const url = normalizeBrowserUrl(value)
-    foundtab.url = url
     if (foundtab.type === "canvastab") {
       if (isLikelyDownloadUrl(url)) {
         markIntentionalDownload(foundtab.view, url)
         foundtab.view.webContents.downloadURL(url)
         return { ok: true, url, download: true }
       }
+      const canvasUrl = normalizeAllowedCanvasTabUrl(url)
+      if (!canvasUrl) {
+        return { ok: false, error: "Canvas URL is not on the configured Canvas host.", url }
+      }
+      foundtab.url = canvasUrl
       const hasAuth = await ensureCanvasAuthForNavigation(foundtab.view.webContents.session)
       if (!hasAuth) {
         mainwindow.webContents.send('canvas:navigation-finished', 'auth')
         revealCanvasView(foundtab.view)
-        return { ok: false, error: "Canvas auth is not ready.", url }
+        return { ok: false, error: "Canvas auth is not ready.", url: canvasUrl }
       }
       await runCanvasNavAction(mainwindow, foundtab, foundtab.view, () => {
-        return loadCanvasTabURL(foundtab.view, url, status => {
+        return loadCanvasTabURL(foundtab.view, canvasUrl, status => {
           mainwindow.webContents.send('canvas:navigation-finished', status)
         })
-      }, { destUrl: url, reason: 'tabs_url_nav' })
+      }, { destUrl: canvasUrl, reason: 'tabs_url_nav' })
     } else {
+      foundtab.url = url
       await foundtab.view.webContents.loadURL(url)
     }
-    return { ok: true, url }
+    return { ok: true, url: foundtab.url }
   })
 
   // handles view of active tab when tabs:back is called in renderer
