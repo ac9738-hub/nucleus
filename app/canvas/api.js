@@ -75,6 +75,15 @@ function canvasFetchOptions(extra = {}) {
   return options
 }
 
+function writeJsonFileAtomic(targetPath, data) {
+  const dir = path.dirname(targetPath)
+  fs.mkdirSync(dir, { recursive: true })
+  const base = path.basename(targetPath)
+  const tmpPath = path.join(dir, `.${base}.${process.pid}.${Date.now()}.${Math.random().toString(16).slice(2)}.tmp`)
+  fs.writeFileSync(tmpPath, JSON.stringify(data, null, 2), 'utf8')
+  fs.renameSync(tmpPath, targetPath)
+}
+
 const canvasCourseColors = ["#0374B5", "#8B1C62", "#E67E22", "#27AE60", "#8E44AD", "#C0392B", "#16A085", "#2980B9"]
 
 function sleepSync(ms) {
@@ -2434,7 +2443,7 @@ ${html}
         })
       })
     }
-    fs.writeFileSync(canvasDataPath, JSON.stringify(data1, null, 2))
+    writeJsonFileAtomic(canvasDataPath, data1)
     setLiveCanvasDataSnapshot(data1)
     invalidateCanvasDataCache()
     if (lambdaParse) {
@@ -2540,5 +2549,6 @@ module.exports = {
   filterCoursesForSync,
   coursesWithWikiHomepage,
   extractSyllabiFromCourses,
-  buildSyllabusBucketFromCourse
+  buildSyllabusBucketFromCourse,
+  writeJsonFileAtomic
 }

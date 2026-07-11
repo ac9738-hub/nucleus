@@ -2,11 +2,15 @@
 
 const test = require('node:test')
 const assert = require('node:assert/strict')
+const fs = require('fs')
+const os = require('os')
+const path = require('path')
 const {
   isIgnorableCanvasFetchError,
   filterCoursesForSync,
   coursesWithWikiHomepage,
-  extractSyllabiFromCourses
+  extractSyllabiFromCourses,
+  writeJsonFileAtomic
 } = require('../app/canvas/api')
 
 test('isIgnorableCanvasFetchError treats 403/404 as expected access denials', () => {
@@ -57,4 +61,38 @@ test('extractSyllabiFromCourses uses syllabus_body from course list', () => {
   assert.equal(Object.keys(buckets).length, 1)
   assert.equal(buckets[10].name, 'Bio')
   assert.match(buckets[10].syllabus_text, /Welcome/)
+})
+
+test('writeJsonFileAtomic preserves prior snapshot if temp write fails', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nucleus-canvas-data-'))
+  const target = path.join(root, 'canvas_data.json')
+  const previous = '{"courses":[{"id":1}]}'
+  fs.writeFileSync(target, previous, 'utf8')
+
+  const originalWrite = fs.writeFileSync
+  fs.writeFileSync = function patchedWrite(file, ...args) {
+    if (String(file).includes('.canvas_data.json.')) {
+      throw new Error('simulated disk write failure')
+    }
+    return originalWrite.call(fs, file, ...args)
+  }
+  try {
+    assert.throws(
+      () => writeJsonFileAtomic(target, { courses: [{ id: 2 }] }),
+      /simulated disk write failure/
+    )
+  } finally {
+    fs.writeFileSync = originalWrite
+  }
+
+  assert.equal(fs.readFileSync(target, 'utf8'), previous)
+})
+
+test('writeJsonFileAtomic replaces snapshot with valid JSON', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nucleus-canvas-data-'))
+  const target = path.join(root, 'canvas_data.json')
+
+  writeJsonFileAtomic(target, { courses: [{ id: 3 }] })
+
+  assert.deepEqual(JSON.parse(fs.readFileSync(target, 'utf8')), { courses: [{ id: 3 }] })
 })
