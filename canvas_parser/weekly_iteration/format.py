@@ -68,6 +68,14 @@ def _parse_any_date(value: str, default_year: int | None = None) -> datetime | N
         return None
     if ISO_DATE.match(text):
         return datetime.strptime(text, '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=timezone.utc)
+    if 'T' in text:
+        try:
+            parsed = datetime.fromisoformat(text.replace('Z', '+00:00'))
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            return parsed
+        except ValueError:
+            pass
     for fmt in (
         '%Y-%m-%dT%H:%M:%SZ',
         '%Y-%m-%d',
@@ -105,10 +113,11 @@ def _parse_any_date(value: str, default_year: int | None = None) -> datetime | N
 
 
 def format_ground_truth_date(value: str, default_year: int | None = None) -> str:
+    raw = str(value or '').strip()
     parsed = _parse_any_date(value, default_year=default_year)
     if not parsed:
         return ''
-    local = parsed.astimezone(LOCAL_TZ)
+    local = parsed.astimezone(LOCAL_TZ) if raw.endswith('Z') else parsed
     return f'{local.month}/{local.day}/{local.year}'
 
 
