@@ -56,6 +56,8 @@ def reset_parser_state() -> None:
     parser_mod.courseModules.clear()
     parser_mod.externalPlatforms.clear()
     parser_mod.problems.clear()
+    parser_mod.eventNodes.clear()
+    parser_mod.allsyllabi.clear()
     parser_mod.logged_details.clear()
     parser_mod.logged_examples.clear()
     parser_mod.logged_problems.clear()
