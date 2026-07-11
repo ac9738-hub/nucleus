@@ -486,7 +486,7 @@ def _format_modules(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 FILENAME_MONTH_DAY = re.compile(
-    r'\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|'
+    r'(?<![A-Za-z])(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|'
     r'Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)[a-z]*[\s,.\'-]*(\d{1,2})(?:[\s,.\'-]*(\d{4}))?',
     re.IGNORECASE,
 )
@@ -581,6 +581,14 @@ def _build_weekly_schedule(snapshot: dict[str, Any], categorized: dict[str, Any]
     assignment_lookup = {
         str(item.get('id') or ''): item for item in (snapshot.get('assignments') or [])
     }
+    modules = snapshot.get('modules') or []
+    has_dated_module_labels = any(MONTH_DAY_NAME.search(str(module.get('name') or '')) for module in modules)
+    has_ordinal_module_labels = any(
+        WEEK_MODULE_PATTERN.search(str(module.get('name') or ''))
+        or PREFIX_MODULE_PATTERN.match(str(module.get('name') or ''))
+        for module in modules
+    )
+    omit_week_boundaries = has_ordinal_module_labels and not has_dated_module_labels
 
     buckets: dict[str, dict[str, Any]] = {}
     dated_points: list[datetime] = []
@@ -703,7 +711,6 @@ def _build_weekly_schedule(snapshot: dict[str, Any], categorized: dict[str, Any]
             add_file(bucket_for(parsed), file_name)
 
     explicit_module_numbers: dict[int, int] = {}
-    modules = snapshot.get('modules') or []
     for index, module in enumerate(modules):
         match = PREFIX_MODULE_PATTERN.match(str(module.get('name') or ''))
         if match:
@@ -832,8 +839,8 @@ def _build_weekly_schedule(snapshot: dict[str, Any], categorized: dict[str, Any]
         }
         schedule.append({
             'name': f'Week {week_index}',
-            'start_date': format_ground_truth_date(cursor.isoformat(), default_year=default_year),
-            'end_date': format_ground_truth_date(_week_end(cursor).isoformat(), default_year=default_year),
+            'start_date': '' if omit_week_boundaries else format_ground_truth_date(cursor.isoformat(), default_year=default_year),
+            'end_date': '' if omit_week_boundaries else format_ground_truth_date(_week_end(cursor).isoformat(), default_year=default_year),
             'files': bucket.get('files') or [],
             'assignments': bucket.get('assignments') or [],
             'events': bucket.get('events') or [],
