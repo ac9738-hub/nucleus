@@ -71,6 +71,10 @@ const {
   normalizeFrameUrl,
   sameTabId
 } = require('./tab-utils')
+const {
+  shouldAllowSidekickBrowserOpen,
+  shouldAllowSidekickWorkspaceDelete
+} = require('./lib/sidekick-tool-policy')
 const { createCanvasApi, clearCanvasAuthFromEnv, killParserProcess, beginCanvasSyncWipe, endCanvasSyncWipe, setParserBatchGate } = require('./app/canvas/api')
 const {
   canvasDiskRecoveryEnabled,
@@ -4493,6 +4497,9 @@ async function refreshCanvasDataFromTool() {
 
 async function runfunction(data) {
   let tool_response = ['tool_response', data.id]
+  const currentUserText = sidekickPendingTurn && sidekickPendingTurn.messageText
+    ? String(sidekickPendingTurn.messageText)
+    : ''
   if (data.name === "add_task") {
      tool_response.push( newTask(
       data.input.task_name,
@@ -4507,8 +4514,18 @@ async function runfunction(data) {
     ));
   }
   else if (data.name === "open_browser_window") {
-    const workspaceId = data.input.workspaceid
-    const url = normalizeBrowserUrl(data.input.url)
+    const input = data.input || {}
+    const workspaceId = input.workspaceid
+    const url = normalizeBrowserUrl(input.url)
+    const policy = shouldAllowSidekickBrowserOpen({
+      rawValue: input.url,
+      normalizedUrl: url,
+      userText: currentUserText
+    })
+    if (!policy.ok) {
+      tool_response.push(policy.error)
+      return tool_response
+    }
 
     if (!dataStore.hasWorkspaceId(workspaceId)) {
       tool_response.push("ERROR opening browser tab: workspace not found: " + workspaceId)
@@ -4541,7 +4558,16 @@ async function runfunction(data) {
     )))
   }
   else if (data.name === "delete_workspace") {
-    tool_response.push(JSON.stringify(dataStore.deleteWorkspace((data.input || {}).workspaceid)))
+    const input = data.input || {}
+    const policy = shouldAllowSidekickWorkspaceDelete({
+      workspaceId: input.workspaceid,
+      userText: currentUserText
+    })
+    if (!policy.ok) {
+      tool_response.push(JSON.stringify({ ok: false, error: policy.error }))
+      return tool_response
+    }
+    tool_response.push(JSON.stringify(dataStore.deleteWorkspace(input.workspaceid)))
   }
   else if (data.name === "get_all_workspaces") {
     tool_response.push(JSON.stringify(dataStore.getAllWorkspacesForTool()))
@@ -4559,7 +4585,18 @@ async function runfunction(data) {
     tool_response.push(JSON.stringify(closeTabFromTool(data.input || {})))
   }
   else if (data.name === "navigate_tab") {
-    tool_response.push(JSON.stringify(await navigateTabFromTool(data.input || {})))
+    const input = data.input || {}
+    const rawValue = input.url || input.value || ''
+    const policy = shouldAllowSidekickBrowserOpen({
+      rawValue,
+      normalizedUrl: normalizeBrowserUrl(rawValue),
+      userText: currentUserText
+    })
+    if (!policy.ok) {
+      tool_response.push(JSON.stringify({ ok: false, error: policy.error }))
+      return tool_response
+    }
+    tool_response.push(JSON.stringify(await navigateTabFromTool(input)))
   }
   else if (data.name === "list_canvas_courses") {
     tool_response.push(JSON.stringify(compactCanvasCourses()))
