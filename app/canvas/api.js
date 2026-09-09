@@ -2028,6 +2028,23 @@ function createCanvasApi({ canvasDataPath, getAuthState, sendCanvasDataUpdate, r
     )
   }
 
+  function assertNoCanvasFetchErrors(errors) {
+    if (!Array.isArray(errors) || !errors.length) return
+    summarizeCanvasErrors(errors)
+    const sample = errors
+      .slice(0, 3)
+      .map(error => {
+        const context = String(error.context || 'Canvas API').trim()
+        const message = String(error.message || 'request failed').trim()
+        return `${context}: ${message}`
+      })
+      .join('; ')
+    throw new Error(
+      'Canvas sync aborted before overwriting local data because one or more Canvas API requests failed'
+      + (sample ? ` (${sample})` : '.')
+    )
+  }
+
   function saveCanvasHomepages(courses, frontPages) {
     const homepagesRoot = path.join(__dirname, 'canvas_homepages')
     fs.mkdirSync(homepagesRoot, { recursive: true })
@@ -2155,7 +2172,6 @@ ${html}
     ])
     saveCanvasAuthToEnv(envPath, authState)
     const lambdaParse = usesLambdaParserPlacement()
-    const proc = lambdaParse ? null : getParserProcess(authState, canvasRootDir, onCanvasTasks, options)
     const prof = responses[0]
     const course = responses[1]
     if (!Array.isArray(course)) {
@@ -2173,7 +2189,6 @@ ${html}
     const syllabusFromList = extractSyllabiFromCourses(course)
     data1.front_pages = await fetchCanvasFrontPages(coursesWithWikiHomepage(course), canvasErrors)
     data1.syllabi = await fetchCanvasCourseSyllabi(course, canvasErrors, syllabusFromList)
-    saveCanvasHomepages(course, data1.front_pages)
     const parsingSyllabi = []
     Object.entries(data1.syllabi).forEach(([courseid, syllabus]) => {
       if (!syllabus || !syllabus.syllabus_text) return
@@ -2244,6 +2259,12 @@ ${html}
     data1.assignments = assignmentsByCourse
     data1.file = filesByCourse
     data1.pages = pagesByCourse
+    data1.modules = await fetchCanvasCourseBuckets(syncCourses, 'modules', canvasErrors)
+    data1.module_items = await fetchCanvasModuleItemBuckets(data1.modules, canvasErrors)
+    assertNoCanvasFetchErrors(canvasErrors)
+
+    saveCanvasHomepages(course, data1.front_pages)
+    const proc = lambdaParse ? null : getParserProcess(authState, canvasRootDir, onCanvasTasks, options)
 
     for (const [courseid, assignments] of Object.entries(data1.assignments)) {
       if (!Array.isArray(assignments)) continue
@@ -2301,8 +2322,6 @@ ${html}
       writeParserLine({ type: 'page', content: parsingPages })
     }
 
-    data1.modules = await fetchCanvasCourseBuckets(syncCourses, 'modules', canvasErrors)
-    data1.module_items = await fetchCanvasModuleItemBuckets(data1.modules, canvasErrors)
     for (const [courseid, modules] of Object.entries(data1.module_items || {})) {
       const moduleNameById = {}
       ;(data1.modules[courseid] || []).forEach(module => {
@@ -2361,12 +2380,7 @@ ${html}
       }
     })
 
-    if (canvasErrors.length) {
-      data1.errors = canvasErrors
-      summarizeCanvasErrors(canvasErrors)
-    } else {
-      delete data1.errors
-    }
+    delete data1.errors
     data1.weekly_schedule = buildWeeklySchedule(data1, canvasRootDir)
     if (canvasMemoryCacheEnabled()) {
       setWeeklyScheduleCache(canvasRootDir, canvasDataPath, data1.weekly_schedule)
