@@ -144,6 +144,31 @@ def _remap_problem_ids(problems: list | dict, course_id: str, id_remap: dict) ->
         ]
 
 
+def _remap_child_ref(value: str, id_remap: dict) -> str:
+    parts = str(value or '').split(':', 2)
+    if len(parts) == 3 and parts[0] in {'detail', 'example'}:
+        parts[1] = id_remap.get(parts[1], parts[1])
+        return ':'.join(parts)
+    return str(value or '')
+
+
+def _remap_learning_blocks(state: dict, course_id: str, id_remap: dict) -> None:
+    if not id_remap:
+        return
+    blocks_root = state.get('learningBlocks') or {}
+    blocks = blocks_root.get(course_id) or blocks_root.get(str(course_id)) or []
+    for block in blocks:
+        if not isinstance(block, dict):
+            continue
+        concept_id = str(block.get('conceptId') or '')
+        if concept_id in id_remap:
+            block['conceptId'] = id_remap[concept_id]
+        if isinstance(block.get('detailRefs'), list):
+            block['detailRefs'] = [_remap_child_ref(ref, id_remap) for ref in block['detailRefs']]
+        if isinstance(block.get('examples'), list):
+            block['examples'] = [_remap_child_ref(ref, id_remap) for ref in block['examples']]
+
+
 def prune_detail_volume_only(state: dict) -> dict:
     """Echo-dedupe, per-concept cap, and course detail budget — no concept merge."""
     concepts = list(state.get('concepts') or [])
@@ -186,12 +211,14 @@ def postprocess_graph(state: dict, *, skip_volume_caps: bool = False) -> dict:
         if shadow_remap:
             merged_total += len(shadow_remap)
             _remap_problem_ids(problems, course_id, shadow_remap)
+            _remap_learning_blocks(state, course_id, shadow_remap)
             apply_concept_id_remap(course_id, {course_id: shadowed}, {}, edges, shadow_remap)
             objs = shadowed
         merged, id_remap = merge_duplicate_concepts(objs)
         if id_remap:
             merged_total += len(id_remap)
             _remap_problem_ids(problems, course_id, id_remap)
+            _remap_learning_blocks(state, course_id, id_remap)
             apply_concept_id_remap(course_id, {course_id: merged}, {}, edges, id_remap)
         by_course[course_id] = [_concept_to_dict(concept) for concept in merged]
 

@@ -182,6 +182,25 @@ def merge_missing_courses_from_backup(graph: dict, backup: dict) -> list[str]:
         graph_events.append(item)
         present_event_keys.add(key)
 
+    restored_ids = _collect_course_node_ids(graph, set(merged))
+    backup_edges = backup.get('edges') or backup.get('graphEdges') or []
+    graph_edges = graph.setdefault('edges', [])
+    present_edges = {
+        _edge_key(edge)
+        for edge in graph_edges
+        if isinstance(edge, dict)
+    }
+    for edge in backup_edges:
+        if not isinstance(edge, dict):
+            continue
+        if not _edge_touches_ids(edge, restored_ids):
+            continue
+        key = _edge_key(edge)
+        if key in present_edges:
+            continue
+        graph_edges.append(edge)
+        present_edges.add(key)
+
     for key in ('logged_details', 'logged_examples', 'logged_problems', 'logged_assignments', 'logged_events'):
         graph.setdefault(key, {})
         backup_section = backup.get(key) if isinstance(backup.get(key), dict) else {}
@@ -190,6 +209,67 @@ def merge_missing_courses_from_backup(graph: dict, backup: dict) -> list[str]:
                 graph[key][course_id] = payload
 
     return sorted(set(merged))
+
+
+def _edge_key(edge: dict) -> tuple[str, str, str, str, str]:
+    return (
+        str(edge.get('fromType') or ''),
+        str(edge.get('fromId') or ''),
+        str(edge.get('toType') or ''),
+        str(edge.get('toId') or ''),
+        str(edge.get('relation') or ''),
+    )
+
+
+def _edge_touches_ids(edge: dict, ids_by_type: dict[str, set[str]]) -> bool:
+    for node_type, node_id in (
+        (edge.get('fromType'), edge.get('fromId')),
+        (edge.get('toType'), edge.get('toId')),
+    ):
+        if str(node_id or '') in ids_by_type.get(str(node_type or ''), set()):
+            return True
+    return False
+
+
+def _collect_course_node_ids(graph: dict, course_ids: set[str]) -> dict[str, set[str]]:
+    ids = {
+        'concept': set(),
+        'problem': set(),
+        'assignment': set(),
+        'learningBlock': set(),
+        'event': set(),
+        'file': set(),
+    }
+    if not course_ids:
+        return ids
+    for concept in graph.get('concepts') or []:
+        if not isinstance(concept, dict) or str(concept.get('courseid') or '') not in course_ids:
+            continue
+        if concept.get('conceptid'):
+            ids['concept'].add(str(concept['conceptid']))
+    for problem in graph.get('problems') or []:
+        if not isinstance(problem, dict) or str(problem.get('courseid') or '') not in course_ids:
+            continue
+        if problem.get('problemid'):
+            ids['problem'].add(str(problem['problemid']))
+    for event in graph.get('events') or []:
+        if not isinstance(event, dict) or str(event.get('courseid') or '') not in course_ids:
+            continue
+        if event.get('eventid'):
+            ids['event'].add(str(event['eventid']))
+    for course_id in course_ids:
+        for file_id, file_node in ((graph.get('files') or {}).get(course_id) or {}).items():
+            ids['file'].add(str(file_id))
+            if isinstance(file_node, dict) and file_node.get('fileid'):
+                ids['file'].add(str(file_node['fileid']))
+        syllabus = (graph.get('syllabi') or {}).get(course_id) or {}
+        for assignment in syllabus.get('assignments') or []:
+            if isinstance(assignment, dict) and assignment.get('assignmentid'):
+                ids['assignment'].add(str(assignment['assignmentid']))
+        for block in ((graph.get('learningBlocks') or {}).get(course_id) or []):
+            if isinstance(block, dict) and block.get('blockId'):
+                ids['learningBlock'].add(str(block['blockId']))
+    return ids
 
 
 def enrich_graph_retrieval(

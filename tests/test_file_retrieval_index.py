@@ -71,13 +71,20 @@ class FileRetrievalIndexTests(unittest.TestCase):
         self.assertEqual(len(type_edges), 1)
 
     def test_merge_missing_courses_from_backup(self):
-        graph = {'syllabi': {'101': {'courseid': '101'}}, 'files': {}, 'concepts': []}
+        graph = {'syllabi': {'101': {'courseid': '101'}}, 'files': {}, 'concepts': [], 'edges': []}
         backup = {
             'syllabi': {'101': {'courseid': '101'}, '202': {'courseid': '202'}},
             'files': {'202': {'999': {'fileid': '999', 'name': 'Syllabus.pdf'}}},
             'concepts': [{'courseid': '202', 'name': 'Demo', 'conceptid': 'demo'}],
             'problems': [],
             'events': [],
+            'edges': [{
+                'fromType': 'concept',
+                'fromId': 'demo',
+                'toType': 'file',
+                'toId': '999',
+                'relation': 'requires_reading',
+            }],
             'logged_details': {},
             'logged_examples': {},
             'logged_problems': {},
@@ -87,6 +94,8 @@ class FileRetrievalIndexTests(unittest.TestCase):
         merged = merge_missing_courses_from_backup(graph, backup)
         self.assertIn('202', merged)
         self.assertIn('202', graph['files'])
+        self.assertEqual(len(graph['edges']), 1)
+        self.assertEqual(graph['edges'][0]['fromId'], 'demo')
 
     def test_enrich_graph_retrieval(self):
         graph = {
