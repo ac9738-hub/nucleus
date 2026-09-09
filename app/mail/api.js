@@ -358,6 +358,11 @@ function setMailAuthTokens(tokens) {
     return true
 }
 
+function resetGmailLimiterForTests() {
+    gmailInFlight = 0
+    gmailWaitQueue.splice(0, gmailWaitQueue.length)
+}
+
 async function refreshMailAccessToken() {
     const saved = loadSavedMailAuth()
     if (!saved || !saved.refresh_token) return false
@@ -569,77 +574,95 @@ function formatMessageDetail(message) {
 }
 
 async function gmailRequest(pathname, options = {}, attempt = 0) {
-    const authtoken = get_token()
-    if (!authtoken) {
-        throw new Error('No token available')
-    }
+    let currentAttempt = attempt
 
-    await acquireGmailSlot()
-    try {
-        const response = await fetch(`${GMAIL_BASE}${pathname}`, {
-            method: options.method || 'GET',
-            headers: {
-                Authorization: `Bearer ${authtoken}`,
-                ...(options.body ? { 'Content-Type': 'application/json' } : {}),
-                ...(options.headers || {})
-            },
-            body: options.body || undefined
-        })
-
-        if (response.status === 204) {
-            return { ok: true }
+    while (true) {
+        const authtoken = get_token()
+        if (!authtoken) {
+            throw new Error('No token available')
         }
 
-        const data = await response.json()
+        let response
+        let data
+        await acquireGmailSlot()
+        try {
+            response = await fetch(`${GMAIL_BASE}${pathname}`, {
+                method: options.method || 'GET',
+                headers: {
+                    Authorization: `Bearer ${authtoken}`,
+                    ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+                    ...(options.headers || {})
+                },
+                body: options.body || undefined
+            })
+
+            if (response.status === 204) {
+                return { ok: true }
+            }
+
+            data = await response.json()
+        } finally {
+            releaseGmailSlot()
+        }
+
         if (!response.ok) {
             const message = data && data.error && data.error.message ? data.error.message : `Gmail API error ${response.status}`
-            if (response.status === 401 && attempt === 0 && await refreshMailAccessToken()) {
-                return gmailRequest(pathname, options, attempt + 1)
+            if (response.status === 401 && currentAttempt === 0 && await refreshMailAccessToken()) {
+                currentAttempt += 1
+                continue
             }
-            if (attempt < 3 && isRetryableGmailError(response.status, message)) {
-                await sleep((attempt + 1) * 700 + Math.floor(Math.random() * 250))
-                return gmailRequest(pathname, options, attempt + 1)
+            if (currentAttempt < 3 && isRetryableGmailError(response.status, message)) {
+                await sleep((currentAttempt + 1) * 700 + Math.floor(Math.random() * 250))
+                currentAttempt += 1
+                continue
             }
             throw new Error(message)
         }
 
         return data
-    } finally {
-        releaseGmailSlot()
     }
 }
 
 async function gmailBatchGetMessages(ids, attempt = 0) {
     if (!ids.length) return []
 
-    const authtoken = get_token()
-    if (!authtoken) {
-        throw new Error('No token available')
-    }
+    let currentAttempt = attempt
 
-    const boundary = `batch_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
-    const query = buildMetadataQueryString()
-    const body = ids.map((id, index) => (
-        `--${boundary}\r\n` +
-        'Content-Type: application/http\r\n' +
-        `Content-ID: <item${index}>\r\n` +
-        '\r\n' +
-        `GET /gmail/v1/users/me/messages/${id}?${query}\r\n`
-    )).join('') + `--${boundary}--\r\n`
+    while (true) {
+        const authtoken = get_token()
+        if (!authtoken) {
+            throw new Error('No token available')
+        }
 
-    await acquireGmailSlot()
-    try {
-        const response = await fetch('https://www.googleapis.com/batch/gmail/v1', {
-            method: 'POST',
-            headers: {
-                Authorization: `Bearer ${authtoken}`,
-                'Content-Type': `multipart/mixed; boundary=${boundary}`
-            },
-            body
-        })
+        const boundary = `batch_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
+        const query = buildMetadataQueryString()
+        const body = ids.map((id, index) => (
+            `--${boundary}\r\n` +
+            'Content-Type: application/http\r\n' +
+            `Content-ID: <item${index}>\r\n` +
+            '\r\n' +
+            `GET /gmail/v1/users/me/messages/${id}?${query}\r\n`
+        )).join('') + `--${boundary}--\r\n`
 
-        const responseText = await response.text()
-        const contentType = response.headers.get('content-type') || ''
+        let response
+        let responseText
+        let contentType
+        await acquireGmailSlot()
+        try {
+            response = await fetch('https://www.googleapis.com/batch/gmail/v1', {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${authtoken}`,
+                    'Content-Type': `multipart/mixed; boundary=${boundary}`
+                },
+                body
+            })
+
+            responseText = await response.text()
+            contentType = response.headers.get('content-type') || ''
+        } finally {
+            releaseGmailSlot()
+        }
 
         if (!response.ok) {
             let message = `Gmail batch error ${response.status}`
@@ -647,9 +670,10 @@ async function gmailBatchGetMessages(ids, attempt = 0) {
                 const data = JSON.parse(responseText)
                 if (data && data.error && data.error.message) message = data.error.message
             } catch (_) {}
-            if (attempt < 3 && isRetryableGmailError(response.status, message)) {
-                await sleep((attempt + 1) * 700 + Math.floor(Math.random() * 250))
-                return gmailBatchGetMessages(ids, attempt + 1)
+            if (currentAttempt < 3 && isRetryableGmailError(response.status, message)) {
+                await sleep((currentAttempt + 1) * 700 + Math.floor(Math.random() * 250))
+                currentAttempt += 1
+                continue
             }
             throw new Error(message)
         }
@@ -659,8 +683,6 @@ async function gmailBatchGetMessages(ids, attempt = 0) {
             throw new Error('Gmail batch response was incomplete.')
         }
         return parsed
-    } finally {
-        releaseGmailSlot()
     }
 }
 
@@ -1431,5 +1453,10 @@ module.exports = {
     parseOAuthCallbackUrl,
     getGmailRedirectUri,
     exchangeGmailAuthCode,
-    classifyInboxMessages
+    classifyInboxMessages,
+    __test: {
+        gmailBatchGetMessages,
+        resetGmailLimiterForTests,
+        setMailAuthTokens
+    }
 }
