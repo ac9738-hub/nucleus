@@ -3,9 +3,10 @@
 // and routes text/tool calls back to main.js.
 // Dependencies: child_process.spawn and main.js callbacks for UI text/tool IO.
 const { spawn } = require('child_process')
+const { resolvePythonExecutable } = require('./lib/python-exec')
 
 function createAgentProcess({ scriptPath, onText, onToolCall, onDone = () => {}, onReplace = () => {}, onAfterToolBatch = null }) {
-  const proc = spawn('python', [scriptPath])
+  const proc = spawn(resolvePythonExecutable(), [scriptPath])
   let stdoutBuffer = ''
 
   proc.stdout.on('data', chunk => {

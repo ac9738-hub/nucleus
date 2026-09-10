@@ -28,6 +28,7 @@ const {
   archiveLiveGraph,
   unwireLiveGraphIfNeeded
 } = require('../../lib/parser-graph-archive')
+const { resolvePythonExecutable } = require('../../lib/python-exec')
 
 const LAMBDA_PARSER_PLACEMENTS = new Set([
   'local_download_lambda_parse',
@@ -913,7 +914,7 @@ function buildWeeklyScheduleViaPython(canvasData, rootDir) {
   } else {
     args.push('--no-graph')
   }
-  const proc = spawnSync('python', args, {
+  const proc = spawnSync(resolvePythonExecutable(), args, {
     cwd: rootDir,
     input: JSON.stringify(canvasData),
     encoding: 'utf8',
@@ -943,7 +944,7 @@ function buildWeeklyScheduleViaPythonAsync(canvasData, rootDir) {
     args.push('--no-graph')
   }
   return new Promise((resolve, reject) => {
-    const proc = spawn('python', args, {
+    const proc = spawn(resolvePythonExecutable(), args, {
       cwd: rootDir,
       stdio: ['pipe', 'pipe', 'pipe'],
       windowsHide: true,
@@ -1324,7 +1325,7 @@ function getParserProcess(authState, rootDir, onCanvasTasks, options = {}) {
   }
 
   parserAllPassesCompleted = false
-  parserProc = spawn('python', [path.join(rootDir, 'parser.py')], {
+  parserProc = spawn(resolvePythonExecutable(), [path.join(rootDir, 'parser.py')], {
     cwd: rootDir,
     env: {
       ...process.env,
@@ -1375,7 +1376,7 @@ function startLambdaParserProcess(authState, rootDir, onCanvasTasks, options = {
   parserAllPassesCompleted = false
   onCanvasTasks([], { restartVector: false })
   const timeoutSec = Number(process.env.PARSER_TIMEOUT_SEC || 7200)
-  parserProc = spawn('python', [
+  parserProc = spawn(resolvePythonExecutable(), [
     '-m', 'canvas_parser.parse.app_parse',
     '--from-canvas-data',
     '--placement', placement,
