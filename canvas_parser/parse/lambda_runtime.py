@@ -47,6 +47,9 @@ def iter_batch_items(batches: list[dict[str, Any]]) -> list[tuple[str, dict[str,
 def reset_parser_state() -> None:
     import parser as parser_mod
 
+    parser_mod.current_assignment_files_groups.clear()
+    parser_mod.current_files_groups.clear()
+    parser_mod.allsyllabi.clear()
     parser_mod.syllabusNodes.clear()
     parser_mod.fileNodes.clear()
     parser_mod.conceptNodes.clear()
@@ -68,6 +71,10 @@ def reset_parser_state() -> None:
     parser_mod.assignmentResourceNodes.clear()
     parser_mod.external_crawl_state.clear()
     parser_mod.externalResources.clear()
+    parser_mod.eventNodes.clear()
+    parser_mod.assignment_description_summary_cache.clear()
+    parser_mod._debug_pass1_tool_names.clear()
+    parser_mod.course_name_cache = None
     parser_mod.parse_file_stats.clear()
     parser_mod.parser_thread_log_lines = []
     parser_mod.completed_model_calls = {
