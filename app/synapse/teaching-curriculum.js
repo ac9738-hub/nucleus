@@ -2,6 +2,7 @@
 const { spawn } = require('child_process')
 const fs = require('fs')
 const path = require('path')
+const { resolvePythonExecutable } = require('../../lib/python-exec')
 
 const ROOT = path.join(__dirname, '..', '..')
 const GRAPH_PATH = process.env.NUCLEUS_GRAPH_PATH || path.join(ROOT, 'canvas_graph.json')
@@ -94,7 +95,7 @@ function pythonEnv() {
 
 function runTeachingCommand(args) {
   return new Promise((resolve) => {
-    const child = spawn('python', ['-m', 'canvas_parser.synapse_teaching', ...args], {
+    const child = spawn(resolvePythonExecutable(), ['-m', 'canvas_parser.synapse_teaching', ...args], {
       cwd: ROOT,
       env: pythonEnv(),
       windowsHide: true

@@ -77,6 +77,7 @@ const {
   canvasMemoryCacheEnabled
 } = require('./lib/canvas-cache-policy')
 const { createSynapseClient } = require('./app/synapse/client')
+const { resolvePythonExecutable } = require('./lib/python-exec')
 const {
   getThemeSelection,
   getRendererStylesheets,
@@ -1336,7 +1337,7 @@ const vectorRetrieval = (() => {
     if (proc && proc.exitCode === null && !proc.killed && !proc.stdin.destroyed) return
     proc = null
     stdoutBuffer = ''
-    const newProc = spawn('python', [path.join(__dirname, 'vector_retreival.py')], {
+    const newProc = spawn(resolvePythonExecutable(), [path.join(__dirname, 'vector_retreival.py')], {
       env: {
         ...process.env,
         NUCLEUS_DISABLE_CANVAS_DISK_RECOVERY: canvasDiskRecoveryEnabled() ? '0' : '1'

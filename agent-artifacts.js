@@ -4,6 +4,7 @@
 const fs = require('fs')
 const path = require('path')
 const { spawnSync } = require('child_process')
+const { resolvePythonExecutable } = require('./lib/python-exec')
 const { generateInProcessArtifact, writePreviewFile } = require('./artifact-generators')
 const {
   buildFlashcardsFromGraph,
@@ -19,7 +20,7 @@ function createAgentArtifacts({ store, repoRoot }) {
   const pythonScript = path.join(repoRoot, 'agent_artifacts', 'build.py')
 
   function runPythonBuild(payload) {
-    const proc = spawnSync('python', [pythonScript], {
+    const proc = spawnSync(resolvePythonExecutable(), [pythonScript], {
       input: JSON.stringify(payload),
       encoding: 'utf8',
       maxBuffer: 10 * 1024 * 1024
