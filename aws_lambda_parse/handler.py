@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import sys
 import tempfile
 from pathlib import Path
@@ -57,23 +58,26 @@ def handler(event, context):
         seed_state = download_seed_from_s3(boto3.client('s3'), bucket, seed_s3_key)
 
     canvas_dir = Path(tempfile.mkdtemp(prefix='nucleus-canvasfiles-'))
-    os.environ['PARSER_CANVASFILES_DIR'] = str(canvas_dir)
-    os.environ.setdefault('PARSER_OUTSIDE_SOURCES_DIR', '/tmp/nucleus-outside-sources')
-    os.environ.setdefault('PARSER_PDF_CACHE_DIR', '/tmp/pdf_extract')
-    os.environ.setdefault('CANVAS_DOWNLOAD_MAX_BYTES', str(128 * 1024 * 1024))
-    import asyncio
+    try:
+        os.environ['PARSER_CANVASFILES_DIR'] = str(canvas_dir)
+        os.environ.setdefault('PARSER_OUTSIDE_SOURCES_DIR', '/tmp/nucleus-outside-sources')
+        os.environ.setdefault('PARSER_PDF_CACHE_DIR', '/tmp/pdf_extract')
+        os.environ.setdefault('CANVAS_DOWNLOAD_MAX_BYTES', str(128 * 1024 * 1024))
+        import asyncio
 
-    fragment = asyncio.run(process_single_item(
-        batch_type,
-        item,
-        placement=placement,
-        canvasfiles_dir=canvas_dir,
-        production=bool(event.get('production')),
-        seed_state=seed_state,
-    ))
+        fragment = asyncio.run(process_single_item(
+            batch_type,
+            item,
+            placement=placement,
+            canvasfiles_dir=canvas_dir,
+            production=bool(event.get('production')),
+            seed_state=seed_state,
+        ))
 
-    if bucket and run_id:
-        s3_key = _upload_fragment(bucket, run_id, key_suffix, fragment)
-        return {'status': 'ok', 'item_key': key_suffix, 's3_key': s3_key}
+        if bucket and run_id:
+            s3_key = _upload_fragment(bucket, run_id, key_suffix, fragment)
+            return {'status': 'ok', 'item_key': key_suffix, 's3_key': s3_key}
 
-    return {'status': 'ok', 'item_key': key_suffix, 'fragment': fragment}
+        return {'status': 'ok', 'item_key': key_suffix, 'fragment': fragment}
+    finally:
+        shutil.rmtree(canvas_dir, ignore_errors=True)
