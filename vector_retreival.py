@@ -2833,6 +2833,7 @@ def run_service():
         rawline = rawline.strip()
         if not rawline:
             continue
+        request_id = ""
         try:
             payload = json.loads(rawline)
             if isinstance(payload, list) and payload and payload[0] == "warm":
@@ -2846,6 +2847,7 @@ def run_service():
             else:
                 mode = payload.get("mode", "agent")
                 options = payload
+            request_id = str(options.get("requestId") or options.get("request_id") or "")
             fast = bool(options.get("fast"))
             grounded = bool(options.get("grounded"))
             problem_query = bool(options.get("problem_query") or options.get("problemQuery"))
@@ -2870,11 +2872,13 @@ def run_service():
                 use_cache=use_cache,
             )
             print(json.dumps({
+                "requestId": request_id,
                 "query": query,
                 "startpoints": [serialize_startpoint(startpoint, query=query) for startpoint in startpoints]
             }, ensure_ascii=False), flush=True)
         except Exception as error:
             print(json.dumps({
+                "requestId": request_id,
                 "error": str(error),
                 "raw": rawline
             }, ensure_ascii=False), flush=True)
