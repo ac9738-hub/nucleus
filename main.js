@@ -40,6 +40,10 @@ const {
   withScreenChunks
 } = require('./sidekick-retrieval-budget')
 const { RetrievalSessionStore } = require('./sidekick-retrieval-session')
+const {
+  makeRetrievalRequestId,
+  takePendingQueryForResult
+} = require('./lib/retrieval-request-queue')
 const { statusForToolCall, statusForPhase } = require('./sidekick-status')
 const {
   normalizeAnswerMode,
@@ -1291,6 +1295,7 @@ const vectorRetrieval = (() => {
   let proc = null
   let stdoutBuffer = ''
   let pendingQueries = []
+  let requestCounter = 0
   let restartTimer = null
 
   function formatRetrievalContext(startpoints = []) {
@@ -1357,11 +1362,11 @@ const vectorRetrieval = (() => {
           const result = JSON.parse(line)
           if (result.error) {
             console.error('vector retrieval error:', result)
-            const pending = pendingQueries.shift()
+            const pending = takePendingQueryForResult(pendingQueries, result)
             if (pending) pending.resolve([])
             return
           }
-          const pending = pendingQueries.shift()
+          const pending = takePendingQueryForResult(pendingQueries, result)
           if (pending) pending.resolve(result.startpoints || [])
         } catch (error) {
           console.error('vector retrieval invalid JSON:', line, error)
@@ -1421,7 +1426,8 @@ const vectorRetrieval = (() => {
         console.error('vector retrieval unavailable after restart')
         return Promise.resolve([])
       }
-      const line = JSON.stringify(['query', query, options]) + '\n'
+      const requestId = makeRetrievalRequestId(++requestCounter)
+      const line = JSON.stringify(['query', query, { ...options, requestId }]) + '\n'
       return new Promise(resolve => {
         let pendingItem = null
         const timeout = setTimeout(() => {
@@ -1432,6 +1438,7 @@ const vectorRetrieval = (() => {
         }, 45000)
 
         pendingItem = {
+          requestId,
           resolve: startpoints => {
             clearTimeout(timeout)
             resolve(startpoints)
