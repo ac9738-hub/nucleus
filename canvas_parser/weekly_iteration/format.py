@@ -66,6 +66,14 @@ def _parse_any_date(value: str, default_year: int | None = None) -> datetime | N
     text = str(value or '').strip()
     if not text:
         return None
+    try:
+        iso_text = text[:-1] + '+00:00' if text.endswith('Z') else text
+        parsed = datetime.fromisoformat(iso_text)
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed
+    except ValueError:
+        pass
     if ISO_DATE.match(text):
         return datetime.strptime(text, '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=timezone.utc)
     for fmt in (
@@ -243,13 +251,29 @@ def _should_skip_module_item(item: dict[str, Any]) -> bool:
 def _extract_page_file_names(snapshot: dict[str, Any]) -> list[str]:
     names: list[str] = []
     seen: set[str] = set()
-    for body in (snapshot.get('page_bodies') or {}).values():
+    bodies = list((snapshot.get('page_bodies') or {}).values())
+    bodies.extend((assignment.get('description') or '') for assignment in snapshot.get('assignments') or [])
+    for body in bodies:
         for match in PDF_LINK_PATTERN.finditer(str(body or '')):
             name = unescape(match.group(1)).strip()
             if name and name not in seen:
                 seen.add(name)
                 names.append(name)
     return names
+
+
+def _clean_reading_candidate(value: str) -> str:
+    candidate = str(value or '').strip(' "\'')
+    candidate = re.sub(
+        r'\s*(?:\(excerpt\)|'
+        r'(?:,\s*)?["“]?ch\.?\s*\d+.*|'
+        r'(?:,\s*)?chapter\s+\d+.*|'
+        r',\s*["“].*)$',
+        '',
+        candidate,
+        flags=re.IGNORECASE,
+    )
+    return candidate.strip(' "\'')
 
 
 def _reading_title_to_discussion_name(title: str) -> str:
@@ -259,36 +283,17 @@ def _reading_title_to_discussion_name(title: str) -> str:
     if READING_SKIP_PATTERN.search(text):
         return ''
 
+    if ' - ' in text:
+        left, right = text.split(' - ', 1)
+        candidate = _clean_reading_candidate(right)
+        return candidate or _clean_reading_candidate(left)
+
     if re.search(r',\s*', text):
         _, after = re.split(r',\s*', text, maxsplit=1)
-        candidate = re.sub(r'\s*(?:\(excerpt\)|ch\.?\s*\d+.*|chapter\s+\d+.*)$', '', after, flags=re.IGNORECASE)
-        candidate = candidate.strip(' "')
-        if re.search(r'\bintimacies of four continents\b', candidate, re.IGNORECASE):
-            return 'The Intimacies of Four Continents'
-        if re.search(r'\bmushroom at the end of the world\b', candidate, re.IGNORECASE):
-            return 'The Mushroom at the End of the World'
+        candidate = _clean_reading_candidate(after)
         if candidate and not candidate.lower().startswith('the '):
             return candidate
         return candidate
-
-    if ' - ' in text:
-        if re.search(r'\bnothing ever dies\b', text, re.IGNORECASE):
-            return 'Nothing Ever Dies'
-        left, right = text.split(' - ', 1)
-        candidate = left.strip()
-        if re.search(r'\bcollateral damage\b', candidate, re.IGNORECASE):
-            return 'Collateral Damage'
-        if re.search(r'\bflavors of empire\b', candidate, re.IGNORECASE):
-            return 'Flavors of Empire'
-        if re.search(r'\balien capital\b', candidate, re.IGNORECASE):
-            return 'Alien Capital'
-        if re.search(r'\bstranger intimacy\b', candidate, re.IGNORECASE):
-            return 'Stranger Intimacy'
-        if re.search(r'\bturbulent circulation\b', candidate, re.IGNORECASE):
-            return 'Turbulent Circulation'
-        if re.search(r'\btrespassers\b', candidate, re.IGNORECASE):
-            return 'Trespassers?'
-        return candidate or right.strip()
 
     return text
 
@@ -311,7 +316,10 @@ def _extract_reading_discussions(snapshot: dict[str, Any], default_year: int | N
 
         module_id = str(module.get('id') or '')
         items = (snapshot.get('module_items') or {}).get(module_id) or []
-        for item in sorted(items, key=lambda row: row.get('position') or 0):
+        sorted_items = sorted(items, key=lambda row: row.get('position') or 0)
+        file_items = [item for item in sorted_items if _normalize_module_item_type(item) == 'file']
+        candidate_items = file_items or sorted_items
+        for item in candidate_items:
             if _should_skip_module_item(item):
                 continue
             item_type = _normalize_module_item_type(item)
@@ -326,7 +334,7 @@ def _extract_reading_discussions(snapshot: dict[str, Any], default_year: int | N
             seen.add(discussion_name)
             discussions.append({
                 'name': discussion_name,
-                'due_at': format_ground_truth_date(due_date.isoformat(), default_year=default_year),
+                'due_at': f'{due_date.month}/{due_date.day}/{due_date.year}',
             })
             break
 
@@ -427,7 +435,7 @@ def _month_token_to_number(token: str) -> int | None:
 
 
 def _parse_filename_date(name: str, default_year: int | None) -> datetime | None:
-    text = str(name or '')
+    text = str(name or '').replace('_', ' ')
     match = FILENAME_MONTH_DAY.search(text)
     if match:
         month = _month_token_to_number(match.group(1))
