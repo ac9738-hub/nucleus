@@ -326,6 +326,26 @@ def test_file_is_primary_pset_solution():
     assert not file_is_primary_pset_solution("MAT202F2025_PSET2_Solution.pdf", "MAT 202 linear algebra pset")
 
 
+def test_lookup_file_node_does_not_fall_back_across_courses(monkeypatch):
+    import vector_retreival as vr
+
+    other_file = DummyNode(fileid="shared", courseid="course-b", name="Other course PDF")
+    monkeypatch.setattr(vr, "allnodes", {
+        "files": {
+            "course-a": {},
+            "course-b": {"shared": other_file},
+        }
+    })
+
+    node, courseid = vr._lookup_file_node("course-a", "shared")
+    assert node is None
+    assert courseid == "course-a"
+
+    node, courseid = vr._lookup_file_node("", "shared")
+    assert node is other_file
+    assert courseid == "course-b"
+
+
 def test_drop_slot_protects_top_homework():
     from vector_retreival import drop_slot_for_promotion
 

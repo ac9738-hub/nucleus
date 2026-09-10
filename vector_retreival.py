@@ -2606,8 +2606,11 @@ def _lookup_file_node(courseid, fileid):
     fileid = str(fileid or "")
     courseid = str(courseid or "")
     files = allnodes.get("files") or {}
-    if courseid and fileid and fileid in (files.get(courseid) or {}):
-        return files[courseid][fileid], courseid
+    if courseid:
+        course_files = files.get(courseid) or {}
+        if fileid and fileid in course_files:
+            return course_files[fileid], courseid
+        return None, courseid
     for candidate_course, course_files in files.items():
         if fileid in (course_files or {}):
             return course_files[fileid], str(candidate_course)
