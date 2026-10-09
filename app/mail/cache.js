@@ -1,7 +1,9 @@
 const fs = require('fs')
 const path = require('path')
 
-const MAIL_CACHE_ROOT = path.join(__dirname, '..', '..', '.cache', 'mail')
+const MAIL_CACHE_ROOT = process.env.NUCLEUS_MAIL_CACHE_ROOT
+    ? path.resolve(process.env.NUCLEUS_MAIL_CACHE_ROOT)
+    : path.join(__dirname, '..', '..', '.cache', 'mail')
 const MAIL_MESSAGES_DIR = path.join(MAIL_CACHE_ROOT, 'messages')
 const MAIL_THREADS_DIR = path.join(MAIL_CACHE_ROOT, 'threads')
 const MAIL_CLASSIFICATIONS_PATH = path.join(MAIL_CACHE_ROOT, 'classifications.json')
@@ -119,6 +121,14 @@ function setCachedMessageDetail(id, message, meta = {}) {
     } catch (_) {}
 }
 
+function removeCachedMessageDetail(id) {
+    if (!id) return
+    messageMemoryCache.delete(id)
+    try {
+        fs.rmSync(messageCachePath(id), { force: true })
+    } catch (_) {}
+}
+
 function getCachedThread(threadId) {
     if (!threadId) return null
     const memory = threadMemoryCache.get(threadId)
@@ -143,6 +153,25 @@ function setCachedThread(threadId, thread) {
     } catch (_) {}
 }
 
+function removeCachedThread(threadId) {
+    if (!threadId) return
+    threadMemoryCache.delete(threadId)
+    try {
+        fs.rmSync(threadCachePath(threadId), { force: true })
+    } catch (_) {}
+}
+
+function clearMailContentCache() {
+    messageMemoryCache.clear()
+    threadMemoryCache.clear()
+    try {
+        fs.rmSync(MAIL_MESSAGES_DIR, { recursive: true, force: true })
+    } catch (_) {}
+    try {
+        fs.rmSync(MAIL_THREADS_DIR, { recursive: true, force: true })
+    } catch (_) {}
+}
+
 function shouldRefreshMessage(id, staleAfterMs = 5 * 60 * 1000) {
     const memory = messageMemoryCache.get(id)
     if (memory && isFreshTimestamp(memory.cachedAt, staleAfterMs)) return false
@@ -160,8 +189,11 @@ module.exports = {
     setCachedInboxCategory,
     getCachedMessageDetail,
     setCachedMessageDetail,
+    removeCachedMessageDetail,
     getCachedThread,
     setCachedThread,
+    removeCachedThread,
+    clearMailContentCache,
     shouldRefreshMessage,
     flushClassificationMap
 }
