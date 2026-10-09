@@ -17,8 +17,11 @@ const {
     setCachedInboxCategory,
     getCachedMessageDetail,
     setCachedMessageDetail,
+    removeCachedMessageDetail,
     getCachedThread,
     setCachedThread,
+    removeCachedThread,
+    clearMailContentCache,
     shouldRefreshMessage
 } = require('./cache')
 const {
@@ -247,7 +250,9 @@ function parseBatchMultipartResponse(responseText, responseContentType) {
     return results
 }
 
-const MAIL_AUTH_PATH = path.join(__dirname, '..', '..', 'mail_auth.json')
+const MAIL_AUTH_PATH = process.env.NUCLEUS_MAIL_AUTH_PATH
+    ? path.resolve(process.env.NUCLEUS_MAIL_AUTH_PATH)
+    : path.join(__dirname, '..', '..', 'mail_auth.json')
 const MAIL_ENV_PATH = path.join(__dirname, '..', '..', '.env')
 const GMAIL_AUTH_PARTITION = 'persist:nucleus-gmail-oauth'
 const GMAIL_OAUTH_TIMEOUT_MS = 5 * 60 * 1000
@@ -331,6 +336,7 @@ function saveMailAuth(tokens) {
 function clearSavedMailAuth() {
     token = null
     oauth2Client.setCredentials({})
+    clearMailContentCache()
     try {
         if (fs.existsSync(MAIL_AUTH_PATH)) {
             fs.unlinkSync(MAIL_AUTH_PATH)
@@ -347,7 +353,7 @@ function mergeMailAuthTokens(existing, incoming) {
 }
 
 function setMailAuthTokens(tokens) {
-    if (!tokens || !tokens.access_token) {
+    if (!tokens || (!tokens.access_token && !tokens.refresh_token)) {
         token = null
         oauth2Client.setCredentials({})
         return false
@@ -356,6 +362,15 @@ function setMailAuthTokens(tokens) {
     token = tokens
     oauth2Client.setCredentials(tokens)
     return true
+}
+
+function isMailAuthRevokedError(error) {
+    const message = String((error && error.message) || error || '').toLowerCase()
+    return message.includes('invalid_grant')
+        || message.includes('expired or revoked')
+        || message.includes('invalid authentication credentials')
+        || message.includes('invalid credentials')
+        || message.includes('unauthorized')
 }
 
 async function refreshMailAccessToken() {
@@ -944,7 +959,10 @@ async function modifyMailMessage(id, changes = {}) {
 }
 
 async function trashMailMessage(id) {
+    const cached = getCachedMessageDetail(id)
     const updated = await gmailRequest(`/messages/${id}/trash`, { method: 'POST' })
+    removeCachedMessageDetail(id)
+    removeCachedThread((updated && updated.threadId) || (cached && cached.threadId))
     return formatMessageSummary(updated)
 }
 
@@ -954,7 +972,10 @@ async function untrashMailMessage(id) {
 }
 
 async function deleteMailMessage(id) {
+    const cached = getCachedMessageDetail(id)
     await gmailRequest(`/messages/${id}`, { method: 'DELETE' })
+    removeCachedMessageDetail(id)
+    removeCachedThread(cached && cached.threadId)
     return { ok: true, id }
 }
 
@@ -1196,21 +1217,24 @@ async function ensureMailAuth() {
         try {
             await getProfile()
             return true
-        } catch (_) {
+        } catch (error) {
+            const hadRefreshToken = Boolean(saved && saved.refresh_token)
             if (await refreshMailAccessToken()) {
                 try {
                     await getProfile()
                     return true
-                } catch (_) {}
+                } catch (refreshError) {
+                    if (isMailAuthRevokedError(refreshError)) clearSavedMailAuth()
+                }
             }
-            clearSavedMailAuth()
+            if (!hadRefreshToken && isMailAuthRevokedError(error)) clearSavedMailAuth()
         }
     } else if (saved && saved.refresh_token && await refreshMailAccessToken()) {
         try {
             await getProfile()
             return true
-        } catch (_) {
-            clearSavedMailAuth()
+        } catch (error) {
+            if (isMailAuthRevokedError(error)) clearSavedMailAuth()
         }
     }
 
@@ -1222,7 +1246,7 @@ async function ensureMailAuth() {
     try {
         await getProfile()
     } catch (error) {
-        clearSavedMailAuth()
+        if (isMailAuthRevokedError(error)) clearSavedMailAuth()
         throw new Error((error && error.message) || 'Gmail authentication failed.')
     }
 
@@ -1431,5 +1455,13 @@ module.exports = {
     parseOAuthCallbackUrl,
     getGmailRedirectUri,
     exchangeGmailAuthCode,
-    classifyInboxMessages
+    classifyInboxMessages,
+    __test: {
+        clearSavedMailAuth,
+        loadSavedMailAuth,
+        saveMailAuth,
+        setMailAuthTokens,
+        isMailAuthRevokedError,
+        getOAuthCredentials: () => oauth2Client.credentials || {}
+    }
 }
