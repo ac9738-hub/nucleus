@@ -63,6 +63,31 @@ def test_dedupe_echo_concept_details():
     assert concept.details[0].name == 'epsilon-delta'
 
 
+def test_dedupe_echo_concept_details_keeps_description_topics():
+    concept = ConceptStub(
+        'Cell biology',
+        'cell',
+        description='Students study the cell membrane and organelles in eukaryotic cells.',
+    )
+    concept.details = [
+        type('Detail', (), {'name': 'Cell membrane', 'description': 'Phospholipid bilayer and transport.'})(),
+        type('Detail', (), {'name': 'Organelles', 'description': 'Specialized eukaryotic cell structures.'})(),
+        type(
+            'Detail',
+            (),
+            {
+                'name': 'Overview',
+                'description': 'Students study the cell membrane and organelles in eukaryotic cells.',
+            },
+        )(),
+    ]
+
+    removed = dedupe_echo_concept_details([concept])
+
+    assert removed == 1
+    assert [detail.name for detail in concept.details] == ['Cell membrane', 'Organelles']
+
+
 def test_merge_duplicate_concepts_empty_name_concept_node():
     kept, remap = merge_duplicate_concepts([
         ConceptStub('', 'a'),
