@@ -254,6 +254,10 @@ const GMAIL_OAUTH_TIMEOUT_MS = 5 * 60 * 1000
 const DEFAULT_GMAIL_CLIENT_ID = '184291192111-g8r7ul70jbvn0jhsv64ums89q47udebb.apps.googleusercontent.com'
 const DEFAULT_GMAIL_CLIENT_SECRET = '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'
 const DEFAULT_GMAIL_REDIRECT_URI = 'http://localhost:3000/callback'
+const GMAIL_OAUTH_ALLOWED_HOSTS = new Set([
+    'accounts.google.com',
+    'myaccount.google.com'
+])
 
 function parseEnvValue(value) {
     const text = String(value || '').trim()
@@ -310,6 +314,40 @@ function parseOAuthCallbackUrl(callbackUrl, redirectUri = getGmailRedirectUri())
     }
 
     return { code }
+}
+
+function isAllowedGmailOAuthNavigation(targetUrl, redirectUri = getGmailRedirectUri()) {
+    let url
+    let expected
+    try {
+        url = new URL(String(targetUrl || ''))
+        expected = new URL(redirectUri)
+    } catch (_) {
+        return false
+    }
+
+    if (url.origin === expected.origin && url.pathname === expected.pathname) {
+        return true
+    }
+
+    return url.protocol === 'https:' && GMAIL_OAUTH_ALLOWED_HOSTS.has(url.hostname.toLowerCase())
+}
+
+function attachGmailOAuthNavigationPolicy(authview, redirectUri = getGmailRedirectUri()) {
+    authview.webContents.setWindowOpenHandler(({ url }) => {
+        if (isAllowedGmailOAuthNavigation(url, redirectUri)) {
+            authview.loadURL(url).catch(error => {
+                console.error('Unable to load Gmail sign-in popup URL:', error)
+            })
+        }
+        return { action: 'deny' }
+    })
+
+    authview.webContents.on('will-navigate', (event, url) => {
+        if (!isAllowedGmailOAuthNavigation(url, redirectUri)) {
+            event.preventDefault()
+        }
+    })
 }
 
 function loadSavedMailAuth() {
@@ -1131,6 +1169,8 @@ async function runGmailOAuthFlow() {
             }
         })
 
+        attachGmailOAuthNavigationPolicy(authview, redirectUri)
+
         const requestFilter = { urls: [`${redirectPrefix}*`] }
         const onBeforeRequest = (details, callback) => {
             if (settled) {
@@ -1430,6 +1470,7 @@ module.exports = {
     FOLDER_LABELS,
     parseOAuthCallbackUrl,
     getGmailRedirectUri,
+    isAllowedGmailOAuthNavigation,
     exchangeGmailAuthCode,
     classifyInboxMessages
 }
