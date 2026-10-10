@@ -26,15 +26,25 @@ class SidekickAnswerModeTests(unittest.TestCase):
         self.assertIn("C1", text)
 
     def test_tools_for_stage_hide_retrieval_in_general(self):
+        sidekick.runtime_stage_mode = "tool_use"
         sidekick.runtime_answer_mode = "general"
         names = [tool.get("name") for tool in sidekick._tools_for_stage(2)]
         self.assertNotIn("retrieve_user_context", names)
         self.assertIn("add_task", names)
 
     def test_tools_for_stage_keep_retrieval_when_grounded(self):
+        sidekick.runtime_stage_mode = "tool_use"
         sidekick.runtime_answer_mode = "grounded"
         names = [tool.get("name") for tool in sidekick._tools_for_stage(2)]
         self.assertIn("retrieve_user_context", names)
+
+    def test_tools_for_stage_without_tool_use_only_allows_grounded_retrieval(self):
+        sidekick.runtime_stage_mode = "wait_for_context"
+        sidekick.runtime_answer_mode = "grounded"
+        self.assertEqual(
+            [tool.get("name") for tool in sidekick._tools_for_stage(2)],
+            ["retrieve_user_context"],
+        )
 
     def test_normalize_claude_model(self):
         self.assertEqual(sidekick._normalize_claude_model("claude-opus-4-8"), "claude-opus-4-8")

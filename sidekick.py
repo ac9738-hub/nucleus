@@ -604,6 +604,10 @@ def _is_grounded_mode():
 def _tools_for_stage(stage):
     if stage == 1:
         return STAGE_ONE_TOOLS
+    if runtime_stage_mode != "tool_use":
+        if _is_grounded_mode():
+            return [tool for tool in tools if tool.get("name") == "retrieve_user_context"]
+        return []
     if not _is_grounded_mode():
         return [tool for tool in tools if tool.get("name") != "retrieve_user_context"]
     return tools
@@ -1108,22 +1112,37 @@ def _tool_response_is_stage_handoff(tool_use_id):
     return True
 
 
+def _stage_handoff_result_allows_continue(content):
+    try:
+        parsed = json.loads(str(content or ""))
+    except (TypeError, ValueError):
+        return True
+    if isinstance(parsed, dict) and parsed.get("ok") is False:
+        return False
+    return True
+
+
 def run_service():
     for line in sys.stdin:
         print(line, file=sys.stderr )
         line = json.loads(line)
         if line[0] == "tool_response":
             tool_use_id = line[1]
+            tool_content = clean_surrogates(line[2])
             chat_history.append({
                 "role": "user",
                 "content": [{
                     "type": "tool_result",
                     "tool_use_id": tool_use_id,
-                    "content": clean_surrogates(line[2]),
+                    "content": tool_content,
                 }],
             })
             if _tool_response_is_stage_handoff(tool_use_id):
-                print("[sidekick] stage 1 handoff acknowledged; waiting for stage_continue", file=sys.stderr)
+                if _stage_handoff_result_allows_continue(tool_content):
+                    print("[sidekick] stage 1 handoff acknowledged; waiting for stage_continue", file=sys.stderr)
+                    continue
+                print("[sidekick] stage 1 handoff rejected; answering without tools", file=sys.stderr)
+                runclaude(prompt=chat_history, active_tools=[], stage=1)
                 continue
             if _is_deepseek_model():
                 run_deepseek(prompt=chat_history)
@@ -1133,22 +1152,30 @@ def run_service():
             batch = line[1] if len(line) > 1 and isinstance(line[1], list) else []
             tool_results = []
             pending_handoff = False
+            rejected_handoff = False
             for entry in batch:
                 if not isinstance(entry, list) or len(entry) < 3:
                     continue
                 tool_use_id = entry[1]
+                content = clean_surrogates(entry[2])
                 tool_results.append({
                     "type": "tool_result",
                     "tool_use_id": tool_use_id,
-                    "content": clean_surrogates(entry[2]),
+                    "content": content,
                 })
                 if str(tool_use_id or "") in stage_one_handoff_tool_ids:
                     pending_handoff = True
+                    if not _stage_handoff_result_allows_continue(content):
+                        rejected_handoff = True
             if tool_results:
                 chat_history.append({"role": "user", "content": tool_results})
                 if pending_handoff:
                     for result in tool_results:
                         _tool_response_is_stage_handoff(result.get("tool_use_id"))
+                    if rejected_handoff:
+                        print("[sidekick] stage 1 handoff rejected; answering without tools", file=sys.stderr)
+                        runclaude(prompt=chat_history, active_tools=[], stage=1)
+                        continue
                     print("[sidekick] stage 1 handoff acknowledged; waiting for stage_continue", file=sys.stderr)
                     continue
                 if _is_deepseek_model():
