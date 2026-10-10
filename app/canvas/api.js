@@ -6,6 +6,7 @@
 const fs = require('fs')
 const { spawn, spawnSync } = require('child_process')
 const path = require('path')
+const crypto = require('crypto')
 const { getThemePalette, getThemeColorScheme } = require('../../theme-manager')
 const {
   startOfWeekMs,
@@ -1293,8 +1294,10 @@ function attachParserProcessHandlers(proc, rootDir, onCanvasTasks) {
     console.error('parser:', chunk.toString('utf8'))
   })
   proc.on('close', () => {
-    parserProc = null
-    parserAuthSignature = null
+    if (parserProc === proc) {
+      parserProc = null
+      parserAuthSignature = null
+    }
   })
 }
 
@@ -1352,6 +1355,11 @@ function startLambdaParserProcess(authState, rootDir, onCanvasTasks, options = {
     csrf: authState.canvasAuthCsrf || '',
     baseUrl: authState.canvasBaseUrl || ''
   })
+  const parserInputSignature = String(options.parserInputSignature || '')
+  const parserRunSignature = JSON.stringify({
+    auth: authSignature,
+    input: parserInputSignature
+  })
 
   const freshSync = Boolean(options.freshSync)
   const placement = resolveParserPlacement()
@@ -1362,12 +1370,12 @@ function startLambdaParserProcess(authState, rootDir, onCanvasTasks, options = {
     parserAuthSignature = null
   }
 
-  if (parserProc && !parserProc.killed && parserAuthSignature !== authSignature) {
+  if (parserProc && !parserProc.killed && parserAuthSignature !== parserRunSignature) {
     parserProc.kill()
     parserProc = null
   }
 
-  if (parserProc && !parserProc.killed && parserAuthSignature === authSignature) {
+  if (parserProc && !parserProc.killed && parserAuthSignature === parserRunSignature) {
     return parserProc
   }
 
@@ -1399,9 +1407,16 @@ function startLambdaParserProcess(authState, rootDir, onCanvasTasks, options = {
   })
   attachParserProcessHandlers(parserProc, rootDir, onCanvasTasks)
 
-  parserAuthSignature = authSignature
+  parserAuthSignature = parserRunSignature
   console.log(`[canvas] Lambda parser started (placement=${placement}, pid=${parserProc.pid})`)
   return parserProc
+}
+
+function canvasSnapshotSignature(serializedData) {
+  return crypto
+    .createHash('sha256')
+    .update(String(serializedData || ''), 'utf8')
+    .digest('hex')
 }
 
 function createCanvasApi({ canvasDataPath, getAuthState, sendCanvasDataUpdate, rootDir, onCanvasTasks = () => {}, shouldBlockCanvasDiskReads = () => false }) {
@@ -2434,13 +2449,17 @@ ${html}
         })
       })
     }
-    fs.writeFileSync(canvasDataPath, JSON.stringify(data1, null, 2))
+    const serializedCanvasData = JSON.stringify(data1, null, 2)
+    fs.writeFileSync(canvasDataPath, serializedCanvasData)
     setLiveCanvasDataSnapshot(data1)
     invalidateCanvasDataCache()
     if (lambdaParse) {
       activeFlushParserBatchQueue = () => {}
       clearParserBatchQueue()
-      startLambdaParserProcess(authState, canvasRootDir, onCanvasTasks, options)
+      startLambdaParserProcess(authState, canvasRootDir, onCanvasTasks, {
+        ...options,
+        parserInputSignature: canvasSnapshotSignature(serializedCanvasData)
+      })
       console.log('[canvas] Lambda parse started from canvas_data.json; graph build continues in background.')
     } else {
       flushParserBatchQueue()
