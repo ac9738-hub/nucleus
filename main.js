@@ -59,6 +59,7 @@ const {
   SIDEKICK_DEFAULT_MODEL,
   normalizeSidekickModel
 } = require('./sidekick-models')
+const { userMessageAllowsToolUse } = require('./lib/sidekick-tool-policy')
 const { renderwebsearchresult, searchweb } = require('./engine')
 const { getAuthBounds, getBrowserBounds, setRightPanelWidth, setWorkspaceSidebarCollapsed } = require('./view-layout')
 const {
@@ -4581,6 +4582,7 @@ async function runfunction(data) {
     const mode = String(input.mode || '').trim()
     const reason = String(input.reason || '').trim()
     const answerMode = normalizeAnswerMode(sidekickPendingTurn && sidekickPendingTurn.answerMode)
+    const messageText = sidekickPendingTurn && sidekickPendingTurn.messageText
     if (mode !== 'wait_for_context' && mode !== 'tool_use') {
       tool_response.push(JSON.stringify({
         ok: false,
@@ -4590,6 +4592,11 @@ async function runfunction(data) {
       tool_response.push(JSON.stringify({
         ok: false,
         error: 'Canvas search requires Grounded mode. Switch the answer mode toggle and try again.'
+      }))
+    } else if (mode === 'tool_use' && !userMessageAllowsToolUse(messageText)) {
+      tool_response.push(JSON.stringify({
+        ok: false,
+        error: 'Tool actions require an explicit request from the user message.'
       }))
     } else {
       sidekickPendingStageContinue = await buildStageContinuePayload({ mode, reason })
