@@ -6,6 +6,7 @@
 const fs = require('fs')
 const { spawn, spawnSync } = require('child_process')
 const path = require('path')
+const crypto = require('crypto')
 const { getThemePalette, getThemeColorScheme } = require('../../theme-manager')
 const {
   startOfWeekMs,
@@ -24,10 +25,6 @@ const {
   canvasMemoryCacheEnabled,
   parserDiskRecoveryEnabled
 } = require('../../lib/canvas-cache-policy')
-const {
-  archiveLiveGraph,
-  unwireLiveGraphIfNeeded
-} = require('../../lib/parser-graph-archive')
 
 const LAMBDA_PARSER_PLACEMENTS = new Set([
   'local_download_lambda_parse',
@@ -1249,6 +1246,28 @@ function usesLambdaParserPlacement(placement = resolveParserPlacement()) {
   return LAMBDA_PARSER_PLACEMENTS.has(placement)
 }
 
+function canvasDataContentSignature(rootDir) {
+  const canvasDataPath = path.join(rootDir, 'canvas_data.json')
+  try {
+    const raw = fs.readFileSync(canvasDataPath)
+    return crypto.createHash('sha256').update(raw).digest('hex')
+  } catch (error) {
+    if (error && error.code === 'ENOENT') return 'missing'
+    console.warn('[canvas] Unable to fingerprint canvas_data.json for parser run:', error && error.message ? error.message : error)
+    return 'unavailable'
+  }
+}
+
+function buildParserRunSignature(authState, rootDir, placement) {
+  return JSON.stringify({
+    cookie: authState.canvasAuthCookie || '',
+    csrf: authState.canvasAuthCsrf || '',
+    baseUrl: authState.canvasBaseUrl || '',
+    placement: placement || '',
+    canvasData: canvasDataContentSignature(rootDir)
+  })
+}
+
 function attachParserProcessHandlers(proc, rootDir, onCanvasTasks) {
   let stdoutBuffer = ''
   let handledCompletion = false
@@ -1293,8 +1312,10 @@ function attachParserProcessHandlers(proc, rootDir, onCanvasTasks) {
     console.error('parser:', chunk.toString('utf8'))
   })
   proc.on('close', () => {
-    parserProc = null
-    parserAuthSignature = null
+    if (parserProc === proc) {
+      parserProc = null
+      parserAuthSignature = null
+    }
   })
 }
 
@@ -1347,14 +1368,9 @@ function getParserProcess(authState, rootDir, onCanvasTasks, options = {}) {
 }
 
 function startLambdaParserProcess(authState, rootDir, onCanvasTasks, options = {}) {
-  const authSignature = JSON.stringify({
-    cookie: authState.canvasAuthCookie || '',
-    csrf: authState.canvasAuthCsrf || '',
-    baseUrl: authState.canvasBaseUrl || ''
-  })
-
   const freshSync = Boolean(options.freshSync)
   const placement = resolveParserPlacement()
+  const authSignature = buildParserRunSignature(authState, rootDir, placement)
 
   if (freshSync && parserProc && !parserProc.killed) {
     parserProc.kill()
@@ -1365,13 +1381,13 @@ function startLambdaParserProcess(authState, rootDir, onCanvasTasks, options = {
   if (parserProc && !parserProc.killed && parserAuthSignature !== authSignature) {
     parserProc.kill()
     parserProc = null
+    parserAuthSignature = null
   }
 
   if (parserProc && !parserProc.killed && parserAuthSignature === authSignature) {
     return parserProc
   }
 
-  archiveLiveGraph(rootDir)
   parserAllPassesCompleted = false
   onCanvasTasks([], { restartVector: false })
   const timeoutSec = Number(process.env.PARSER_TIMEOUT_SEC || 7200)
@@ -1379,7 +1395,8 @@ function startLambdaParserProcess(authState, rootDir, onCanvasTasks, options = {
     '-m', 'canvas_parser.parse.app_parse',
     '--from-canvas-data',
     '--placement', placement,
-    '--timeout', String(timeoutSec)
+    '--timeout', String(timeoutSec),
+    '--skip-archive'
   ], {
     cwd: rootDir,
     env: {
@@ -1407,9 +1424,6 @@ function startLambdaParserProcess(authState, rootDir, onCanvasTasks, options = {
 function createCanvasApi({ canvasDataPath, getAuthState, sendCanvasDataUpdate, rootDir, onCanvasTasks = () => {}, shouldBlockCanvasDiskReads = () => false }) {
   setCanvasDiskReadBlock(shouldBlockCanvasDiskReads)
   const canvasRootDir = rootDir || path.resolve(__dirname, '..', '..')
-  if (usesLambdaParserPlacement()) {
-    unwireLiveGraphIfNeeded(canvasRootDir)
-  }
   const envPath = path.join(canvasRootDir, '.env')
   let parsedCanvasCache = { mtimeMs: null, data: null }
   let liveCanvasDataSnapshot = null
