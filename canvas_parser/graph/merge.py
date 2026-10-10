@@ -192,7 +192,7 @@ def dedupe_echo_concept_details(course_concepts):
             if detail_name == concept_name:
                 removed += 1
                 continue
-            if concept_desc and (detail_name in concept_desc or detail_desc == concept_desc):
+            if concept_desc and (detail_name == concept_desc or detail_desc == concept_desc):
                 removed += 1
                 continue
             seen_names.add(detail_name)
