@@ -55,6 +55,7 @@ DISCUSSION_GROUP_PATTERN = re.compile(r'\bdiscussion\b', re.IGNORECASE)
 WEEKLY_TEST_PATTERN = re.compile(r'\bweekly\s+test\b|周考', re.IGNORECASE)
 MINI_QUIZ_PATTERN = re.compile(r'小考')
 READING_PERIOD_PATTERN = re.compile(r'\breading\s+period\b', re.IGNORECASE)
+ASSIGNMENT_NUMBER_PATTERN = re.compile(r'\bassignment\s*(\d+)\b', re.IGNORECASE)
 
 
 def _strip_html(value: str) -> str:
@@ -68,6 +69,14 @@ def _parse_any_date(value: str, default_year: int | None = None) -> datetime | N
         return None
     if ISO_DATE.match(text):
         return datetime.strptime(text, '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=timezone.utc)
+    if re.match(r'^\d{4}-\d{2}-\d{2}T', text):
+        try:
+            parsed = datetime.fromisoformat(text.replace('Z', '+00:00'))
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            return parsed
+        except ValueError:
+            pass
     for fmt in (
         '%Y-%m-%dT%H:%M:%SZ',
         '%Y-%m-%d',
@@ -252,6 +261,19 @@ def _extract_page_file_names(snapshot: dict[str, Any]) -> list[str]:
     return names
 
 
+READING_BOOK_PATTERNS: list[tuple[re.Pattern[str], str]] = [
+    (re.compile(r'\bintimacies of four continents\b', re.IGNORECASE), 'The Intimacies of Four Continents'),
+    (re.compile(r'\bmushroom at the end of the world\b', re.IGNORECASE), 'The Mushroom at the End of the World'),
+    (re.compile(r'\bcollateral damage\b', re.IGNORECASE), 'Collateral Damage'),
+    (re.compile(r'\bflavors of empire\b', re.IGNORECASE), 'Flavors of Empire'),
+    (re.compile(r'\bnothing ever dies\b', re.IGNORECASE), 'Nothing Ever Dies'),
+    (re.compile(r'\balien capital\b', re.IGNORECASE), 'Alien Capital'),
+    (re.compile(r'\bstranger intimacy\b', re.IGNORECASE), 'Stranger Intimacy'),
+    (re.compile(r'\bturbulent circulation\b', re.IGNORECASE), 'Turbulent Circulation'),
+    (re.compile(r'\btrespassers\??\b', re.IGNORECASE), 'Trespassers?'),
+]
+
+
 def _reading_title_to_discussion_name(title: str) -> str:
     text = unicodedata.normalize('NFKC', str(title or '').strip())
     text = re.sub(r'\.pdf$', '', text, flags=re.IGNORECASE).strip()
@@ -259,35 +281,21 @@ def _reading_title_to_discussion_name(title: str) -> str:
     if READING_SKIP_PATTERN.search(text):
         return ''
 
+    for pattern, label in READING_BOOK_PATTERNS:
+        if pattern.search(text):
+            return label
+
     if re.search(r',\s*', text):
         _, after = re.split(r',\s*', text, maxsplit=1)
         candidate = re.sub(r'\s*(?:\(excerpt\)|ch\.?\s*\d+.*|chapter\s+\d+.*)$', '', after, flags=re.IGNORECASE)
         candidate = candidate.strip(' "')
-        if re.search(r'\bintimacies of four continents\b', candidate, re.IGNORECASE):
-            return 'The Intimacies of Four Continents'
-        if re.search(r'\bmushroom at the end of the world\b', candidate, re.IGNORECASE):
-            return 'The Mushroom at the End of the World'
         if candidate and not candidate.lower().startswith('the '):
             return candidate
         return candidate
 
     if ' - ' in text:
-        if re.search(r'\bnothing ever dies\b', text, re.IGNORECASE):
-            return 'Nothing Ever Dies'
         left, right = text.split(' - ', 1)
         candidate = left.strip()
-        if re.search(r'\bcollateral damage\b', candidate, re.IGNORECASE):
-            return 'Collateral Damage'
-        if re.search(r'\bflavors of empire\b', candidate, re.IGNORECASE):
-            return 'Flavors of Empire'
-        if re.search(r'\balien capital\b', candidate, re.IGNORECASE):
-            return 'Alien Capital'
-        if re.search(r'\bstranger intimacy\b', candidate, re.IGNORECASE):
-            return 'Stranger Intimacy'
-        if re.search(r'\bturbulent circulation\b', candidate, re.IGNORECASE):
-            return 'Turbulent Circulation'
-        if re.search(r'\btrespassers\b', candidate, re.IGNORECASE):
-            return 'Trespassers?'
         return candidate or right.strip()
 
     return text
@@ -311,11 +319,13 @@ def _extract_reading_discussions(snapshot: dict[str, Any], default_year: int | N
 
         module_id = str(module.get('id') or '')
         items = (snapshot.get('module_items') or {}).get(module_id) or []
-        for item in sorted(items, key=lambda row: row.get('position') or 0):
+        reading_items = [
+            item for item in sorted(items, key=lambda row: row.get('position') or 0)
+            if _normalize_module_item_type(item) in {'file', 'externalurl'}
+        ]
+        reading_items.sort(key=lambda item: (_normalize_module_item_type(item) != 'file', item.get('position') or 0))
+        for item in reading_items:
             if _should_skip_module_item(item):
-                continue
-            item_type = _normalize_module_item_type(item)
-            if item_type not in {'file', 'externalurl'}:
                 continue
             title = _module_item_name(item, file_lookup)
             if READING_SKIP_PATTERN.search(title):
@@ -326,7 +336,7 @@ def _extract_reading_discussions(snapshot: dict[str, Any], default_year: int | N
             seen.add(discussion_name)
             discussions.append({
                 'name': discussion_name,
-                'due_at': format_ground_truth_date(due_date.isoformat(), default_year=default_year),
+                'due_at': f'{due_date.month}/{due_date.day}/{due_date.year}',
             })
             break
 
@@ -386,6 +396,39 @@ def _module_item_name(item: dict[str, Any], file_lookup: dict[str, dict[str, Any
             or 'Untitled file'
         ).strip()
     return str(item.get('title') or item.get('name') or 'Untitled').strip()
+
+
+def _assignment_number(name: str) -> str:
+    match = ASSIGNMENT_NUMBER_PATTERN.search(str(name or ''))
+    return match.group(1) if match else ''
+
+
+def _pdf_stem(name: str) -> str:
+    return re.sub(r'\.pdf$', '', str(name or '').strip(), flags=re.IGNORECASE).strip()
+
+
+def _assignment_sheet_aliases(snapshot: dict[str, Any], file_lookup: dict[str, dict[str, Any]]) -> dict[str, list[str]]:
+    aliases: dict[str, list[str]] = {}
+    seen: set[tuple[str, str]] = set()
+    for items in (snapshot.get('module_items') or {}).values():
+        for item in items or []:
+            if _should_skip_module_item(item):
+                continue
+            if _normalize_module_item_type(item) != 'file':
+                continue
+            name = _module_item_name(item, file_lookup)
+            number = _assignment_number(name)
+            if not number:
+                continue
+            alias = _pdf_stem(name)
+            if not alias or alias.lower() == str(name or '').strip().lower():
+                continue
+            key = (number, alias)
+            if key in seen:
+                continue
+            seen.add(key)
+            aliases.setdefault(number, []).append(alias)
+    return aliases
 
 
 def _format_modules(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
@@ -499,6 +542,7 @@ def _resolve_item_date(
 def _build_weekly_schedule(snapshot: dict[str, Any], categorized: dict[str, Any]) -> list[dict[str, Any]]:
     default_year = _infer_default_year(snapshot)
     file_lookup = _build_file_lookup(snapshot.get('files') or [])
+    assignment_aliases = _assignment_sheet_aliases(snapshot, file_lookup)
     assignment_lookup = {
         str(item.get('id') or ''): item for item in (snapshot.get('assignments') or [])
     }
@@ -550,7 +594,10 @@ def _build_weekly_schedule(snapshot: dict[str, Any], categorized: dict[str, Any]
         due = assignment.get('due_at') or ''
         parsed = _parse_any_date(due, default_year=default_year)
         if parsed:
-            add_assignment(bucket_for(parsed), name)
+            bucket = bucket_for(parsed)
+            add_assignment(bucket, name)
+            for alias in assignment_aliases.get(_assignment_number(name), []):
+                add_assignment(bucket, alias)
 
     for raw_assignment in snapshot.get('assignments') or []:
         name = str(raw_assignment.get('name') or '').strip()
