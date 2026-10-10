@@ -27,6 +27,19 @@ from canvas_parser.parse.parse_trial import (
     is_production_parse,
 )
 
+_PARSER_STATE_LOCK: asyncio.Lock | None = None
+_PARSER_STATE_LOCK_LOOP: asyncio.AbstractEventLoop | None = None
+
+
+def parser_state_lock() -> asyncio.Lock:
+    """Return an event-loop-local lock for parser.py's module-level state."""
+    global _PARSER_STATE_LOCK, _PARSER_STATE_LOCK_LOOP
+    loop = asyncio.get_running_loop()
+    if _PARSER_STATE_LOCK is None or _PARSER_STATE_LOCK_LOOP is not loop:
+        _PARSER_STATE_LOCK = asyncio.Lock()
+        _PARSER_STATE_LOCK_LOOP = loop
+    return _PARSER_STATE_LOCK
+
 
 def item_key(batch_type: str, item: dict[str, Any]) -> str:
     courseid = str(item.get('courseid') or '')
@@ -51,6 +64,8 @@ def reset_parser_state() -> None:
     parser_mod.fileNodes.clear()
     parser_mod.conceptNodes.clear()
     parser_mod.learningBlocks.clear()
+    parser_mod.eventNodes.clear()
+    parser_mod.allsyllabi.clear()
     parser_mod.graphEdges = parser_mod.GraphEdgeStore()
     parser_mod.moduleOrderHints.clear()
     parser_mod.courseModules.clear()
@@ -68,6 +83,12 @@ def reset_parser_state() -> None:
     parser_mod.assignmentResourceNodes.clear()
     parser_mod.external_crawl_state.clear()
     parser_mod.externalResources.clear()
+    parser_mod.current_assignment_files_groups = []
+    parser_mod.current_files_groups = []
+    parser_mod._deepseek_pass_context = {'final_pass': False, 'courseid': '', 'fileid': '', 'academicFileType': ''}
+    parser_mod._debug_pass1_tool_names.clear()
+    parser_mod.assignment_description_summary_cache.clear()
+    parser_mod.assignment_summary_queue = None
     parser_mod.parse_file_stats.clear()
     parser_mod.parser_thread_log_lines = []
     parser_mod.completed_model_calls = {
@@ -193,86 +214,85 @@ async def process_single_item(
     from canvas_parser.parse.parse_item_log import log_worker_item_done, log_worker_item_start
     from canvas_parser.parse.parse_pass_overrides import pass_plan_enabled
 
-    reset_parser_state()
-    configure_runtime(
-        placement=placement,
-        phase=phase,
-        canvasfiles_dir=canvasfiles_dir,
-        production=production,
-    )
-    # After configure_runtime (which clears env); concurrent workers use pass plan by default.
-    os.environ.setdefault('PARSER_PASS_PLAN', '1')
-    hydrate_parser_seed(seed_state)
-    import parser as parser_mod
-
-    course_id = str(item.get('courseid') or '')
-    item_id = str(item.get('id') or '')
-    filename = str(item.get('name') or '')
-    use_production = production if production is not None else is_production_parse()
-    log_worker_item_start(
-        batch_type=batch_type,
-        course_id=course_id,
-        item_id=item_id,
-        filename=filename,
-        placement=placement,
-        production=use_production,
-        pass_plan=pass_plan_enabled(),
-        has_seed=bool(seed_state),
-    )
-
-    started = time.perf_counter()
-    stdout_buf = io.StringIO()
-    with redirect_stdout(stdout_buf):
-        await parser_mod.process_parse_item(item, batch_type)
-    parser_lines = stdout_buf.getvalue().splitlines()
-    thread_lines = list(getattr(parser_mod, 'parser_thread_log_lines', []) or [])
-    parser_skip_lines = collect_parser_skip_lines(parser_lines + thread_lines)
-    fragment = export_parser_state()
-    elapsed_ms = round((time.perf_counter() - started) * 1000, 1)
-    skip_info = infer_fragment_skip(fragment, item, batch_type, parser_skip_lines)
-    calls = fragment.get('completed_model_calls') or {}
-    deepseek_passes = len(calls.get('deepseek_file_passes') or [])
-    course_id = str(item.get('courseid') or '')
-    item_id = str(item.get('id') or '')
-    fragment['_meta'] = {
-        'batch_type': batch_type,
-        'item_id': item.get('id'),
-        'courseid': item.get('courseid'),
-        'elapsed_ms': elapsed_ms,
-        'parser_skip_lines': parser_skip_lines,
-        'deepseek_passes': deepseek_passes,
-        'pass_plan': item.get('passPlan'),
-        'pass_plan_enabled': pass_plan_enabled(),
-    }
-    if skip_info:
-        fragment['_meta']['skip_reason'] = skip_info.get('reason')
-        log_worker_skip(
-            run_id=os.getenv('PARSER_WORKER_RUN_ID', ''),
+    async with parser_state_lock():
+        reset_parser_state()
+        configure_runtime(
             placement=placement,
+            phase=phase,
+            canvasfiles_dir=canvasfiles_dir,
+            production=production,
+        )
+        # After configure_runtime (which clears env); concurrent workers use pass plan by default.
+        os.environ.setdefault('PARSER_PASS_PLAN', '1')
+        hydrate_parser_seed(seed_state)
+        import parser as parser_mod
+
+        course_id = str(item.get('courseid') or '')
+        item_id = str(item.get('id') or '')
+        filename = str(item.get('name') or '')
+        use_production = production if production is not None else is_production_parse()
+        log_worker_item_start(
+            batch_type=batch_type,
             course_id=course_id,
             item_id=item_id,
-            batch_type=batch_type,
-            item_name=str(item.get('name') or ''),
-            reason=str(skip_info.get('reason') or ''),
-            parser_skip_lines=parser_skip_lines,
-            deepseek_passes=deepseek_passes,
-            elapsed_ms=elapsed_ms,
-            url=str(item.get('url') or ''),
-            extra={
-                'has_file_node': skip_info.get('has_file_node'),
-                'marked_parsed': skip_info.get('marked_parsed'),
-            },
+            filename=filename,
+            placement=placement,
+            production=use_production,
+            pass_plan=pass_plan_enabled(),
+            has_seed=bool(seed_state),
         )
-    log_worker_item_done(
-        batch_type=batch_type,
-        course_id=course_id,
-        item_id=item_id,
-        filename=filename,
-        elapsed_ms=elapsed_ms,
-        deepseek_passes=deepseek_passes,
-        skip_reason=str((fragment.get('_meta') or {}).get('skip_reason') or ''),
-        pass_plan=item.get('passPlan') if isinstance(item.get('passPlan'), dict) else None,
-    )
+
+        started = time.perf_counter()
+        stdout_buf = io.StringIO()
+        with redirect_stdout(stdout_buf):
+            await parser_mod.process_parse_item(item, batch_type)
+        parser_lines = stdout_buf.getvalue().splitlines()
+        thread_lines = list(getattr(parser_mod, 'parser_thread_log_lines', []) or [])
+        parser_skip_lines = collect_parser_skip_lines(parser_lines + thread_lines)
+        fragment = export_parser_state()
+        elapsed_ms = round((time.perf_counter() - started) * 1000, 1)
+        skip_info = infer_fragment_skip(fragment, item, batch_type, parser_skip_lines)
+        calls = fragment.get('completed_model_calls') or {}
+        deepseek_passes = len(calls.get('deepseek_file_passes') or [])
+        fragment['_meta'] = {
+            'batch_type': batch_type,
+            'item_id': item.get('id'),
+            'courseid': item.get('courseid'),
+            'elapsed_ms': elapsed_ms,
+            'parser_skip_lines': parser_skip_lines,
+            'deepseek_passes': deepseek_passes,
+            'pass_plan': item.get('passPlan'),
+            'pass_plan_enabled': pass_plan_enabled(),
+        }
+        if skip_info:
+            fragment['_meta']['skip_reason'] = skip_info.get('reason')
+            log_worker_skip(
+                run_id=os.getenv('PARSER_WORKER_RUN_ID', ''),
+                placement=placement,
+                course_id=course_id,
+                item_id=item_id,
+                batch_type=batch_type,
+                item_name=str(item.get('name') or ''),
+                reason=str(skip_info.get('reason') or ''),
+                parser_skip_lines=parser_skip_lines,
+                deepseek_passes=deepseek_passes,
+                elapsed_ms=elapsed_ms,
+                url=str(item.get('url') or ''),
+                extra={
+                    'has_file_node': skip_info.get('has_file_node'),
+                    'marked_parsed': skip_info.get('marked_parsed'),
+                },
+            )
+        log_worker_item_done(
+            batch_type=batch_type,
+            course_id=course_id,
+            item_id=item_id,
+            filename=filename,
+            elapsed_ms=elapsed_ms,
+            deepseek_passes=deepseek_passes,
+            skip_reason=str((fragment.get('_meta') or {}).get('skip_reason') or ''),
+            pass_plan=item.get('passPlan') if isinstance(item.get('passPlan'), dict) else None,
+        )
     for line in parser_lines:
         print(line, flush=True)
     return fragment
@@ -319,6 +339,36 @@ def _merge_syllabus_course(existing: Any, incoming: Any) -> Any:
     return existing
 
 
+def _merge_unique_list(target: list, rows: list) -> None:
+    seen = {json.dumps(row, sort_keys=True, default=str) for row in target}
+    for row in rows or []:
+        marker = json.dumps(row, sort_keys=True, default=str)
+        if marker in seen:
+            continue
+        target.append(row)
+        seen.add(marker)
+
+
+def _merge_course_value(existing: Any, incoming: Any) -> Any:
+    if existing is None:
+        return incoming
+    if incoming is None:
+        return existing
+    if isinstance(existing, list) and isinstance(incoming, list):
+        merged = list(existing)
+        _merge_unique_list(merged, incoming)
+        return merged
+    if isinstance(existing, dict) and isinstance(incoming, dict):
+        merged = dict(existing)
+        for key, value in incoming.items():
+            if key in merged:
+                merged[key] = _merge_course_value(merged[key], value)
+            else:
+                merged[key] = value
+        return merged
+    return incoming
+
+
 def merge_graph_fragments(fragments: list[dict[str, Any]]) -> dict[str, Any]:
     merged: dict[str, Any] = {
         'concepts': [],
@@ -329,6 +379,7 @@ def merge_graph_fragments(fragments: list[dict[str, Any]]) -> dict[str, Any]:
         'edges': [],
         'learningBlocks': {},
         'moduleOrderHints': {},
+        'courseModules': {},
         'external_platforms': {},
         'logged_details': {},
         'logged_examples': {},
@@ -364,7 +415,7 @@ def merge_graph_fragments(fragments: list[dict[str, Any]]) -> dict[str, Any]:
         _extend_list(merged['problems'], fragment.get('problems') or [])
         _extend_list(merged['events'], fragment.get('events') or [])
         _extend_list(merged['edges'], fragment.get('edges') or [])
-        for key in ('syllabi', 'files', 'learningBlocks', 'moduleOrderHints', 'external_platforms'):
+        for key in ('syllabi', 'files', 'learningBlocks', 'moduleOrderHints', 'courseModules', 'external_platforms'):
             bucket = merged[key]
             for cid, value in (fragment.get(key) or {}).items():
                 if key == 'files':
@@ -374,7 +425,7 @@ def merge_graph_fragments(fragments: list[dict[str, Any]]) -> dict[str, Any]:
                 elif key == 'syllabi':
                     bucket[cid] = _merge_syllabus_course(bucket.get(cid), value)
                 else:
-                    bucket[cid] = value
+                    bucket[cid] = _merge_course_value(bucket.get(cid), value)
         for key in (
             'logged_details', 'logged_examples', 'logged_problems', 'logged_assignments',
             'logged_events', 'looking_for_files', 'looking_for_in_canvas', 'url_to_node',
