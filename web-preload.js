@@ -2,8 +2,14 @@
 // Intercepts nucleus:// links so they stay inside the app instead of being handed to Windows.
 // Dependencies: main.js listens for the 'engine:internal-navigate' channel.
 const { contextBridge, ipcRenderer } = require('electron')
+const { isTrustedEngineSurfaceUrl } = require('./lib/engine-navigation-policy')
+
+function isTrustedEnginePage() {
+  return isTrustedEngineSurfaceUrl(window.location.href, __dirname)
+}
 
 function sendEngineOpenApp(app) {
+  if (!isTrustedEnginePage()) return
   ipcRenderer.send('engine:open-app', app)
 }
 
@@ -21,6 +27,10 @@ try {
 
 function navigateInternal(url) {
   if (!url) return
+  if (!isTrustedEnginePage()) {
+    window.location.href = url
+    return
+  }
   try {
     ipcRenderer.send('engine:internal-navigate', url)
   } catch (_error) {
@@ -50,6 +60,15 @@ function parseEngineAppName(value) {
 }
 
 document.addEventListener('click', event => {
+  if (!isTrustedEnginePage()) {
+    const blockedLink = event.target.closest && event.target.closest('a[href^="nucleus://"]')
+    if (blockedLink) {
+      event.preventDefault()
+      event.stopPropagation()
+    }
+    return
+  }
+
   const link = event.target.closest && event.target.closest('a[href^="nucleus://app/"]')
   if (link) {
     event.preventDefault()
@@ -83,6 +102,8 @@ function normalizeEngineSearchUrl(value) {
 }
 
 document.addEventListener('submit', event => {
+  if (!isTrustedEnginePage()) return
+
   const form = event.target
   if (!form || form.id !== 'engine-search-form') return
   event.preventDefault()
@@ -95,5 +116,7 @@ document.addEventListener('submit', event => {
 
 
 try {
-  ipcRenderer.send('engine:preload-ready')
+  if (isTrustedEnginePage()) {
+    ipcRenderer.send('engine:preload-ready')
+  }
 } catch (_error) {}

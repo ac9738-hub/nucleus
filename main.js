@@ -71,6 +71,7 @@ const {
   normalizeFrameUrl,
   sameTabId
 } = require('./tab-utils')
+const { isTrustedEngineSurfaceUrl } = require('./lib/engine-navigation-policy')
 const { createCanvasApi, clearCanvasAuthFromEnv, killParserProcess, beginCanvasSyncWipe, endCanvasSyncWipe, setParserBatchGate } = require('./app/canvas/api')
 const {
   canvasDiskRecoveryEnabled,
@@ -938,9 +939,8 @@ function getActiveThemeVarsCss() {
 // True for our own engine surfaces (home + file-backed search result pages).
 function isInternalEngineUrl(value) {
   if (!value) return false
-  return value.includes('engine.html')
-    || value.includes('engine-search-cache')
-    || value.startsWith('nucleus:')
+  return isTrustedEngineSurfaceUrl(value, __dirname)
+    || String(value).startsWith('nucleus:')
 }
 
 // Injects CSS as an AUTHOR-origin <style> appended to <head>, not via
@@ -980,7 +980,7 @@ async function applyEngineTheme(webContents) {
 async function installEngineAppShortcutLaunchers(webContents) {
   if (!webContents || webContents.isDestroyed()) return
   const url = String(webContents.getURL() || '')
-  if (!url.includes('engine.html')) return
+  if (!isTrustedEngineSurfaceUrl(url, __dirname)) return
 
   try {
     await webContents.executeJavaScript(`
@@ -1012,16 +1012,17 @@ function registerEngineIpcHandlers() {
   ipcMain.on('engine:internal-navigate', (event, url) => {
     const tab = resolveTabForSender(event.sender)
     if (!tab) return
-    handleEngineInternalNavigation(tab, url)
+    handleTrustedEngineInternalNavigation(tab, url, event.sender)
   })
 
   ipcMain.on('engine:open-app', (event, appName) => {
     const tab = resolveTabForSender(event.sender)
-    if (!tab || !appName) return
+    if (!tab || !appName || !isTrustedEngineSurfaceUrl(event.sender.getURL(), __dirname)) return
     openEngineAppInTab(tab, String(appName).trim())
   })
 
   ipcMain.on('engine:preload-ready', (event) => {
+    if (!isTrustedEngineSurfaceUrl(event.sender.getURL(), __dirname)) return
     installEngineAppShortcutLaunchers(event.sender).catch(() => {})
   })
 }
@@ -2217,6 +2218,20 @@ function resolveTabForWebContents(webContents) {
 
 function resolveTabForSender(webContents) {
   return resolveTabForWebContents(webContents) || getActiveWebLikeMainTab()
+}
+
+function isNucleusProtocolUrl(value) {
+  if (!value) return false
+  try {
+    return new URL(value).protocol === 'nucleus:'
+  } catch (_error) {
+    return false
+  }
+}
+
+function handleTrustedEngineInternalNavigation(tab, url, webContents) {
+  if (!webContents || webContents.isDestroyed() || !isTrustedEngineSurfaceUrl(webContents.getURL(), __dirname)) return false
+  return handleEngineInternalNavigation(tab, url)
 }
 
 function handleEngineInternalNavigation(tab, url) {
@@ -6778,7 +6793,10 @@ async function handleCanvasPreloadLinkNavigation(window, tab, view, url) {
 }
 
 function handleCanvasWindowOpen(window, tab, view, url) {
-  if (handleEngineInternalNavigation(tab, url)) {
+  if (handleTrustedEngineInternalNavigation(tab, url, view.webContents)) {
+    return { action: 'deny' }
+  }
+  if (isNucleusProtocolUrl(url)) {
     return { action: 'deny' }
   }
   if (isLikelyDownloadUrl(url)) {
@@ -7068,7 +7086,7 @@ function renderTab(view, window, tab = null) {
   }
   view.setVisible(true)
   try {
-    if (String(view.webContents.getURL() || '').includes('engine.html')) {
+    if (isTrustedEngineSurfaceUrl(view.webContents.getURL(), __dirname)) {
       installEngineAppShortcutLaunchers(view.webContents).catch(() => {})
     }
   } catch (_error) {}
@@ -8828,7 +8846,7 @@ app.whenReady().then(() => {
           view.webContents.on('will-navigate', event => {
             const ownerTab = resolveTabForView(view, tab)
             if (!ownerTab) return
-            if (handleEngineInternalNavigation(ownerTab, event.url)) {
+            if (handleTrustedEngineInternalNavigation(ownerTab, event.url, view.webContents) || isNucleusProtocolUrl(event.url)) {
               event.preventDefault()
             }
           })
