@@ -32,6 +32,6 @@ test('renderSynapseLearnPage shows course picker when learn session is empty', (
   harness.loadSynapseStack()
   const tab = { ...sampleSynapseTab(), synapseMode: 'learn', learnSession: { coursesLoadState: 'done', courses: [{ id: '101', name: 'Intro to Architecture' }] } }
   const html = harness.window.nucleusSynapseApp.renderSynapseLearnPage(tab, { conversations: [] })
-  assert.match(html, /synapse-shell/)
+  assert.match(html, /synapse-textbook-shell/)
   assert.match(html, /Intro to Architecture/)
 })
