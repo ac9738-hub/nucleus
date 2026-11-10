@@ -2,7 +2,11 @@
 
 const test = require('node:test')
 const assert = require('node:assert/strict')
+const fs = require('fs')
+const os = require('os')
+const path = require('path')
 const {
+  createCanvasApi,
   isIgnorableCanvasFetchError,
   filterCoursesForSync,
   coursesWithWikiHomepage,
@@ -57,4 +61,40 @@ test('extractSyllabiFromCourses uses syllabus_body from course list', () => {
   assert.equal(Object.keys(buckets).length, 1)
   assert.equal(buckets[10].name, 'Bio')
   assert.match(buckets[10].syllabus_text, /Welcome/)
+})
+
+test('collectParserFilesForCourse includes files that only appear in module items', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nucleus-canvas-files-'))
+  try {
+    const api = createCanvasApi({
+      canvasDataPath: path.join(root, 'canvas_data.json'),
+      getAuthState: () => ({ canvasBaseUrl: 'https://canvas.example' }),
+      sendCanvasDataUpdate: () => {},
+      rootDir: root
+    })
+    const parserFiles = api.collectParserFilesForCourse(
+      '42',
+      'https://canvas.example',
+      [],
+      {
+        moduleA: [
+          {
+            id: 'module-item-1',
+            type: 'File',
+            content_id: '99',
+            title: 'Lecture 01 Slides.pdf'
+          }
+        ]
+      },
+      [],
+      []
+    )
+
+    assert.equal(parserFiles.length, 1)
+    assert.equal(parserFiles[0].id, '99')
+    assert.equal(parserFiles[0].name, 'Lecture 01 Slides.pdf')
+    assert.equal(parserFiles[0].url, 'https://canvas.example/courses/42/files/99/download')
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true })
+  }
 })

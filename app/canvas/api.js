@@ -1682,25 +1682,30 @@ function createCanvasApi({ canvasDataPath, getAuthState, sendCanvasDataUpdate, r
         .map(file => file && file.id != null ? String(file.id) : '')
         .filter(Boolean)
     )
-    Object.values(moduleItemsByCourse || {}).forEach(itemsByModule => {
-      Object.values(itemsByModule || {}).forEach(items => {
-        if (!Array.isArray(items)) return
-        items.forEach(item => {
-          if (String(item && item.type || '').toLowerCase() !== 'file') return
-          const fileId = String(item.content_id || item.id || '')
-          if (!fileId || seen.has(fileId)) return
-          const title = String(item.title || item.name || '').trim()
-          if (!title) return
-          merged.push({
-            id: fileId,
-            display_name: title,
-            filename: title,
-            'content-type': item['content-type'] || item.content_type || ''
-          })
-          seen.add(fileId)
+    const visitItems = items => {
+      if (!Array.isArray(items)) return
+      items.forEach(item => {
+        if (String(item && item.type || '').toLowerCase() !== 'file') return
+        const fileId = String(item.content_id || item.id || '')
+        if (!fileId || seen.has(fileId)) return
+        const title = String(item.title || item.name || '').trim()
+        if (!title) return
+        merged.push({
+          id: fileId,
+          display_name: title,
+          filename: title,
+          'content-type': item['content-type'] || item.content_type || ''
         })
+        seen.add(fileId)
       })
-    })
+    }
+    const visitModuleMap = moduleMap => {
+      Object.values(moduleMap || {}).forEach(value => {
+        if (Array.isArray(value)) visitItems(value)
+        else if (value && typeof value === 'object') visitModuleMap(value)
+      })
+    }
+    visitModuleMap(moduleItemsByCourse)
     return merged
   }
 
@@ -2512,6 +2517,7 @@ ${html}
     invalidateCanvasDataCache,
     clearLiveCanvasSession,
     fetchCanvasImageDataUrl,
+    collectParserFilesForCourse,
     flushParserBatchQueue: () => {
       if (activeFlushParserBatchQueue) activeFlushParserBatchQueue()
     },
