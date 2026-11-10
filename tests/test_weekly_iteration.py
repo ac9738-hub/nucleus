@@ -6,7 +6,12 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from canvas_parser.weekly_iteration.evaluate import compare_to_ground_truth, names_match
-from canvas_parser.weekly_iteration.format import format_course_snapshot
+from canvas_parser.weekly_iteration.format import (
+    _parse_any_date,
+    _parse_filename_date,
+    _reading_title_to_discussion_name,
+    format_course_snapshot,
+)
 
 
 def _assignment(name, due_at='', submission_types=None, published=True):
@@ -22,6 +27,30 @@ def _assignment(name, due_at='', submission_types=None, published=True):
 def test_names_match_is_fuzzy():
     assert names_match('Problem Set 1', 'problem set 1')
     assert names_match('Exam 1 (Midterm)', 'Midterm Exam') is False
+    assert names_match('Assignment 1 Photography', 'Assignment 1: Architectural Photography')
+
+
+def test_parse_iso_datetime_with_offset():
+    parsed = _parse_any_date('2025-09-08T00:00:00+00:00')
+    assert parsed is not None
+    assert parsed.year == 2025
+    assert parsed.month == 9
+    assert parsed.day == 8
+
+
+def test_parse_filename_date_after_underscore():
+    parsed = _parse_filename_date('Dr Francis Slides_Sept 3, 2024.pdf', 2024)
+    assert parsed is not None
+    assert parsed.month == 9
+    assert parsed.day == 3
+
+
+def test_reading_discussion_title_from_dash_separated_filename():
+    assert (
+        _reading_title_to_discussion_name('Nguyen - Nothing Ever Dies, "On Remembering One\'s Own".pdf')
+        == 'Nothing Ever Dies'
+    )
+    assert _reading_title_to_discussion_name('Chua et al. - Turbulent Circulation') == 'Turbulent Circulation'
 
 
 def test_format_course_snapshot_basic():
