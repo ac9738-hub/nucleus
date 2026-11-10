@@ -74,7 +74,8 @@ const {
 const { createCanvasApi, clearCanvasAuthFromEnv, killParserProcess, beginCanvasSyncWipe, endCanvasSyncWipe, setParserBatchGate } = require('./app/canvas/api')
 const {
   canvasDiskRecoveryEnabled,
-  canvasMemoryCacheEnabled
+  canvasMemoryCacheEnabled,
+  vectorDiskRecoveryEnabled
 } = require('./lib/canvas-cache-policy')
 const { createSynapseClient } = require('./app/synapse/client')
 const {
@@ -1287,6 +1288,10 @@ function getAgent() {
   return agent
 }
 
+// The vector subprocess is isolated from main's live Canvas snapshot; only let it
+// read canvas_graph.json after this session's parser completion produced it.
+let vectorGraphReadyForSession = false
+
 const vectorRetrieval = (() => {
   let proc = null
   let stdoutBuffer = ''
@@ -1339,7 +1344,7 @@ const vectorRetrieval = (() => {
     const newProc = spawn('python', [path.join(__dirname, 'vector_retreival.py')], {
       env: {
         ...process.env,
-        NUCLEUS_DISABLE_CANVAS_DISK_RECOVERY: canvasDiskRecoveryEnabled() ? '0' : '1'
+        NUCLEUS_DISABLE_CANVAS_DISK_RECOVERY: vectorDiskRecoveryEnabled(vectorGraphReadyForSession) ? '0' : '1'
       }
     })
     proc = newProc
@@ -2063,6 +2068,7 @@ function addCanvasTasks(tasks, options = {}) {
     )
   })
   if (shouldRestartVector) {
+    vectorGraphReadyForSession = true
     vectorRetrieval.restartSoon()
   }
 }
@@ -2476,6 +2482,7 @@ function markCanvasSyncWiped() {
   writeCanvasSyncState({ wiped: true, wipedAt: new Date().toISOString() })
   canvasDiskReadsBlocked = true
   canvasInitialSetupDone = false
+  vectorGraphReadyForSession = false
 }
 
 function clearCanvasSyncWipeMark() {
