@@ -49,25 +49,29 @@ function createAgentProcess({ scriptPath, onText, onToolCall, onDone = () => {},
 
         if (!toolItems.length) return
 
-        Promise.all(toolItems.map(item => Promise.resolve(onToolCall(item))))
-          .then(responses => {
-            const valid = responses.filter(response => Array.isArray(response))
-            if (!valid.length) return
-            if (valid.length === 1) {
-              proc.stdin.write(JSON.stringify(valid[0]) + '\n')
+        Promise.allSettled(toolItems.map(item => Promise.resolve().then(() => onToolCall(item))))
+          .then(results => {
+            const responses = results.map((result, index) => {
+              const item = toolItems[index]
+              if (result.status === 'fulfilled' && Array.isArray(result.value)) {
+                return result.value
+              }
+              if (result.status === 'fulfilled') {
+                const value = result.value == null ? '' : String(result.value)
+                return ['tool_response', item.id, value]
+              }
+              const error = result.reason
+              const message = error && error.message ? error.message : String(error)
+              return ['tool_response', item.id, message]
+            })
+            if (responses.length === 1) {
+              proc.stdin.write(JSON.stringify(responses[0]) + '\n')
             } else {
-              proc.stdin.write(JSON.stringify(['tool_response_batch', valid]) + '\n')
+              proc.stdin.write(JSON.stringify(['tool_response_batch', responses]) + '\n')
             }
             if (typeof onAfterToolBatch === 'function') {
-              onAfterToolBatch(toolItems, valid)
+              onAfterToolBatch(toolItems, responses)
             }
-          })
-          .catch(error => {
-            proc.stdin.write(JSON.stringify([
-              'tool_response',
-              toolItems[0].id,
-              error && error.message ? error.message : String(error)
-            ]) + '\n')
           })
       }
     })
