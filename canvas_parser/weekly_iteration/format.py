@@ -40,7 +40,7 @@ MONTH_DAY_NAME = re.compile(
     re.IGNORECASE,
 )
 WEEK_MODULE_PATTERN = re.compile(r'\bweek\s*(\d+)\b', re.IGNORECASE)
-PREFIX_MODULE_PATTERN = re.compile(r'^(\d+)\s+')
+PREFIX_MODULE_PATTERN = re.compile(r'^(\d+)(?:\s+|-)')
 FILENAME_DATE_PATTERNS = [
     re.compile(
         r'\b(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|'
@@ -66,6 +66,14 @@ def _parse_any_date(value: str, default_year: int | None = None) -> datetime | N
     text = str(value or '').strip()
     if not text:
         return None
+    try:
+        iso_text = text[:-1] + '+00:00' if text.endswith('Z') else text
+        parsed = datetime.fromisoformat(iso_text)
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed
+    except ValueError:
+        pass
     if ISO_DATE.match(text):
         return datetime.strptime(text, '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=timezone.utc)
     for fmt in (
@@ -259,10 +267,18 @@ def _reading_title_to_discussion_name(title: str) -> str:
     if READING_SKIP_PATTERN.search(text):
         return ''
 
+    if ' - ' in text:
+        _, right = text.split(' - ', 1)
+        candidate = re.split(r',\s*', right, maxsplit=1)[0]
+        candidate = re.sub(r'\s*(?:\(excerpt\)|ch\.?\s*\d+.*|chapter\s+\d+.*)$', '', candidate, flags=re.IGNORECASE)
+        candidate = candidate.strip(' "\'')
+        if candidate:
+            return candidate
+
     if re.search(r',\s*', text):
         _, after = re.split(r',\s*', text, maxsplit=1)
         candidate = re.sub(r'\s*(?:\(excerpt\)|ch\.?\s*\d+.*|chapter\s+\d+.*)$', '', after, flags=re.IGNORECASE)
-        candidate = candidate.strip(' "')
+        candidate = candidate.strip(' ",')
         if re.search(r'\bintimacies of four continents\b', candidate, re.IGNORECASE):
             return 'The Intimacies of Four Continents'
         if re.search(r'\bmushroom at the end of the world\b', candidate, re.IGNORECASE):
@@ -270,25 +286,6 @@ def _reading_title_to_discussion_name(title: str) -> str:
         if candidate and not candidate.lower().startswith('the '):
             return candidate
         return candidate
-
-    if ' - ' in text:
-        if re.search(r'\bnothing ever dies\b', text, re.IGNORECASE):
-            return 'Nothing Ever Dies'
-        left, right = text.split(' - ', 1)
-        candidate = left.strip()
-        if re.search(r'\bcollateral damage\b', candidate, re.IGNORECASE):
-            return 'Collateral Damage'
-        if re.search(r'\bflavors of empire\b', candidate, re.IGNORECASE):
-            return 'Flavors of Empire'
-        if re.search(r'\balien capital\b', candidate, re.IGNORECASE):
-            return 'Alien Capital'
-        if re.search(r'\bstranger intimacy\b', candidate, re.IGNORECASE):
-            return 'Stranger Intimacy'
-        if re.search(r'\bturbulent circulation\b', candidate, re.IGNORECASE):
-            return 'Turbulent Circulation'
-        if re.search(r'\btrespassers\b', candidate, re.IGNORECASE):
-            return 'Trespassers?'
-        return candidate or right.strip()
 
     return text
 
@@ -311,7 +308,13 @@ def _extract_reading_discussions(snapshot: dict[str, Any], default_year: int | N
 
         module_id = str(module.get('id') or '')
         items = (snapshot.get('module_items') or {}).get(module_id) or []
-        for item in sorted(items, key=lambda row: row.get('position') or 0):
+        sorted_items = [
+            item for item in sorted(items, key=lambda row: row.get('position') or 0)
+            if not _should_skip_module_item(item)
+        ]
+        file_items = [item for item in sorted_items if _normalize_module_item_type(item) == 'file']
+        fallback_items = [item for item in sorted_items if _normalize_module_item_type(item) == 'externalurl']
+        for item in file_items or fallback_items:
             if _should_skip_module_item(item):
                 continue
             item_type = _normalize_module_item_type(item)
@@ -409,8 +412,8 @@ def _format_modules(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 FILENAME_MONTH_DAY = re.compile(
-    r'\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|'
-    r'Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)[a-z]*[\s,.\'-]*(\d{1,2})(?:[\s,.\'-]*(\d{4}))?',
+    r'(?<![A-Za-z])(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|'
+    r'Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)[a-z]*[\s,._\'-]*(\d{1,2})(?:[\s,._\'-]*(\d{4}))?',
     re.IGNORECASE,
 )
 MONTH_LOOKUP = {
