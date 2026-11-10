@@ -78,6 +78,10 @@ const {
 } = require('./lib/canvas-cache-policy')
 const { createSynapseClient } = require('./app/synapse/client')
 const {
+  listTeachingCourses,
+  getTeachingCurriculum
+} = require('./app/synapse/teaching-curriculum')
+const {
   getThemeSelection,
   getRendererStylesheets,
   getCanvasThemeConfig,
@@ -8029,6 +8033,16 @@ app.whenReady().then(() => {
     } finally {
       resourceGovernor.clearSynapseBusy()
     }
+  });
+
+  ipcMain.handle('synapse:list_courses', async (_event, payload = {}) => {
+    return listTeachingCourses(payload && typeof payload === 'object' ? payload : {})
+  });
+
+  ipcMain.handle('synapse:get_curriculum', async (_event, payload = {}) => {
+    const courseId = payload && typeof payload === 'object' ? payload.courseId : payload
+    const options = payload && typeof payload === 'object' ? payload.options || {} : {}
+    return getTeachingCurriculum(courseId, options)
   });
 
   // tabs:new_active — Switches the active rendered tab view.
