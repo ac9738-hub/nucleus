@@ -19,6 +19,7 @@ const {
     setCachedMessageDetail,
     getCachedThread,
     setCachedThread,
+    evictCachedMessage,
     shouldRefreshMessage
 } = require('./cache')
 const {
@@ -955,6 +956,7 @@ async function untrashMailMessage(id) {
 
 async function deleteMailMessage(id) {
     await gmailRequest(`/messages/${id}`, { method: 'DELETE' })
+    evictCachedMessage(id)
     return { ok: true, id }
 }
 

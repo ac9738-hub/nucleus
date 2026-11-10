@@ -37,6 +37,16 @@ function writeJsonFile(filePath, value) {
     fs.writeFileSync(filePath, JSON.stringify(value, null, 2), 'utf8')
 }
 
+function removeJsonFile(filePath) {
+    try {
+        fs.unlinkSync(filePath)
+    } catch (error) {
+        if (!error || error.code !== 'ENOENT') {
+            throw error
+        }
+    }
+}
+
 function loadClassificationMap() {
     if (classificationMemoryCache) return classificationMemoryCache
     const fromCache = readJsonFile(MAIL_CLASSIFICATIONS_PATH, null)
@@ -143,6 +153,56 @@ function setCachedThread(threadId, thread) {
     } catch (_) {}
 }
 
+function threadContainsMessage(thread, messageId) {
+    if (!thread || !messageId) return false
+    const messages = Array.isArray(thread.messages) ? thread.messages : []
+    return messages.some(message => message && String(message.id || '') === String(messageId))
+}
+
+function evictCachedMessage(messageId) {
+    if (!messageId) return
+    const id = String(messageId)
+    const threadIds = new Set()
+
+    const memoryEntry = messageMemoryCache.get(id)
+    const diskEntry = readJsonFile(messageCachePath(id), null)
+    const cachedMessage = (memoryEntry && memoryEntry.message) || (diskEntry && diskEntry.message) || null
+    if (cachedMessage && cachedMessage.threadId) {
+        threadIds.add(String(cachedMessage.threadId))
+    }
+
+    messageMemoryCache.delete(id)
+    try {
+        removeJsonFile(messageCachePath(id))
+    } catch (_) {}
+
+    for (const [threadId, entry] of threadMemoryCache.entries()) {
+        if (threadContainsMessage(entry && entry.thread, id)) {
+            threadIds.add(String(threadId))
+        }
+    }
+
+    try {
+        const files = fs.existsSync(MAIL_THREADS_DIR) ? fs.readdirSync(MAIL_THREADS_DIR) : []
+        files.forEach(fileName => {
+            if (!fileName.endsWith('.json')) return
+            const threadId = fileName.slice(0, -5)
+            if (threadIds.has(threadId)) return
+            const entry = readJsonFile(path.join(MAIL_THREADS_DIR, fileName), null)
+            if (entry && threadContainsMessage(entry.thread, id)) {
+                threadIds.add(threadId)
+            }
+        })
+    } catch (_) {}
+
+    threadIds.forEach(threadId => {
+        threadMemoryCache.delete(threadId)
+        try {
+            removeJsonFile(threadCachePath(threadId))
+        } catch (_) {}
+    })
+}
+
 function shouldRefreshMessage(id, staleAfterMs = 5 * 60 * 1000) {
     const memory = messageMemoryCache.get(id)
     if (memory && isFreshTimestamp(memory.cachedAt, staleAfterMs)) return false
@@ -162,6 +222,7 @@ module.exports = {
     setCachedMessageDetail,
     getCachedThread,
     setCachedThread,
+    evictCachedMessage,
     shouldRefreshMessage,
     flushClassificationMap
 }
